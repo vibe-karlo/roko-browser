@@ -22,6 +22,12 @@ enum AppleModels {
         SystemLanguageModel.default.isAvailable
     }
 
+    /// The on-device model with the guardrails Apple provides for transforming
+    /// text the user already has, such as summarizing an article: a news story
+    /// about a crime is the page's content, not a request for harm, and the
+    /// default guardrails turn many of those down.
+    static let summarizing = SystemLanguageModel(guardrails: .permissiveContentTransformations)
+
     /// Roughly how many characters fit in a model's context, leaving room for
     /// instructions and the answer. About three characters per token.
     static func characterBudget(of model: PrivateCloudComputeLanguageModel, reservingTokens: Int = 2_500) async -> Int {
@@ -78,18 +84,83 @@ nonisolated struct GeneratedSection {
     var points: [String]
 }
 
+/// The short shape, for a quick question: the answer itself, and a few
+/// supporting points if they help. No sections to fill.
+@Generable
+nonisolated struct BriefAnswer {
+    @Guide(description: "A specific title for the answer, a few words")
+    var title: String
+    @Guide(description: "The direct answer in one to three plain sentences")
+    var answer: String
+    @Guide(description: "Up to three short supporting points, one sentence each; start with a key term in **bold** when there is one", .count(0...3))
+    var points: [String]
+}
+
+/// A partly written answer, shown as the app's Markdown while it streams.
+nonisolated protocol AnswerDraft {
+    /// `droppingUnfinished` leaves out the last point, which may have been cut off.
+    func markdown(titled: Bool, droppingUnfinished: Bool) -> String
+    /// Whether enough is written to be worth showing if generation stops here.
+    var isUseful: Bool { get }
+}
+
+extension GeneratedAnswer.PartiallyGenerated: AnswerDraft {
+    var isUseful: Bool { sections?.isEmpty == false }
+
+    func markdown(titled: Bool, droppingUnfinished: Bool) -> String {
+        var sections = self.sections ?? []
+        if droppingUnfinished, var last = sections.popLast() {
+            last.points = Array((last.points ?? []).dropLast())
+            if last.points?.isEmpty == false { sections.append(last) }
+        }
+        var lines: [String] = []
+        if titled, let title, !title.isEmpty { lines.append("# \(title)") }
+        if let gist, !gist.isEmpty { lines.append("> \(gist)") }
+        for section in sections {
+            guard let heading = section.heading, !heading.isEmpty else { continue }
+            lines.append("## [\(section.topic ?? "")] \(heading)")
+            for point in section.points ?? [] where !point.isEmpty { lines.append("- \(point)") }
+        }
+        return lines.joined(separator: "\n")
+    }
+}
+
+extension BriefAnswer.PartiallyGenerated: AnswerDraft {
+    /// Once a point has begun, the answer before it is whole.
+    var isUseful: Bool { points?.isEmpty == false }
+
+    func markdown(titled: Bool, droppingUnfinished: Bool) -> String {
+        var lines: [String] = []
+        if titled, let title, !title.isEmpty { lines.append("# \(title)") }
+        if let answer, !answer.isEmpty { lines.append("> \(answer)") }
+        let points = droppingUnfinished ? Array((self.points ?? []).dropLast()) : self.points ?? []
+        for point in points where !point.isEmpty { lines.append("- \(point)") }
+        return lines.joined(separator: "\n")
+    }
+}
+
 extension AppleModels {
     /// Streams a structured answer, as Markdown the app's renderer lays out.
     /// `titled` false leaves the title out (a page summary has the page's own).
-    static func streamAnswer(_ model: some LanguageModel, instructions: String, prompt: String,
-                             titled: Bool = true) -> AsyncThrowingStream<String, Error> {
+    static func streamAnswer<Answer: Generable>(_ model: some LanguageModel, shape: Answer.Type = GeneratedAnswer.self,
+                                                instructions: String, prompt: String,
+                                                titled: Bool = true) -> AsyncThrowingStream<String, Error>
+    where Answer.PartiallyGenerated: AnswerDraft {
         AsyncThrowingStream { continuation in
             let task = Task {
+                var latest: Answer.PartiallyGenerated?
                 do {
                     let session = LanguageModelSession(model: model, instructions: instructions)
-                    for try await snapshot in session.streamResponse(to: prompt, generating: GeneratedAnswer.self) {
-                        continuation.yield(markdown(snapshot.content, titled: titled))
+                    for try await snapshot in session.streamResponse(to: prompt, generating: Answer.self) {
+                        latest = snapshot.content
+                        continuation.yield(snapshot.content.markdown(titled: titled, droppingUnfinished: false))
                     }
+                    continuation.finish()
+                } catch LanguageModelError.contextSizeExceeded where latest?.isUseful == true {
+                    // The model ran on until its context was full, usually by
+                    // repeating itself. Keep everything it finished and drop
+                    // only the point it was cut off in: no answer ends mid-word.
+                    continuation.yield(latest!.markdown(titled: titled, droppingUnfinished: true))
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
@@ -97,17 +168,5 @@ extension AppleModels {
             }
             continuation.onTermination = { _ in task.cancel() }
         }
-    }
-
-    private static func markdown(_ answer: GeneratedAnswer.PartiallyGenerated, titled: Bool) -> String {
-        var lines: [String] = []
-        if titled, let title = answer.title, !title.isEmpty { lines.append("# \(title)") }
-        if let gist = answer.gist, !gist.isEmpty { lines.append("> \(gist)") }
-        for section in answer.sections ?? [] {
-            guard let heading = section.heading, !heading.isEmpty else { continue }
-            lines.append("## [\(section.topic ?? "")] \(heading)")
-            for point in section.points ?? [] where !point.isEmpty { lines.append("- \(point)") }
-        }
-        return lines.joined(separator: "\n")
     }
 }

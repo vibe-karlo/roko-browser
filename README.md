@@ -93,11 +93,19 @@ app rather than reporting an error.
 
 | Feature | First choice | Then | Last resort |
 | --- | --- | --- | --- |
-| Summarize | Apple's cloud model (needs the entitlement) | On-device model | Claude (API key) |
+| Summarize | Apple's cloud model (needs the entitlement) | On-device model | Claude Haiku (API key) |
+| Summarize, Croatian page | Claude Haiku (API key) | Apple's cloud model | On-device model |
 | Browse for Me | Our search and page reading, then Apple's cloud model | Claude with its own web search | Our search and reading, then the on-device model |
 
-Browse for Me searches DuckDuckGo's HTML results, reads the top five pages in parallel
-(plain HTTP, no web views), and hands their text to the model with the question.
+Apple's on-device model writes poor Croatian (Serbian words, broken endings) and no prompt
+fixes it, so with a key Croatian pages go to Claude first. Claude summaries use Haiku 5.5,
+retried on Sonnet 5.5 if Haiku declines.
+
+Browse for Me judges each question from its words (`ResearchDepth`): a quick fact reads three
+pages (Claude: Haiku, two searches); an ordinary question six (Sonnet, medium effort); a
+comparison, a "best", a decision or a plan eight (Sonnet, high effort, up to ten searches) and
+gets a longer answer. Our own search uses DuckDuckGo's HTML results and reads the pages in
+parallel (plain HTTP, no web views).
 
 ## Not done yet
 

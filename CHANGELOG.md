@@ -13,8 +13,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Translate any page into English or Croatian, in place.
 - Address suggestions show the real icon of 150 popular sites, bundled, with no network request.
 - Haptics when a toast confirms an action, a tab is thrown away, or the bar swipes to the next tab.
+- Browse for Me matches the question: a quick fact gets a short answer from three sources; a comparison, a "best" or a plan reads more sites and writes more.
 
 ### Changed
+- Croatian pages are summarized by Claude Haiku when there's an API key; Apple's on-device model writes poor Croatian. English stays on the iPhone.
+- Claude summaries use Haiku 5.5, and Browse for Me uses Haiku for quick questions and Sonnet 5.5 for the rest, instead of Opus.
+- The address bar no longer lists open pages before you type; they show up when they match, marked "Already open".
+- Browse for Me's suggestion has a sparkle and says what it does: "Reads the web and answers".
 - Phosphor icons throughout.
 - The page menu is a panel flush with the bottom edge.
 - Private mode is an eye that blinks shut, instead of glasses.
@@ -38,6 +43,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - The status bar stays readable over the address bar in light mode.
 - The bar comes back after closing a summary, an answer or Reader Mode.
 - Search suggestions no longer repeat exactly what you typed.
+- On-device summaries no longer end mid-word when the model runs out of room; the unfinished point is left out.
+- News about crimes or attacks is no longer refused by Apple's on-device safety filter as often.
 
 ## [0.1.0] - 2026-10-23
 

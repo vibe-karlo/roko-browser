@@ -321,16 +321,9 @@ enum CommandRanker {
         let needle = query.lowercased()
         let pins = browser.pins()
 
-        guard !query.isEmpty else {
-            // Nothing typed: what you were just doing. Pins sit in their own
-            // row right above the field.
-            let recentTabs = browser.tabs
-                .filter { $0.id != browser.selectedID }
-                .sorted { $0.lastActive > $1.lastActive }
-                .prefix(4)
-                .map(tabItem)
-            return Array(recentTabs)
-        }
+        // Nothing typed: just your pins, in their own row above the field.
+        // Open pages show up only once they match what you type.
+        guard !query.isEmpty else { return [] }
 
         var ranked: [(score: Int, item: CommandItem)] = []
 
@@ -350,8 +343,9 @@ enum CommandRanker {
                                             kind: "Search", icon: .glyph(.search), action: .search(query))))
             // A question, not a word: one word is usually an address being typed.
             if query.contains(" ") {
-                ranked.append((850, CommandItem(id: "browse-\(query)", title: "Browse for me", subtitle: query,
-                                                kind: "Answer", icon: .glyph(.browse), action: .browse(query))))
+                // Says what it does; the question itself is already in the field.
+                ranked.append((850, CommandItem(id: "browse-\(query)", title: "Browse for me", subtitle: "Reads the web and answers",
+                                                kind: "AI", icon: .glyph(.browse), action: .browse(query))))
             }
         }
 
@@ -452,7 +446,7 @@ enum CommandRanker {
     private static func tabItem(_ tab: BrowserTab) -> CommandItem {
         let host = tab.url?.displayHost ?? ""
         return CommandItem(id: "tab-\(tab.id)", title: tab.displayTitle, subtitle: host,
-                           kind: "Tab", icon: .site(host), action: .switchTab(tab))
+                           kind: "Already open", icon: .site(host), action: .switchTab(tab))
     }
 }
 

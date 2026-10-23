@@ -14,6 +14,8 @@ enum ClaudeEvent {
 
 struct ClaudeError: LocalizedError {
     let message: String
+    /// Claude's safety classifier declined; another model may answer.
+    var isRefusal = false
     var errorDescription: String? { message }
 }
 
@@ -23,7 +25,23 @@ struct ClaudeError: LocalizedError {
 /// Today the key lives in this phone's Keychain. For an App Store build, point
 /// `endpoint` at your own proxy and drop the key: nothing else changes.
 struct ClaudeClient {
-    static let model = "claude-opus-5-5"
+    enum Model: String {
+        /// Browse for Me questions worth some research: searches and weighs
+        /// several sources. $2 / $10 per million tokens in and out.
+        case sonnet = "claude-sonnet-5-5"
+        /// Summaries and quick questions: fast, and a twentieth of Sonnet's
+        /// price ($0.10 / $0.50).
+        case haiku = "claude-haiku-5-5"
+
+        /// Sonnet has a server-side fallback when its safety classifier
+        /// declines; Haiku has none and would reject the field.
+        var hasServerFallback: Bool { self == .sonnet }
+
+        /// Sonnet filters search results before reading them (the newer tool);
+        /// Haiku has the basic one, which is fine for a quick question.
+        var webSearchTool: String { self == .sonnet ? "web_search_20260209" : "web_search_20250305" }
+    }
+
     var endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
     let apiKey: String
 
@@ -31,22 +49,24 @@ struct ClaudeClient {
         Keychain.claudeAPIKey.map { ClaudeClient(apiKey: $0) }
     }
 
-    /// Streams one answer. With `webSearch`, Claude searches and reads the web
-    /// itself on Anthropic's servers; the app only renders what comes back.
-    func stream(system: String, prompt: String, effort: String, webSearch: Bool) -> AsyncThrowingStream<ClaudeEvent, Error> {
+    /// Streams one answer. With `searches` above zero, Claude searches and reads
+    /// the web itself on Anthropic's servers, up to that many times; the app
+    /// only renders what comes back.
+    func stream(system: String, prompt: String, model: Model = .sonnet, effort: String, maxTokens: Int = 32_000,
+                searches: Int = 0) -> AsyncThrowingStream<ClaudeEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
                     var messages: [[String: Any]] = [["role": "user", "content": prompt]]
                     // A long search turn can pause; sending the partial turn back resumes it.
                     for _ in 0..<5 {
-                        let turn = try await send(system: system, messages: messages, effort: effort,
-                                                  webSearch: webSearch, continuation: continuation)
+                        let turn = try await send(system: system, messages: messages, model: model, effort: effort,
+                                                  maxTokens: maxTokens, searches: searches, continuation: continuation)
                         switch turn.stopReason {
                         case "pause_turn":
                             messages.append(["role": "assistant", "content": turn.content])
                         case "refusal":
-                            throw ClaudeError(message: "Claude declined to answer this one.")
+                            throw ClaudeError(message: "Claude declined to answer this one.", isRefusal: true)
                         default:
                             continuation.finish()
                             return
@@ -66,20 +86,22 @@ struct ClaudeClient {
         var stopReason: String?
     }
 
-    private func send(system: String, messages: [[String: Any]], effort: String, webSearch: Bool,
-                      continuation: AsyncThrowingStream<ClaudeEvent, Error>.Continuation) async throws -> Turn {
+    private func send(system: String, messages: [[String: Any]], model: Model, effort: String, maxTokens: Int,
+                      searches: Int, continuation: AsyncThrowingStream<ClaudeEvent, Error>.Continuation) async throws -> Turn {
         var body: [String: Any] = [
-            "model": Self.model,
-            "max_tokens": 32000,
+            "model": model.rawValue,
+            "max_tokens": maxTokens,
             "stream": true,
             "system": system,
             "messages": messages,
             "output_config": ["effort": effort],
-            // If a safety classifier declines, the API retries on a fallback model itself.
-            "fallbacks": "default",
         ]
-        if webSearch {
-            body["tools"] = [["type": "web_search_20260209", "name": "web_search", "max_uses": 6]]
+        if model.hasServerFallback {
+            // If a safety classifier declines, the API retries on a fallback model itself.
+            body["fallbacks"] = "default"
+        }
+        if searches > 0 {
+            body["tools"] = [["type": model.webSearchTool, "name": "web_search", "max_uses": searches]]
         }
 
         var request = URLRequest(url: endpoint)
@@ -88,7 +110,9 @@ struct ClaudeClient {
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2026-10-21", forHTTPHeaderField: "anthropic-version")
-        request.setValue("server-side-fallback-2026-07-01", forHTTPHeaderField: "anthropic-beta")
+        if model.hasServerFallback {
+            request.setValue("server-side-fallback-2026-07-01", forHTTPHeaderField: "anthropic-beta")
+        }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (bytes, response) = try await URLSession.shared.bytes(for: request)

@@ -1,31 +1,41 @@
 import FoundationModels
+import NaturalLanguage
 import UIKit
 import WebKit
 
 /// The shape every AI answer takes, so the app can lay it out as a page:
 /// a lead line, then a few sections each tagged with a topic the app draws as an icon.
-private let answerShape = """
-Format, in Markdown (angle brackets mark what you write):
+private func answerShape(sections: String = "three to five") -> String {
+    """
+    Format, in Markdown (angle brackets mark what you write):
 
-> <the gist, one or two sentences>
-## [<topic>] <heading for this answer>
-<one or two short sentences>
-## [<topic>] <heading for this answer>
-- **<key term>:** <detail>
-- **<key term>:** <detail>
+    > <the gist, one or two sentences>
+    ## [<topic>] <heading for this answer>
+    <one or two short sentences>
+    ## [<topic>] <heading for this answer>
+    - **<key term>:** <detail>
+    - **<key term>:** <detail>
 
-Rules: one "> " line with the gist. Then three to five "## " sections with headings written for \
-this answer. The word in brackets only chooses the section's icon: pick the closest from \
-[\(AnswerTopic.vocabulary)], and use each at most once. Under each heading, one or two short \
-sentences or two to four "- " lines. No emoji. No preamble, no sign-off.
+    Rules: one "> " line with the gist. Then \(sections) "## " sections with headings written for \
+    this answer. The word in brackets only chooses the section's icon: pick the closest from \
+    [\(AnswerTopic.vocabulary)], and use each at most once. Under each heading, one or two short \
+    sentences or two to four "- " lines. No emoji. No preamble, no sign-off.
+    """
+}
+
+/// Claude writes Croatian well when told which standard to keep to.
+private let croatianStandard = """
+In Croatian, write standard Croatian (ijekavica): Croatian words, never Serbian or Bosnian ones.
 """
 
 private let summaryGuidance = """
 You summarize web pages for a phone browser. Write in the page's own language. \
-Only facts from the page. No preamble, no sign-off.
+Only facts from the page, and each fact once: never repeat a point. No preamble, no sign-off.
 """
 
-private let summaryInstructions = summaryGuidance + "\n" + answerShape
+/// For Claude. (Apple's on-device model refused every request whose
+/// instructions were written in Croatian, so it keeps the plain guidance above.)
+private let summaryInstructions = summaryGuidance + " " + croatianStandard + "\n\n" + answerShape()
 
 @Observable
 final class SummaryModel: Identifiable {
@@ -52,59 +62,84 @@ final class SummaryModel: Identifiable {
     }
 
     func run(webView: WKWebView) async {
+        let page: ReadablePage
         do {
-            let page = try await PageReader.read(webView)
-            phase = .writing
-
-            // Best available first: Apple's cloud model, then on-device, then Claude.
-            if let cloud = AppleModels.cloudIfAvailable {
-                do {
-                    engine = "Apple Intelligence"
-                    let budget = await AppleModels.characterBudget(of: cloud)
-                    if page.text.count > budget { note = "Long page: this covers the first part." }
-                    let prompt = "Title: \(page.title)\nSite: \(page.site)\n\n\(page.text.prefix(budget))"
-                    for try await snapshot in AppleModels.streamAnswer(cloud, instructions: summaryGuidance, prompt: prompt, titled: false) {
-                        text = snapshot
-                    }
-                    phase = .done
-                    return
-                } catch is CancellationError {
-                    return
-                } catch {
-                    // Quota reached, offline, or service busy: try the next engine.
-                    text = ""
-                    note = nil
-                }
-            }
-
-            if OnDeviceSummarizer.isAvailable {
-                engine = "On-device"
-                do {
-                    let (stream, truncated) = OnDeviceSummarizer.summarize(page)
-                    if truncated { note = "Long page: this covers the first part." }
-                    for try await snapshot in stream { text = snapshot }
-                    phase = .done
-                    return
-                } catch where ClaudeClient.configured != nil {
-                    text = ""
-                    note = nil
-                    // Fall through to Claude when the small on-device model can't cope.
-                }
-            }
-
-            guard let client = ClaudeClient.configured else {
-                throw ClaudeError(message: "Summaries need Apple Intelligence on this iPhone, or a Claude API key in Settings.")
-            }
-            engine = "Claude"
-            let prompt = "Title: \(page.title)\nSite: \(page.site)\n\n\(page.text)"
-            for try await event in client.stream(system: summaryInstructions, prompt: prompt, effort: "low", webSearch: false) {
-                if case .text(let chunk) = event { text += chunk }
-            }
-            phase = .done
-        } catch is CancellationError {
-            return
+            page = try await PageReader.read(webView)
         } catch {
             phase = .failed(error.localizedDescription)
+            return
+        }
+        phase = .writing
+
+        // Apple's models write good English and poor Croatian (Serbian words,
+        // broken endings), and no prompt fixes that. So a Croatian page goes
+        // to Claude first; everything else stays on Apple's models, free and
+        // private, with Claude as the fallback.
+        let claudeFirst = AnswerLanguage.of(page.text, host: host) == .croatian
+        var engines: [Engine] = [.appleCloud, .onDevice]
+        if ClaudeClient.configured != nil { claudeFirst ? engines.insert(.claude, at: 0) : engines.append(.claude) }
+
+        var lastError: Error = ClaudeError(
+            message: "Summaries need Apple Intelligence on this iPhone, or a Claude API key in Settings.")
+        for engine in engines {
+            do {
+                guard try await write(page, with: engine) else { continue }
+                phase = .done
+                return
+            } catch is CancellationError {
+                return
+            } catch {
+                // Quota reached, offline, refused, or out of its depth: try the next engine.
+                lastError = error
+                text = ""
+                note = nil
+            }
+        }
+        phase = .failed(lastError.localizedDescription)
+    }
+
+    private enum Engine { case appleCloud, onDevice, claude }
+
+    /// Writes the summary with one engine; false when that engine isn't available here.
+    private func write(_ page: ReadablePage, with engine: Engine) async throws -> Bool {
+        switch engine {
+        case .appleCloud:
+            guard let cloud = AppleModels.cloudIfAvailable else { return false }
+            self.engine = "Apple Intelligence"
+            let budget = await AppleModels.characterBudget(of: cloud)
+            if page.text.count > budget { note = "Long page: this covers the first part." }
+            let prompt = "Title: \(page.title)\nSite: \(page.site)\n\n\(page.text.prefix(budget))"
+            for try await snapshot in AppleModels.streamAnswer(cloud, instructions: summaryGuidance, prompt: prompt, titled: false) {
+                text = snapshot
+            }
+
+        case .onDevice:
+            guard OnDeviceSummarizer.isAvailable else { return false }
+            self.engine = "On-device"
+            let (stream, truncated) = OnDeviceSummarizer.summarize(page)
+            if truncated { note = "Long page: this covers the first part." }
+            for try await snapshot in stream { text = snapshot }
+
+        case .claude:
+            guard let client = ClaudeClient.configured else { return false }
+            self.engine = "Claude"
+            let prompt = "Title: \(page.title)\nSite: \(page.site)\n\n\(page.text)"
+            // Haiku: a summary needs no more. Sonnet only if Haiku declines,
+            // since Sonnet has a fallback of its own for refusals.
+            do {
+                try await stream(client, prompt: prompt, model: .haiku)
+            } catch let error as ClaudeError where error.isRefusal {
+                text = ""
+                try await stream(client, prompt: prompt, model: .sonnet)
+            }
+        }
+        return true
+    }
+
+    private func stream(_ client: ClaudeClient, prompt: String, model: ClaudeClient.Model) async throws {
+        for try await event in client.stream(system: summaryInstructions, prompt: prompt, model: model,
+                                             effort: "low", maxTokens: 4_096) {
+            if case .text(let chunk) = event { text += chunk }
         }
     }
 }
@@ -131,6 +166,7 @@ enum OnDeviceSummarizer {
                         var notes: [String] = []
                         for chunk in chunks.prefix(maxChunks) {
                             let session = LanguageModelSession(
+                                model: AppleModels.summarizing,
                                 instructions: "List the key facts in this part of a web page as three to five short lines starting with \"- \". Nothing else.")
                             notes.append(try await session.respond(to: chunk).content)
                         }
@@ -138,7 +174,7 @@ enum OnDeviceSummarizer {
                     }
 
                     let prompt = "Title: \(page.title)\nSite: \(page.site)\n\n\(material)"
-                    for try await markdown in AppleModels.streamAnswer(SystemLanguageModel.default, instructions: summaryGuidance,
+                    for try await markdown in AppleModels.streamAnswer(AppleModels.summarizing, instructions: summaryGuidance,
                                                                        prompt: prompt, titled: false) {
                         continuation.yield(markdown)
                     }
@@ -182,6 +218,8 @@ final class BrowseForMeModel: Identifiable {
     }
 
     let query: String
+    /// Quick fact, ordinary question, or one worth real research.
+    let depth: ResearchDepth
     private(set) var text = ""
     private(set) var sources: [Source] = []
     private(set) var steps: [Step] = []
@@ -192,24 +230,49 @@ final class BrowseForMeModel: Identifiable {
 
     init(query: String) {
         self.query = query
+        depth = ResearchDepth.of(query)
     }
 
-    private static let format = """
-    Write a compact answer page. First line: "# " and a specific title. Lead with what the \
-    person most likely wants to know. Don't list the sources (the app shows them).
-    """ + answerShape
+    private static func claudeInstructions(_ depth: ResearchDepth) -> String {
+        let task = switch depth {
+        case .quick: """
+            Answer briefly. One or two searches and two or three good sources are enough. First \
+            line: "# " and a specific title. Then one "> " line with the direct answer in one to \
+            three sentences. Then at most three "- " lines of supporting detail, only if they \
+            help. No "## " sections. No emoji. No preamble, no sign-off.
+            """
+        case .standard: """
+            Search as needed and read four to six trustworthy sources. Write a compact answer \
+            page. First line: "# " and a specific title. Lead with what the person most likely \
+            wants to know.
+            """ + answerShape()
+        case .deep: """
+            Research this properly: search from several angles and read at least eight \
+            trustworthy sources. Give specifics: names, numbers, prices, dates and trade-offs. \
+            Where sources disagree, say so. First line: "# " and a specific title. Lead with \
+            what the person most likely wants to know.
+            """ + answerShape(sections: "five to seven")
+        }
+        return """
+        You are the "Browse for Me" feature of a phone browser. Search the web, then answer in \
+        the language of the question. \(croatianStandard) Don't list the sources (the app shows them).
 
-    private static let claudeInstructions = """
-    You are the "Browse for Me" feature of a phone browser. Search the web, read several \
-    trustworthy sources, then answer. 
-    """ + format
+        """ + task
+    }
 
-    private static let appleInstructions = """
-    You are the "Browse for Me" feature of a phone browser. The app has searched the web and \
-    read the pages below for you. Answer the question using only these sources. Where they \
-    disagree, say so; if they don't answer part of the question, say what is missing. Write in \
-    the language of the question. Lead with what the person most likely wants to know.
-    """
+    private static func appleInstructions(_ depth: ResearchDepth) -> String {
+        let length = switch depth {
+        case .quick: "Answer in one to three sentences."
+        case .standard: "Lead with what the person most likely wants to know."
+        case .deep: "Lead with what the person most likely wants to know, then give specifics: names, numbers, prices, dates and trade-offs."
+        }
+        return """
+        You are the "Browse for Me" feature of a phone browser. The app has searched the web and \
+        read the pages below for you. Answer the question using only these sources. Where they \
+        disagree, say so; if they don't answer part of the question, say what is missing. Write in \
+        the language of the question. Never repeat a point. \(length)
+        """
+    }
 
     func run() async {
         // Apple's cloud model, fed by our own search, is the default; Claude
@@ -242,7 +305,7 @@ final class BrowseForMeModel: Identifiable {
                 phase = .failed("The search came back empty. Try wording it differently.")
                 return true
             }
-            let candidates = Array(results.prefix(6))
+            let candidates = Array(results.prefix(depth.pages))
             steps = candidates.map { Step(url: $0.url, state: .reading) }
             phase = .reading(candidates.count)
             var pages = await WebResearcher.read(candidates, perPageLimit: perPage) { [weak self] url, useful in
@@ -266,9 +329,12 @@ final class BrowseForMeModel: Identifiable {
 
             engine = label
             phase = .writing
-            for try await snapshot in AppleModels.streamAnswer(model, instructions: Self.appleInstructions, prompt: prompt) {
-                text = snapshot
-            }
+            let instructions = Self.appleInstructions(depth)
+            // A quick question gets the short shape: no sections to fill out.
+            let answer = depth == .quick
+                ? AppleModels.streamAnswer(model, shape: BriefAnswer.self, instructions: instructions, prompt: prompt)
+                : AppleModels.streamAnswer(model, instructions: instructions, prompt: prompt)
+            for try await snapshot in answer { text = snapshot }
             phase = .done
             return true
         } catch is CancellationError {
@@ -286,19 +352,15 @@ final class BrowseForMeModel: Identifiable {
     private func runClaude(_ client: ClaudeClient) async {
         engine = "Claude"
         do {
-            for try await event in client.stream(system: Self.claudeInstructions, prompt: query, effort: "medium", webSearch: true) {
-                switch event {
-                case .searching(let query):
-                    phase = .searching(query)
-                case .source(let source):
-                    if !sources.contains(where: { $0.url.displayHost == source.url.displayHost }) {
-                        sources.append(source)
-                        steps.append(Step(url: source.url, state: .read))
-                    }
-                case .text(let chunk):
-                    text += chunk
-                    phase = .writing
-                }
+            do {
+                try await streamClaude(client, model: depth.model)
+            } catch let error where depth.model == .haiku && !(error is CancellationError) {
+                // Haiku declined (it has no fallback of its own): Sonnet answers instead.
+                text = ""
+                sources = []
+                steps = []
+                phase = .searching(query)
+                try await streamClaude(client, model: .sonnet)
             }
             phase = .done
         } catch is CancellationError {
@@ -306,6 +368,105 @@ final class BrowseForMeModel: Identifiable {
         } catch {
             phase = .failed(error.localizedDescription)
         }
+    }
+
+    private func streamClaude(_ client: ClaudeClient, model: ClaudeClient.Model) async throws {
+        for try await event in client.stream(system: Self.claudeInstructions(depth), prompt: query, model: model,
+                                             effort: depth.effort, searches: depth.searches) {
+            switch event {
+            case .searching(let query):
+                phase = .searching(query)
+            case .source(let source):
+                if !sources.contains(where: { $0.url.displayHost == source.url.displayHost }) {
+                    sources.append(source)
+                    steps.append(Step(url: source.url, state: .read))
+                }
+            case .text(let chunk):
+                text += chunk
+                phase = .writing
+            }
+        }
+    }
+}
+
+/// How much digging a question deserves, judged from its words alone: on the
+/// phone, instantly, with no model call. A quick fact wants its answer now; a
+/// comparison, a "best", a plan or a long question wants more sources and room.
+nonisolated enum ResearchDepth: Equatable {
+    case quick, standard, deep
+
+    static func of(_ question: String) -> ResearchDepth {
+        let words = question.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        // Padded with spaces so a cue matches whole words (or, for Croatian, word stems).
+        let text = " " + words.joined(separator: " ") + " "
+        guard let first = words.first else { return .standard }
+        let asksForAFact = quickStarts.contains(first)
+            || first == "how" && words.count > 1 && howMuch.contains(words[1])
+        // "or" makes a comparison ("iPhone or Pixel"), but not in a fact
+        // question ("is it open or closed today").
+        let compares = !asksForAFact && (text.contains(" or ") || text.contains(" ili "))
+        if words.count >= 12 || compares || deepCues.contains(where: text.contains) { return .deep }
+        // A recipe, a how-to or an explanation needs room, however short the question.
+        if roomCues.contains(where: text.contains) { return .standard }
+        if words.count <= 3 || words.count <= 7 && asksForAFact { return .quick }
+        return .standard
+    }
+
+    /// Choosing or planning: comparisons, the best of something, whether it's
+    /// worth it, a trip. Explanations ("why", "how does") are standard: one
+    /// good source explains as well as eight.
+    private static let deepCues = [
+        " vs ", " versus ", " compare", " comparison", " difference", " pros and cons", " best ", " top ",
+        " review", " should i ", " worth ", " alternative", " plan ", " itinerary", " guide", " recommend",
+        " usporedb", " razlik", " najbolj", " isplati", " prednost", " nedostat", " mane ", " recenzij",
+        " preporu", " vodič", " savjet", " ideje ",
+    ]
+    private static let roomCues = [" recipe", " recept", " how to ", " kako ", " tutorial", " upute", " steps ",
+                                   " explain", " objasni", " why ", " zašto ", " zasto "]
+    private static let quickStarts: Set<String> = [
+        "what", "who", "when", "where", "which", "whose", "is", "are", "was", "were", "does", "did", "can",
+        "koliko", "kolika", "kada", "kad", "tko", "gdje", "koji", "koja", "koje", "što", "sto", "je", "ima",
+    ]
+    private static let howMuch: Set<String> = ["many", "much", "old", "tall", "long", "far", "big", "fast"]
+
+    /// Pages read for Apple's models, which get no searches of their own.
+    var pages: Int {
+        switch self { case .quick: 3; case .standard: 6; case .deep: 8 }
+    }
+
+    /// Claude's web searches.
+    var searches: Int {
+        switch self { case .quick: 2; case .standard: 5; case .deep: 10 }
+    }
+
+    var model: ClaudeClient.Model { self == .quick ? .haiku : .sonnet }
+
+    var effort: String {
+        switch self { case .quick: "low"; case .standard: "medium"; case .deep: "high" }
+    }
+}
+
+/// The language an answer will be written in, as far as choosing a model goes:
+/// Apple's on-device model writes Croatian with Serbian words and broken
+/// endings, so Croatian goes to Claude when there's a key.
+nonisolated enum AnswerLanguage {
+    case croatian, other
+
+    /// From the page's (or question's) own text. Croatian, Serbian and Bosnian
+    /// in Latin script are close enough to be confused for one another, so
+    /// those count as Croatian on a .hr site or on a phone set to Croatia.
+    static func of(_ text: String, host: String = "") -> AnswerLanguage {
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(String(text.prefix(2_000)))
+        guard let language = recognizer.dominantLanguage else { return .other }
+        if language == .croatian { return .croatian }
+        let neighbours: Set<NLLanguage> = [NLLanguage("sr"), NLLanguage("bs")]
+        let isCyrillic = text.prefix(400).unicodeScalars.contains { (0x0400...0x04FF).contains($0.value) }
+        if neighbours.contains(language), !isCyrillic,
+           host.hasSuffix(".hr") || Locale.current.region?.identifier == "HR" {
+            return .croatian
+        }
+        return .other
     }
 }
 
