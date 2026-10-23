@@ -14,6 +14,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Address suggestions show the real icon of 150 popular sites, bundled, with no network request.
 - Haptics when a toast confirms an action, a tab is thrown away, or the bar swipes to the next tab.
 - Settings → Use Claude: turn Claude off without deleting the API key; Apple's models then do everything.
+- Browse for Me suggests two or three follow-up questions under the answer when they'd help; tap one to ask it.
+- Tap the question in Browse for Me to reword it.
+- Browse for Me's Google button is there from the start, so a slow answer can be swapped for a search; closing or switching stops the answer and its spending.
 - Browse for Me matches the question: a quick fact gets a short answer from three sources; a comparison, a "best" or a plan reads more sites and writes more.
 
 ### Changed
@@ -22,6 +25,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Browse for Me always searches the web before answering, so every answer has sources.
 - The address bar no longer lists open pages before you type; they show up when they match, marked "Already open".
 - The address bar opens in one move: no dark overlay fading in over the page.
+- Browse for Me is full screen, like Summarize; pull down at the top to close. When the answer arrives, the reading list's site icons fly into its row of sources.
+- Browse for Me shows bigger pictures above more compact source cards.
+- Text scrolling up in Summarize and Browse for Me fades under the status bar instead of running into the clock.
 - Browse for Me's suggestion has a sparkle and says what it does: "Reads the web and answers".
 - A question, comparison or decision puts Browse for Me first, so Return answers it; keywords, sites, weather and logins still search first.
 - Phosphor icons throughout.

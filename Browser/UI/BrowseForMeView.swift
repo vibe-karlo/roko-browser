@@ -3,10 +3,19 @@ import SwiftUI
 /// A page written for one question, from several sources read on your behalf.
 /// While it works, it shows the work: your question, then each site as it is
 /// read. Then the answer, with its sources and pictures up front.
+///
+/// Full screen, like Summarize, on the same plain canvas: it's for reading.
+/// Its one flourish has a job: when the answer arrives, the icons of the sites
+/// it read fly up into the row of sources, so the list visibly becomes them.
 struct BrowseForMeView: View {
     @Environment(BrowserModel.self) private var browser
-    @Environment(\.dismiss) private var dismiss
     let model: BrowseForMeModel
+    /// Pairs each site's icon in the reading list with the same icon in the source row.
+    @Namespace private var icons
+    /// Rewording the question, in place.
+    @State private var editing = false
+    @State private var draft = ""
+    @FocusState private var fieldFocused: Bool
 
     private var isWorking: Bool {
         switch model.phase {
@@ -17,14 +26,11 @@ struct BrowseForMeView: View {
     }
 
     var body: some View {
-        ScrollViewReader { scroller in
+        // No scrolling to the top when the answer arrives: the view is already
+        // there, and in full screen scrollTo pulled the question under the status bar.
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
-                Text(model.query)
-                    .id("top")
-                    .font(.system(size: isWorking ? 30 : 17, weight: .semibold))
-                    .foregroundStyle(isWorking ? Theme.ink : Theme.secondaryInk)
-                    .lineLimit(isWorking ? 4 : 2)
+                question
                     .padding(.top, isWorking ? 24 : 0)
 
                 if isWorking {
@@ -32,9 +38,12 @@ struct BrowseForMeView: View {
                 } else if case .failed(let message) = model.phase {
                     Text(message).foregroundStyle(Theme.secondaryInk)
                 } else {
-                    if !model.sources.isEmpty { sources }
+                    // Pictures first, then the sources: the faces of the answer
+                    // up top, its footnotes compact beneath them.
                     if !model.images.isEmpty { pictures }
-                    MarkdownText(markdown: model.text, isStreaming: model.phase == .writing)
+                    if !model.sources.isEmpty { sources }
+                    MarkdownText(markdown: model.answer, isStreaming: model.phase == .writing)
+                    if !model.followUps.isEmpty { followUps }
                 }
             }
             .animation(.snappy(duration: 0.4), value: isWorking)
@@ -43,16 +52,95 @@ struct BrowseForMeView: View {
             .padding(.top, 26)
             .padding(.bottom, 24)
         }
-        // When the answer replaces the reading list, start at its top.
-        .onChange(of: isWorking) { _, working in
-            if !working { scroller.scrollTo("top", anchor: .top) }
-        }
+        // Pulling down past the top closes it, as the sheet it replaces did.
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y < -geometry.contentInsets.top - 90
+        } action: { _, pulledPastTop in
+            if pulledPastTop { close() }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { footer }
+        .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas) }
+        .background(Theme.canvas.ignoresSafeArea())
+        .foregroundStyle(Theme.ink)
+        .accessibilityAddTraits(.isModal)
         .sensoryFeedback(.success, trigger: model.phase == .done)
-        .presentationDetents([.large])
-        .presentationBackground(Theme.panel)
-        .presentationCornerRadius(28)
+    }
+
+    private func close() {
+        withAnimation(.spring(duration: 0.35, bounce: 0)) { browser.browseForMe = nil }
+    }
+
+    // MARK: The question
+
+    /// The question, large while it's being worked on and quiet above the
+    /// answer. Tap it to reword it; Return asks again.
+    @ViewBuilder
+    private var question: some View {
+        let font = Font.system(size: isWorking ? 30 : 17, weight: .semibold)
+        if editing {
+            TextField("Ask anything", text: $draft)
+                .font(font)
+                .foregroundStyle(Theme.ink)
+                .tint(Theme.accent)
+                .focused($fieldFocused)
+                .submitLabel(.go)
+                .autocorrectionDisabled()
+                .onSubmit(ask)
+                .onAppear { fieldFocused = true }
+                .onChange(of: fieldFocused) { _, focused in if !focused { editing = false } }
+        } else {
+            Button {
+                draft = model.query
+                editing = true
+            } label: {
+                Text(model.query)
+                    .font(font)
+                    .foregroundStyle(isWorking ? Theme.ink : Theme.secondaryInk)
+                    .lineLimit(isWorking ? 4 : 2)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(RowButtonStyle())
+            .accessibilityHint("Edit the question")
+        }
+    }
+
+    private func ask() {
+        let question = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        editing = false
+        guard !question.isEmpty, question != model.query else { return }
+        browser.browse(for: question)
+    }
+
+    // MARK: Follow-ups
+
+    /// What to ask next, when the answer suggests it. Each opens a new answer.
+    private var followUps: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(model.followUps, id: \.self) { question in
+                Button { browser.browse(for: question) } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Glyph(.browse, size: 15)
+                            .foregroundStyle(Theme.secondaryInk)
+                            .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 2 }
+                        Text(question)
+                            .font(.system(size: 16))
+                            .foregroundStyle(Theme.ink)
+                            .multilineTextAlignment(.leading)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .background(Theme.raised, in: .rect(cornerRadius: 16))
+                    .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.edge))
+                    .contentShape(.rect)
+                }
+                .buttonStyle(RowButtonStyle())
+            }
+        }
+        .padding(.top, 4)
+        .transition(.opacity)
     }
 
     // MARK: Working
@@ -65,6 +153,7 @@ struct BrowseForMeView: View {
                 ForEach(model.steps) { step in
                     HStack(spacing: 12) {
                         SiteIcon(host: step.url.displayHost, size: 18, remote: true)
+                            .matchedGeometryEffect(id: step.url.absoluteString, in: icons)
                             .opacity(step.state == .reading ? 0.45 : 1)
                         // Read: the site lights up from faint to ink. Nothing tacked on beside it.
                         Text(step.url.displayHost)
@@ -91,13 +180,15 @@ struct BrowseForMeView: View {
 
     /// The sites behind the answer: their icons in a row, then cards to open each.
     private var sources: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 HStack(spacing: -5) {
                     ForEach(model.sources.prefix(6)) { source in
+                        // Arrives from its place in the reading list.
                         SiteIcon(host: source.url.displayHost, size: 18, remote: true)
+                            .matchedGeometryEffect(id: source.url.absoluteString, in: icons)
                             .padding(2)
-                            .background(Theme.panel, in: .rect(cornerRadius: 6))
+                            .background(Theme.canvas, in: .rect(cornerRadius: 6))
                     }
                 }
                 // The pages the answer rests on, not every search hit along the way.
@@ -106,27 +197,28 @@ struct BrowseForMeView: View {
                     .foregroundStyle(Theme.secondaryInk)
             }
             ScrollView(.horizontal) {
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     ForEach(model.sources) { source in
                         Button { open(source.url) } label: {
-                            VStack(alignment: .leading, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 6) {
                                 Text(source.title)
-                                    .font(.system(size: 14, weight: .medium))
+                                    .font(.system(size: 13, weight: .medium))
                                     .foregroundStyle(Theme.ink)
                                     .lineLimit(2, reservesSpace: true)
                                     .multilineTextAlignment(.leading)
-                                HStack(spacing: 6) {
-                                    SiteIcon(host: source.url.displayHost, size: 14, remote: true)
+                                HStack(spacing: 5) {
+                                    SiteIcon(host: source.url.displayHost, size: 12, remote: true)
                                     Text(source.url.displayHost)
-                                        .font(.system(size: 12))
+                                        .font(.system(size: 11))
                                         .foregroundStyle(Theme.secondaryInk)
                                         .lineLimit(1)
                                 }
                             }
-                            .padding(14)
-                            .frame(width: 190, alignment: .leading)
-                            .background(Theme.raised, in: .rect(cornerRadius: 16))
-                            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.edge))
+                            .padding(.horizontal, 11)
+                            .padding(.vertical, 9)
+                            .frame(width: 164, alignment: .leading)
+                            .background(Theme.raised, in: .rect(cornerRadius: 13))
+                            .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(Theme.edge))
                         }
                         .buttonStyle(RowButtonStyle())
                     }
@@ -149,8 +241,8 @@ struct BrowseForMeView: View {
                             Theme.raised
                         }
                     }
-                    .frame(width: 200, height: 130)
-                    .clipShape(.rect(cornerRadius: 16))
+                    .frame(width: 240, height: 160)
+                    .clipShape(.rect(cornerRadius: 18))
                 }
             }
         }
@@ -160,30 +252,30 @@ struct BrowseForMeView: View {
 
     private var footer: some View {
         HStack(spacing: 12) {
-            if model.phase == .done {
-                Button {
-                    open(SearchEngine.current.searchURL(for: model.query))
-                } label: {
-                    HStack(spacing: 8) {
-                        Glyph(.search, size: 15)
-                        Text(SearchEngine.current.name).font(.system(size: 15, weight: .medium))
-                    }
-                    .fixedSize()
-                    .padding(.horizontal, 16)
-                    .frame(height: 44)
-                    .background(Theme.raised, in: .capsule)
-                    .contentShape(.capsule)
+            // From the start, not only once the answer is in: if it's taking
+            // long, the search engine is one tap away (and the answer stops).
+            Button {
+                open(SearchEngine.current.searchURL(for: model.query))
+            } label: {
+                HStack(spacing: 8) {
+                    Glyph(.search, size: 15)
+                    Text(SearchEngine.current.name).font(.system(size: 15, weight: .medium))
                 }
-                .buttonStyle(GlyphButtonStyle())
-                .accessibilityLabel("Search \(SearchEngine.current.name) instead")
+                .fixedSize()
+                .padding(.horizontal, 16)
+                .frame(height: 44)
+                .background(Theme.raised, in: .capsule)
+                .contentShape(.capsule)
             }
+            .buttonStyle(GlyphButtonStyle())
+            .accessibilityLabel("Search \(SearchEngine.current.name) instead")
             Text(credit)
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.faintInk)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
             Spacer(minLength: 8)
-            Button { dismiss() } label: {
+            Button(action: close) {
                 Glyph(.close, size: 16, weight: 2)
                     .frame(width: 44, height: 44)
                     .background(Theme.raised, in: .circle)
@@ -194,8 +286,8 @@ struct BrowseForMeView: View {
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 10)
-        .background(Theme.panel)
-        .background(alignment: .top) { FadeEdge(color: Theme.panel) }
+        .background(Theme.canvas)
+        .background(alignment: .top) { FadeEdge(color: Theme.canvas) }
     }
 
     private var credit: String {

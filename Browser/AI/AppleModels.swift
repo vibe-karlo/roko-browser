@@ -94,7 +94,27 @@ nonisolated struct BriefAnswer {
     var answer: String
     @Guide(description: "Up to three short supporting points, one sentence each; start with a key term in **bold** when there is one", .count(0...3))
     var points: [String]
+    @Guide(description: followUpsGuide, .count(0...3))
+    var followUps: [String]
 }
+
+/// Browse for Me's shape for a question worth sections: GeneratedAnswer's,
+/// plus questions to ask next. (Summaries keep GeneratedAnswer: nobody asks a
+/// page a follow-up.)
+@Generable
+nonisolated struct ResearchedAnswer {
+    @Guide(description: "A specific title for the answer, a few words")
+    var title: String
+    @Guide(description: "The gist in one or two plain sentences")
+    var gist: String
+    @Guide(description: "Three to five sections, each about a different aspect", .count(3...5))
+    var sections: [GeneratedSection]
+    @Guide(description: followUpsGuide, .count(0...3))
+    var followUps: [String]
+}
+
+private nonisolated let followUpsGuide =
+    "Up to three short follow-up questions the person is likely to ask next, in the language of the question; none if they wouldn't help"
 
 /// A partly written answer, shown as the app's Markdown while it streams.
 nonisolated protocol AnswerDraft {
@@ -108,21 +128,44 @@ extension GeneratedAnswer.PartiallyGenerated: AnswerDraft {
     var isUseful: Bool { sections?.isEmpty == false }
 
     func markdown(titled: Bool, droppingUnfinished: Bool) -> String {
-        var sections = self.sections ?? []
-        if droppingUnfinished, var last = sections.popLast() {
+        sectionedMarkdown(title: titled ? title : nil, gist: gist, sections: sections ?? [], followUps: [],
+                          droppingUnfinished: droppingUnfinished)
+    }
+}
+
+extension ResearchedAnswer.PartiallyGenerated: AnswerDraft {
+    var isUseful: Bool { sections?.isEmpty == false }
+
+    func markdown(titled: Bool, droppingUnfinished: Bool) -> String {
+        sectionedMarkdown(title: titled ? title : nil, gist: gist, sections: sections ?? [], followUps: followUps ?? [],
+                          droppingUnfinished: droppingUnfinished)
+    }
+}
+
+/// Title, gist and sections, then any follow-ups as "?? " lines (Browse for Me
+/// lifts those out of the answer). Cut off mid-way, the last item is dropped:
+/// a follow-up if they had begun, otherwise a point.
+private nonisolated func sectionedMarkdown(title: String?, gist: String?, sections: [GeneratedSection.PartiallyGenerated],
+                                           followUps: [String], droppingUnfinished: Bool) -> String {
+    var sections = sections, followUps = followUps
+    if droppingUnfinished {
+        if !followUps.isEmpty {
+            followUps.removeLast()
+        } else if var last = sections.popLast() {
             last.points = Array((last.points ?? []).dropLast())
             if last.points?.isEmpty == false { sections.append(last) }
         }
-        var lines: [String] = []
-        if titled, let title, !title.isEmpty { lines.append("# \(title)") }
-        if let gist, !gist.isEmpty { lines.append("> \(gist)") }
-        for section in sections {
-            guard let heading = section.heading, !heading.isEmpty else { continue }
-            lines.append("## [\(section.topic ?? "")] \(heading)")
-            for point in section.points ?? [] where !point.isEmpty { lines.append("- \(point)") }
-        }
-        return lines.joined(separator: "\n")
     }
+    var lines: [String] = []
+    if let title, !title.isEmpty { lines.append("# \(title)") }
+    if let gist, !gist.isEmpty { lines.append("> \(gist)") }
+    for section in sections {
+        guard let heading = section.heading, !heading.isEmpty else { continue }
+        lines.append("## [\(section.topic ?? "")] \(heading)")
+        for point in section.points ?? [] where !point.isEmpty { lines.append("- \(point)") }
+    }
+    for question in followUps where !question.isEmpty { lines.append("?? \(question)") }
+    return lines.joined(separator: "\n")
 }
 
 extension BriefAnswer.PartiallyGenerated: AnswerDraft {
@@ -133,8 +176,12 @@ extension BriefAnswer.PartiallyGenerated: AnswerDraft {
         var lines: [String] = []
         if titled, let title, !title.isEmpty { lines.append("# \(title)") }
         if let answer, !answer.isEmpty { lines.append("> \(answer)") }
-        let points = droppingUnfinished ? Array((self.points ?? []).dropLast()) : self.points ?? []
+        var points = self.points ?? [], followUps = self.followUps ?? []
+        if droppingUnfinished {
+            if !followUps.isEmpty { followUps.removeLast() } else if !points.isEmpty { points.removeLast() }
+        }
         for point in points where !point.isEmpty { lines.append("- \(point)") }
+        for question in followUps where !question.isEmpty { lines.append("?? \(question)") }
         return lines.joined(separator: "\n")
     }
 }

@@ -44,6 +44,8 @@ struct SummaryView: View {
                 footer
                     .opacity(textShown ? 1 : 0)
             }
+            // Only once settled: while opening and closing, the page card owns the top.
+            .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas).opacity(textShown ? 1 : 0) }
         }
         .sensoryFeedback(.success, trigger: model.phase == .done)
         .onAppear {
@@ -184,6 +186,29 @@ struct FadeEdge: View {
         }, startPoint: .top, endPoint: .bottom)
         .frame(height: height)
         .offset(y: -height)
+        .allowsHitTesting(false)
+    }
+}
+
+/// Behind the status bar of a full-screen reading view: text scrolled up
+/// dissolves there instead of running into the clock and battery.
+struct StatusBarFade: View {
+    let color: Color
+    /// The soft edge below the status bar; above it, solid.
+    private let feather: CGFloat = 18
+
+    var body: some View {
+        // Sized from the real status bar height: ignoresSafeArea on a fixed
+        // frame only moves it up, it doesn't make it tall enough to cover.
+        GeometryReader { proxy in
+            let inset = proxy.safeAreaInsets.top
+            LinearGradient(stops: [.init(color: color, location: 0),
+                                   .init(color: color, location: inset / (inset + feather)),
+                                   .init(color: color.opacity(0), location: 1)],
+                           startPoint: .top, endPoint: .bottom)
+                .frame(height: inset + feather)
+                .offset(y: -inset)
+        }
         .allowsHitTesting(false)
     }
 }

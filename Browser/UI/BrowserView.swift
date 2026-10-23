@@ -104,6 +104,17 @@ struct BrowserView: View {
             }
         }
         .overlay {
+            if let model = browser.browseForMe {
+                // Full screen, rising from the bar where the question was asked.
+                // One identity for every answer, so a follow-up or a reworded
+                // question changes the page in place instead of rising again.
+                BrowseForMeView(model: model)
+                    .id("browse-for-me")
+                    .transition(.move(edge: .bottom))
+            }
+        }
+        .animation(.spring(duration: 0.42, bounce: 0.06), value: browser.browseForMe?.id)
+        .overlay {
             if let summary = browser.summary {
                 // Full screen; it animates the page into its card itself.
                 SummaryView(model: summary)
@@ -130,9 +141,6 @@ struct BrowserView: View {
         .animation(.snappy(duration: 0.3), value: browser.panel)
         .sheet(isPresented: panelBinding(.settings)) {
             SettingsView()
-        }
-        .sheet(item: $browser.browseForMe) { model in
-            BrowseForMeView(model: model)
         }
         .sheet(item: $browser.reader) { model in
             ReaderView(model: model)
@@ -164,7 +172,8 @@ struct BrowserView: View {
 
     /// Text that reads on whatever is behind the status bar.
     private var statusBarStyle: UIStatusBarStyle {
-        if browser.summary != nil { return .default }  // the summary sits on the app's own canvas
+        // The summary and Browse for Me sit on the app's own canvas.
+        if browser.summary != nil || browser.browseForMe != nil { return .default }
         if browser.panel == .tabs { return .lightContent }  // the switcher is always dark
         guard let color = browser.selectedTab?.topColor else { return .default }
         return color.isLight ? .darkContent : .lightContent

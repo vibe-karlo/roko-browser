@@ -233,6 +233,43 @@ final class BrowseForMeModel: Identifiable {
         depth = ResearchDepth.of(query)
     }
 
+    @ObservationIgnored private var task: Task<Void, Never>?
+
+    func start() {
+        task = Task { await run() }
+    }
+
+    /// Stops searching and writing: the answer was closed or replaced.
+    func cancel() {
+        task?.cancel()
+    }
+
+    /// The answer without its follow-up lines (nor the lone "?" a follow-up
+    /// line starts as while it streams in).
+    var answer: String {
+        text.split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { line in
+                let line = line.trimmingCharacters(in: .whitespaces)
+                return line != "?" && !line.hasPrefix(Self.followUpMark)
+            }
+            .joined(separator: "\n")
+    }
+
+    /// Questions to ask next, once the answer is complete. Written by the model
+    /// as lines starting with "?? ", only when they'd genuinely help.
+    var followUps: [String] {
+        guard phase == .done else { return [] }
+        return text.split(separator: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { $0.hasPrefix(Self.followUpMark) }
+            .map { String($0.dropFirst(Self.followUpMark.count)).trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .prefix(3)
+            .map { $0 }
+    }
+
+    static let followUpMark = "??"
+
     private static func claudeInstructions(_ depth: ResearchDepth) -> String {
         let task = switch depth {
         case .quick: """
@@ -261,7 +298,13 @@ final class BrowseForMeModel: Identifiable {
         sources they can open. Answer in the language of the question. \(croatianStandard) \
         Don't list the sources (the app shows them).
 
-        """ + task
+        """ + task + """
+
+
+        After the answer, only if they would genuinely help: two or three short follow-up \
+        questions the person is likely to ask next, in the language of the question, each on \
+        its own line starting with "\(followUpMark) ". Nothing after them.
+        """
     }
 
     private static func appleInstructions(_ depth: ResearchDepth, question: String) -> String {
@@ -341,7 +384,7 @@ final class BrowseForMeModel: Identifiable {
             // A quick question gets the short shape: no sections to fill out.
             let answer = depth == .quick
                 ? AppleModels.streamAnswer(model, shape: BriefAnswer.self, instructions: instructions, prompt: prompt)
-                : AppleModels.streamAnswer(model, instructions: instructions, prompt: prompt)
+                : AppleModels.streamAnswer(model, shape: ResearchedAnswer.self, instructions: instructions, prompt: prompt)
             for try await snapshot in answer { text = snapshot }
             phase = .done
             return true

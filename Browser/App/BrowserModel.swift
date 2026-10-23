@@ -28,7 +28,11 @@ final class BrowserModel {
     var summaryCoversPage = false
     private(set) var toast: String?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
-    var browseForMe: BrowseForMeModel?
+    var browseForMe: BrowseForMeModel? {
+        // An answer that's closed or replaced stops working on the spot:
+        // nobody will read it, so it shouldn't keep searching or spending tokens.
+        didSet { if oldValue !== browseForMe { oldValue?.cancel() } }
+    }
     var reader: ReaderModel?
 
     @ObservationIgnored private var context: ModelContext?
@@ -262,8 +266,8 @@ final class BrowserModel {
 
     func browse(for query: String) {
         let model = BrowseForMeModel(query: query)
+        model.start()
         presentAfterPanelCloses { self.browseForMe = model }
-        Task { await model.run() }
     }
 
     /// SwiftUI drops a sheet presented while another is still sliding away, so
