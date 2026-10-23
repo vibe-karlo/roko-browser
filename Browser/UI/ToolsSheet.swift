@@ -25,9 +25,6 @@ struct ToolsSheet: View {
             }
             .scrollBounceBehavior(.basedOnSize)
             .foregroundStyle(Theme.ink)
-            .presentationDetents([.height(520), .large])
-            .presentationBackground(Theme.panel)
-            .presentationCornerRadius(28)
             .onAppear {
                 let host = tab.url?.host()
                 blockingOn = !(host.map { ContentBlocker.shared.isAllowed(host: $0) } ?? false)

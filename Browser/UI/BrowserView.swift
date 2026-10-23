@@ -13,11 +13,18 @@ struct BrowserView: View {
         @Bindable var browser = browser
 
         ZStack {
-            // Shows only behind the status bar: the page's own top colour, so
-            // the site runs up to the top of the screen, as in Safari.
-            (pinchScale < 1 ? Theme.canvas : browser.selectedTab?.topColor.map(Color.init) ?? Theme.canvas)
+            // Behind the page: the site's top colour in the status-bar strip
+            // only (as in Safari), and its own background below, so no header
+            // colour ever shows at the bottom of the screen.
+            GeometryReader { proxy in
+                VStack(spacing: 0) {
+                    (pinchScale < 1 ? Theme.canvas : browser.selectedTab?.topColor.map(Color.init) ?? Theme.canvas)
+                        .frame(height: proxy.safeAreaInsets.top)
+                    (pinchScale < 1 ? Theme.canvas : browser.selectedTab?.bottomColor.map(Color.init) ?? Theme.canvas)
+                }
                 .ignoresSafeArea()
-                .animation(.easeOut(duration: 0.2), value: browser.selectedTab?.topColor)
+            }
+            .animation(.easeOut(duration: 0.2), value: browser.selectedTab?.topColor)
 
             if let tab = browser.selectedTab {
                 WebViewHost(
@@ -89,6 +96,11 @@ struct BrowserView: View {
             }
         }
         .overlay {
+            if browser.panel == .tools {
+                BottomPanel { browser.panel = .none } content: { ToolsSheet() }
+            }
+        }
+        .overlay {
             if let summary = browser.summary {
                 // Full screen; it animates the page into its card itself.
                 SummaryView(model: summary)
@@ -111,9 +123,6 @@ struct BrowserView: View {
         .background(StatusBarStyler(style: statusBarStyle))
         .animation(.snappy(duration: 0.25), value: browser.toast)
         .animation(.snappy(duration: 0.3), value: browser.panel)
-        .sheet(isPresented: panelBinding(.tools)) {
-            ToolsSheet()
-        }
         .sheet(isPresented: panelBinding(.settings)) {
             SettingsView()
         }
@@ -178,5 +187,57 @@ private struct LoadErrorView: View {
         .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.canvas)
+    }
+}
+
+/// A panel that rises from the bottom edge and sits flush with it: rounded
+/// top corners, square bottom ones, running under the home indicator. Tap
+/// outside or drag it down to close.
+private struct BottomPanel<Content: View>: View {
+    let dismiss: () -> Void
+    @ViewBuilder let content: Content
+    @State private var shown = false
+    @State private var drag: CGFloat = 0
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Color.black.opacity(shown ? 0.35 : 0)
+                .ignoresSafeArea()
+                .onTapGesture(perform: close)
+
+            if shown {
+                VStack(spacing: 0) {
+                    Capsule()
+                        .fill(Theme.faintInk.opacity(0.6))
+                        .frame(width: 36, height: 5)
+                        .padding(.top, 8)
+                    content
+                        .frame(maxHeight: 640)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity)
+                .background {
+                    UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
+                        .fill(Theme.panel)
+                        .ignoresSafeArea(edges: .bottom)
+                }
+                .offset(y: max(0, drag))
+                .gesture(DragGesture()
+                    .onChanged { drag = $0.translation.height }
+                    .onEnded { value in
+                        if value.translation.height > 120 || value.predictedEndTranslation.height > 300 {
+                            close()
+                        } else {
+                            withAnimation(.spring(duration: 0.3, bounce: 0.2)) { drag = 0 }
+                        }
+                    })
+                .transition(.move(edge: .bottom))
+            }
+        }
+        .onAppear { withAnimation(.spring(duration: 0.4, bounce: 0.12)) { shown = true } }
+    }
+
+    private func close() {
+        withAnimation(.easeOut(duration: 0.22)) { shown = false } completion: { dismiss() }
     }
 }

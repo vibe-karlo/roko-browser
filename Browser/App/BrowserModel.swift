@@ -207,7 +207,7 @@ final class BrowserModel {
     /// SwiftUI drops a sheet presented while another is still sliding away, so
     /// when a sheet panel is open, wait for it to finish closing first.
     private func presentAfterPanelCloses(_ present: @escaping () -> Void) {
-        let wasSheet = panel == .tools || panel == .settings
+        let wasSheet = panel == .settings
         panel = .none
         guard wasSheet else { return present() }
         Task {

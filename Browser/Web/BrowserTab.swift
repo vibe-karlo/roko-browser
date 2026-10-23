@@ -225,7 +225,17 @@ final class BrowserTab: NSObject, Identifiable {
     /// The colour at the very bottom of the page: usually its footer.
     @ObservationIgnored private var footerColor: UIColor?
     /// The page's own background, as WebKit reports it.
-    @ObservationIgnored private var pageBackground: UIColor?
+    @ObservationIgnored private var pageBackground: UIColor? {
+        didSet { updateBottomColor() }
+    }
+    /// What shows behind the page below the status bar: the footer's colour
+    /// near the end of a page, the page's own background elsewhere.
+    private(set) var bottomColor: UIColor?
+
+    private func updateBottomColor() {
+        let color = showsFooterColor ? (footerColor ?? pageBackground) : pageBackground
+        if color != bottomColor { bottomColor = color }
+    }
     /// Whether the strip past the page's end currently shows the footer colour.
     @ObservationIgnored private var showsFooterColor = false
 
@@ -279,6 +289,7 @@ final class BrowserTab: NSObject, Identifiable {
             if let bottom, bottom != footerColor {
                 footerColor = bottom
                 if showsFooterColor { webView.underPageBackgroundColor = bottom }
+                updateBottomColor()
             }
         }
     }
@@ -298,6 +309,7 @@ final class BrowserTab: NSObject, Identifiable {
         guard show != showsFooterColor, let webView else { return }
         showsFooterColor = show
         webView.underPageBackgroundColor = show ? footerColor : nil
+        updateBottomColor()
     }
 
     private func updateTopColor(_ webView: WKWebView) {

@@ -14,10 +14,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 - Phosphor icons throughout.
+- The page menu is a panel flush with the bottom edge.
 
 ### Fixed
 - The page no longer zooms out under the summary card while pinching.
 - The summary's title no longer passes over the card as it lands.
+- A site's header colour no longer shows at the bottom of the screen.
 
 ## [0.1.0] - 2026-10-23
 
