@@ -62,6 +62,10 @@ final class CosmeticFilter: NSObject, WKScriptMessageHandlerWithReply {
         let hosts = Self.suffixes(of: host)
 
         var selectors: [String] = []
+        // Cookie banners are faded out rather than removed: the consent script
+        // (ConsentHandler) has to find a banner to answer it, and a removed one
+        // can't be found. The page script removes them for good a little later.
+        var faded: [String] = []
         // Overlays (cookie banners, pop-ups) often lock page scrolling; the page
         // script checks these against the page and unlocks it if one was hidden.
         var overlays: [String] = []
@@ -77,15 +81,15 @@ final class CosmeticFilter: NSObject, WKScriptMessageHandlerWithReply {
                 for host in hosts { found += index.scoped[host] ?? [] }
             }
             for key in keys { found += index.keyed[key] ?? [] }
-            selectors += found
+            if category == .cookies { faded += found } else { selectors += found }
             if category == .cookies || category == .popups { overlays += found }
         }
         // One rule per selector, so a selector WebKit can't parse only drops itself.
         let css = selectors.map { $0 + "{display:none!important}" }.joined(separator: "\n")
         if LaunchClock.isEnabled {
-            print("HIDE \(host) keys=\(keys.count) first=\(isFirst) selectors=\(selectors.count)")
+            print("HIDE \(host) keys=\(keys.count) first=\(isFirst) selectors=\(selectors.count) faded=\(faded.count)")
         }
-        return (["css": css, "overlays": overlays, "collapseAds": isFirst && collapseAds], nil)
+        return (["css": css, "faded": faded, "overlays": overlays, "collapseAds": isFirst && collapseAds], nil)
     }
 
     /// "news.bbc.co.uk" → ["news.bbc.co.uk", "bbc.co.uk", "co.uk", "uk"].

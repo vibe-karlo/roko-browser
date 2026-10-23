@@ -44,7 +44,9 @@
     try {
       const reply = await handler.postMessage({ host: location.hostname, keys, first: isFirst });
       if (reply && reply.collapseAds) startCollapsing();
-      if (!reply || !reply.css) return;
+      if (!reply) return;
+      if (reply.faded && reply.faded.length) fade(reply.faded);
+      if (!reply.css) return;
       if (!style) style = document.createElement("style");
       style.appendChild(document.createTextNode(reply.css + "\n"));
       if (!style.isConnected) (document.head || document.documentElement).appendChild(style);
@@ -53,6 +55,23 @@
         unlockIfNeeded();
       }
     } catch (_) {}
+  };
+
+  // Cookie banners: invisible and untouchable at once, but still on the page
+  // for a while, so roko's consent script can find each one and answer it
+  // (a site whose banner is only hidden keeps asking, and keeps the page
+  // locked). After that, whatever is left is removed for good.
+  let fadeStyle = null, faded = [], fadeTimer = 0;
+  const fadeRules = (block) => faded.map((s) => s + block).join("\n");
+  const fade = (selectors) => {
+    faded.push(...selectors);
+    if (!fadeStyle) {
+      fadeStyle = document.createElement("style");
+      (document.head || document.documentElement).appendChild(fadeStyle);
+    }
+    fadeStyle.textContent = fadeRules("{opacity:0!important;pointer-events:none!important}");
+    clearTimeout(fadeTimer);
+    fadeTimer = setTimeout(() => { fadeStyle.textContent = fadeRules("{display:none!important}"); }, 10000);
   };
 
   // A hidden pop-up often leaves the page frozen: sites lock scrolling while

@@ -5,6 +5,8 @@ import WebKit
 protocol BrowserTabDelegate: AnyObject {
     func tab(_ tab: BrowserTab, didFinishLoading url: URL, title: String)
     func tab(_ tab: BrowserTab, wantsNewTabWith url: URL)
+    /// The same page reloaded again and again, as people do when a page doesn't work.
+    func tabKeepsReloading(_ tab: BrowserTab)
 }
 
 /// One tab. Its web view exists only while the tab is "live"; a hibernated tab
@@ -36,6 +38,8 @@ final class BrowserTab: NSObject, Identifiable {
     @ObservationIgnored private var restoreState: Data?
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
     @ObservationIgnored weak var delegate: BrowserTabDelegate?
+    /// Recent reloads of the page on screen (see noteReload).
+    @ObservationIgnored fileprivate var reloads: [(url: URL, at: Date)] = []
 
     init(id: UUID = UUID(), url: URL?, title: String = "", isPrivate: Bool = false,
          lastActive: Date = .now, restoreState: Data? = nil) {
@@ -352,6 +356,16 @@ final class BrowserTab: NSObject, Identifiable {
 
 // MARK: - Navigation
 
+extension BrowserTab {
+    /// A second reload of the same page within two minutes: it probably isn't working.
+    fileprivate func noteReload(of url: URL) {
+        let now = Date.now
+        reloads = reloads.filter { $0.url == url && now.timeIntervalSince($0.at) < 120 }
+        reloads.append((url, now))
+        if reloads.count == 2 { delegate?.tabKeepsReloading(self) }
+    }
+}
+
 extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  preferences: WKWebpagePreferences) async -> (WKNavigationActionPolicy, WKWebpagePreferences) {
@@ -363,6 +377,9 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
             // tel:, mailto:, maps, App Store links: hand off to the system.
             await UIApplication.shared.open(url)
             return (.cancel, preferences)
+        }
+        if navigationAction.targetFrame?.isMainFrame == true, navigationAction.navigationType == .reload {
+            noteReload(of: url)
         }
         if navigationAction.targetFrame?.isMainFrame == true {
             // Instant once the lists are loaded; on a fresh install it holds the

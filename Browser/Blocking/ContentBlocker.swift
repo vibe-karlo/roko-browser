@@ -27,22 +27,6 @@ final class ContentBlocker {
     private let controllers = NSHashTable<WKUserContentController>.weakObjects()
     private let defaults = UserDefaults.standard
 
-    private lazy var cookieScript: WKUserScript? = {
-        guard let url = Bundle.main.url(forResource: "cookie-consent", withExtension: "js"),
-              let source = try? String(contentsOf: url, encoding: .utf8) else { return nil }
-        // Sourcepoint and others render their banner in an iframe, so all frames.
-        return WKUserScript(source: source, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: .defaultClient)
-    }()
-
-    /// Didomi's pop-up style (Index, Jutarnji) has no reject button on its first
-    /// screen, so ask Didomi itself to record "disagree to all". This has to run
-    /// in the page's world to reach Didomi's API; it does nothing else.
-    private let didomiScript = WKUserScript(source: """
-        (window.didomiOnReady = window.didomiOnReady || []).push(function (Didomi) {
-          if (Didomi.shouldConsentBeCollected()) Didomi.setUserDisagreeToAll();
-        });
-        """, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page)
-
     /// Lists and the hiding index, loaded once. Page loads wait on this, so a
     /// page opened during the first launch's compile is still filtered.
     private lazy var preparation = Task { await load() }
@@ -156,7 +140,11 @@ final class ContentBlocker {
         let exempt = Category.allCases.filter { category in
             !isEnabled(category) || host.map { isAllowed(host: $0, category: category) } == true
         }
-        let signature = "\(allowed)|\(exempt.map(\.rawValue).joined(separator: ","))|\(compiled.count)"
+        // A site that needs its cookies accepted gets its consent platform
+        // back: the cookie list blocks many of them, and a blocked one can't
+        // be accepted. Its pop-up is still answered, with accept.
+        let acceptsCookies = host.map { ConsentHandler.shared.acceptance(for: $0) != nil } ?? false
+        let signature = "\(allowed)|\(exempt.map(\.rawValue).joined(separator: ","))|\(acceptsCookies)|\(compiled.count)"
         if applied.object(forKey: controller) as String? == signature { return }
         applied.setObject(signature as NSString, forKey: controller)
 
@@ -164,15 +152,20 @@ final class ContentBlocker {
         controller.removeAllUserScripts()
         // Only the blocker's own handler: page translation keeps its own.
         controller.removeScriptMessageHandler(forName: CosmeticFilter.handlerName, contentWorld: CosmeticFilter.world)
+        controller.removeScriptMessageHandler(forName: ConsentHandler.handlerName, contentWorld: ConsentHandler.world)
         guard !allowed else { return }
 
         for category in Category.allCases where isEnabled(category) {
             if let host, isAllowed(host: host, category: category) { continue }
+            if category == .cookies, acceptsCookies { continue }
             if let list = compiled[category] { controller.add(list) }
         }
+        // Cookie pop-ups are answered, not just hidden: hidden, a site keeps
+        // asking, and often keeps the page locked or its content held back.
         if isEnabled(.cookies), !(host.map { isAllowed(host: $0, category: .cookies) } ?? false) {
-            if let cookieScript { controller.addUserScript(cookieScript) }
-            controller.addUserScript(didomiScript)
+            ConsentHandler.shared.scripts.forEach(controller.addUserScript)
+            controller.addScriptMessageHandler(ConsentHandler.shared, contentWorld: ConsentHandler.world,
+                                               name: ConsentHandler.handlerName)
         }
         // Element hiding is served per page rather than through the rule lists.
         if isEnabled(.ads) || isEnabled(.cookies) || isEnabled(.popups), let script = CosmeticFilter.shared.script {

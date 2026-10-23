@@ -31,6 +31,11 @@ final class BrowserModel {
     var summaryCoversPage = false
     private(set) var toast: String?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
+    /// The site roko is offering to allow cookies on (see tabKeepsReloading).
+    private(set) var cookieOffer: String?
+    @ObservationIgnored private var cookieOfferTask: Task<Void, Never>?
+    /// Offered once per site while roko is open.
+    @ObservationIgnored private var cookieOffersMade = Set<String>()
     var browseForMe: BrowseSession? {
         // An answer that's closed or replaced stops working on the spot:
         // nobody will read it, so it shouldn't keep searching or spending tokens.
@@ -57,6 +62,10 @@ final class BrowserModel {
         restoreTabs()
         // A Notify Me notification opens its page.
         NotificationRouter.shared.open = { [weak self] url in self?.open(url, inNewTab: true) }
+        // Cookies accepted because a site needs them: say so, once per site.
+        ConsentHandler.shared.onAccepted = { [weak self] host, _ in
+            self?.showToast("Accepted cookies: \(URL(string: "https://\(host)")?.displayHost ?? host) needs them")
+        }
         Task {
             await ContentBlocker.shared.prepare()
             LaunchClock.mark("blockerReady")
@@ -292,14 +301,15 @@ final class BrowserModel {
         (try? context?.fetch(FetchDescriptor<Pin>(sortBy: [SortDescriptor(\.order)]))) ?? []
     }
 
+    /// Pins are pages, not sites: two pages of one site can both be pinned.
     func isPinned(_ url: URL?) -> Bool {
         guard let url else { return false }
-        return pins().contains { URL(string: $0.url)?.displayHost == url.displayHost }
+        return pins().contains { pin in URL(string: pin.url).map(Self.samePage) == Self.samePage(url) }
     }
 
     func togglePin(for tab: BrowserTab) {
         guard let context, let url = tab.url else { return }
-        if let existing = pins().first(where: { URL(string: $0.url)?.displayHost == url.displayHost }) {
+        if let existing = pins().first(where: { pin in URL(string: pin.url).map(Self.samePage) == Self.samePage(url) }) {
             context.delete(existing)
         } else {
             context.insert(Pin(url: url, title: tab.displayTitle, order: pins().count))
@@ -312,15 +322,30 @@ final class BrowserModel {
         try? context?.save()
     }
 
-    /// Opens a pinned site in its existing tab when there is one, Arc-style.
+    /// A pin always goes to the page that was pinned. A tab already showing
+    /// exactly that page is reused; one elsewhere on the same site is left as
+    /// it is, and the pinned page opens in a new tab.
     func open(_ pin: Pin) {
         guard let url = URL(string: pin.url) else { return }
-        if let tab = tabs.first(where: { $0.url?.displayHost == url.displayHost && !$0.isPrivate }) {
+        let pinned = Self.samePage(url)
+        if let tab = tabs.first(where: { !$0.isPrivate && $0.url.map(Self.samePage) == pinned }) {
             select(tab)
             panel = .none
         } else {
             open(url, inNewTab: true)
         }
+    }
+
+    /// The page an address points at, ignoring "www.", http vs https, a
+    /// trailing slash and the #section within it.
+    private static func samePage(_ url: URL) -> String {
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.fragment = nil
+        components?.scheme = "https"
+        if let host = components?.host, host.hasPrefix("www.") { components?.host = String(host.dropFirst(4)) }
+        var page = components?.string ?? url.absoluteString
+        if page.hasSuffix("/") { page.removeLast() }
+        return page.lowercased()
     }
 
     // MARK: History
@@ -366,6 +391,30 @@ extension BrowserModel: BrowserTabDelegate {
 
     func tab(_ tab: BrowserTab, wantsNewTabWith url: URL) {
         open(url, inNewTab: true, isPrivate: tab.isPrivate)
+    }
+
+    /// As in Arc: a page reloaded again and again probably isn't working.
+    /// When roko is answering its cookie pop-ups, offer to allow cookies there.
+    func tabKeepsReloading(_ tab: BrowserTab) {
+        guard tab.id == selectedID, let host = tab.url?.host(),
+              ContentBlocker.shared.isEnabled(.cookies), !ContentBlocker.shared.isAllowed(host: host),
+              !ContentBlocker.shared.isAllowed(host: host, category: .cookies),
+              ConsentHandler.shared.acceptance(for: host) == nil,
+              cookieOffersMade.insert(host).inserted else { return }
+        cookieOffer = host
+        cookieOfferTask?.cancel()
+        cookieOfferTask = Task {
+            try? await Task.sleep(for: .seconds(10))
+            if !Task.isCancelled { cookieOffer = nil }
+        }
+    }
+
+    func allowCookies() {
+        guard let host = cookieOffer, let webView = selectedTab?.webView else { return }
+        cookieOffer = nil
+        cookieOfferTask?.cancel()
+        Task { await ConsentHandler.shared.acceptNow(in: webView, host: host) }
+        showToast("Cookies allowed on \(URL(string: "https://\(host)")?.displayHost ?? host)")
     }
 }
 

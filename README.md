@@ -136,6 +136,28 @@ every check in a Debug build, launch with `-checkWatches`.
 - A count of blocked items: WebKit doesn't report blocks to the app.
 - Default-browser status needs Apple's browser entitlement, which is requested separately.
 
+## Cookie pop-ups
+
+roko answers cookie pop-ups instead of only hiding them, with DuckDuckGo's
+[Autoconsent](https://github.com/duckduckgo/autoconsent) (MPL-2.0), the library DuckDuckGo's
+own iOS browser uses: about 1,200 rules for consent platforms and single sites (Consent-O-Matic's
+among them), plus a heuristic that finds a pop-up by its buttons. `Scripts/build_consent.sh`
+bundles it with `Scripts/consent/bridge.js` into `consent-main.js` (pages, every rule) and
+`consent-frame.js` (frames, the frame rules only). They run in their own content world;
+`ConsentHandler` decides each answer.
+
+- **Reject** by default. A known pop-up is kept hidden while it's answered.
+- **Accept only where a site needs it**: rejecting didn't get past the pop-up (a cookie wall),
+  or the page shows a platform's "accept cookies to see this video" placeholder. roko accepts
+  through the platform's API, or reloads with the site's consent platform unblocked (the
+  cookie list blocks many), and, if the site kept an earlier "rejected", resets that site's
+  data once. The site is remembered, and Site Settings → Reject cookies shows and changes it.
+- **Two reloads** of the same page within two minutes offer "Allow cookies", as Arc does.
+
+Cookie banners the cosmetic list hides are faded (opacity) for ten seconds before being
+removed, so Autoconsent can still find and answer them. Measured on an iPhone 17 Pro with the
+`-benchmark -benchConsent` harness, the scripts made no measurable difference to page loads.
+
 ## Credits
 
 Icons: [Phosphor Icons](https://phosphoricons.com) (regular and bold), MIT License,

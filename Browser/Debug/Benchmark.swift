@@ -9,7 +9,14 @@ import WebKit
 enum Benchmark {
     static var isRequested: Bool { ProcessInfo.processInfo.arguments.contains("-benchmark") }
 
-    static let pages = [
+    /// `-benchPage <url>` measures just that page, five times.
+    static var pages: [String] {
+        let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of: "-benchPage"), index + 1 < arguments.count { return [arguments[index + 1]] }
+        return defaultPages
+    }
+
+    static let defaultPages = [
         "https://www.theverge.com",
         "https://edition.cnn.com",
         "https://www.bbc.com/news",
@@ -21,12 +28,18 @@ enum Benchmark {
 
     /// networkOnly: request blocking, no element hiding.
     /// legacy: request blocking plus every hiding rule handed to WebKit (the old way).
-    /// onDemand: request blocking plus per-page hiding (what the app ships).
+    /// onDemand: request blocking plus per-page hiding.
+    /// consent: onDemand plus the cookie pop-up scripts (what the app ships).
+    /// `-benchConsent` runs only the last two, to see what answering pop-ups costs.
     enum Variant: String, CaseIterable {
-        case networkOnly, legacy, onDemand
+        case networkOnly, legacy, onDemand, consent
     }
 
-    private static let runsPerPage = 3
+    private static var variants: [Variant] {
+        ProcessInfo.processInfo.arguments.contains("-benchConsent") ? [.onDemand, .consent] : Variant.allCases
+    }
+
+    private static var runsPerPage: Int { ProcessInfo.processInfo.arguments.contains("-benchPage") ? 5 : 3 }
 
     static func run() async {
         guard let window = UIApplication.shared.connectedScenes
@@ -36,13 +49,14 @@ enum Benchmark {
         }
         await CosmeticFilter.shared.load()
         let lists = await compileLists()
-        for variant in Variant.allCases {
+        for variant in variants {
             for page in pages {
                 guard let url = URL(string: page) else { continue }
                 var samples: [[String: Double]] = []
                 for _ in 0..<runsPerPage {
                     if let sample = await load(url, lists: lists[variant] ?? [],
-                                               onDemandHiding: variant == .onDemand, in: window) {
+                                               onDemandHiding: variant == .onDemand || variant == .consent,
+                                               consent: variant == .consent, in: window) {
                         samples.append(sample)
                     }
                 }
@@ -92,12 +106,12 @@ enum Benchmark {
             }
             if let list = await compile(old + rules, "bench-legacy-\(name)") { legacy.append(list) }
         }
-        return [.networkOnly: network, .legacy: legacy, .onDemand: network]
+        return [.networkOnly: network, .legacy: legacy, .onDemand: network, .consent: network]
     }
 
     // MARK: Loading
 
-    private static func load(_ url: URL, lists: [WKContentRuleList], onDemandHiding: Bool,
+    private static func load(_ url: URL, lists: [WKContentRuleList], onDemandHiding: Bool, consent: Bool,
                              in window: UIWindow) async -> [String: Double]? {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
@@ -108,6 +122,11 @@ enum Benchmark {
             controller.addUserScript(script)
             controller.addScriptMessageHandler(CosmeticFilter.shared, contentWorld: CosmeticFilter.world,
                                                name: CosmeticFilter.handlerName)
+        }
+        if consent {
+            ConsentHandler.shared.scripts.forEach(controller.addUserScript)
+            controller.addScriptMessageHandler(ConsentHandler.shared, contentWorld: ConsentHandler.world,
+                                               name: ConsentHandler.handlerName)
         }
         configuration.userContentController = controller
 

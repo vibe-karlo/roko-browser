@@ -47,11 +47,14 @@ struct BrowserView: View {
                     onScrollDirection: { down in
                         if browser.isBarCollapsed != down { browser.isBarCollapsed = down }
                     })
-                    .ignoresSafeArea(.container, edges: .bottom)
                     // The page itself follows a pinch, shrinking into a card.
                     .clipShape(.rect(cornerRadius: 40 * (1 - pinchScale)))
                     .scaleEffect(pinchScale)
                     .opacity(browser.summaryCoversPage ? 0 : 1)
+                    // Last, so the clip above is the full height too: applied
+                    // before it, the clip still ended at the home indicator
+                    // and cut a blank strip off the bottom of every page.
+                    .ignoresSafeArea(.container, edges: .bottom)
                     // Once the card has taken over, the hidden page returns to
                     // full size, ready for the card to grow back into it.
                     .onChange(of: browser.summaryCoversPage) { _, covered in
@@ -73,9 +76,16 @@ struct BrowserView: View {
                 }
             } else {
                 StartView()
+                    // The bar floats over the page; the start page keeps clear of it.
+                    .safeAreaPadding(.bottom, Theme.barHeight + 4)
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        // Floating over the page rather than inset below it, as in Safari: the
+        // page runs to the bottom edge, bar or no bar. Laid out below the page,
+        // it left a strip of the page's background under it, and when the bar
+        // folded away while scrolling, a blank band above the home indicator.
+        // The page learns which strip the bar covers from barTop (WebViewHost).
+        .overlay(alignment: .bottom) {
             // The command bar takes the bar's place rather than stacking on top of it.
             BottomBar()
                 .opacity(browser.panel == .command || browser.panel == .tabs ? 0 : 1)
@@ -136,6 +146,27 @@ struct BrowserView: View {
                     .allowsHitTesting(false)
             }
         }
+        .overlay(alignment: .bottom) {
+            if browser.cookieOffer != nil {
+                // After a few reloads: the page may be broken by its cookie pop-up's answer.
+                HStack(spacing: 14) {
+                    Text("Page not working?")
+                        .font(.system(size: 15, weight: .medium))
+                    Button("Allow cookies") { browser.allowCookies() }
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.accentText)
+                        .frame(minHeight: 44)
+                        .contentShape(.rect)
+                }
+                .lineLimit(1)
+                .padding(.leading, 18)
+                .padding(.trailing, 16)
+                .barSurface(cornerRadius: 14)
+                .padding(.bottom, Theme.barHeight + 20)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy(duration: 0.3), value: browser.cookieOffer)
         .background(StatusBarStyler(style: statusBarStyle))
         // Every toast confirms something done (copied, pinned, translating): a tick to feel it.
         .sensoryFeedback(.impact(weight: .light), trigger: browser.toast) { _, toast in toast != nil }

@@ -116,7 +116,7 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Text("Filter lists: EasyList, EasyPrivacy and Fanboy's Cookie List (CC BY-SA 3.0). Article extraction: Mozilla Readability (Apache 2.0).")
+                    Text("Filter lists: EasyList, EasyPrivacy and Fanboy's Cookie List (CC BY-SA 3.0). Cookie pop-ups: DuckDuckGo Autoconsent, with Consent-O-Matic's rules (MPL 2.0). Article extraction: Mozilla Readability (Apache 2.0).")
                         .font(.footnote)
                         .foregroundStyle(Theme.secondaryInk)
                 }

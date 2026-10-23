@@ -11,7 +11,9 @@ struct Glyph: View {
              // Private browsing, as in Arc: an open eye for a normal tab, a closed one for private.
              eye, eyeClosed,
              // Notify Me.
-             bell
+             bell,
+             // Cookie pop-ups, in Site Settings.
+             cookie
     }
 
     let kind: Kind

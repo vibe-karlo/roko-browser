@@ -10,7 +10,18 @@ struct ToolsSheet: View {
     @State private var blockingOn = true
     @State private var popupsOn = true
     @State private var pinchOn = true
+    @State private var rejectingCookies = true
+    @State private var cookieReason: ConsentHandler.Reason?
     @State private var siteSettingsOpen = false
+
+    /// What happens to this site's cookie pop-ups, and why.
+    private var cookieDetail: String {
+        switch cookieReason {
+        case nil: "Pop-ups answered with reject"
+        case .wall, .content: "Accepted: the site needs them"
+        case .chosen: "Accepted on this site"
+        }
+    }
 
     var body: some View {
         if let tab = browser.selectedTab {
@@ -33,6 +44,8 @@ struct ToolsSheet: View {
                 blockingOn = !(host.map { ContentBlocker.shared.isAllowed(host: $0) } ?? false)
                 popupsOn = !(host.map { ContentBlocker.shared.isAllowed(host: $0, category: .popups) } ?? false)
                 pinchOn = PinchToSummarize.isOn(for: host)
+                cookieReason = host.flatMap(ConsentHandler.shared.acceptance)
+                rejectingCookies = cookieReason == nil
             }
         }
     }
@@ -234,6 +247,14 @@ struct ToolsSheet: View {
                         tab.webView?.reload()
                     }))
                     .disabled(!blockingOn || !ContentBlocker.shared.isEnabled(.popups))
+                toggleRow(glyph: .cookie, title: "Reject cookies", detail: cookieDetail, isOn: Binding(
+                    get: { rejectingCookies },
+                    set: { on in
+                        rejectingCookies = on
+                        ConsentHandler.shared.setAccepted(on ? nil : .chosen, for: host)
+                        cookieReason = on ? nil : .chosen
+                    }))
+                    .disabled(!blockingOn || !ContentBlocker.shared.isEnabled(.cookies))
                 toggleRow(glyph: .summarize, title: "Pinch to summarize",
                           detail: pinchOn ? "Pinching in summarizes" : "Pinching zooms instead", isOn: Binding(
                     get: { pinchOn },

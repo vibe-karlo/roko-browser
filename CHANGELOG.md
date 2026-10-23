@@ -23,6 +23,10 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Answers written by Claude show pictures too, from the pages its searches found, fetched alongside while it works.
 - A weather topic, with a sun, for answer sections about weather and seasons.
 - Site Settings → Pinch to summarize: turn it off for a site where you need the pinch to zoom.
+- Cookie pop-ups are answered, not just hidden: DuckDuckGo's Autoconsent (with Consent-O-Matic's rules) rejects them on about 1,200 consent platforms and sites, and finds the rest by their buttons.
+- Cookies are accepted only where a site needs them: a cookie wall, or a video or embed held back until you accept. roko remembers the site and says so ("Accepted cookies: … needs them").
+- Site Settings → Reject cookies: see and change what roko does with a site's cookie pop-ups.
+- Reload a page twice and roko offers "Allow cookies" there, as Arc does.
 - Notify Me, as in Safari: in a page's menu, say what to look for ("size M in stock", or nothing for anything new) and check hourly, daily or weekly. roko reads the page in the background, Apple's on-device model decides whether it's what you asked for, and a notification opens the page. Settings lists the watched pages.
 
 ### Changed
@@ -46,6 +50,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Apple's models answer from what the sources say, instead of listing what they leave out; short answers give the facts in full sentences.
 - A follow-up's section comes up to the top of the screen while it's worked on, instead of its reading list running under the footer.
 - Rewording a question wraps over lines instead of scrolling sideways.
+- The bar floats over the page, as in Safari: pages run to the bottom edge with the bar showing or folded away.
+- A pin always opens the page that was pinned, not whatever page of that site is open; two pages of one site can both be pinned.
 - A pinch summarizes pages wider than the screen too, from their own size; a page you've zoomed into still zooms out.
 - Apple's models write in English when they summarize a Croatian page or answer a Croatian question, and say why; Claude still writes Croatian.
 
@@ -79,6 +85,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Closing Browse for Me mid-answer no longer flips the page to finished as it slides away, or starts another AI engine.
 - A picture that won't load is removed instead of staying an empty tile, and the same picture no longer shows twice.
 - Bold terms no longer show their asterisks while an answer is streaming in.
+- Pages no longer stop short of the bottom edge, leaving a blank strip above the home indicator.
+- Typing an address for a private tab no longer offers an open normal tab, which Return would switch to.
 
 ## [0.1.0] - 2026-10-23
 

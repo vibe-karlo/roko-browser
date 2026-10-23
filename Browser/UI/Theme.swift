@@ -14,6 +14,10 @@ enum Theme {
     static let faintInk = Color(light: 0x737370, dark: 0x7E7E7A)
     /// The mark's orange. In light mode a shade deeper, so it holds on white.
     static let accent = Color(light: 0xE84A10, dark: 0xFF5B1F)
+    /// The mark's orange for words: thin strokes of it read redder than a
+    /// filled shape does, so text gets a step lighter on dark and a warmer
+    /// step on light, and still reads as the same orange as the switches.
+    static let accentText = Color(light: 0xD4570C, dark: 0xFF7A38)
     /// The highlighted row: a neutral lift, not orange, so the accent stays rare.
     static let selection = Color(light: 0x0E0E0F, dark: 0xE7E7E4).opacity(0.08)
     /// The panel's own colour at low opacity: an edge you sense rather than see.

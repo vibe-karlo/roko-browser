@@ -369,7 +369,10 @@ enum CommandRanker {
         // Sites already offered, so a popular site doesn't repeat one of your own.
         var offeredHosts = Set(literalURL.map { [$0.displayHost] } ?? [])
 
-        for tab in browser.tabs where tab.id != browser.selectedID {
+        // Typing for a private tab, a normal tab isn't offered: Return would
+        // switch to it and leave private browsing.
+        for tab in browser.tabs where tab.id != browser.selectedID
+            && (browser.commandMode != .privateTab || tab.isPrivate) {
             if let value = score(title: tab.displayTitle, host: tab.url?.displayHost ?? "", base: 760) {
                 ranked.append((value, tabItem(tab)))
                 offeredHosts.insert(tab.url?.displayHost ?? "")
