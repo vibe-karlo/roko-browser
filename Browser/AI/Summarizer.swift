@@ -415,7 +415,7 @@ nonisolated enum ResearchDepth: Equatable {
     /// Choosing or planning: comparisons, the best of something, whether it's
     /// worth it, a trip. Explanations ("why", "how does") are standard: one
     /// good source explains as well as eight.
-    private static let deepCues = [
+    fileprivate static let deepCues = [
         " vs ", " versus ", " compare", " comparison", " difference", " pros and cons", " best ", " top ",
         " review", " should i ", " worth ", " alternative", " plan ", " itinerary", " guide", " recommend",
         " usporedb", " razlik", " najbolj", " isplati", " prednost", " nedostat", " mane ", " recenzij",
@@ -440,6 +440,33 @@ nonisolated enum ResearchDepth: Equatable {
     }
 
     var model: ClaudeClient.Model { self == .quick ? .haiku : .sonnet }
+
+    /// Whether a typed query asks for an answer rather than for a page: a
+    /// question ("can dogs eat grapes", "zašto…"), a comparison or a decision.
+    /// Keywords, site names, weather, maps and logins stay searches: the
+    /// search engine's own results answer those better.
+    static func prefersAnswer(_ query: String) -> Bool {
+        let words = query.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        guard words.count >= 3, let first = words.first else { return false }
+        let text = " " + words.joined(separator: " ") + " "
+        if searchCues.contains(where: text.contains) { return false }
+        return query.trimmingCharacters(in: .whitespaces).hasSuffix("?")
+            || questionStarts.contains(first)
+            || text.contains(" or ") || text.contains(" ili ")  // "iPhone or Pixel": a choice
+            || deepCues.contains(where: text.contains)
+    }
+
+    private static let questionStarts: Set<String> = [
+        "what", "who", "whose", "when", "where", "why", "how", "which", "should", "can", "could", "would",
+        "will", "is", "are", "was", "were", "do", "does", "did",
+        "što", "sto", "šta", "tko", "kada", "kad", "gdje", "zašto", "zasto", "kako", "koji", "koja", "koje",
+        "koliko", "kolika", "je", "ima", "isplati", "trebam", "trebaš", "mogu", "može", "smijem",
+    ]
+    private static let searchCues = [
+        " weather", " vrijeme u ", " prognoza", " near me", " u blizini", " login", " log in", " sign in",
+        " prijava", " download", " preuzmi", " youtube", " reddit", " wikipedia", " map ", " maps ",
+        " karta ", " lyrics", " tekst pjesme", " live ", " uživo", " stock price",
+    ]
 
     var effort: String {
         switch self { case .quick: "low"; case .standard: "medium"; case .deep: "high" }

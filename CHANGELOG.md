@@ -21,6 +21,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - The address bar no longer lists open pages before you type; they show up when they match, marked "Already open".
 - The address bar opens in one move: no dark overlay fading in over the page.
 - Browse for Me's suggestion has a sparkle and says what it does: "Reads the web and answers".
+- A question, comparison or decision puts Browse for Me first, so Return answers it; keywords, sites, weather and logins still search first.
 - Phosphor icons throughout.
 - The page menu is a panel flush with the bottom edge.
 - Private mode is an eye that blinks shut, instead of glasses.

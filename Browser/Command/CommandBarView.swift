@@ -345,8 +345,12 @@ enum CommandRanker {
                                             kind: "Search", icon: .glyph(.search), action: .search(query))))
             // A question, not a word: one word is usually an address being typed.
             if query.contains(" ") {
+                // A question, a comparison or a decision is better answered than
+                // searched: then Browse for Me goes first, so Return runs it,
+                // with the plain search right under it.
+                let score = ResearchDepth.prefersAnswer(query) ? 905 : 850
                 // Says what it does; the question itself is already in the field.
-                ranked.append((850, CommandItem(id: "browse-\(query)", title: "Browse for me", subtitle: "Reads the web and answers",
+                ranked.append((score, CommandItem(id: "browse-\(query)", title: "Browse for me", subtitle: "Reads the web and answers",
                                                 kind: "AI", icon: .glyph(.browse), action: .browse(query))))
             }
         }
