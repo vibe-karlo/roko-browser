@@ -19,6 +19,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Croatian pages are summarized by Claude Haiku when there's an API key; Apple's on-device model writes poor Croatian. English stays on the iPhone.
 - Claude summaries use Haiku 5.5, and Browse for Me uses Haiku for quick questions and Sonnet 5.5 for the rest, instead of Opus.
 - The address bar no longer lists open pages before you type; they show up when they match, marked "Already open".
+- The address bar opens in one move: no dark overlay fading in over the page.
 - Browse for Me's suggestion has a sparkle and says what it does: "Reads the web and answers".
 - Phosphor icons throughout.
 - The page menu is a panel flush with the bottom edge.

@@ -84,7 +84,8 @@ struct BrowserView: View {
         .overlay {
             if browser.panel == .command {
                 CommandBarView()
-                    .transition(.opacity)
+                    // Quick: it swaps places with the bar, and the keyboard brings the motion.
+                    .transition(.opacity.animation(.easeOut(duration: 0.12)))
             }
         }
         .overlay {
@@ -162,8 +163,7 @@ struct BrowserView: View {
 
     /// Text that reads on whatever is behind the status bar.
     private var statusBarStyle: UIStatusBarStyle {
-        // The summary and the command bar sit on the app's own canvas, whatever the page's colour.
-        if browser.summary != nil || browser.panel == .command { return .default }
+        if browser.summary != nil { return .default }  // the summary sits on the app's own canvas
         if browser.panel == .tabs { return .lightContent }  // the switcher is always dark
         guard let color = browser.selectedTab?.topColor else { return .default }
         return color.isLight ? .darkContent : .lightContent

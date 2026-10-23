@@ -41,11 +41,13 @@ struct CommandBarView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // A solid graphite floor: a see-through veil mixed with the page
-            // behind it (yellow under dark turns to mud) and tinted the keyboard.
-            Theme.canvas.opacity(browser.selectedTab == nil ? 0 : 0.97)
-                .ignoresSafeArea()
+            // Nothing laid over the page: the panel is the only thing that
+            // opens, riding up with the keyboard in one move. A full-screen
+            // veil fading in on top made opening feel like two steps.
+            // A tap anywhere above the panel closes it.
+            Color.clear
                 .contentShape(.rect)
+                .ignoresSafeArea()
                 .onTapGesture { dismiss() }
 
             VStack(spacing: 0) {
