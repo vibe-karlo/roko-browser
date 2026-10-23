@@ -26,9 +26,11 @@ struct SummaryView: View {
                                 .id("card")
                             content
                                 .opacity(settled ? 1 : 0)
-                                .offset(y: settled ? 0 : 40)
-                                // Out quickly on close, so only the card is moving.
-                                .animation(settled ? nil : .easeOut(duration: 0.15), value: settled)
+                                .offset(y: settled ? 0 : 16)
+                                // In once the card has landed; out at once on close,
+                                // so only the card is ever moving.
+                                .animation(settled ? .easeOut(duration: 0.35).delay(0.38) : .easeOut(duration: 0.12),
+                                           value: settled)
                         }
                         .padding(.bottom, 24)
                     }
@@ -90,7 +92,10 @@ struct SummaryView: View {
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.secondaryInk)
             }
+            // Appears only once the card has reached its size, never across it.
             .opacity(settled ? 1 : 0)
+            .offset(y: settled ? 0 : 10)
+            .animation(settled ? .easeOut(duration: 0.3).delay(0.3) : .easeOut(duration: 0.1), value: settled)
         }
         .padding(.horizontal, inset)
         .padding(.top, settled ? 12 : 0)

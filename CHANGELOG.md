@@ -17,6 +17,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - The page no longer zooms out under the summary card while pinching.
+- The summary's title no longer passes over the card as it lands.
 
 ## [0.1.0] - 2026-10-23
 
