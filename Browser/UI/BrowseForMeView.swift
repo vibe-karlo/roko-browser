@@ -1,82 +1,221 @@
 import SwiftUI
+import WebKit
 
-/// A page written for one question, from several sources read on your behalf.
-/// While it works, it shows the work: your question, then each site as it is
-/// read. Then the answer, with its sources and pictures up front.
+/// A page written for a question, from several sources read on your behalf,
+/// that grows as you ask follow-ups: each is a new section below the last,
+/// answered with the page so far in mind. While a section is being worked on
+/// it shows the work (each site as it's read, over a warm light that rises as
+/// they are), then the answer with its pictures and sources.
 ///
-/// Full screen, like Summarize, on the same plain canvas: it's for reading.
-/// Its one flourish has a job: when the answer arrives, the icons of the sites
-/// it read fly up into the row of sources, so the list visibly becomes them.
+/// Full screen, like Summarize. A switch at the bottom flips the whole page to
+/// the search engine's results for the latest question and back, losing nothing.
 struct BrowseForMeView: View {
     @Environment(BrowserModel.self) private var browser
-    let model: BrowseForMeModel
-    /// Pairs each site's icon in the reading list with the same icon in the source row.
+    @Bindable var session: BrowseSession
+    /// Pairs each site's icon in a reading list with the same icon in its source row.
     @Namespace private var icons
-    /// Rewording the question, in place.
-    @State private var editing = false
-    @State private var draft = ""
-    @FocusState private var fieldFocused: Bool
 
-    private var isWorking: Bool {
-        switch model.phase {
-        case .searching, .reading: true
-        case .writing: model.text.isEmpty
-        case .done, .failed: false
+    private var latest: BrowseForMeModel { session.latest }
+
+    var body: some View {
+        ZStack {
+            answers
+                .opacity(session.showsSearch ? 0 : 1)
+                .allowsHitTesting(!session.showsSearch)
+            if session.showsSearch, let webView = session.searchView {
+                SearchResults(webView: webView)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: session.showsSearch)
+        .safeAreaInset(edge: .bottom, spacing: 0) { footer }
+        .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas).opacity(session.showsSearch ? 0 : 1) }
+        .background { background }
+        .foregroundStyle(Theme.ink)
+        .accessibilityAddTraits(.isModal)
+        .sensoryFeedback(.success, trigger: latest.phase == .done)
+    }
+
+    /// The canvas, and while the latest question is being worked on, the light.
+    private var background: some View {
+        ZStack {
+            Theme.canvas
+            if latest.isWorking && !session.showsSearch {
+                WorkingGlow(progress: latest.progress)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.8), value: latest.isWorking)
+        .ignoresSafeArea()
+    }
+
+    // MARK: Answers
+
+    private var answers: some View {
+        ScrollViewReader { scroller in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(session.turns.enumerated()), id: \.element.id) { index, turn in
+                        // Where a new section is scrolled to.
+                        Color.clear.frame(height: 0).id(ObjectIdentifier(turn))
+                        TurnSection(turn: turn, isLatest: index == session.turns.count - 1, icons: icons,
+                                    reword: { session.reask(turn, as: $0) },
+                                    ask: { session.ask($0) },
+                                    open: open)
+                            .padding(.top, index == 0 ? 0 : 56)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 22)
+                .padding(.top, 26)
+                .padding(.bottom, 24)
+            }
+            // A follow-up's section comes into view just under the status bar.
+            // (Not anchor .top: in full screen that's under the status bar.)
+            .onChange(of: session.turns.count) { old, new in
+                guard new > old else { return }
+                withAnimation(.snappy(duration: 0.45)) {
+                    scroller.scrollTo(ObjectIdentifier(latest), anchor: UnitPoint(x: 0.5, y: 0.09))
+                }
+            }
+            // Pulling down past the top closes it, as the sheet it replaces did.
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentOffset.y < -geometry.contentInsets.top - 90
+            } action: { _, pulledPastTop in
+                if pulledPastTop { close() }
+            }
         }
     }
 
-    var body: some View {
-        // No scrolling to the top when the answer arrives: the view is already
-        // there, and in full screen scrollTo pulled the question under the status bar.
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                question
-                    .padding(.top, isWorking ? 24 : 0)
+    // MARK: Footer
 
-                if isWorking {
-                    working
-                } else if case .failed(let message) = model.phase {
-                    Text(message).foregroundStyle(Theme.secondaryInk)
-                } else {
-                    // Pictures first, then the sources: the faces of the answer
-                    // up top, its footnotes compact beneath them.
-                    if !model.images.isEmpty { pictures }
-                    if !model.sources.isEmpty { sources }
-                    MarkdownText(markdown: model.answer, isStreaming: model.phase == .writing)
-                    if !model.followUps.isEmpty { followUps }
-                }
+    private var footer: some View {
+        HStack(spacing: 12) {
+            AnswerOrSearch(showsSearch: $session.showsSearch)
+            Spacer(minLength: 8)
+            Button(action: close) {
+                Glyph(.close, size: 16, weight: 2)
+                    .frame(width: 44, height: 44)
+                    .background(Theme.raised, in: .circle)
+                    .contentShape(.circle)
             }
-            .animation(.snappy(duration: 0.4), value: isWorking)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 22)
-            .padding(.top, 26)
-            .padding(.bottom, 24)
+            .buttonStyle(GlyphButtonStyle())
+            .accessibilityLabel("Close")
         }
-        // Pulling down past the top closes it, as the sheet it replaces did.
-        .onScrollGeometryChange(for: Bool.self) { geometry in
-            geometry.contentOffset.y < -geometry.contentInsets.top - 90
-        } action: { _, pulledPastTop in
-            if pulledPastTop { close() }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 10)
+        // See-through while the light is up, so its brightest part shows.
+        .background(Theme.canvas.opacity(latest.isWorking && !session.showsSearch ? 0 : 1))
+        .background(alignment: .top) {
+            FadeEdge(color: Theme.canvas).opacity(latest.isWorking || session.showsSearch ? 0 : 1)
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) { footer }
-        .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas) }
-        .background(Theme.canvas.ignoresSafeArea())
-        .foregroundStyle(Theme.ink)
-        .accessibilityAddTraits(.isModal)
-        .sensoryFeedback(.success, trigger: model.phase == .done)
     }
 
     private func close() {
         withAnimation(.spring(duration: 0.35, bounce: 0)) { browser.browseForMe = nil }
     }
 
+    private func open(_ url: URL) {
+        browser.browseForMe = nil
+        browser.open(url, inNewTab: true)
+    }
+}
+
+/// Answer or search results, for the whole page. The selection slides between them.
+private struct AnswerOrSearch: View {
+    @Binding var showsSearch: Bool
+    @Namespace private var selection
+
+    var body: some View {
+        HStack(spacing: 0) {
+            segment(.browse, "Answer", isOn: !showsSearch) { showsSearch = false }
+            segment(.search, SearchEngine.current.name, isOn: showsSearch) { showsSearch = true }
+        }
+        .padding(3)
+        .background(Theme.raised, in: .capsule)
+        .animation(.snappy(duration: 0.28), value: showsSearch)
+        .sensoryFeedback(.selection, trigger: showsSearch)
+    }
+
+    private func segment(_ glyph: Glyph.Kind, _ title: String, isOn: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Glyph(glyph, size: 14)
+                Text(title).font(.system(size: 14, weight: .medium))
+            }
+            .foregroundStyle(isOn ? Theme.ink : Theme.secondaryInk)
+            .fixedSize()
+            .padding(.horizontal, 13)
+            .frame(height: 38)
+            .background {
+                if isOn {
+                    Capsule().fill(Theme.ink.opacity(0.12))
+                        .matchedGeometryEffect(id: "selection", in: selection)
+                }
+            }
+            .contentShape(.capsule)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
+}
+
+/// The search engine's results, live: scroll, tap through, and flip back.
+private struct SearchResults: UIViewRepresentable {
+    let webView: WKWebView
+
+    func makeUIView(context: Context) -> WKWebView { webView }
+    func updateUIView(_ webView: WKWebView, context: Context) {}
+}
+
+/// One question on the page and its answer.
+private struct TurnSection: View {
+    let turn: BrowseForMeModel
+    /// The last section: it gets the follow-ups.
+    let isLatest: Bool
+    let icons: Namespace.ID
+    let reword: (String) -> Void
+    let ask: (String) -> Void
+    let open: (URL) -> Void
+
+    /// Rewording the question, in place.
+    @State private var editing = false
+    @State private var draft = ""
+    @FocusState private var fieldFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 28) {
+            question
+                .padding(.top, turn.isWorking ? 24 : 0)
+
+            if turn.isWorking {
+                working
+            } else if case .failed(let message) = turn.phase {
+                Text(message).foregroundStyle(Theme.secondaryInk)
+            } else {
+                // Pictures first, then the sources: the faces of the answer
+                // up top, its footnotes compact beneath them.
+                if !turn.images.isEmpty { pictures }
+                if !turn.sources.isEmpty { sources }
+                MarkdownText(markdown: turn.answer, isStreaming: turn.phase == .writing)
+                if !credit.isEmpty {
+                    Text(credit)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.faintInk)
+                }
+                if isLatest, !turn.followUps.isEmpty { followUps }
+            }
+        }
+        .animation(.snappy(duration: 0.4), value: turn.isWorking)
+    }
+
     // MARK: The question
 
-    /// The question, large while it's being worked on and quiet above the
-    /// answer. Tap it to reword it; Return asks again.
+    /// Large while it's being worked on, quiet above the answer. Tap it to
+    /// reword it; Return asks again from there.
     @ViewBuilder
     private var question: some View {
-        let font = Font.system(size: isWorking ? 30 : 17, weight: .semibold)
+        let font = Font.system(size: turn.isWorking ? 30 : 17, weight: .semibold)
         if editing {
             TextField("Ask anything", text: $draft)
                 .font(font)
@@ -85,18 +224,18 @@ struct BrowseForMeView: View {
                 .focused($fieldFocused)
                 .submitLabel(.go)
                 .autocorrectionDisabled()
-                .onSubmit(ask)
+                .onSubmit(submit)
                 .onAppear { fieldFocused = true }
                 .onChange(of: fieldFocused) { _, focused in if !focused { editing = false } }
         } else {
             Button {
-                draft = model.query
+                draft = turn.query
                 editing = true
             } label: {
-                Text(model.query)
+                Text(turn.query)
                     .font(font)
-                    .foregroundStyle(isWorking ? Theme.ink : Theme.secondaryInk)
-                    .lineLimit(isWorking ? 4 : 2)
+                    .foregroundStyle(turn.isWorking ? Theme.ink : Theme.secondaryInk)
+                    .lineLimit(turn.isWorking ? 4 : 2)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(.rect)
@@ -106,41 +245,11 @@ struct BrowseForMeView: View {
         }
     }
 
-    private func ask() {
+    private func submit() {
         let question = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         editing = false
-        guard !question.isEmpty, question != model.query else { return }
-        browser.browse(for: question)
-    }
-
-    // MARK: Follow-ups
-
-    /// What to ask next, when the answer suggests it. Each opens a new answer.
-    private var followUps: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(model.followUps, id: \.self) { question in
-                Button { browser.browse(for: question) } label: {
-                    HStack(alignment: .firstTextBaseline, spacing: 10) {
-                        Glyph(.browse, size: 15)
-                            .foregroundStyle(Theme.secondaryInk)
-                            .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 2 }
-                        Text(question)
-                            .font(.system(size: 16))
-                            .foregroundStyle(Theme.ink)
-                            .multilineTextAlignment(.leading)
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                    .background(Theme.raised, in: .rect(cornerRadius: 16))
-                    .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.edge))
-                    .contentShape(.rect)
-                }
-                .buttonStyle(RowButtonStyle())
-            }
-        }
-        .padding(.top, 4)
-        .transition(.opacity)
+        guard !question.isEmpty, question != turn.query else { return }
+        reword(question)
     }
 
     // MARK: Working
@@ -150,10 +259,10 @@ struct BrowseForMeView: View {
         VStack(alignment: .leading, spacing: 14) {
             StatusLine(text: statusText, font: .system(size: 20, weight: .medium))
             VStack(alignment: .leading, spacing: 10) {
-                ForEach(model.steps) { step in
+                ForEach(turn.steps) { step in
                     HStack(spacing: 12) {
                         SiteIcon(host: step.url.displayHost, size: 18, remote: true)
-                            .matchedGeometryEffect(id: step.url.absoluteString, in: icons)
+                            .matchedGeometryEffect(id: iconID(step.url), in: icons)
                             .opacity(step.state == .reading ? 0.45 : 1)
                         // Read: the site lights up from faint to ink. Nothing tacked on beside it.
                         Text(step.url.displayHost)
@@ -164,16 +273,21 @@ struct BrowseForMeView: View {
                     .transition(.offset(y: 8).combined(with: .opacity))
                 }
             }
-            .animation(.easeOut(duration: 0.3), value: model.steps)
+            .animation(.easeOut(duration: 0.3), value: turn.steps)
         }
     }
 
     private var statusText: String {
-        switch model.phase {
-        case .searching(let query): query.isEmpty || query == model.query ? "Searching the web" : "Searching \u{201C}\(query)\u{201D}"
+        switch turn.phase {
+        case .searching(let query): query.isEmpty || query == turn.query ? "Searching the web" : "Searching \u{201C}\(query)\u{201D}"
         case .reading(let count): "Reading \(count) web pages"
         default: "Writing your answer"
         }
+    }
+
+    /// Per section, so the same site in two sections flies to its own row.
+    private func iconID(_ url: URL) -> String {
+        "\(ObjectIdentifier(turn).hashValue)|\(url.absoluteString)"
     }
 
     // MARK: Answer
@@ -183,22 +297,22 @@ struct BrowseForMeView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 HStack(spacing: -5) {
-                    ForEach(model.sources.prefix(6)) { source in
+                    ForEach(turn.sources.prefix(6)) { source in
                         // Arrives from its place in the reading list.
                         SiteIcon(host: source.url.displayHost, size: 18, remote: true)
-                            .matchedGeometryEffect(id: source.url.absoluteString, in: icons)
+                            .matchedGeometryEffect(id: iconID(source.url), in: icons)
                             .padding(2)
                             .background(Theme.canvas, in: .rect(cornerRadius: 6))
                     }
                 }
                 // The pages the answer rests on, not every search hit along the way.
-                Text("Based on \(model.sources.count) \(model.sources.count == 1 ? "page" : "pages")")
+                Text("Based on \(turn.sources.count) \(turn.sources.count == 1 ? "page" : "pages")")
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.secondaryInk)
             }
             ScrollView(.horizontal) {
                 HStack(spacing: 8) {
-                    ForEach(model.sources) { source in
+                    ForEach(turn.sources) { source in
                         Button { open(source.url) } label: {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(source.title)
@@ -233,7 +347,7 @@ struct BrowseForMeView: View {
     private var pictures: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 8) {
-                ForEach(model.images, id: \.self) { url in
+                ForEach(turn.images, id: \.self) { url in
                     AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.3))) { phase in
                         if let image = phase.image {
                             image.resizable().scaledToFill()
@@ -250,57 +364,42 @@ struct BrowseForMeView: View {
         .scrollClipDisabled()
     }
 
-    private var footer: some View {
-        HStack(spacing: 12) {
-            // From the start, not only once the answer is in: if it's taking
-            // long, the search engine is one tap away (and the answer stops).
-            Button {
-                open(SearchEngine.current.searchURL(for: model.query))
-            } label: {
-                HStack(spacing: 8) {
-                    Glyph(.search, size: 15)
-                    Text(SearchEngine.current.name).font(.system(size: 15, weight: .medium))
+    // MARK: Follow-ups
+
+    /// What to ask next, when the answer suggests it. Each adds a section below.
+    private var followUps: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(turn.followUps, id: \.self) { question in
+                Button { ask(question) } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Glyph(.browse, size: 15)
+                            .foregroundStyle(Theme.secondaryInk)
+                            .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 2 }
+                        Text(question)
+                            .font(.system(size: 16))
+                            .foregroundStyle(Theme.ink)
+                            .multilineTextAlignment(.leading)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .background(Theme.raised, in: .rect(cornerRadius: 16))
+                    .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.edge))
+                    .contentShape(.rect)
                 }
-                .fixedSize()
-                .padding(.horizontal, 16)
-                .frame(height: 44)
-                .background(Theme.raised, in: .capsule)
-                .contentShape(.capsule)
+                .buttonStyle(RowButtonStyle())
             }
-            .buttonStyle(GlyphButtonStyle())
-            .accessibilityLabel("Search \(SearchEngine.current.name) instead")
-            Text(credit)
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.faintInk)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-            Spacer(minLength: 8)
-            Button(action: close) {
-                Glyph(.close, size: 16, weight: 2)
-                    .frame(width: 44, height: 44)
-                    .background(Theme.raised, in: .circle)
-                    .contentShape(.circle)
-            }
-            .buttonStyle(GlyphButtonStyle())
-            .accessibilityLabel("Close")
         }
-        .padding(.horizontal, 22)
-        .padding(.vertical, 10)
-        .background(Theme.canvas)
-        .background(alignment: .top) { FadeEdge(color: Theme.canvas) }
+        .padding(.top, 4)
+        .transition(.opacity)
     }
 
     private var credit: String {
-        guard model.phase == .done else { return "" }
-        switch model.engine {
+        guard turn.phase == .done else { return "" }
+        switch turn.engine {
         case "Claude": return "By Claude"
         case "Apple Intelligence": return "By Apple Intelligence"
         default: return "Written on this iPhone"
         }
-    }
-
-    private func open(_ url: URL) {
-        browser.browseForMe = nil
-        browser.open(url, inNewTab: true)
     }
 }

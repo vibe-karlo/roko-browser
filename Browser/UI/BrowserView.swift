@@ -104,12 +104,9 @@ struct BrowserView: View {
             }
         }
         .overlay {
-            if let model = browser.browseForMe {
+            if let session = browser.browseForMe {
                 // Full screen, rising from the bar where the question was asked.
-                // One identity for every answer, so a follow-up or a reworded
-                // question changes the page in place instead of rising again.
-                BrowseForMeView(model: model)
-                    .id("browse-for-me")
+                BrowseForMeView(session: session)
                     .transition(.move(edge: .bottom))
             }
         }

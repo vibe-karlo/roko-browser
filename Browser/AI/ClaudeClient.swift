@@ -65,12 +65,18 @@ struct ClaudeClient {
     /// Streams one answer. With `searches` above zero, Claude searches and reads
     /// the web itself on Anthropic's servers, up to that many times; the app
     /// only renders what comes back.
-    func stream(system: String, prompt: String, model: Model = .sonnet, effort: String, maxTokens: Int = 32_000,
+    /// `history`: earlier questions and answers in the same conversation, sent
+    /// as plain text turns (no tool calls), so a follow-up costs little extra.
+    func stream(system: String, prompt: String, history: [(question: String, answer: String)] = [],
+                model: Model = .sonnet, effort: String, maxTokens: Int = 32_000,
                 searches: Int = 0) -> AsyncThrowingStream<ClaudeEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    var messages: [[String: Any]] = [["role": "user", "content": prompt]]
+                    var messages: [[String: Any]] = history.flatMap { turn in
+                        [["role": "user", "content": turn.question], ["role": "assistant", "content": turn.answer]]
+                    }
+                    messages.append(["role": "user", "content": prompt])
                     // A long search turn can pause; sending the partial turn back resumes it.
                     for _ in 0..<5 {
                         let turn = try await send(system: system, messages: messages, model: model, effort: effort,

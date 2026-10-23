@@ -61,6 +61,16 @@ final class SummaryModel: Identifiable {
         self.snapshot = snapshot
     }
 
+    /// Reading the page or waiting for the first words: the light is up.
+    var isWorking: Bool {
+        phase == .reading || phase == .writing && text.isEmpty
+    }
+
+    /// For the light: lower while the page is read, higher while the first words come.
+    var progress: Double {
+        phase == .reading ? 0.35 : 0.8
+    }
+
     func run(webView: WKWebView) async {
         let page: ReadablePage
         do {
@@ -227,10 +237,35 @@ final class BrowseForMeModel: Identifiable {
     private(set) var images: [URL] = []
     private(set) var phase: Phase = .searching("")
     private(set) var engine = ""
+    /// Earlier questions and answers on the same page, for a follow-up.
+    let context: [(question: String, answer: String)]
 
-    init(query: String) {
+    init(query: String, context: [(question: String, answer: String)] = []) {
         self.query = query
+        self.context = context
         depth = ResearchDepth.of(query)
+    }
+
+    /// Still finding: no answer text yet.
+    var isWorking: Bool {
+        switch phase {
+        case .searching, .reading: true
+        case .writing: text.isEmpty
+        case .done, .failed: false
+        }
+    }
+
+    /// How far along the finding is, 0 to 1, for the light that rises while you wait.
+    var progress: Double {
+        switch phase {
+        case .searching:
+            // Claude's own searches turn up pages before any reading phase.
+            0.12 + 0.5 * min(1, Double(steps.count) / 8)
+        case .reading(let count):
+            0.3 + 0.5 * Double(steps.filter { $0.state != .reading }.count) / Double(max(count, 1))
+        case .writing: text.isEmpty ? 0.9 : 1
+        case .done, .failed: 1
+        }
     }
 
     @ObservationIgnored private var task: Task<Void, Never>?
@@ -368,7 +403,11 @@ final class BrowseForMeModel: Identifiable {
             if pages.count < 2 { pages = candidates.map { var page = $0; page.text = $0.snippet; return page } }
             sources = pages.map { Source(url: $0.url, title: $0.title) }
 
-            var prompt = "Question: \(query)\n\nSources:\n"
+            // A follow-up carries the page so far, briefly, so "and in winter?" makes sense.
+            var prompt = context.isEmpty ? "" : "Earlier on this page:\n" + context.map {
+                "Q: \($0.question)\nA: \($0.answer.prefix(600))"
+            }.joined(separator: "\n\n") + "\n\n"
+            prompt += "Question: \(query)\n\nSources:\n"
             for (index, page) in pages.enumerated() {
                 let entry = "\n[\(index + 1)] \(page.title) (\(page.url.displayHost))\n\(page.text)\n"
                 if prompt.count + entry.count > budget {
@@ -425,8 +464,8 @@ final class BrowseForMeModel: Identifiable {
     }
 
     private func streamClaude(_ client: ClaudeClient, model: ClaudeClient.Model) async throws {
-        for try await event in client.stream(system: Self.claudeInstructions(depth), prompt: query, model: model,
-                                             effort: depth.effort, searches: depth.searches) {
+        for try await event in client.stream(system: Self.claudeInstructions(depth), prompt: query, history: context,
+                                             model: model, effort: depth.effort, searches: depth.searches) {
             switch event {
             case .searching(let query):
                 phase = .searching(query)

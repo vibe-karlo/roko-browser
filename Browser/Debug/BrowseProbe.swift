@@ -15,18 +15,37 @@ enum BrowseProbe {
         return arguments.indices.dropLast().filter { arguments[$0] == "-browse" }.map { arguments[$0 + 1] }
     }
 
+    /// Follow-ups to ask on the last question's page: `-then "and in winter?"`.
+    static var followUps: [String] {
+        let arguments = ProcessInfo.processInfo.arguments
+        return arguments.indices.dropLast().filter { arguments[$0] == "-then" }.map { arguments[$0 + 1] }
+    }
+
     static func run() async {
+        var last: BrowseForMeModel?
         for question in questions {
-            AITrace.start("BROWSE \"\(question)\"")
             let model = BrowseForMeModel(query: question)
-            AITrace.log("depth \(model.depth)")
-            let watch = Task { await watchPhases(of: model) }
-            await model.run()
-            watch.cancel()
-            AITrace.log("done: \(model.phase) engine=\(model.engine) sources=\(model.sources.count) chars=\(model.text.count)")
-            print("PROBE answer >>>\n\(model.text)\n<<<")
+            await measure(model)
+            last = model
+        }
+        // Follow-ups carry the page so far, as BrowseSession.ask does.
+        var context = last.map { [(question: $0.query, answer: $0.answer)] } ?? []
+        for question in followUps {
+            let model = BrowseForMeModel(query: question, context: context)
+            await measure(model)
+            context.append((question: model.query, answer: model.answer))
         }
         print("PROBE finished")
+    }
+
+    private static func measure(_ model: BrowseForMeModel) async {
+        AITrace.start("BROWSE \"\(model.query)\" context=\(model.context.count)")
+        AITrace.log("depth \(model.depth)")
+        let watch = Task { await watchPhases(of: model) }
+        await model.run()
+        watch.cancel()
+        AITrace.log("done: \(model.phase) engine=\(model.engine) sources=\(model.sources.count) chars=\(model.text.count)")
+        print("PROBE answer >>>\n\(model.text)\n<<<")
     }
 
     /// Notes each phase change (searching, reading, writing) as it happens.

@@ -14,9 +14,10 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Address suggestions show the real icon of 150 popular sites, bundled, with no network request.
 - Haptics when a toast confirms an action, a tab is thrown away, or the bar swipes to the next tab.
 - Settings → Use Claude: turn Claude off without deleting the API key; Apple's models then do everything.
-- Browse for Me suggests two or three follow-up questions under the answer when they'd help; tap one to ask it.
-- Tap the question in Browse for Me to reword it.
-- Browse for Me's Google button is there from the start, so a slow answer can be swapped for a search; closing or switching stops the answer and its spending.
+- Browse for Me suggests two or three follow-up questions under the answer when they'd help. Asking one adds a new section to the same page, answered with the earlier answers as context.
+- Tap a question in Browse for Me to reword it; that section and the ones after it are asked again.
+- An Answer / Google switch flips the Browse for Me page to the search results and back, from the start, losing neither. Closing the page stops any answer still being written.
+- roko's orange light: while Browse for Me or Summarize works, a warm light rises from the bottom edge as pages are read, and leaves when the answer starts.
 - Browse for Me matches the question: a quick fact gets a short answer from three sources; a comparison, a "best" or a plan reads more sites and writes more.
 
 ### Changed
