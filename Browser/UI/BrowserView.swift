@@ -18,9 +18,9 @@ struct BrowserView: View {
             // colour ever shows at the bottom of the screen.
             GeometryReader { proxy in
                 VStack(spacing: 0) {
-                    (pinchScale < 1 ? Theme.canvas : browser.selectedTab?.topColor.map(Color.init) ?? Theme.canvas)
+                    (pinchScale < 1 || browser.summaryCoversPage && browser.summary?.isClosing != true ? Theme.canvas : browser.selectedTab?.topColor.map(Color.init) ?? Theme.canvas)
                         .frame(height: proxy.safeAreaInsets.top)
-                    (pinchScale < 1 ? Theme.canvas : browser.selectedTab?.bottomColor.map(Color.init) ?? Theme.canvas)
+                    (pinchScale < 1 || browser.summaryCoversPage && browser.summary?.isClosing != true ? Theme.canvas : browser.selectedTab?.bottomColor.map(Color.init) ?? Theme.canvas)
                 }
                 .ignoresSafeArea()
             }
@@ -37,8 +37,10 @@ struct BrowserView: View {
                     },
                     onPinchChange: { scale in
                         if let scale {
+                            browser.preparePinchSnapshot()
                             pinchScale = scale
                         } else if browser.summary == nil {
+                            browser.cancelPinchSnapshot()
                             withAnimation(.spring(duration: 0.35, bounce: 0.25)) { pinchScale = 1 }
                         }
                     },

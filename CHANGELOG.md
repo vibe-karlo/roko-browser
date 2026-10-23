@@ -18,7 +18,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - The page no longer zooms out under the summary card while pinching.
-- The summary's title no longer passes over the card as it lands.
+- Summarize opens and closes seamlessly: the card and the page swap only where they match exactly.
 - A site's header colour no longer shows at the bottom of the screen.
 
 ## [0.1.0] - 2026-10-23

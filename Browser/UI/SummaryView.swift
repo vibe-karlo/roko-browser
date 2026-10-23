@@ -10,6 +10,8 @@ struct SummaryView: View {
 
     /// False: the card fills the screen as the page did. True: it's the card.
     @State private var settled = false
+    /// The title and summary show only once the card has come to rest.
+    @State private var textShown = false
     private let cardHeight: CGFloat = 210
 
     var body: some View {
@@ -25,12 +27,8 @@ struct SummaryView: View {
                             card(width: proxy.size.width)
                                 .id("card")
                             content
-                                .opacity(settled ? 1 : 0)
-                                .offset(y: settled ? 0 : 16)
-                                // In once the card has landed; out at once on close,
-                                // so only the card is ever moving.
-                                .animation(settled ? .easeOut(duration: 0.35).delay(0.38) : .easeOut(duration: 0.12),
-                                           value: settled)
+                                .opacity(textShown ? 1 : 0)
+                                .offset(y: textShown || model.isClosing ? 0 : 12)
                         }
                         .padding(.bottom, 24)
                     }
@@ -44,14 +42,16 @@ struct SummaryView: View {
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 footer
-                    .opacity(settled ? 1 : 0)
+                    .opacity(textShown ? 1 : 0)
             }
         }
         .sensoryFeedback(.success, trigger: model.phase == .done)
         .onAppear {
             // The card now sits exactly where the page was: hide the page.
             browser.summaryCoversPage = true
-            withAnimation(.spring(duration: 0.6, bounce: 0.16)) { settled = true }
+            withAnimation(.spring(duration: 0.5, bounce: 0.1)) { settled = true } completion: {
+                withAnimation(.easeOut(duration: 0.28)) { textShown = true }
+            }
         }
     }
 
@@ -93,9 +93,8 @@ struct SummaryView: View {
                     .foregroundStyle(Theme.secondaryInk)
             }
             // Appears only once the card has reached its size, never across it.
-            .opacity(settled ? 1 : 0)
-            .offset(y: settled ? 0 : 10)
-            .animation(settled ? .easeOut(duration: 0.3).delay(0.3) : .easeOut(duration: 0.1), value: settled)
+            .opacity(textShown ? 1 : 0)
+            .offset(y: textShown || model.isClosing ? 0 : 8)
         }
         .padding(.horizontal, inset)
         .padding(.top, settled ? 12 : 0)
@@ -147,11 +146,19 @@ struct SummaryView: View {
         .background(Theme.canvas)
     }
 
+    /// The card grows back to exactly the page's size and place; only then is
+    /// it swapped for the live page, in one frame, so the hand-over can't be seen.
     private func close() {
-        // The page comes back underneath, full size, as the card grows into it.
-        browser.summaryCoversPage = false
-        withAnimation(.spring(duration: 0.5, bounce: 0.05)) { settled = false } completion: {
-            browser.summary = nil
+        model.startScale = 1
+        textShown = false  // at once: only the card moves on the way out
+        withAnimation(.easeOut(duration: 0.3)) { model.isClosing = true }
+        withAnimation(.spring(duration: 0.45, bounce: 0)) { settled = false } completion: {
+            var swap = Transaction()
+            swap.disablesAnimations = true
+            withTransaction(swap) {
+                browser.summaryCoversPage = false
+                browser.summary = nil
+            }
         }
     }
 

@@ -179,13 +179,29 @@ final class BrowserModel {
 
     /// Opens the full-screen summary. `fromScale` is how far a pinch had already
     /// shrunk the page, so the card continues from exactly there.
+    /// The page as it was when a pinch began, taken then so the summary can
+    /// open the instant the fingers lift.
+    @ObservationIgnored private var pinchSnapshot: Task<UIImage?, Never>?
+
+    func preparePinchSnapshot() {
+        guard pinchSnapshot == nil, let tab = selectedTab else { return }
+        pinchSnapshot = Task { await tab.viewportSnapshot() }
+    }
+
+    func cancelPinchSnapshot() {
+        pinchSnapshot = nil
+    }
+
     func summarize(fromScale: CGFloat = 1) {
         guard let tab = selectedTab, let webView = tab.webView, tab.url != nil else { return }
         let model = SummaryModel(title: tab.displayTitle, host: tab.url?.displayHost ?? "", snapshot: nil)
         model.startScale = fromScale
+        let prepared = pinchSnapshot
+        pinchSnapshot = nil
         Task {
             // The page as it is on screen, so it can shrink into the card.
-            model.snapshot = await tab.viewportSnapshot() ?? tab.snapshot
+            if let prepared { model.snapshot = await prepared.value }
+            if model.snapshot == nil { model.snapshot = await tab.viewportSnapshot() ?? tab.snapshot }
             presentAfterPanelCloses { self.summary = model }
             await model.run(webView: webView)
         }
