@@ -1,0 +1,444 @@
+import SwiftData
+import SwiftUI
+
+struct CommandItem: Identifiable {
+    enum Action {
+        case open(URL), switchTab(BrowserTab), openPin(Pin), search(String),
+             browse(String), summarize, findOnPage, privateTab, settings, copy(String)
+    }
+
+    let id: String
+    let title: String
+    let subtitle: String
+    let kind: String
+    let icon: Icon
+    let action: Action
+
+    enum Icon {
+        case glyph(Glyph.Kind), site(String)
+    }
+}
+
+/// One field, one ranked list: addresses, searches, pins, open tabs, history,
+/// suggestions and page actions. The best match sits right above the field,
+/// where the thumb is, and Return runs it.
+struct CommandBarView: View {
+    @Environment(BrowserModel.self) private var browser
+    @Query(sort: \Pin.order) private var pins: [Pin]
+    @State private var query = ""
+    @State private var items: [CommandItem] = []
+    @State private var suggestions: [String] = []
+    @State private var selection = 0
+    @State private var resultsHeight: CGFloat = 0
+    @FocusState private var focused: Bool
+
+    /// Panel corner, and the row inset inside it. Rows round by the difference,
+    /// so the two curves run parallel instead of a tight corner in a loose one.
+    static let corner: CGFloat = 28
+    static let inset: CGFloat = 8
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            // A solid graphite floor: a see-through veil mixed with the page
+            // behind it (yellow under dark turns to mud) and tinted the keyboard.
+            Theme.canvas.opacity(browser.selectedTab == nil ? 0 : 0.97)
+                .ignoresSafeArea()
+                .contentShape(.rect)
+                .onTapGesture { dismiss() }
+
+            VStack(spacing: 0) {
+                results
+                if query.isEmpty && !pins.isEmpty { pinRow }
+                field
+            }
+            .foregroundStyle(Theme.ink)
+            .background(Theme.panel, in: .rect(cornerRadius: CommandBarView.corner))
+            .overlay(RoundedRectangle(cornerRadius: CommandBarView.corner).strokeBorder(Theme.edge))
+            .padding(.horizontal, 8)
+            .padding(.bottom, 8)
+            .gesture(DragGesture(minimumDistance: 30).onEnded { value in
+                if value.translation.height > 60 { dismiss() }
+            })
+        }
+        .onAppear {
+            query = browser.commandPrefill
+            rebuild()
+            focused = true
+        }
+        .onChange(of: query) {
+            selection = 0
+            rebuild()
+        }
+        .onChange(of: CurrencyRates.shared.date) { rebuild() }
+        .task(id: query) {
+            // A short pause so suggestions aren't requested for every keystroke.
+            let text = query.trimmingCharacters(in: .whitespaces)
+            guard UserDefaults.standard.object(forKey: "suggestions") as? Bool ?? true,
+                  text.count >= 2, Omnibox.url(from: text) == nil else {
+                suggestions = []
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(140))
+            guard !Task.isCancelled else { return }
+            let fetched = await SearchEngine.current.fetchSuggestions(for: text)
+            guard !Task.isCancelled else { return }
+            suggestions = Array(fetched.filter { $0.lowercased() != text.lowercased() }.prefix(4))
+            rebuild()
+        }
+    }
+
+    // MARK: Layout
+
+    private var results: some View {
+        ScrollView {
+            LazyVStack(spacing: 2) {
+                // Best match last, so it lands next to the field.
+                ForEach(Array(items.enumerated()).reversed(), id: \.element.id) { index, item in
+                    Button { perform(item) } label: {
+                        CommandRow(item: item, isSelected: index == selection && !query.isEmpty)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, Self.inset)
+            .padding(.top, Self.inset)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { resultsHeight = $0 }
+        }
+        .defaultScrollAnchor(.bottom)
+        .scrollBounceBehavior(.basedOnSize)
+        // Hug the rows; scroll only past a comfortable height.
+        .frame(height: items.isEmpty ? 0 : min(resultsHeight, 380))
+    }
+
+    /// Your pins, one tap away, right above the field where the thumb already is.
+    private var pinRow: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 0) {
+                ForEach(pins) { pin in
+                    Button { focused = false; browser.open(pin) } label: {
+                        VStack(spacing: 6) {
+                            SiteIcon(host: pin.host, size: 30)
+                            Text(pin.title.isEmpty ? pin.host : pin.title)
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.secondaryInk)
+                                .lineLimit(1)
+                        }
+                        .frame(width: 66)
+                        .padding(.vertical, 6)
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(RowButtonStyle())
+                    .accessibilityLabel(pin.title.isEmpty ? pin.host : pin.title)
+                    .contextMenu {
+                        Button("Unpin", role: .destructive) { browser.unpin(pin) }
+                    }
+                }
+            }
+            .padding(.horizontal, 10)
+        }
+        .scrollIndicators(.hidden)
+        .padding(.top, items.isEmpty ? 10 : 2)
+    }
+
+    private var field: some View {
+        HStack(spacing: 12) {
+            // While typing hides the switch, the leading mark keeps private mode visible.
+            let showsPrivate = browser.commandMode == .privateTab && !query.isEmpty
+            Glyph(showsPrivate ? .privacy : .search, size: 18)
+                .foregroundStyle(showsPrivate ? Theme.accent : Theme.secondaryInk)
+                .frame(width: 22)
+            TextField(placeholder, text: $query)
+                .font(.system(size: 17))
+                .foregroundStyle(Theme.ink)
+                .focused($focused)
+                .keyboardType(.webSearch)
+                .textInputAutocapitalization(.never)
+                // Autocorrect turns "theverge.com" into "the verge.com", a search.
+                .autocorrectionDisabled()
+                .submitLabel(.go)
+                .onSubmit {
+                    guard !query.trimmingCharacters(in: .whitespaces).isEmpty,
+                          let item = items[safe: selection] else { return }
+                    perform(item)
+                }
+                .onKeyPress(.upArrow) { move(1) }
+                .onKeyPress(.downArrow) { move(-1) }
+                .onKeyPress(.escape) { dismiss(); return .handled }
+            if !query.isEmpty {
+                Button { query = "" } label: {
+                    // A filled disc so it reads as a control at a glance; the
+                    // whole 44-point square is tappable, not just the mark.
+                    Circle()
+                        .fill(Theme.secondaryInk.opacity(0.8))
+                        .frame(width: 22, height: 22)
+                        .overlay { Glyph(.close, size: 10, weight: 2.4).foregroundStyle(Theme.panel) }
+                        .frame(width: 44, height: 44)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear")
+                .transition(.opacity)
+            } else {
+                // Same spot: the private switch while empty, the clear button once typing.
+                privateSwitch
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: query.isEmpty)
+        .padding(.horizontal, 18)
+        .frame(height: 56)
+    }
+
+    /// Arc-style private switch: the glasses light up in the accent when on.
+    private var privateSwitch: some View {
+        let isPrivate = browser.commandMode == .privateTab
+        return Button {
+            browser.commandMode = isPrivate ? .newTab : .privateTab
+        } label: {
+            Glyph(.privacy, size: 22)
+                .foregroundStyle(isPrivate ? Theme.accent : Theme.secondaryInk)
+                .frame(width: 40, height: 44)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Private")
+        .accessibilityValue(isPrivate ? "On" : "Off")
+        .accessibilityAddTraits(.isToggle)
+    }
+
+    private var placeholder: String {
+        switch browser.commandMode {
+        case .privateTab: "Private search or address"
+        case .currentTab, .newTab: "Search or enter address"
+        }
+    }
+
+    private func move(_ step: Int) -> KeyPress.Result {
+        guard !items.isEmpty else { return .ignored }
+        selection = min(max(selection + step, 0), items.count - 1)
+        return .handled
+    }
+
+    private func dismiss() {
+        focused = false
+        browser.panel = .none
+    }
+
+    // MARK: Ranking
+
+    private func rebuild() {
+        items = CommandRanker.rank(query: query, browser: browser, suggestions: suggestions)
+        // Resolve where Return would go before it's pressed.
+        switch items.first?.action {
+        case .open(let url): DNSPrefetcher.warm(url.host())
+        case .openPin(let pin): DNSPrefetcher.warm(URL(string: pin.url)?.host())
+        case .search(let text): DNSPrefetcher.warm(SearchEngine.current.searchURL(for: text).host())
+        default: break
+        }
+    }
+
+    private func perform(_ item: CommandItem) {
+        focused = false
+        switch item.action {
+        case .open(let url): browser.openFromCommandBar(url)
+        case .switchTab(let tab): browser.select(tab); browser.panel = .none
+        case .openPin(let pin): browser.open(pin)
+        case .search(let text): browser.openFromCommandBar(SearchEngine.current.searchURL(for: text))
+        case .browse(let text): browser.browse(for: text)
+        case .summarize: browser.summarize()
+        case .findOnPage:
+            browser.panel = .none
+            browser.selectedTab?.webView?.findInteraction?.presentFindNavigator(showingReplace: false)
+        case .privateTab: browser.showCommandBar(mode: .privateTab)
+        case .settings: browser.panel = .settings
+        case .copy(let result):
+            UIPasteboard.general.string = result
+            browser.panel = .none
+            browser.showToast("Copied \(result)")
+        }
+    }
+}
+
+private struct CommandRow: View {
+    let item: CommandItem
+    let isSelected: Bool
+
+    private var isAnswer: Bool {
+        if case .copy = item.action { return true }
+        return false
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Group {
+                switch item.icon {
+                case .glyph(let kind): Glyph(kind, size: 18).foregroundStyle(Theme.secondaryInk)
+                case .site(let host): SiteIcon(host: host, size: 18)
+                }
+            }
+            .frame(width: 22)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.title)
+                    .font(isAnswer ? .system(size: 26, weight: .semibold).monospacedDigit() : .system(size: 16))
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(1)
+                    // Only an answer shrinks to fit; a long page title just truncates.
+                    .minimumScaleFactor(isAnswer ? 0.6 : 1)
+                    .textSelection(.disabled)
+                if !item.subtitle.isEmpty {
+                    Text(item.subtitle)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.secondaryInk)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 8)
+            Text(item.kind)
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.faintInk)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(isSelected ? Theme.selection : .clear,
+                    in: .rect(cornerRadius: CommandBarView.corner - CommandBarView.inset))
+        .contentShape(.rect)
+    }
+}
+
+enum CommandRanker {
+    static func rank(query rawQuery: String, browser: BrowserModel, suggestions: [String]) -> [CommandItem] {
+        let query = rawQuery.trimmingCharacters(in: .whitespaces)
+        let needle = query.lowercased()
+        let pins = browser.pins()
+
+        guard !query.isEmpty else {
+            // Nothing typed: what you were just doing. Pins sit in their own
+            // row right above the field.
+            let recentTabs = browser.tabs
+                .filter { $0.id != browser.selectedID }
+                .sorted { $0.lastActive > $1.lastActive }
+                .prefix(4)
+                .map(tabItem)
+            return Array(recentTabs)
+        }
+
+        var ranked: [(score: Int, item: CommandItem)] = []
+
+        // A sum, conversion or time question gets answered on top, Raycast-style.
+        if let answer = Calculator.answer(query) {
+            ranked.append((1000, CommandItem(id: "calc", title: answer.result, subtitle: answer.question,
+                                             kind: "Copy", icon: .glyph(.equals), action: .copy(answer.result))))
+        }
+
+        // The literal reading of what was typed.
+        let literalURL = Omnibox.url(from: query)
+        if let url = literalURL {
+            ranked.append((900, CommandItem(id: "open-\(url)", title: url.displayHost, subtitle: url.absoluteString,
+                                            kind: "Open", icon: .glyph(.openLink), action: .open(url))))
+        } else {
+            ranked.append((900, CommandItem(id: "search-\(query)", title: query, subtitle: "Search \(SearchEngine.current.name)",
+                                            kind: "Search", icon: .glyph(.search), action: .search(query))))
+            if query.count >= 3 {
+                ranked.append((850, CommandItem(id: "browse-\(query)", title: "Browse for me", subtitle: query,
+                                                kind: "Answer", icon: .glyph(.browse), action: .browse(query))))
+            }
+        }
+
+        // A host that starts with what you typed beats the search, like an address bar autocomplete.
+        func score(title: String, host: String, base: Int) -> Int? {
+            let title = title.lowercased(), host = host.lowercased()
+            if host.hasPrefix(needle) { return base + 200 }
+            if title.hasPrefix(needle) { return base + 120 }
+            if host.contains(needle) || title.contains(needle) { return base }
+            return nil
+        }
+
+        // Sites already offered, so a popular site doesn't repeat one of your own.
+        var offeredHosts = Set(literalURL.map { [$0.displayHost] } ?? [])
+
+        for tab in browser.tabs where tab.id != browser.selectedID {
+            if let value = score(title: tab.displayTitle, host: tab.url?.displayHost ?? "", base: 760) {
+                ranked.append((value, tabItem(tab)))
+                offeredHosts.insert(tab.url?.displayHost ?? "")
+            }
+        }
+        for pin in pins {
+            if let value = score(title: pin.title, host: pin.host, base: 740) {
+                ranked.append((value, pinItem(pin)))
+                offeredHosts.insert(pin.host)
+            }
+        }
+        // A page already open in a tab isn't repeated from history, even when the
+        // address differs slightly (index.hr vs index.hr/mobile).
+        let openPages = Set(browser.tabs.compactMap { tab in tab.url.map { "\($0.displayHost)|\(tab.displayTitle)" } })
+        let openURLs = Set(browser.tabs.compactMap { $0.url?.absoluteString })
+        for entry in browser.history(matching: query, limit: 8) where !openURLs.contains(entry.url) {
+            guard let url = URL(string: entry.url) else { continue }
+            if openPages.contains("\(url.displayHost)|\(entry.title.isEmpty ? url.displayHost : entry.title)") { continue }
+            // A site you've been to whose address starts with what you typed is
+            // the best guess of all, ahead of searching for the letters.
+            let value = url.displayHost.lowercased().hasPrefix(needle) && needle.count >= 2
+                ? 910 : score(title: entry.title, host: url.displayHost, base: 600) ?? 560
+            ranked.append((value + min(entry.visitCount, 20), CommandItem(
+                id: "history-\(entry.url)", title: entry.title.isEmpty ? url.displayHost : entry.title,
+                subtitle: url.displayHost, kind: "History", icon: .site(url.displayHost), action: .open(url))))
+            offeredHosts.insert(url.displayHost)
+        }
+
+        // Well-known sites, for addresses you haven't visited yet. From three
+        // letters the best one beats a search, like address-bar autocomplete.
+        if needle.count >= 2, !needle.contains(" ") {
+            for (offset, site) in PopularSites.matching(needle).enumerated() where !offeredHosts.contains(site.host) {
+                guard let url = URL(string: "https://\(site.host)") else { continue }
+                ranked.append(((needle.count >= 3 ? 905 : 870) - offset, CommandItem(
+                    id: "popular-\(site.host)", title: site.name, subtitle: site.host,
+                    kind: "Open", icon: .site(site.host), action: .open(url))))
+            }
+        }
+
+        let actions: [(words: [String], item: CommandItem)] = [
+            (["summarize", "summary", "tldr"], CommandItem(id: "action-summarize", title: "Summarize this page", subtitle: "",
+                                                          kind: "Action", icon: .glyph(.summarize), action: .summarize)),
+            (["find", "search page"], CommandItem(id: "action-find", title: "Find on page", subtitle: "",
+                                                  kind: "Action", icon: .glyph(.search), action: .findOnPage)),
+            (["settings", "preferences", "api key"], CommandItem(id: "action-settings", title: "Settings", subtitle: "",
+                                                                 kind: "Action", icon: .glyph(.settings), action: .settings)),
+        ]
+        for (words, item) in actions where words.contains(where: { $0.hasPrefix(needle) }) {
+            let needsPage = ["action-summarize", "action-find"].contains(item.id)
+            if needsPage && browser.selectedTab == nil { continue }
+            ranked.append((needle.count >= 3 ? 880 : 500, item))
+        }
+
+        for (offset, suggestion) in suggestions.enumerated() {
+            ranked.append((400 - offset, CommandItem(id: "suggest-\(suggestion)", title: suggestion, subtitle: "",
+                                                     kind: "", icon: .glyph(.search), action: .search(suggestion))))
+        }
+
+        var seen = Set<String>()
+        return ranked
+            .sorted { $0.score > $1.score }
+            .map(\.item)
+            .filter { seen.insert($0.id).inserted }
+            .prefix(12)
+            .map { $0 }
+    }
+
+    private static func pinItem(_ pin: Pin) -> CommandItem {
+        CommandItem(id: "pin-\(pin.url)", title: pin.title.isEmpty ? pin.host : pin.title,
+                    subtitle: pin.host, kind: "Pinned", icon: .site(pin.host), action: .openPin(pin))
+    }
+
+    private static func tabItem(_ tab: BrowserTab) -> CommandItem {
+        let host = tab.url?.displayHost ?? ""
+        return CommandItem(id: "tab-\(tab.id)", title: tab.displayTitle, subtitle: host,
+                           kind: "Tab", icon: .site(host), action: .switchTab(tab))
+    }
+}
+
+extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
+}

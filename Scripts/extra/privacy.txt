@@ -1,0 +1,5 @@
+! Our additions to the tracker list, appended to EasyPrivacy at build time.
+!
+! Glas Slavonije: telemetry pings and a data collector.
+||nladmin.net^$third-party
+||cloud-hub.eu^$third-party

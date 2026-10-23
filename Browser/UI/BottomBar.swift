@@ -1,0 +1,171 @@
+import SwiftUI
+
+/// The only chrome on screen while browsing. Swipe up for tabs, sideways to
+/// switch tabs; it gets out of the way while you scroll down a page and comes
+/// back as soon as you scroll up.
+struct BottomBar: View {
+    @Environment(BrowserModel.self) private var browser
+
+    var body: some View {
+        Group {
+            if !browser.isBarCollapsed || browser.selectedTab == nil {
+                expanded
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .padding(.horizontal, Theme.gutter)
+        .padding(.bottom, 4)
+        .animation(.snappy(duration: 0.28), value: browser.isBarCollapsed)
+    }
+
+    /// Arc's layout: the bar is about starting something new. Tabs on the left,
+    /// a wide + in the middle, and everything about the current page behind ⌃.
+    private var expanded: some View {
+        HStack(spacing: 0) {
+            Button { browser.showTabs() } label: {
+                TabThumbnails(tabs: recentTabs, count: browser.tabs.count)
+                    .frame(width: 64, height: Theme.barHeight)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(GlyphButtonStyle())
+            .accessibilityLabel("Tabs, \(browser.tabs.count) open")
+
+            Spacer(minLength: 8)
+
+            Button { browser.showCommandBar() } label: {
+                Glyph(.plus, size: 22, weight: 2)
+                    .frame(width: 104, height: 38)
+                    .background(Theme.raised, in: .capsule)
+                    .overlay(Capsule().strokeBorder(Theme.edge))
+                    .contentShape(.capsule)
+            }
+            .buttonStyle(GlyphButtonStyle())
+            .accessibilityLabel("New tab")
+
+            Spacer(minLength: 8)
+
+            Button { browser.panel = .tools } label: {
+                Glyph(.chevronUp, size: 18, weight: 2)
+                    .frame(width: 38, height: 38)
+                    .background(Theme.raised, in: .circle)
+                    .overlay(Circle().strokeBorder(Theme.edge))
+                    .frame(width: 64, height: Theme.barHeight)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(GlyphButtonStyle())
+            .disabled(browser.selectedTab == nil)
+            .accessibilityLabel("Page menu")
+        }
+        .frame(height: Theme.barHeight + 8)
+        .overlay(alignment: .bottom) { progressLine }
+        .barSurface(cornerRadius: 24)
+        .highPriorityGesture(swipes)
+    }
+
+    private var recentTabs: [BrowserTab] {
+        Array(browser.tabs.sorted { $0.lastActive > $1.lastActive }.prefix(2))
+    }
+
+    @ViewBuilder
+    private var progressLine: some View {
+        if let tab = browser.selectedTab, tab.isLoading {
+            GeometryReader { proxy in
+                let track = proxy.size.width
+                Capsule()
+                    .fill(Theme.accent.opacity(0.75))
+                    .frame(width: max(6, track * tab.progress), height: 2)
+                    .animation(.easeOut(duration: 0.25), value: tab.progress)
+            }
+            .frame(height: 2)
+            .padding(.horizontal, 22)
+            .padding(.bottom, 5)
+            .transition(.opacity)
+        }
+    }
+
+    private var swipes: some Gesture {
+        DragGesture(minimumDistance: 24)
+            .onEnded { value in
+                let dx = value.translation.width, dy = value.translation.height
+                if dy < -40, abs(dy) > abs(dx) {
+                    browser.showTabs()
+                } else if abs(dx) > 60, abs(dx) > abs(dy) {
+                    withAnimation(.snappy) { browser.selectNeighbor(offset: dx < 0 ? 1 : -1) }
+                }
+            }
+    }
+}
+
+/// Your two most recent tabs as tiny fanned cards, like Arc. Falls back to
+/// the tabs glyph until there are snapshots to show.
+private struct TabThumbnails: View {
+    let tabs: [BrowserTab]
+    let count: Int
+
+    var body: some View {
+        let shots = tabs.compactMap(\.snapshot)
+        if shots.isEmpty {
+            TabsGlyph(count: count)
+        } else {
+            ZStack {
+                ForEach(Array(shots.prefix(2).enumerated().reversed()), id: \.offset) { index, shot in
+                    Image(uiImage: shot)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 22, height: 30, alignment: .top)
+                        .clipShape(.rect(cornerRadius: 5))
+                        .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Theme.edge, lineWidth: 1))
+                        .rotationEffect(.degrees(index == 0 ? 7 : -9))
+                        .offset(x: index == 0 ? 5 : -5, y: index == 0 ? -1 : 2)
+                }
+            }
+        }
+    }
+}
+
+/// The tabs glyph, a little larger, with the open-tab count set inside its front card.
+private struct TabsGlyph: View {
+    let count: Int
+    private let size: CGFloat = 24
+
+    var body: some View {
+        Glyph(.tabs, size: size)
+            .overlay(alignment: .topLeading) {
+                if count > 0 {
+                    // The front card spans 3...14 × 6...17 on the 20-point grid.
+                    Text(count > 99 ? "∞" : "\(count)")
+                        .font(.system(size: count > 9 ? 8 : 10, weight: .semibold))
+                        .fixedSize()
+                        .position(x: 8.5 * size / 20, y: 11.5 * size / 20)
+                }
+            }
+            .frame(width: size, height: size)
+    }
+}
+
+struct BarButton: View {
+    let glyph: Glyph.Kind
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Glyph(glyph)
+                .frame(width: 48, height: Theme.barHeight)
+                .contentShape(.rect)
+        }
+        .buttonStyle(GlyphButtonStyle())
+        .accessibilityLabel(label)
+    }
+}
+
+/// Pressing dims the glyph; nothing moves or scales. Hierarchical styles, so on
+/// glass the system keeps it legible and on our panels it resolves to Theme.ink.
+struct GlyphButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(isEnabled ? (configuration.isPressed ? HierarchicalShapeStyle.secondary : .primary) : .tertiary)
+    }
+}

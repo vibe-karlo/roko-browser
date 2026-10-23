@@ -1,0 +1,155 @@
+import SwiftData
+import SwiftUI
+
+struct BrowserView: View {
+    @Environment(BrowserModel.self) private var browser
+    @Environment(\.modelContext) private var context
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var barTop: CGFloat = 0
+
+    var body: some View {
+        @Bindable var browser = browser
+
+        ZStack {
+            // Shows only behind the status bar: the page's own top colour, so
+            // the site runs up to the top of the screen, as in Safari.
+            (browser.selectedTab?.topColor.map(Color.init) ?? Theme.canvas)
+                .ignoresSafeArea()
+                .animation(.easeOut(duration: 0.2), value: browser.selectedTab?.topColor)
+
+            if let tab = browser.selectedTab {
+                WebViewHost(
+                    tab: tab,
+                    barTop: barTop,
+                    onPinchIn: { browser.summarize() },
+                    onScrollDirection: { down in
+                        if browser.isBarCollapsed != down { browser.isBarCollapsed = down }
+                    })
+                    .ignoresSafeArea(.container, edges: .bottom)
+
+                // A restored tab shows its last snapshot until its page is live.
+                if !tab.isLive, let snapshot = tab.snapshot {
+                    Image(uiImage: snapshot)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .ignoresSafeArea(.container, edges: .bottom)
+                        .allowsHitTesting(false)
+                }
+
+                if let error = tab.loadError {
+                    LoadErrorView(message: error) { if let url = tab.url { tab.load(url) } }
+                }
+            } else {
+                StartView()
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            // The command bar takes the bar's place rather than stacking on top of it.
+            BottomBar()
+                .opacity(browser.panel == .command || browser.panel == .tabs ? 0 : 1)
+                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { barTop = $0 }
+        }
+        .overlay {
+            if browser.panel == .command {
+                CommandBarView()
+                    .transition(.opacity)
+            }
+        }
+        .overlay {
+            if browser.panel == .tabs {
+                // Arrives from below; leaves upward, continuing the pull that uncovers the page.
+                // Full screen: its own bottom row replaces the bar it would sit above.
+                TabStackView()
+                    .ignoresSafeArea(.container, edges: .bottom)
+                    .transition(.asymmetric(insertion: .move(edge: .bottom),
+                                            removal: .move(edge: .top).combined(with: .opacity)))
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if let toast = browser.toast {
+                Text(toast)
+                    .font(.system(size: 15, weight: .medium))
+                    .lineLimit(1)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 11)
+                    .barSurface(cornerRadius: 14)
+                    .padding(.bottom, Theme.barHeight + 20)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .allowsHitTesting(false)
+            }
+        }
+        .background(StatusBarStyler(style: statusBarStyle))
+        .animation(.snappy(duration: 0.25), value: browser.toast)
+        .animation(.snappy(duration: 0.3), value: browser.panel)
+        .sheet(isPresented: panelBinding(.tools)) {
+            ToolsSheet()
+        }
+        .sheet(isPresented: panelBinding(.settings)) {
+            SettingsView()
+        }
+        .sheet(item: $browser.summary) { summary in
+            SummaryView(model: summary)
+        }
+        .sheet(item: $browser.browseForMe) { model in
+            BrowseForMeView(model: model)
+        }
+        .sheet(item: $browser.reader) { model in
+            ReaderView(model: model)
+        }
+        .onAppear {
+            LaunchClock.mark("firstAppear")
+            browser.start(context: context)
+        }
+        #if DEBUG
+        .task {
+            if Benchmark.isRequested { await Benchmark.run() }
+        }
+        #endif
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { browser.saveTabs() }
+        }
+        // Coming back to the app always shows the bar; scrolling hides it again.
+        // UIKit's own signal: it arrives whatever wraps the SwiftUI scene.
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            if browser.isBarCollapsed { browser.isBarCollapsed = false }
+        }
+    }
+
+    /// Text that reads on whatever is behind the status bar.
+    private var statusBarStyle: UIStatusBarStyle {
+        if browser.panel == .tabs { return .lightContent }  // the switcher is always dark
+        guard let color = browser.selectedTab?.topColor else { return .default }
+        return color.isLight ? .darkContent : .lightContent
+    }
+
+    private func panelBinding(_ panel: BrowserModel.Panel) -> Binding<Bool> {
+        Binding(
+            get: { browser.panel == panel },
+            set: { if !$0, browser.panel == panel { browser.panel = .none } })
+    }
+}
+
+private struct LoadErrorView: View {
+    let message: String
+    let retry: () -> Void
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Text("This page didn't load")
+                .font(.headline)
+                .foregroundStyle(Theme.ink)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(Theme.secondaryInk)
+                .multilineTextAlignment(.center)
+            Button("Try again", action: retry)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(Theme.accent)
+                .padding(.top, 4)
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.canvas)
+    }
+}

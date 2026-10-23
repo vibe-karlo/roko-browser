@@ -1,0 +1,14 @@
+! Our additions to the pop-up list, appended to Fanboy's Annoyances at build time.
+!
+! Piano (piano.io / tinypass) draws subscription and offer pop-ups for many news
+! sites. Fanboy only blocks it on sites it has checked, because some sites also
+! use Piano for login. We hide its pop-ups everywhere; if a site's login needs
+! Piano, allow pop-ups for that site in page tools.
+##.tp-modal
+##.tp-backdrop
+###piano_inline_popup
+! Jutarnji (and other Joomla news sites) render Piano offers into a fixed
+! full-screen holder in the footer, not into the pop-up target above.
+###piano_wrapper
+! Index.hr's own "Index bez reklama" subscription banner, pinned to the bottom.
+index.hr###premium-sticky

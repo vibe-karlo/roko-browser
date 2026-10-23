@@ -1,0 +1,25 @@
+! Our additions to the ad list, appended to EasyList at build time.
+!
+! Ad-Shield "ad recovery": when a site sees ads blocked, it reloads them through
+! its own hosts. The loader moves to throwaway domains; these are the ones seen.
+||coolbonsai.com^
+||error-report.com^
+!
+! Glas Slavonije: its ad loader and a clickbait "news" widget.
+||234doo.com^$third-party
+||247news.info^
+!
+! Midas native ads (the "Više s weba" boxes) wherever they appear.
+##.midas-wgt
+##[id^="midasWidget__"]
+!
+! Empty ad boxes sites leave behind once the ad itself is blocked.
+index.hr##.js-slot-container
+index.hr##.js-slot-holder
+index.hr##.google-box
+sib.hr,sib.net.hr##.banner-widget
+sib.hr,sib.net.hr##.midas
+sib.hr,sib.net.hr##.div-gpt
+glas-slavonije.hr##.se-module--banner
+glas-slavonije.hr##.se-module__ad
+glas-slavonije.hr##.iat-adhesion-bar

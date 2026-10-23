@@ -1,0 +1,5 @@
+! Our additions to the cookie-banner list, appended to Fanboy's at build time.
+!
+! CARNET's school CMS (every *.skole.hr site, thousands of Croatian schools):
+! a "necessary cookies only" notice with a single "I understand" button.
+##.cn-consent-container

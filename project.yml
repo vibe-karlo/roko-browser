@@ -1,0 +1,63 @@
+# Generates Browser.xcodeproj:  brew install xcodegen && xcodegen
+name: Browser
+options:
+  bundleIdPrefix: com.growthstudio
+  deploymentTarget:
+    iOS: "27.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  Browser:
+    type: application
+    platform: iOS
+    sources:
+      - path: Browser
+        excludes:
+          - "Info.plist"
+    info:
+      path: Browser/Info.plist
+      properties:
+        CFBundleDisplayName: roko
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen:
+          UIColorName: ""
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSAppTransportSecurity:
+          # A browser has to open plain-http sites; this only relaxes ATS inside web views.
+          NSAllowsArbitraryLoadsInWebContent: true
+        ITSAppUsesNonExemptEncryption: false
+        # Required before Apple will grant the browser entitlements (default
+        # browser, passkeys): the app must declare it opens http and https.
+        CFBundleURLTypes:
+          - CFBundleURLName: Web
+            CFBundleURLSchemes: [http, https]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.growthstudio.roko
+        TARGETED_DEVICE_FAMILY: "1"
+        # Drawn by Scripts/make_app_icon.swift from the roko logo design.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Automatic
+        # Your team, kept here so regenerating the project doesn't drop it.
+        DEVELOPMENT_TEAM: 6ZQC2F6CF2
+        # Once Apple grants your team the managed entitlements (browser,
+        # passkeys, Private Cloud Compute), uncomment both lines. The flag lets
+        # the app use Apple's cloud model; never set it without the entitlement,
+        # or the first AI request crashes. See README, "Apple's permissions".
+        # CODE_SIGN_ENTITLEMENTS: Browser/Browser.entitlements
+        # SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) PRIVATE_CLOUD_COMPUTE
+        ENABLE_PREVIEWS: YES

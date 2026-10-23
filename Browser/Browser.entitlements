@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Managed entitlements: Apple must grant them to your team before a build
+	     that includes this file can be signed. Wired up in project.yml. -->
+	<key>com.apple.developer.web-browser</key>
+	<true/>
+	<key>com.apple.developer.web-browser.public-key-credential</key>
+	<true/>
+	<!-- Apple's cloud model for Summarize and Browse for Me. -->
+	<key>com.apple.developer.private-cloud-compute</key>
+	<true/>
+</dict>
+</plist>
