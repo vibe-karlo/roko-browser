@@ -13,6 +13,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Translate any page into English or Croatian, in place.
 - Address suggestions show the real icon of 150 popular sites, bundled, with no network request.
 - Haptics when a toast confirms an action, a tab is thrown away, or the bar swipes to the next tab.
+- Settings → Use Claude: turn Claude off without deleting the API key; Apple's models then do everything.
 - Browse for Me matches the question: a quick fact gets a short answer from three sources; a comparison, a "best" or a plan reads more sites and writes more.
 
 ### Changed

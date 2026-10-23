@@ -45,8 +45,13 @@ struct ClaudeClient {
     var endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
     let apiKey: String
 
+    /// Settings' "Use Claude" switch. Off keeps the key but sends nothing to
+    /// Claude: every feature falls back to Apple's models.
+    static let enabledKey = "claude.enabled"
+
     static var configured: ClaudeClient? {
-        Keychain.claudeAPIKey.map { ClaudeClient(apiKey: $0) }
+        guard UserDefaults.standard.object(forKey: enabledKey) as? Bool ?? true else { return nil }
+        return Keychain.claudeAPIKey.map { ClaudeClient(apiKey: $0) }
     }
 
     /// Streams one answer. With `searches` above zero, Claude searches and reads

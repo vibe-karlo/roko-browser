@@ -5,6 +5,7 @@ struct SettingsView: View {
     @AppStorage("searchEngine") private var engine: SearchEngine = .google
     @AppStorage("suggestions") private var suggestions = true
     @AppStorage("archivePolicy") private var archive: ArchivePolicy = .day
+    @AppStorage(ClaudeClient.enabledKey) private var claudeEnabled = true
     @State private var apiKey = Keychain.claudeAPIKey ?? ""
     @State private var blocking: [ContentBlocker.Category: Bool] = [:]
     @State private var confirmClear = false
@@ -48,14 +49,19 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("Use Claude", isOn: $claudeEnabled)
                     SecureField("sk-ant-…", text: $apiKey)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .onSubmit { Keychain.claudeAPIKey = apiKey }
+                        // Still editable while off: the key is kept, just not used.
+                        .foregroundStyle(claudeEnabled ? Theme.ink : Theme.secondaryInk)
                 } header: {
                     Text("Claude API key")
                 } footer: {
-                    Text("Powers Browse for Me, and summaries when Apple Intelligence isn't available. Stored only in this iPhone's Keychain.")
+                    Text(claudeEnabled
+                         ? "Powers Browse for Me and summaries of Croatian pages. Stored only in this iPhone's Keychain."
+                         : "Off: nothing is sent to Claude, and Apple's models write every summary and answer. Your key stays saved.")
                 }
 
                 Section {
