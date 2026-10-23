@@ -20,6 +20,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - roko's orange light: while Browse for Me or Summarize works, a warm light rises from the bottom edge as pages are read, in one continuous motion, and sinks back into the edge when the answer starts.
 - Browse for Me's answer arrives in order: the question shrinks to its heading, then pictures, sources and text ease in one after another.
 - Browse for Me matches the question: a quick fact gets a short answer from three sources; a comparison, a "best" or a plan reads more sites and writes more.
+- Answers written by Claude show pictures too, from the pages its searches found, fetched alongside while it works.
+- A weather topic, with a sun, for answer sections about weather and seasons.
 
 ### Changed
 - Croatian pages are summarized by Claude Haiku when there's an API key; Apple's on-device model writes poor Croatian. English stays on the iPhone.
@@ -37,6 +39,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Private mode is an eye that blinks shut, instead of glasses.
 - Browse for Me is offered for questions of more than one word, not for a single word being typed.
 - Text scrolling under the Summary and Browse for Me footers fades out instead of being cut off.
+- The Eclipse icons use the app's own colours: its dark canvas, light ink and orange.
+- In light mode roko's light warms toward amber at its edge, so it reads as sunlight, not a pink wash.
+- Apple's models answer from what the sources say, instead of listing what they leave out; short answers give the facts in full sentences.
+- A follow-up's section comes up to the top of the screen while it's worked on, instead of its reading list running under the footer.
+- Rewording a question wraps over lines instead of scrolling sideways.
 
 ### Performance
 - The first page after launch starts about 0.16 s sooner: it waits only for the request rules; the hiding indexes now decode in parallel.
@@ -63,6 +70,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Source icons no longer show a grey arrow placeholder for sites without an icon.
 - The on-device Browse for Me answers a Croatian question in Croatian.
 - News about crimes or attacks is no longer refused by Apple's on-device safety filter as often.
+- Summarize: "Writing the summary" no longer overlaps the first words; the summary eases in after it.
+- Closing a summary, the card grows back to the page's full height, with no grey gap above the bar.
+- Closing a summary stops it; it no longer finishes writing in the background, spending Claude tokens on Croatian pages.
+- Closing Browse for Me mid-answer no longer flips the page to finished as it slides away, or starts another AI engine.
+- A picture that won't load is removed instead of staying an empty tile, and the same picture no longer shows twice.
+- Bold terms no longer show their asterisks while an answer is streaming in.
 
 ## [0.1.0] - 2026-10-23
 

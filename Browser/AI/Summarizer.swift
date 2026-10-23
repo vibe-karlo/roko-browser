@@ -71,12 +71,23 @@ final class SummaryModel: Identifiable {
         phase == .reading ? 0.35 : 0.8
     }
 
-    func run(webView: WKWebView) async {
+    @ObservationIgnored private var task: Task<Void, Never>?
+
+    func start(webView: WKWebView) {
+        task = Task { await run(webView: webView) }
+    }
+
+    /// Stops reading and writing: the summary was closed, and nobody will read the rest.
+    func cancel() {
+        task?.cancel()
+    }
+
+    private func run(webView: WKWebView) async {
         let page: ReadablePage
         do {
             page = try await PageReader.read(webView)
         } catch {
-            phase = .failed(error.localizedDescription)
+            if !Task.isCancelled { phase = .failed(error.localizedDescription) }
             return
         }
         phase = .writing
@@ -99,6 +110,8 @@ final class SummaryModel: Identifiable {
             } catch is CancellationError {
                 return
             } catch {
+                // A cancelled request fails as URLError.cancelled: closed, not failed.
+                if Task.isCancelled { return }
                 // Quota reached, offline, refused, or out of its depth: try the next engine.
                 lastError = error
                 text = ""
@@ -143,6 +156,8 @@ final class SummaryModel: Identifiable {
                 try await stream(client, prompt: prompt, model: .sonnet)
             }
         }
+        // Cancelled, a stream just ends: closed, not done.
+        try Task.checkCancellation()
         return true
     }
 
@@ -277,6 +292,7 @@ final class BrowseForMeModel: Identifiable {
     /// Stops searching and writing: the answer was closed or replaced.
     func cancel() {
         task?.cancel()
+        stopLookingForPictures()
     }
 
     /// The answer without its follow-up lines (nor the lone "?" a follow-up
@@ -346,7 +362,7 @@ final class BrowseForMeModel: Identifiable {
         let length = switch depth {
         case .quick: "Answer in one to three sentences."
         case .standard: "Lead with what the person most likely wants to know."
-        case .deep: "Lead with what the person most likely wants to know, then give specifics: names, numbers, prices, dates and trade-offs."
+        case .deep: "Lead with what the person most likely wants to know, then the specifics the sources give: names, numbers, prices, dates and trade-offs."
         }
         // Told only "the language of the question", the small model answers a
         // Croatian question in English (its sources are often English), so name it.
@@ -355,7 +371,9 @@ final class BrowseForMeModel: Identifiable {
         return """
         You are the "Browse for Me" feature of a phone browser. The app has searched the web and \
         read the pages below for you. Answer the question using only these sources. Where they \
-        disagree, say so; if they don't answer part of the question, say what is missing. \
+        disagree, say so. If they don't answer the question, say so once, in the first lines; \
+        otherwise write only about what they do say, never about what they leave out. Write the \
+        answer itself, not about the sources ("the sources describe..."). \
         \(language) Never repeat a point. \(length)
         """
     }
@@ -398,7 +416,7 @@ final class BrowseForMeModel: Identifiable {
                 guard let self, let index = self.steps.firstIndex(where: { $0.url == url }) else { return }
                 self.steps[index].state = useful ? .read : .skipped
             }
-            images = Array(pages.compactMap(\.image).prefix(4))
+            images = Array(WebResearcher.distinctImages(pages.compactMap(\.image)).prefix(4))
             // Pages that wouldn't load still contribute their search snippet.
             if pages.count < 2 { pages = candidates.map { var page = $0; page.text = $0.snippet; return page } }
             sources = pages.map { Source(url: $0.url, title: $0.title) }
@@ -425,11 +443,16 @@ final class BrowseForMeModel: Identifiable {
                 ? AppleModels.streamAnswer(model, shape: BriefAnswer.self, instructions: instructions, prompt: prompt)
                 : AppleModels.streamAnswer(model, shape: ResearchedAnswer.self, instructions: instructions, prompt: prompt)
             for try await snapshot in answer { text = snapshot }
+            // Cancelled, the stream just ends: closed, not done.
+            try Task.checkCancellation()
             phase = .done
             return true
         } catch is CancellationError {
             return true
         } catch {
+            // Closed mid-way (a cancelled request fails as URLError.cancelled):
+            // leave it as it was, and don't go on to the next engine.
+            if Task.isCancelled { return true }
             text = ""
             sources = []
             steps = []
@@ -444,22 +467,25 @@ final class BrowseForMeModel: Identifiable {
         do {
             do {
                 try await streamClaude(client, model: depth.model)
-            } catch let error where depth.model == .haiku && !(error is CancellationError) {
+            } catch where depth.model == .haiku && !Task.isCancelled {
                 // Haiku declined (it has no fallback of its own): Sonnet answers instead.
                 text = ""
                 sources = []
                 steps = []
                 found = []
+                images = []
+                stopLookingForPictures()
                 phase = .searching(query)
                 try await streamClaude(client, model: .sonnet)
             }
+            try Task.checkCancellation()
             // An answer that cites nothing still shows where it looked.
             if sources.isEmpty { sources = Array(found.prefix(6)) }
             phase = .done
         } catch is CancellationError {
             return
         } catch {
-            phase = .failed(error.localizedDescription)
+            if !Task.isCancelled { phase = .failed(error.localizedDescription) }
         }
     }
 
@@ -481,6 +507,7 @@ final class BrowseForMeModel: Identifiable {
                 guard !found.contains(where: { $0.url.displayHost == page.url.displayHost }) else { break }
                 found.append(page)
                 if steps.count < 8 { steps.append(Step(url: page.url, state: .read)) }
+                lookForPicture(on: page.url)
             case .source(let page):
                 // Cited by the answer: these are its sources.
                 if !sources.contains(where: { $0.url.displayHost == page.url.displayHost }) { sources.append(page) }
@@ -493,6 +520,33 @@ final class BrowseForMeModel: Identifiable {
 
     /// Pages Claude's searches turned up, whether or not the answer used them.
     private var found: [Source] = []
+
+    /// Claude reads pages on its own servers, so their pictures aren't at hand:
+    /// the first few hits' share images are fetched alongside, while it works.
+    /// Each holds a place in the row of pictures until it's found or not. The
+    /// first words usually come before the pictures do, and a row appearing
+    /// above them then would push the text being read down.
+    private func lookForPicture(on url: URL) {
+        // Once the answer shows, only into a row that's already there.
+        guard pictureLookups.count < 4, isWorking || !images.isEmpty || pendingPictures > 0 else { return }
+        pendingPictures += 1
+        pictureLookups.append(Task { [weak self] in
+            let image = await WebResearcher.shareImage(of: url)
+            guard let self, !Task.isCancelled else { return }
+            pendingPictures -= 1
+            if let image { images = WebResearcher.distinctImages(images + [image]) }
+        })
+    }
+
+    /// Pictures still being looked for, shown as empty tiles.
+    private(set) var pendingPictures = 0
+    @ObservationIgnored private var pictureLookups: [Task<Void, Never>] = []
+
+    private func stopLookingForPictures() {
+        pictureLookups.forEach { $0.cancel() }
+        pictureLookups = []
+        pendingPictures = 0
+    }
 }
 
 /// How much digging a question deserves, judged from its words alone: on the
@@ -613,6 +667,7 @@ nonisolated enum AnswerLanguage {
 nonisolated enum AnswerTopic {
     static let all = ["idea", "check", "warning", "money", "time", "place", "people", "privacy", "speed", "star",
                       "trend", "learn", "health", "tools", "world", "list", "question", "date", "battery", "device",
-                      "code", "nature", "food", "quote", "travel", "sport", "law", "news", "compare", "settings"]
+                      "code", "nature", "food", "quote", "travel", "sport", "law", "news", "compare", "settings",
+                      "weather"]
     static let vocabulary = all.joined(separator: ", ")
 }

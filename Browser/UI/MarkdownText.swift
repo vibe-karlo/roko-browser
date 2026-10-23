@@ -115,6 +115,7 @@ struct MarkdownText: View {
     private static func topic(for heading: String) -> String {
         let words = heading.lowercased()
         let hints: [(String, [String])] = [
+            ("weather", ["weather", "climate", "temperature", "rain", "snow", "sunshine"]),
             ("money", ["cost", "price", "pay", "budget", "cheap", "fee", "money", "cijen"]),
             ("time", ["when", "time", "hour", "how long", "schedule", "vrijeme"]),
             ("date", ["date", "year", "history", "season", "day"]),
@@ -123,7 +124,7 @@ struct MarkdownText: View {
             ("speed", ["speed", "fast", "performance", "quick"]),
             ("warning", ["risk", "warning", "missing", "caution", "limit", "downside", "con"]),
             ("people", ["who", "people", "team", "family", "kids", "community"]),
-            ("food", ["food", "eat", "drink", "restaurant", "coffee", "hrana"]),
+            ("food", ["food", "eat", "drink", "restaurant", "coffee", "pizz", "dish", "menu", "cuisine", "hrana"]),
             ("travel", ["travel", "getting", "transport", "trip", "flight"]),
             ("compare", ["compare", "vs", "versus", "alternative", "option"]),
             ("star", ["best", "top", "highlight", "recommend"]),
@@ -138,6 +139,21 @@ struct MarkdownText: View {
 
     /// Inline emphasis and links; the last piece of text carries the caret while streaming.
     private func inline(_ text: String, last: Bool) -> AttributedString {
+        var text = text
+        if last && isStreaming {
+            // A bold term still arriving: closed for now, so it reads bold as it
+            // grows instead of showing its asterisks until the closing pair comes.
+            if text.hasSuffix("*") && !text.hasSuffix("**") { text.removeLast() }
+            if text.components(separatedBy: "**").count % 2 == 0 {
+                if text.hasSuffix("**") {
+                    text.removeLast(2)
+                } else {
+                    // Before any trailing space: "**Bolt or **" wouldn't read as bold.
+                    let trailing = text.reversed().prefix(while: \.isWhitespace).count
+                    text.insert(contentsOf: "**", at: text.index(text.endIndex, offsetBy: -trailing))
+                }
+            }
+        }
         var result = (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
             ?? AttributedString(text)
         // Bold terms read in full ink, ahead of the softer body.

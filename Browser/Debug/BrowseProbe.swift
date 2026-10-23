@@ -44,7 +44,10 @@ enum BrowseProbe {
         let watch = Task { await watchPhases(of: model) }
         await model.run()
         watch.cancel()
-        AITrace.log("done: \(model.phase) engine=\(model.engine) sources=\(model.sources.count) chars=\(model.text.count)")
+        AITrace.log("answered; pictures=\(model.images.count) pending=\(model.pendingPictures)")
+        // Pictures are looked for alongside; note when the last one lands.
+        for _ in 0..<60 where model.pendingPictures > 0 { try? await Task.sleep(for: .milliseconds(100)) }
+        AITrace.log("done: \(model.phase) engine=\(model.engine) sources=\(model.sources.count) pictures=\(model.images.count) chars=\(model.text.count)")
         print("PROBE answer >>>\n\(model.text)\n<<<")
     }
 

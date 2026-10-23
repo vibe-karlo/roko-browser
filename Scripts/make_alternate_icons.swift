@@ -42,9 +42,11 @@ let icons: [(String, Mark, String, String)] = [
     ("AppIcon-ChevronsGraphite", chevrons, "#1A1A1B", "#A9A9A9"),
     ("AppIcon-Plus", forwardPlus, "#050506", "#FF5B1F"),
     ("AppIcon-RollingO", rollingO, "#15171B", "#FF5B1F"),
-    ("AppIcon-EclipseCream", eclipse, "#161514", "#F1EDE6"),
-    ("AppIcon-EclipseOnOrange", eclipse, "#FF5B1F", "#161514"),
-    ("AppIcon-EclipseOrange", eclipse, "#161514", "#FF5B1F"),
+    // In the app's own colours: the dark canvas (Theme.canvas), the accent,
+    // and the light ink text is set in (Theme.ink), all as in dark mode.
+    ("AppIcon-EclipseCream", eclipse, "#0E0E0F", "#E7E7E4"),
+    ("AppIcon-EclipseOnOrange", eclipse, "#FF5B1F", "#0E0E0F"),
+    ("AppIcon-EclipseOrange", eclipse, "#0E0E0F", "#FF5B1F"),
 ]
 
 func svg(_ mark: Mark, tile: String, color: String, size: Double) -> String {

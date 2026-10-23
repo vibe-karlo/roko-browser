@@ -76,7 +76,8 @@ nonisolated struct GeneratedAnswer {
 
 @Generable
 nonisolated struct GeneratedSection {
-    @Guide(description: "The topic that best fits this section, used for its icon", .anyOf(AnswerTopic.all))
+    @Guide(description: "What this section is about, for its icon: food for restaurants and dishes, weather for climate and seasons, money for prices, place for locations, and so on",
+           .anyOf(AnswerTopic.all))
     var topic: String
     @Guide(description: "A heading of two to four words, written for this answer")
     var heading: String
@@ -92,7 +93,7 @@ nonisolated struct BriefAnswer {
     var title: String
     @Guide(description: "The direct answer in one to three plain sentences")
     var answer: String
-    @Guide(description: "Up to three short supporting points, one sentence each; start with a key term in **bold** when there is one", .count(0...3))
+    @Guide(description: "Up to three short supporting facts, each a full sentence with a number, name or detail; bold only a key term at its start, if there is one", .count(0...3))
     var points: [String]
     @Guide(description: followUpsGuide, .count(0...3))
     var followUps: [String]
@@ -107,7 +108,9 @@ nonisolated struct ResearchedAnswer {
     var title: String
     @Guide(description: "The gist in one or two plain sentences")
     var gist: String
-    @Guide(description: "Three to five sections, each about a different aspect", .count(3...5))
+    // Made to write at least three, the small model padded thin sources with
+    // sections on what they don't say ("prices are not specified").
+    @Guide(description: "Two to five sections, each about a different aspect the sources cover", .count(2...5))
     var sections: [GeneratedSection]
     @Guide(description: followUpsGuide, .count(0...3))
     var followUps: [String]

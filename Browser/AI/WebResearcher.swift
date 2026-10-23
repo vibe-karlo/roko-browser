@@ -70,6 +70,34 @@ nonisolated enum WebResearcher {
         }
     }
 
+    /// One page's share image, read from its head alone: for answers Claude
+    /// wrote from pages it read on its own servers.
+    static func shareImage(of url: URL) async -> URL? {
+        guard let (bytes, response) = try? await session.bytes(from: url),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              (response.mimeType ?? "").contains("html") else { return nil }
+        let end = Data("</head>".utf8)
+        var head = Data()
+        do {
+            for try await byte in bytes {
+                head.append(byte)
+                if head.count % 8_192 == 0, head.range(of: end) != nil || head.count >= 60_000 { break }
+            }
+        } catch {}
+        return shareImage(String(decoding: head, as: UTF8.self), base: url)
+    }
+
+    /// Pictures without repeats: the same file is often shared at several sizes
+    /// ("1200px-Cathedral.jpg", "800px-Cathedral.jpg") or by sister sites.
+    static func distinctImages(_ images: [URL]) -> [URL] {
+        var seen: Set<String> = []
+        return images.filter { url in
+            let name = url.lastPathComponent.lowercased()
+                .replacingOccurrences(of: #"^\d+px-"#, with: "", options: .regularExpression)
+            return seen.insert(name.isEmpty ? url.absoluteString : name).inserted
+        }
+    }
+
     /// The page's og:image (or twitter:image), when it has one.
     static func shareImage(_ html: String, base: URL) -> URL? {
         let head = String(html.prefix(60_000))

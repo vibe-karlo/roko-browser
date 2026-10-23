@@ -172,6 +172,10 @@ final class BrowserTab: NSObject, Identifiable {
         guard let webView else { return nil }
         let configuration = WKSnapshotConfiguration()
         configuration.afterScreenUpdates = false
+        // The whole view, the strip under the bar included: by default WebKit
+        // leaves out the obscured inset, and the card growing back into the
+        // page would then show a gap there until the page took over.
+        configuration.rect = CGRect(origin: .zero, size: webView.bounds.size)
         return try? await webView.takeSnapshot(configuration: configuration)
     }
 

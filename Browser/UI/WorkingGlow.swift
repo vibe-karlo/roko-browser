@@ -21,6 +21,7 @@ struct WorkingGlow: View {
     let progress: Double
     var isActive = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     /// The progress actually drawn, easing after `progress`.
     @State private var shown: Double?
     @State private var breathing = false
@@ -29,6 +30,8 @@ struct WorkingGlow: View {
 
     /// From a low dawn to about half the screen, as a share of the full light.
     private static let lowest = 0.2, highest = 0.52
+    /// The warm end of the light's falloff on the light canvas.
+    private static let amber = Color(red: 0.96, green: 0.65, blue: 0.14)
 
     var body: some View {
         GeometryReader { proxy in
@@ -82,15 +85,21 @@ struct WorkingGlow: View {
     /// The accent, falling off over many stops so it eases out rather than
     /// ending in a ring, with grain on top so the falloff can't band.
     private var light: some View {
+        // Over the light canvas the accent's faint tail reads as pink, so there
+        // it warms toward amber as it falls off: sunlight, not a pink wash.
+        let warms = colorScheme == .light
+        func shade(_ opacity: Double, warmth: Double) -> Color {
+            (warms ? Theme.accent.mix(with: Self.amber, by: warmth) : Theme.accent).opacity(opacity)
+        }
         // Strong at the edge it rises from: at half strength over the near-black
         // canvas, orange reads as rust, not light.
         let falloff = EllipticalGradient(stops: [
-            .init(color: Theme.accent.opacity(0.85), location: 0),
-            .init(color: Theme.accent.opacity(0.6), location: 0.16),
-            .init(color: Theme.accent.opacity(0.38), location: 0.34),
-            .init(color: Theme.accent.opacity(0.2), location: 0.52),
-            .init(color: Theme.accent.opacity(0.08), location: 0.72),
-            .init(color: Theme.accent.opacity(0), location: 1),
+            .init(color: shade(0.85, warmth: 0), location: 0),
+            .init(color: shade(0.6, warmth: 0.25), location: 0.16),
+            .init(color: shade(0.38, warmth: 0.5), location: 0.34),
+            .init(color: shade(0.2, warmth: 0.65), location: 0.52),
+            .init(color: shade(0.08, warmth: 0.8), location: 0.72),
+            .init(color: shade(0, warmth: 0.8), location: 1),
         ], center: .center)
         return falloff
             .overlay {

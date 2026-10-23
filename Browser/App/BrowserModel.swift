@@ -22,7 +22,10 @@ final class BrowserModel {
     var commandPrefill = ""
     var commandMode: CommandMode = .newTab
     var isBarCollapsed = false
-    var summary: SummaryModel?
+    var summary: SummaryModel? {
+        // Closed before it's finished: stop there, as Browse for Me does.
+        didSet { if oldValue !== summary { oldValue?.cancel() } }
+    }
     /// True while the summary's card stands in for the page, which hides
     /// underneath so the two never show at once.
     var summaryCoversPage = false
@@ -253,7 +256,7 @@ final class BrowserModel {
             if let prepared { model.snapshot = await prepared.value }
             if model.snapshot == nil { model.snapshot = await tab.viewportSnapshot() ?? tab.snapshot }
             presentAfterPanelCloses { self.summary = model }
-            await model.run(webView: webView)
+            model.start(webView: webView)
         }
     }
 

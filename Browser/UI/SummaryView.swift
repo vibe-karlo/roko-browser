@@ -120,22 +120,31 @@ struct SummaryView: View {
     private var content: some View {
         Group {
             switch model.phase {
-            case .reading:
-                StatusLine(text: "Reading the page", font: .system(size: 20))
             case .failed(let message):
                 Text(message)
                     .font(.body)
                     .foregroundStyle(Theme.secondaryInk)
-            case .writing, .done:
+                    .transition(.opacity)
+            default:
                 if model.text.isEmpty {
-                    StatusLine(text: "Writing the summary", font: .system(size: 20))
+                    StatusLine(text: model.phase == .reading ? "Reading the page" : "Writing the summary",
+                               font: .system(size: 20))
+                        // Out quickly, so none of it is left under the first words.
+                        .transition(.asymmetric(insertion: .opacity,
+                                                removal: .opacity.animation(.easeOut(duration: 0.12))))
                 } else {
                     MarkdownText(markdown: model.text, isStreaming: model.phase == .writing)
+                        // Then the summary eases up into its place, as Browse for Me's answer does.
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .offset(y: 16))
+                                .animation(.smooth(duration: 0.6).delay(0.14)),
+                            removal: .opacity))
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 22)
+        .animation(.smooth(duration: 0.5), value: model.text.isEmpty)
     }
 
     /// Who wrote it, and the way back to the page, always in reach.

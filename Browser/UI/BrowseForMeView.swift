@@ -14,6 +14,7 @@ struct BrowseForMeView: View {
     @Bindable var session: BrowseSession
     /// Pairs each site's icon in a reading list with the same icon in its source row.
     @Namespace private var icons
+    @State private var viewportHeight: CGFloat = 0
 
     private var latest: BrowseForMeModel { session.latest }
 
@@ -60,6 +61,10 @@ struct BrowseForMeView: View {
                                     ask: { session.ask($0) },
                                     open: open)
                             .padding(.top, index == 0 ? 0 : 56)
+                            // A follow-up's section is at least a screen tall, so it can
+                            // come up to the top while it's still only a question.
+                            .frame(minHeight: index > 0 && index == session.turns.count - 1 ? viewportHeight : nil,
+                                   alignment: .top)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -80,6 +85,9 @@ struct BrowseForMeView: View {
                 geometry.contentOffset.y < -geometry.contentInsets.top - 90
             } action: { _, pulledPastTop in
                 if pulledPastTop { close() }
+            }
+            .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.height } action: { _, height in
+                viewportHeight = height
             }
         }
     }
@@ -181,6 +189,8 @@ private struct TurnSection: View {
     @State private var editing = false
     @State private var draft = ""
     @FocusState private var fieldFocused: Bool
+    /// Pictures that wouldn't load.
+    @State private var brokenImages: Set<URL> = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
@@ -198,7 +208,9 @@ private struct TurnSection: View {
                 // Pictures first, then the sources: the faces of the answer
                 // up top, its footnotes compact beneath them. They arrive in
                 // that order, a beat apart, each easing up into place.
-                if !turn.images.isEmpty { pictures.transition(Self.reveal(0)) }
+                if turn.pendingPictures > 0 || !turn.images.allSatisfy(brokenImages.contains) {
+                    pictures.transition(Self.reveal(0))
+                }
                 if !turn.sources.isEmpty { sources.transition(Self.reveal(1)) }
                 MarkdownText(markdown: turn.answer, isStreaming: turn.phase == .writing)
                     .transition(Self.reveal(2))
@@ -232,14 +244,23 @@ private struct TurnSection: View {
     private var question: some View {
         let font = Font.system(size: turn.isWorking ? 30 : 17, weight: .semibold)
         if editing {
-            TextField("Ask anything", text: $draft)
+            // Wraps like the question it replaces, instead of scrolling sideways on one line.
+            TextField("Ask anything", text: $draft, axis: .vertical)
                 .font(font)
                 .foregroundStyle(Theme.ink)
                 .tint(Theme.accent)
+                .lineLimit(1...4)
                 .focused($fieldFocused)
                 .submitLabel(.go)
                 .autocorrectionDisabled()
                 .onSubmit(submit)
+                // A wrapping field takes Return as a new line: here it asks.
+                .onChange(of: draft) { _, text in
+                    if text.contains("\n") {
+                        draft = text.replacingOccurrences(of: "\n", with: "")
+                        submit()
+                    }
+                }
                 .onAppear { fieldFocused = true }
                 .onChange(of: fieldFocused) { _, focused in if !focused { editing = false } }
         } else {
@@ -366,18 +387,32 @@ private struct TurnSection: View {
     private var pictures: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 8) {
-                ForEach(turn.images, id: \.self) { url in
+                ForEach(turn.images.filter { !brokenImages.contains($0) }, id: \.self) { url in
                     AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.3))) { phase in
                         if let image = phase.image {
                             image.resizable().scaledToFill()
+                        } else if case .failure = phase {
+                            // Gone, rather than an empty tile for good.
+                            Theme.raised.onAppear { brokenImages.insert(url) }
                         } else {
                             Theme.raised
                         }
                     }
                     .frame(width: 240, height: 160)
                     .clipShape(.rect(cornerRadius: 18))
+                    .transition(.opacity)
+                }
+                // Still being looked for: their places, kept so the text below stays put.
+                ForEach(0..<turn.pendingPictures, id: \.self) { _ in
+                    Theme.raised
+                        .frame(width: 240, height: 160)
+                        .clipShape(.rect(cornerRadius: 18))
+                        .transition(.opacity)
                 }
             }
+            .animation(.easeOut(duration: 0.3), value: brokenImages)
+            .animation(.easeOut(duration: 0.3), value: turn.images)
+            .animation(.easeOut(duration: 0.3), value: turn.pendingPictures)
         }
         .scrollIndicators(.hidden)
         .scrollClipDisabled()
