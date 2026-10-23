@@ -22,6 +22,9 @@ final class BrowserTab: NSObject, Identifiable {
     var loadError: String?
     /// Asks sites for their desktop layout; set from the page menu.
     private(set) var wantsDesktopSite = false
+    /// The language this tab's pages are translated into, if any. Stays on for
+    /// the pages you open next in the tab, until you show the original.
+    private(set) var translation: TranslationTarget?
     var lastActive: Date
     private(set) var snapshot: UIImage?
     private(set) var isLive = false
@@ -123,6 +126,21 @@ final class BrowserTab: NSObject, Identifiable {
         let configuration = WKSnapshotConfiguration()
         configuration.snapshotWidth = 360
         keep(try? await webView.takeSnapshot(configuration: configuration))
+    }
+
+    func translate(to target: TranslationTarget?) {
+        let previous = translation
+        translation = target
+        guard let webView else { return }
+        Task {
+            if let target {
+                // Switching languages: back to the original text first.
+                if previous != nil { await PageTranslator.shared.restore(webView) }
+                await PageTranslator.shared.translate(webView, to: target)
+            } else {
+                await PageTranslator.shared.restore(webView)
+            }
+        }
     }
 
     func setDesktopSite(_ desktop: Bool) {
@@ -331,6 +349,9 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         samplePageColors()
+        if let translation {
+            Task { await PageTranslator.shared.translate(webView, to: translation) }
+        }
         guard let url = webView.url else { return }
         delegate?.tab(self, didFinishLoading: url, title: webView.title ?? "")
     }

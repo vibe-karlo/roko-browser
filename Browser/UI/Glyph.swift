@@ -5,7 +5,7 @@ import SwiftUI
 struct Glyph: View {
     nonisolated enum Kind {
         case tabs, plus, chevronUp, back, forward, close, search, pin, history, tab,
-             openLink, summarize, browse, share, reload, blocking, settings, copy, privacy, popup, equals, link, textSize, desktop, reader
+             openLink, summarize, browse, share, reload, blocking, settings, copy, privacy, popup, equals, link, textSize, desktop, reader, translate
     }
 
     let kind: Kind
@@ -119,6 +119,13 @@ private nonisolated struct GlyphShape: Shape {
         case .desktop:
             p.chamferedBox(x: 4, y: 4.5, width: 12, height: 8.5)
             p.lines([(2.5, 15.5), (17.5, 15.5)])
+        case .translate:
+            // An "A" beside a chamfered card of lines: one language becoming another.
+            p.lines([(2.5, 15), (6, 5), (9.5, 15)])
+            p.lines([(3.8, 11.5), (8.2, 11.5)])
+            p.chamferedBox(x: 11, y: 6, width: 7, height: 10, cut: 2.2)
+            p.lines([(13, 10), (16, 10)])
+            p.lines([(13, 13), (15, 13)])
         case .reader:
             p.chamferedBox(x: 4, y: 3, width: 12, height: 14)
             p.lines([(7, 7.5), (13, 7.5)])

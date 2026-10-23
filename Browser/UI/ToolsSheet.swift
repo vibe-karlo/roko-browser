@@ -113,6 +113,8 @@ struct ToolsSheet: View {
         VStack(spacing: 0) {
             ToolRow(glyph: .reader, title: "Reader Mode") { browser.openReader() }
 
+            translateRow(tab)
+
             HStack(spacing: 14) {
                 Glyph(.textSize).foregroundStyle(Theme.secondaryInk).frame(width: 24)
                 Text("Page Zoom").font(.system(size: 16))
@@ -137,6 +139,38 @@ struct ToolsSheet: View {
         .padding(.vertical, 4)
         .background(Theme.raised, in: .rect(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.edge))
+    }
+
+    /// Translate into English or Croatian; the language in use is lit, and
+    /// tapping it again brings back the original.
+    private func translateRow(_ tab: BrowserTab) -> some View {
+        HStack(spacing: 14) {
+            Glyph(.translate).foregroundStyle(Theme.secondaryInk).frame(width: 24)
+            Text(tab.translation == nil ? "Translate" : "Translated").font(.system(size: 16))
+            Spacer()
+            HStack(spacing: 0) {
+                ForEach(TranslationTarget.allCases) { target in
+                    let isOn = tab.translation == target
+                    Button {
+                        tab.translate(to: isOn ? nil : target)
+                        browser.panel = .none
+                        browser.showToast(isOn ? "Showing the original" : "Translating to \(target.name)")
+                    } label: {
+                        Text(target.name)
+                            .font(.system(size: 14, weight: isOn ? .semibold : .regular))
+                            .foregroundStyle(isOn ? Theme.accent : Theme.ink)
+                            .padding(.horizontal, 12)
+                            .frame(height: 38)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(RowButtonStyle())
+                    .accessibilityLabel(isOn ? "Show original" : "Translate to \(target.name)")
+                }
+            }
+            .background(Theme.panel, in: .capsule)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
     private func zoomButton(_ symbol: String, _ label: String, action: @escaping () -> Void) -> some View {
