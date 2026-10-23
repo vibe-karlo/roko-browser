@@ -43,9 +43,11 @@ struct ClaudeClient {
         /// declines; Haiku has none and would reject the field.
         var hasServerFallback: Bool { self == .sonnet }
 
-        /// Sonnet filters search results before reading them (the newer tool);
-        /// Haiku has the basic one, which is fine for a quick question.
-        var webSearchTool: String { self == .sonnet ? "web_search_20260209" : "web_search_20250305" }
+        /// The basic search tool for both. Sonnet also has a newer one that
+        /// filters results by writing and running code first; measured on an
+        /// iPhone, each code round took 4 to 10 s, so a question took 29 to 48 s
+        /// with the answer arriving in one burst at the end.
+        var webSearchTool: String { "web_search_20250305" }
     }
 
     var endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
@@ -126,8 +128,10 @@ struct ClaudeClient {
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
+        AITrace.log("request \(model.rawValue) effort=\(effort) searches=\(searches) messages=\(messages.count)")
         let (bytes, response) = try await URLSession.shared.bytes(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        AITrace.log("http \(status)")
         guard status == 200 else {
             var raw = Data()
             for try await byte in bytes { raw.append(byte) }
@@ -146,11 +150,17 @@ struct ClaudeClient {
             let index = event["index"] as? Int ?? 0
 
             switch type {
+            case "message_start":
+                let usage = (event["message"] as? [String: Any])?["usage"] as? [String: Any]
+                AITrace.log("message_start input_tokens=\(usage?["input_tokens"] ?? "?")")
+
             case "content_block_start":
                 blocks[index] = event["content_block"] as? [String: Any] ?? [:]
                 let type = blocks[index]?["type"] as? String
+                AITrace.log("block \(index) \(type ?? "?") \(blocks[index]?["name"] as? String ?? "")")
                 if type == "server_tool_use" { continuation.yield(.usingTool) }
                 if let results = blocks[index]?["content"] as? [[String: Any]], type == "web_search_tool_result" {
+                    AITrace.log("  \(results.count) search results")
                     for result in results {
                         if let source = Self.source(from: result) { continuation.yield(.result(source)) }
                     }
@@ -185,14 +195,19 @@ struct ClaudeClient {
                    let input = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                     blocks[index]?["input"] = input
                     if blocks[index]?["type"] as? String == "server_tool_use", let query = input["query"] as? String {
+                        AITrace.log("  search: \(query)")
                         continuation.yield(.searching(query))
                     }
+                }
+                if blocks[index]?["type"] as? String == "text" {
+                    AITrace.log("  text \((blocks[index]?["text"] as? String ?? "").count) chars")
                 }
 
             case "message_delta":
                 if let delta = event["delta"] as? [String: Any], let reason = delta["stop_reason"] as? String {
                     stopReason = reason
                 }
+                AITrace.log("message_delta stop=\(stopReason ?? "-") usage=\(event["usage"].map { "\($0)" } ?? "-")")
 
             case "error":
                 let error = event["error"] as? [String: Any]

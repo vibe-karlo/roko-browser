@@ -144,6 +144,7 @@ struct BrowserView: View {
         #if DEBUG
         .task {
             if Benchmark.isRequested { await Benchmark.run() }
+            if !BrowseProbe.questions.isEmpty { await BrowseProbe.run() }
         }
         #endif
         .onChange(of: scenePhase) { _, phase in

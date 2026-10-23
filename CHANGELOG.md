@@ -35,6 +35,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Page loads skip resending unchanged blocker settings to WebKit.
 - Site icons are no longer re-read from disk on every redraw.
 - Scrolling no longer creates a timer per frame; the empty-ad-box check waits for scrolling to pause.
+- Browse for Me is two to three times faster with Claude (measured on an iPhone): a deep question 48 s to 20 s, an ordinary one 29 s to 12 s, at about half the tokens. Sonnet uses the basic search tool instead of the one that filters results by running code, searches less, and thinks at medium effort.
 
 ### Fixed
 - Low memory: background tabs hibernate and tab pictures are released before iOS has to close roko.

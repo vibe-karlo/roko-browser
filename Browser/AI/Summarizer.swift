@@ -247,7 +247,7 @@ final class BrowseForMeModel: Identifiable {
             wants to know.
             """ + answerShape()
         case .deep: """
-            Research this properly: search from several angles and read at least eight \
+            Research this properly: search from several angles and read at least six \
             trustworthy sources. Give specifics: names, numbers, prices, dates and trade-offs. \
             Where sources disagree, say so. First line: "# " and a specific title. Lead with \
             what the person most likely wants to know.
@@ -454,9 +454,10 @@ nonisolated enum ResearchDepth: Equatable {
         switch self { case .quick: 3; case .standard: 6; case .deep: 8 }
     }
 
-    /// Claude's web searches.
+    /// Claude's web searches. Each one adds its results to what every later
+    /// step re-reads, so more searches cost time and tokens twice over.
     var searches: Int {
-        switch self { case .quick: 2; case .standard: 5; case .deep: 10 }
+        switch self { case .quick: 2; case .standard: 3; case .deep: 6 }
     }
 
     var model: ClaudeClient.Model { self == .quick ? .haiku : .sonnet }
@@ -488,8 +489,10 @@ nonisolated enum ResearchDepth: Equatable {
         " karta ", " lyrics", " tekst pjesme", " live ", " uživo", " stock price",
     ]
 
+    /// Deep questions get more sources and room, not more thinking: high
+    /// effort spent 16 s thinking before the first word, measured on a phone.
     var effort: String {
-        switch self { case .quick: "low"; case .standard: "medium"; case .deep: "high" }
+        switch self { case .quick: "low"; case .standard, .deep: "medium" }
     }
 }
 
