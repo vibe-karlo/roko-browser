@@ -102,10 +102,15 @@ fixes it, so with a key Croatian pages go to Claude first. Claude summaries use 
 retried on Sonnet 5.5 if Haiku declines.
 
 Browse for Me judges each question from its words (`ResearchDepth`): a quick fact reads three
-pages (Claude: Haiku, two searches); an ordinary question six (Sonnet, medium effort); a
-comparison, a "best", a decision or a plan eight (Sonnet, high effort, up to ten searches) and
-gets a longer answer. Our own search uses DuckDuckGo's HTML results and reads the pages in
-parallel (plain HTTP, no web views).
+pages (Claude: Haiku, low effort, two searches); an ordinary question six (Haiku, three
+searches); a comparison, a "best", a decision or a plan eight (Sonnet, medium effort, six
+searches) and gets a longer answer. Claude always searches before answering, with the basic
+search tool: the newer one filters results by running code and was two to three times slower
+on a phone. Our own search uses DuckDuckGo's HTML results and reads the pages in parallel
+(plain HTTP, no web views).
+
+To time Browse for Me on a phone, launch a Debug build over the cable:
+`xcrun devicectl device process launch --console --device <id> com.growthstudio.roko -- -perf -browse "question"`.
 
 ## Not done yet
 

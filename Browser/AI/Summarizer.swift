@@ -242,7 +242,7 @@ final class BrowseForMeModel: Identifiable {
             help. No "## " sections. No emoji. No preamble, no sign-off.
             """
         case .standard: """
-            Search as needed and read four to six trustworthy sources. Write a compact answer \
+            One to three searches and four to six trustworthy sources. Write a compact answer \
             page. First line: "# " and a specific title. Lead with what the person most likely \
             wants to know.
             """ + answerShape()
@@ -253,9 +253,13 @@ final class BrowseForMeModel: Identifiable {
             what the person most likely wants to know.
             """ + answerShape(sections: "five to seven")
         }
+        // Haiku answered "why is the sky blue" from memory, with no search and
+        // so no sources; the feature promises an answer read from the web.
         return """
-        You are the "Browse for Me" feature of a phone browser. Search the web, then answer in \
-        the language of the question. \(croatianStandard) Don't list the sources (the app shows them).
+        You are the "Browse for Me" feature of a phone browser. Always search the web before \
+        answering, even when you already know the answer: the person wants current facts with \
+        sources they can open. Answer in the language of the question. \(croatianStandard) \
+        Don't list the sources (the app shows them).
 
         """ + task
     }
@@ -460,7 +464,10 @@ nonisolated enum ResearchDepth: Equatable {
         switch self { case .quick: 2; case .standard: 3; case .deep: 6 }
     }
 
-    var model: ClaudeClient.Model { self == .quick ? .haiku : .sonnet }
+    /// Haiku streams its answer from the first word; Sonnet's arrives in one
+    /// burst once mostly written. So Haiku for everything but the questions
+    /// that need weighing many sources.
+    var model: ClaudeClient.Model { self == .deep ? .sonnet : .haiku }
 
     /// Whether a typed query asks for an answer rather than for a page: a
     /// question ("can dogs eat grapes", "zašto…"), a comparison or a decision.

@@ -18,7 +18,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 - Croatian pages are summarized by Claude Haiku when there's an API key; Apple's on-device model writes poor Croatian. English stays on the iPhone.
-- Claude summaries use Haiku 5.5, and Browse for Me uses Haiku for quick questions and Sonnet 5.5 for the rest, instead of Opus.
+- Claude summaries use Haiku 5.5, and Browse for Me uses Haiku for quick and ordinary questions and Sonnet 5.5 for deep ones, instead of Opus.
+- Browse for Me always searches the web before answering, so every answer has sources.
 - The address bar no longer lists open pages before you type; they show up when they match, marked "Already open".
 - The address bar opens in one move: no dark overlay fading in over the page.
 - Browse for Me's suggestion has a sparkle and says what it does: "Reads the web and answers".
@@ -35,7 +36,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Page loads skip resending unchanged blocker settings to WebKit.
 - Site icons are no longer re-read from disk on every redraw.
 - Scrolling no longer creates a timer per frame; the empty-ad-box check waits for scrolling to pause.
-- Browse for Me is two to three times faster with Claude (measured on an iPhone): a deep question 48 s to 20 s, an ordinary one 29 s to 12 s, at about half the tokens. Sonnet uses the basic search tool instead of the one that filters results by running code, searches less, and thinks at medium effort.
+- Browse for Me is two to three times faster with Claude (measured on an iPhone): a deep question 48 s to 20 s, at about half the tokens; an ordinary one 29 s to 8 to 13 s, on Haiku, with the answer streaming in from about 6 s. Sonnet uses the basic search tool instead of the one that filters results by running code, searches less, and thinks at medium effort.
 
 ### Fixed
 - Low memory: background tabs hibernate and tab pictures are released before iOS has to close roko.
