@@ -22,6 +22,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Browse for Me matches the question: a quick fact gets a short answer from three sources; a comparison, a "best" or a plan reads more sites and writes more.
 - Answers written by Claude show pictures too, from the pages its searches found, fetched alongside while it works.
 - A weather topic, with a sun, for answer sections about weather and seasons.
+- Site Settings → Pinch to summarize: turn it off for a site where you need the pinch to zoom.
 
 ### Changed
 - Croatian pages are summarized by Claude Haiku when there's an API key; Apple's on-device model writes poor Croatian. English stays on the iPhone.
@@ -44,6 +45,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Apple's models answer from what the sources say, instead of listing what they leave out; short answers give the facts in full sentences.
 - A follow-up's section comes up to the top of the screen while it's worked on, instead of its reading list running under the footer.
 - Rewording a question wraps over lines instead of scrolling sideways.
+- A pinch summarizes pages wider than the screen too, from their own size; a page you've zoomed into still zooms out.
+- Apple's models write in English when they summarize a Croatian page or answer a Croatian question, and say why; Claude still writes Croatian.
 
 ### Performance
 - The first page after launch starts about 0.16 s sooner: it waits only for the request rules; the hiding indexes now decode in parallel.
@@ -68,7 +71,6 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Browse for Me no longer shows Claude thinking aloud between searches as the answer.
 - Browse for Me counts the pages the answer is based on, not every search hit ("Read 39 pages").
 - Source icons no longer show a grey arrow placeholder for sites without an icon.
-- The on-device Browse for Me answers a Croatian question in Croatian.
 - News about crimes or attacks is no longer refused by Apple's on-device safety filter as often.
 - Summarize: "Writing the summary" no longer overlaps the first words; the summary eases in after it.
 - Closing a summary, the card grows back to the page's full height, with no grey gap above the bar.

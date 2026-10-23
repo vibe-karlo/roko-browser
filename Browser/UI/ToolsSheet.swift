@@ -7,6 +7,7 @@ struct ToolsSheet: View {
     @Environment(BrowserModel.self) private var browser
     @State private var blockingOn = true
     @State private var popupsOn = true
+    @State private var pinchOn = true
     @State private var siteSettingsOpen = false
 
     var body: some View {
@@ -29,6 +30,7 @@ struct ToolsSheet: View {
                 let host = tab.url?.host()
                 blockingOn = !(host.map { ContentBlocker.shared.isAllowed(host: $0) } ?? false)
                 popupsOn = !(host.map { ContentBlocker.shared.isAllowed(host: $0, category: .popups) } ?? false)
+                pinchOn = PinchToSummarize.isOn(for: host)
             }
         }
     }
@@ -220,6 +222,13 @@ struct ToolsSheet: View {
                         tab.webView?.reload()
                     }))
                     .disabled(!blockingOn || !ContentBlocker.shared.isEnabled(.popups))
+                toggleRow(glyph: .summarize, title: "Pinch to summarize",
+                          detail: pinchOn ? "Pinching in summarizes" : "Pinching zooms instead", isOn: Binding(
+                    get: { pinchOn },
+                    set: { on in
+                        pinchOn = on
+                        PinchToSummarize.set(on, for: host)
+                    }))
                 ToolRow(glyph: .settings, title: "All settings") { browser.panel = .settings }
             }
         }

@@ -117,7 +117,7 @@ nonisolated struct ResearchedAnswer {
 }
 
 private nonisolated let followUpsGuide =
-    "Up to three short follow-up questions the person is likely to ask next, in the language of the question; none if they wouldn't help"
+    "Up to three short follow-up questions the person is likely to ask next, in the language of the answer; none if they wouldn't help"
 
 /// A partly written answer, shown as the app's Markdown while it streams.
 nonisolated protocol AnswerDraft {

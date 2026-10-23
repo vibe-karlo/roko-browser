@@ -33,6 +33,16 @@ You summarize web pages for a phone browser. Write in the page's own language. \
 Only facts from the page, and each fact once: never repeat a point. No preamble, no sign-off.
 """
 
+/// Apple's models read Croatian well enough but write it badly (Serbian words,
+/// broken endings), so when they summarize a Croatian page, it's in English.
+private let summaryGuidanceInEnglish = """
+You summarize web pages for a phone browser. The page is in Croatian: write the summary in English. \
+Only facts from the page, and each fact once: never repeat a point. No preamble, no sign-off.
+"""
+
+/// Says why a summary or answer of something Croatian is in English.
+private let englishNote = "In English: Apple's models write poor Croatian."
+
 /// For Claude. (Apple's on-device model refused every request whose
 /// instructions were written in Croatian, so it keeps the plain guidance above.)
 private let summaryInstructions = summaryGuidance + " " + croatianStandard + "\n\n" + answerShape()
@@ -94,17 +104,18 @@ final class SummaryModel: Identifiable {
 
         // Apple's models write good English and poor Croatian (Serbian words,
         // broken endings), and no prompt fixes that. So a Croatian page goes
-        // to Claude first; everything else stays on Apple's models, free and
-        // private, with Claude as the fallback.
-        let claudeFirst = AnswerLanguage.of(page.text, host: host) == .croatian
+        // to Claude first, and when Apple's models summarize it anyway (no key,
+        // Claude off or failing), they write in English. Everything else stays
+        // on Apple's models, free and private, with Claude as the fallback.
+        let croatian = AnswerLanguage.of(page.text, host: host) == .croatian
         var engines: [Engine] = [.appleCloud, .onDevice]
-        if ClaudeClient.configured != nil { claudeFirst ? engines.insert(.claude, at: 0) : engines.append(.claude) }
+        if ClaudeClient.configured != nil { croatian ? engines.insert(.claude, at: 0) : engines.append(.claude) }
 
         var lastError: Error = ClaudeError(
             message: "Summaries need Apple Intelligence on this iPhone, or a Claude API key in Settings.")
         for engine in engines {
             do {
-                guard try await write(page, with: engine) else { continue }
+                guard try await write(page, with: engine, croatian: croatian) else { continue }
                 phase = .done
                 return
             } catch is CancellationError {
@@ -124,23 +135,25 @@ final class SummaryModel: Identifiable {
     private enum Engine { case appleCloud, onDevice, claude }
 
     /// Writes the summary with one engine; false when that engine isn't available here.
-    private func write(_ page: ReadablePage, with engine: Engine) async throws -> Bool {
+    private func write(_ page: ReadablePage, with engine: Engine, croatian: Bool) async throws -> Bool {
+        let longNote = "Long page: this covers the first part."
         switch engine {
         case .appleCloud:
             guard let cloud = AppleModels.cloudIfAvailable else { return false }
             self.engine = "Apple Intelligence"
             let budget = await AppleModels.characterBudget(of: cloud)
-            if page.text.count > budget { note = "Long page: this covers the first part." }
+            note = Self.note(page.text.count > budget ? longNote : nil, croatian ? englishNote : nil)
             let prompt = "Title: \(page.title)\nSite: \(page.site)\n\n\(page.text.prefix(budget))"
-            for try await snapshot in AppleModels.streamAnswer(cloud, instructions: summaryGuidance, prompt: prompt, titled: false) {
+            for try await snapshot in AppleModels.streamAnswer(cloud, instructions: croatian ? summaryGuidanceInEnglish : summaryGuidance,
+                                                               prompt: prompt, titled: false) {
                 text = snapshot
             }
 
         case .onDevice:
             guard OnDeviceSummarizer.isAvailable else { return false }
             self.engine = "On-device"
-            let (stream, truncated) = OnDeviceSummarizer.summarize(page)
-            if truncated { note = "Long page: this covers the first part." }
+            let (stream, truncated) = OnDeviceSummarizer.summarize(page, inEnglish: croatian)
+            note = Self.note(truncated ? longNote : nil, croatian ? englishNote : nil)
             for try await snapshot in stream { text = snapshot }
 
         case .claude:
@@ -159,6 +172,12 @@ final class SummaryModel: Identifiable {
         // Cancelled, a stream just ends: closed, not done.
         try Task.checkCancellation()
         return true
+    }
+
+    /// The footer's notes, together; nil when there are none.
+    private static func note(_ parts: String?...) -> String? {
+        let text = parts.compactMap { $0 }.joined(separator: " ")
+        return text.isEmpty ? nil : text
     }
 
     private func stream(_ client: ClaudeClient, prompt: String, model: ClaudeClient.Model) async throws {
@@ -180,7 +199,8 @@ enum OnDeviceSummarizer {
     }
 
     /// Streams the growing summary text; `truncated` is true when the page was too long to read in full.
-    static func summarize(_ page: ReadablePage) -> (AsyncThrowingStream<String, Error>, truncated: Bool) {
+    /// `inEnglish`: the page is Croatian, which the model reads but writes badly.
+    static func summarize(_ page: ReadablePage, inEnglish: Bool) -> (AsyncThrowingStream<String, Error>, truncated: Bool) {
         let chunks = chunked(page.text)
         let truncated = chunks.count > maxChunks
         let stream = AsyncThrowingStream<String, Error> { continuation in
@@ -192,14 +212,15 @@ enum OnDeviceSummarizer {
                         for chunk in chunks.prefix(maxChunks) {
                             let session = LanguageModelSession(
                                 model: AppleModels.summarizing,
-                                instructions: "List the key facts in this part of a web page as three to five short lines starting with \"- \". Nothing else.")
+                                instructions: "List the key facts in this part of a web page\(inEnglish ? ", in English," : "") as three to five short lines starting with \"- \". Nothing else.")
                             notes.append(try await session.respond(to: chunk).content)
                         }
                         material = notes.joined(separator: "\n")
                     }
 
                     let prompt = "Title: \(page.title)\nSite: \(page.site)\n\n\(material)"
-                    for try await markdown in AppleModels.streamAnswer(AppleModels.summarizing, instructions: summaryGuidance,
+                    for try await markdown in AppleModels.streamAnswer(AppleModels.summarizing,
+                                                                       instructions: inEnglish ? summaryGuidanceInEnglish : summaryGuidance,
                                                                        prompt: prompt, titled: false) {
                         continuation.yield(markdown)
                     }
@@ -364,10 +385,10 @@ final class BrowseForMeModel: Identifiable {
         case .standard: "Lead with what the person most likely wants to know."
         case .deep: "Lead with what the person most likely wants to know, then the specifics the sources give: names, numbers, prices, dates and trade-offs."
         }
-        // Told only "the language of the question", the small model answers a
-        // Croatian question in English (its sources are often English), so name it.
+        // Apple's models write poor Croatian, so a Croatian question gets its
+        // answer in English from them (Claude answers it in Croatian).
         let language = AnswerLanguage.of(question) == .croatian
-            ? "Write the whole answer in Croatian." : "Write in the language of the question."
+            ? "The question is in Croatian: write the whole answer in English." : "Write in the language of the question."
         return """
         You are the "Browse for Me" feature of a phone browser. The app has searched the web and \
         read the pages below for you. Answer the question using only these sources. Where they \

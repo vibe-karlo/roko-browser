@@ -98,8 +98,9 @@ app rather than reporting an error.
 | Browse for Me | Our search and page reading, then Apple's cloud model | Claude with its own web search | Our search and reading, then the on-device model |
 
 Apple's on-device model writes poor Croatian (Serbian words, broken endings) and no prompt
-fixes it, so with a key Croatian pages go to Claude first. Claude summaries use Haiku 5.5,
-retried on Sonnet 5.5 if Haiku declines.
+fixes it, so with a key Croatian pages go to Claude first. When Apple's models do handle a
+Croatian page or question (no key, Claude off or failing), they write in English and say why.
+Claude summaries use Haiku 5.5, retried on Sonnet 5.5 if Haiku declines.
 
 Browse for Me judges each question from its words (`ResearchDepth`): a quick fact reads three
 pages (Claude: Haiku, low effort, two searches); an ordinary question six (Haiku, three

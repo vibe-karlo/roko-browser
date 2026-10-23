@@ -217,31 +217,40 @@ struct WebViewHost: UIViewRepresentable {
             }
         }
 
-        private var pinchStartedAtMinimumZoom = false
+        /// A pinch that began with the page at its own size: it summarizes.
+        private var pinchSummarizes = false
+        private var pinchStartZoom: CGFloat = 1
 
         @objc func pinched(_ recognizer: UIPinchGestureRecognizer) {
             guard let scrollView = parent.tab.webView?.scrollView else { return }
             switch recognizer.state {
             case .began:
                 // Only a pinch that starts on an un-zoomed page means "summarize";
-                // otherwise it's an ordinary zoom out.
-                pinchStartedAtMinimumZoom = scrollView.zoomScale <= scrollView.minimumZoomScale + 0.01
-            case .changed where pinchStartedAtMinimumZoom:
+                // on a page you've zoomed into, it's an ordinary zoom out. Un-zoomed
+                // is as small as it goes, or a mobile page at its own scale of 1:
+                // one wider than the screen (a wide table, say) could zoom out
+                // further, but it's still at its own size.
+                // Turned off for this site in Site Settings, it's always a zoom.
+                pinchStartZoom = scrollView.zoomScale
+                pinchSummarizes = PinchToSummarize.isOn(for: parent.tab.url?.host())
+                    && (pinchStartZoom <= scrollView.minimumZoomScale + 0.01 || abs(pinchStartZoom - 1) < 0.01)
+            case .changed where pinchSummarizes:
                 let scale = recognizer.scale
                 // A pinch inward from the page's own size is ours: stop WebKit
                 // zooming the page out as well (cancelling its recognizer), or
-                // the two shrink the page together.
+                // the two shrink the page together. Whatever it zoomed out
+                // already goes back, so the page returns at the size it was.
                 if scale < 0.97, let zoom = scrollView.pinchGestureRecognizer, zoom.isEnabled {
                     zoom.isEnabled = false
                     zoom.isEnabled = true
-                    scrollView.setZoomScale(scrollView.minimumZoomScale, animated: false)
+                    scrollView.setZoomScale(pinchStartZoom, animated: false)
                 }
                 // The page follows the fingers, with resistance as it gets small.
                 parent.onPinchChange(scale < 1 ? max(0.55, 1 - (1 - scale) * 0.7) : nil)
-            case .ended where pinchStartedAtMinimumZoom && recognizer.scale < 0.75:
+            case .ended where pinchSummarizes && recognizer.scale < 0.75:
                 parent.onPinchIn()
             case .ended, .cancelled, .failed:
-                if pinchStartedAtMinimumZoom { parent.onPinchChange(nil) }
+                if pinchSummarizes { parent.onPinchChange(nil) }
             default:
                 break
             }

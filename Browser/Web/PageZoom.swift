@@ -28,3 +28,25 @@ enum PageZoom {
         "zoom." + (host.hasPrefix("www.") ? String(host.dropFirst(4)) : host)
     }
 }
+
+/// Pinching in to summarize, per site: on unless turned off, for sites where
+/// a pinch is needed for zooming (maps, wide tables, pictures).
+enum PinchToSummarize {
+    static func isOn(for host: String?) -> Bool {
+        guard let host else { return true }
+        return !UserDefaults.standard.bool(forKey: key(host))
+    }
+
+    static func set(_ on: Bool, for host: String) {
+        // Only the exceptions are stored.
+        if on {
+            UserDefaults.standard.removeObject(forKey: key(host))
+        } else {
+            UserDefaults.standard.set(true, forKey: key(host))
+        }
+    }
+
+    private static func key(_ host: String) -> String {
+        "pinchOff." + (host.hasPrefix("www.") ? String(host.dropFirst(4)) : host)
+    }
+}
