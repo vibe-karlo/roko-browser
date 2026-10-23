@@ -132,11 +132,11 @@ private struct TabsGlyph: View {
         Glyph(.tabs, size: size)
             .overlay(alignment: .topLeading) {
                 if count > 0 {
-                    // The front card spans 3...14 × 6...17 on the 20-point grid.
+                    // Phosphor's front card spans 24...200 × 72...216 of its 256 grid.
                     Text(count > 99 ? "∞" : "\(count)")
                         .font(.system(size: count > 9 ? 8 : 10, weight: .semibold))
                         .fixedSize()
-                        .position(x: 8.5 * size / 20, y: 11.5 * size / 20)
+                        .position(x: 112 / 256 * size, y: 144 / 256 * size)
                 }
             }
             .frame(width: size, height: size)
