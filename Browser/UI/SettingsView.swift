@@ -118,7 +118,8 @@ private struct AppIconPicker: View {
     /// Asset names; "AppIcon" is the default.
     private static let icons = ["AppIcon", "AppIcon-StarOrange", "AppIcon-StarLight", "AppIcon-StarFlame",
                                 "AppIcon-StarBlue", "AppIcon-StarGreen", "AppIcon-StarGold", "AppIcon-Chevrons",
-                                "AppIcon-ChevronsGraphite", "AppIcon-Plus", "AppIcon-RollingO"]
+                                "AppIcon-ChevronsGraphite", "AppIcon-Plus", "AppIcon-RollingO",
+                                "AppIcon-EclipseCream", "AppIcon-EclipseOnOrange", "AppIcon-EclipseOrange"]
     @State private var current = UIApplication.shared.alternateIconName ?? "AppIcon"
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
 

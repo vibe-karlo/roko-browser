@@ -23,6 +23,13 @@ let rollingO = Mark(viewBox: (5, 0, 200, 200), widthShare: 236.0 / 360) {
     "<path d=\"M20 150H140A50 50 0 1 0 139.99 150\" fill=\"none\" stroke=\"\($0)\" stroke-width=\"26\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
 }
 
+/// A disc with a smaller disc cut out, set off to the right: on the 1024 tile,
+/// radius 300 at the centre, hole of radius 150 moved 94 to the right. The hole
+/// is cut (even-odd), so the tile shows through it in any colourway.
+let eclipse = Mark(viewBox: (0, 0, 600, 600), widthShare: 600.0 / 1024) {
+    "<path fill-rule=\"evenodd\" fill=\"\($0)\" d=\"M0 300A300 300 0 1 0 600 300A300 300 0 1 0 0 300ZM244 300A150 150 0 1 0 544 300A150 150 0 1 0 244 300Z\"/>"
+}
+
 /// Icon set name, mark, tile colour, mark colour.
 let icons: [(String, Mark, String, String)] = [
     ("AppIcon-StarOrange", star, "#050506", "#FF5B1F"),
@@ -35,6 +42,9 @@ let icons: [(String, Mark, String, String)] = [
     ("AppIcon-ChevronsGraphite", chevrons, "#1A1A1B", "#A9A9A9"),
     ("AppIcon-Plus", forwardPlus, "#050506", "#FF5B1F"),
     ("AppIcon-RollingO", rollingO, "#15171B", "#FF5B1F"),
+    ("AppIcon-EclipseCream", eclipse, "#161514", "#F1EDE6"),
+    ("AppIcon-EclipseOnOrange", eclipse, "#FF5B1F", "#161514"),
+    ("AppIcon-EclipseOrange", eclipse, "#161514", "#FF5B1F"),
 ]
 
 func svg(_ mark: Mark, tile: String, color: String, size: Double) -> String {

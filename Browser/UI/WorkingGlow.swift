@@ -7,36 +7,76 @@ import SwiftUI
 /// read (`progress`, 0 to 1) and breathes slowly while it waits. It leaves as
 /// soon as the answer starts, so it never sits behind text being read.
 ///
-/// Cheap by construction: one gradient and one still grain, moved only by
-/// scale and opacity, which the GPU animates with no work per frame on the CPU.
-/// With Reduce Motion it holds still.
+/// Smooth by construction: the light is drawn once, at full size, and only
+/// scaled and faded after that, so no frame redraws the gradient or the grain;
+/// the GPU does the rest. Progress arrives in steps (a page read, then another),
+/// so it's carried by a critically damped spring: a new target bends the motion
+/// already under way instead of restarting it, and the steps blend into one
+/// continuous rise. With Reduce Motion it holds still.
+///
+/// It stays in place and leaves on its own (`isActive` false): it sinks back
+/// into the edge as it fades, then stops breathing, so a hidden light costs
+/// nothing. (Removing it with a transition instead skipped the animation.)
 struct WorkingGlow: View {
     let progress: Double
+    var isActive = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The progress actually drawn, easing after `progress`.
+    @State private var shown: Double?
     @State private var breathing = false
+    /// Faded in once on first appearance.
+    @State private var appeared = false
+
+    /// From a low dawn to about half the screen, as a share of the full light.
+    private static let lowest = 0.2, highest = 0.52
 
     var body: some View {
         GeometryReader { proxy in
             let width = proxy.size.width, height = proxy.size.height
-            // How far up the light reaches: a low dawn at first, about half the
-            // screen once the pages are read.
-            let reach = height * (0.2 + 0.32 * progress)
+            let reach = (Self.lowest + (Self.highest - Self.lowest) * (shown ?? progress)) / Self.highest
 
             light
                 // An ellipse centred on the bottom edge: only its top half shows,
                 // as light coming from below the screen rather than a blob on it.
-                .frame(width: width * 1.9, height: reach * 2)
+                .frame(width: width * 1.9, height: height * Self.highest * 2)
+                // Scaled about that centre, it rises from and sinks into the edge.
+                .scaleEffect(x: 1, y: reach)
+                .scaleEffect(x: breathing ? 1.02 : 0.99, y: breathing ? 1.06 : 0.97)
                 .position(x: width / 2, y: height)
-                .scaleEffect(x: 1, y: breathing ? 1.07 : 0.96, anchor: .bottom)
-                .opacity(breathing ? 1 : 0.8)
+                .opacity((breathing ? 1 : 0.84) * (0.8 + 0.2 * (shown ?? progress)))
         }
-        .animation(.easeInOut(duration: 1.1), value: progress)
+        // Arriving it rises out of the edge; leaving, it sinks back into it.
+        .scaleEffect(x: 1, y: lit ? 1 : 0.6, anchor: .bottom)
+        .opacity(lit ? 1 : 0)
+        .animation(.easeInOut(duration: lit ? 0.7 : 0.9), value: lit)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
         .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 2.8).repeatForever(autoreverses: true)) { breathing = true }
+            shown = progress
+            appeared = true
+            if isActive { breathe() }
         }
+        .onChange(of: progress) { _, target in
+            withAnimation(reduceMotion ? nil : .spring(duration: 2.4, bounce: 0)) { shown = target }
+        }
+        .onChange(of: isActive) { _, active in
+            if active {
+                breathe()
+            } else {
+                // Once it has faded out, stop the breathing: no frames for a hidden light.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    guard !isActive else { return }
+                    withTransaction(Transaction(animation: nil)) { breathing = false }
+                }
+            }
+        }
+    }
+
+    private var lit: Bool { appeared && isActive }
+
+    private func breathe() {
+        guard !reduceMotion, !breathing else { return }
+        withAnimation(.easeInOut(duration: 3.2).repeatForever(autoreverses: true)) { breathing = true }
     }
 
     /// The accent, falling off over many stops so it eases out rather than

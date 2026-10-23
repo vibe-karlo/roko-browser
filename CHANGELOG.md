@@ -9,7 +9,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Full-screen Summarize: the page shrinks into a card, live with a pinch, then the summary writes itself.
 - Structured answers for Summarize and Browse for Me: a gist, then sections with topic icons.
 - Browse for Me shows each site as it's read, with source cards, pictures and real site icons.
-- Settings → App icon: ten alternates from the logo designs.
+- Settings → App icon: thirteen alternates from the logo designs, including three Eclipse marks (cream, on orange, orange).
 - Translate any page into English or Croatian, in place.
 - Address suggestions show the real icon of 150 popular sites, bundled, with no network request.
 - Haptics when a toast confirms an action, a tab is thrown away, or the bar swipes to the next tab.
@@ -17,7 +17,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Browse for Me suggests two or three follow-up questions under the answer when they'd help. Asking one adds a new section to the same page, answered with the earlier answers as context.
 - Tap a question in Browse for Me to reword it; that section and the ones after it are asked again.
 - An Answer / Google switch flips the Browse for Me page to the search results and back, from the start, losing neither. Closing the page stops any answer still being written.
-- roko's orange light: while Browse for Me or Summarize works, a warm light rises from the bottom edge as pages are read, and leaves when the answer starts.
+- roko's orange light: while Browse for Me or Summarize works, a warm light rises from the bottom edge as pages are read, in one continuous motion, and sinks back into the edge when the answer starts.
+- Browse for Me's answer arrives in order: the question shrinks to its heading, then pictures, sources and text ease in one after another.
 - Browse for Me matches the question: a quick fact gets a short answer from three sources; a comparison, a "best" or a plan reads more sites and writes more.
 
 ### Changed

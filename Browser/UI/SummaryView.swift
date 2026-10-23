@@ -21,12 +21,11 @@ struct SummaryView: View {
                     .opacity(settled ? 1 : 0)
                     .ignoresSafeArea()
 
-                // roko's light while it works: rising as the page is read, gone
-                // as the summary starts. Not while the card is still moving.
-                if showsLight {
-                    WorkingGlow(progress: model.progress)
+                // roko's light while it works: rising as the page is read, sinking
+                // away as the summary starts. Not while the card is still moving.
+                if textShown {
+                    WorkingGlow(progress: model.progress, isActive: showsLight)
                         .ignoresSafeArea()
-                        .transition(.opacity)
                 }
 
                 ScrollViewReader { scroller in
@@ -55,7 +54,7 @@ struct SummaryView: View {
             // Only once settled: while opening and closing, the page card owns the top.
             .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas).opacity(textShown ? 1 : 0) }
         }
-        .animation(.easeOut(duration: 0.8), value: showsLight)
+        .animation(.easeInOut(duration: 0.4), value: showsLight)
         .sensoryFeedback(.success, trigger: model.phase == .done)
         .onAppear {
             // The card now sits exactly where the page was: hide the page.
@@ -161,6 +160,8 @@ struct SummaryView: View {
         // See-through while the light is up, so its brightest part shows.
         .background(Theme.canvas.opacity(showsLight ? 0 : 1))
         .background(alignment: .top) { FadeEdge(color: Theme.canvas).opacity(showsLight ? 0 : 1) }
+        // At the light's own pace, so no dark band crosses it as it sinks.
+        .animation(.easeInOut(duration: 0.9), value: showsLight)
     }
 
     /// The card grows back to exactly the page's size and place; only then is

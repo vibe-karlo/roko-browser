@@ -40,12 +40,9 @@ struct BrowseForMeView: View {
     private var background: some View {
         ZStack {
             Theme.canvas
-            if latest.isWorking && !session.showsSearch {
-                WorkingGlow(progress: latest.progress)
-                    .transition(.opacity)
-            }
+            // Always in place; it rises and sinks by itself as work starts and ends.
+            WorkingGlow(progress: latest.progress, isActive: latest.isWorking && !session.showsSearch)
         }
-        .animation(.easeOut(duration: 0.8), value: latest.isWorking)
         .ignoresSafeArea()
     }
 
@@ -105,10 +102,12 @@ struct BrowseForMeView: View {
         .padding(.horizontal, 22)
         .padding(.vertical, 10)
         // See-through while the light is up, so its brightest part shows.
+        // It turns solid at the light's own pace, so no dark band crosses the light as it sinks.
         .background(Theme.canvas.opacity(latest.isWorking && !session.showsSearch ? 0 : 1))
         .background(alignment: .top) {
             FadeEdge(color: Theme.canvas).opacity(latest.isWorking || session.showsSearch ? 0 : 1)
         }
+        .animation(.easeInOut(duration: 0.9), value: latest.isWorking)
     }
 
     private func close() {
@@ -189,24 +188,40 @@ private struct TurnSection: View {
                 .padding(.top, turn.isWorking ? 24 : 0)
 
             if turn.isWorking {
+                // Out quickly, so nothing of it is left under the answer coming in.
                 working
+                    .transition(.asymmetric(insertion: .opacity,
+                                            removal: .opacity.animation(.easeOut(duration: 0.12))))
             } else if case .failed(let message) = turn.phase {
                 Text(message).foregroundStyle(Theme.secondaryInk)
             } else {
                 // Pictures first, then the sources: the faces of the answer
-                // up top, its footnotes compact beneath them.
-                if !turn.images.isEmpty { pictures }
-                if !turn.sources.isEmpty { sources }
+                // up top, its footnotes compact beneath them. They arrive in
+                // that order, a beat apart, each easing up into place.
+                if !turn.images.isEmpty { pictures.transition(Self.reveal(0)) }
+                if !turn.sources.isEmpty { sources.transition(Self.reveal(1)) }
                 MarkdownText(markdown: turn.answer, isStreaming: turn.phase == .writing)
+                    .transition(Self.reveal(2))
                 if !credit.isEmpty {
                     Text(credit)
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.faintInk)
+                        .transition(.opacity)
                 }
-                if isLatest, !turn.followUps.isEmpty { followUps }
+                if isLatest, !turn.followUps.isEmpty { followUps.transition(Self.reveal(1)) }
             }
         }
-        .animation(.snappy(duration: 0.4), value: turn.isWorking)
+        .animation(.smooth(duration: 0.5), value: turn.isWorking)
+        .animation(.smooth(duration: 0.4), value: turn.phase == .done)
+    }
+
+    /// The answer's parts coming in: up from a little below and out of nothing,
+    /// one after another, once the reading list has gone. Leaving, they just fade.
+    private static func reveal(_ order: Int) -> AnyTransition {
+        .asymmetric(
+            insertion: .opacity.combined(with: .offset(y: 16))
+                .animation(.smooth(duration: 0.6).delay(0.16 + Double(order) * 0.1)),
+            removal: .opacity)
     }
 
     // MARK: The question
@@ -233,7 +248,11 @@ private struct TurnSection: View {
                 editing = true
             } label: {
                 Text(turn.query)
-                    .font(font)
+                    // Shrinks from the large question to the quiet heading as one
+                    // smooth change of size, laid out afresh at every size between,
+                    // rather than two sizes cross-fading over each other.
+                    .modifier(AnimatedFontSize(size: turn.isWorking ? 30 : 17))
+                    .contentTransition(.identity)
                     .foregroundStyle(turn.isWorking ? Theme.ink : Theme.secondaryInk)
                     .lineLimit(turn.isWorking ? 4 : 2)
                     .multilineTextAlignment(.leading)
@@ -401,5 +420,19 @@ private struct TurnSection: View {
         case "Apple Intelligence": return "By Apple Intelligence"
         default: return "Written on this iPhone"
         }
+    }
+}
+
+/// A semibold system font whose size animates: SwiftUI asks for the body at
+/// every size in between, so text grows or shrinks as one shape.
+private struct AnimatedFontSize: ViewModifier, Animatable {
+    var size: CGFloat
+    var animatableData: CGFloat {
+        get { size }
+        set { size = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        content.font(.system(size: size, weight: .semibold))
     }
 }
