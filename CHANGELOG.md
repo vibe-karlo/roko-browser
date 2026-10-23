@@ -47,6 +47,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - The bar comes back after closing a summary, an answer or Reader Mode.
 - Search suggestions no longer repeat exactly what you typed.
 - On-device summaries no longer end mid-word when the model runs out of room; the unfinished point is left out.
+- The calculator reads currency symbols after the amount and decimal commas ("25$ in €", "12,50 € u kn"), plus Croatian currency names ("50 funti u eurima").
+- Browse for Me no longer shows Claude thinking aloud between searches as the answer.
+- Browse for Me counts the pages the answer is based on, not every search hit ("Read 39 pages").
+- Source icons no longer show a grey arrow placeholder for sites without an icon.
+- The on-device Browse for Me answers a Croatian question in Croatian.
 - News about crimes or attacks is no longer refused by Apple's on-device safety filter as often.
 
 ## [0.1.0] - 2026-10-23

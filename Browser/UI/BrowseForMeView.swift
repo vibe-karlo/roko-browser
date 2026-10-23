@@ -100,7 +100,8 @@ struct BrowseForMeView: View {
                             .background(Theme.panel, in: .rect(cornerRadius: 6))
                     }
                 }
-                Text("Read \(model.sources.count) \(model.sources.count == 1 ? "page" : "pages")")
+                // The pages the answer rests on, not every search hit along the way.
+                Text("Based on \(model.sources.count) \(model.sources.count == 1 ? "page" : "pages")")
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.secondaryInk)
             }

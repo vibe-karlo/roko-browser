@@ -260,17 +260,21 @@ final class BrowseForMeModel: Identifiable {
         """ + task
     }
 
-    private static func appleInstructions(_ depth: ResearchDepth) -> String {
+    private static func appleInstructions(_ depth: ResearchDepth, question: String) -> String {
         let length = switch depth {
         case .quick: "Answer in one to three sentences."
         case .standard: "Lead with what the person most likely wants to know."
         case .deep: "Lead with what the person most likely wants to know, then give specifics: names, numbers, prices, dates and trade-offs."
         }
+        // Told only "the language of the question", the small model answers a
+        // Croatian question in English (its sources are often English), so name it.
+        let language = AnswerLanguage.of(question) == .croatian
+            ? "Write the whole answer in Croatian." : "Write in the language of the question."
         return """
         You are the "Browse for Me" feature of a phone browser. The app has searched the web and \
         read the pages below for you. Answer the question using only these sources. Where they \
-        disagree, say so; if they don't answer part of the question, say what is missing. Write in \
-        the language of the question. Never repeat a point. \(length)
+        disagree, say so; if they don't answer part of the question, say what is missing. \
+        \(language) Never repeat a point. \(length)
         """
     }
 
@@ -329,7 +333,7 @@ final class BrowseForMeModel: Identifiable {
 
             engine = label
             phase = .writing
-            let instructions = Self.appleInstructions(depth)
+            let instructions = Self.appleInstructions(depth, question: query)
             // A quick question gets the short shape: no sections to fill out.
             let answer = depth == .quick
                 ? AppleModels.streamAnswer(model, shape: BriefAnswer.self, instructions: instructions, prompt: prompt)
@@ -359,9 +363,12 @@ final class BrowseForMeModel: Identifiable {
                 text = ""
                 sources = []
                 steps = []
+                found = []
                 phase = .searching(query)
                 try await streamClaude(client, model: .sonnet)
             }
+            // An answer that cites nothing still shows where it looked.
+            if sources.isEmpty { sources = Array(found.prefix(6)) }
             phase = .done
         } catch is CancellationError {
             return
@@ -376,17 +383,30 @@ final class BrowseForMeModel: Identifiable {
             switch event {
             case .searching(let query):
                 phase = .searching(query)
-            case .source(let source):
-                if !sources.contains(where: { $0.url.displayHost == source.url.displayHost }) {
-                    sources.append(source)
-                    steps.append(Step(url: source.url, state: .read))
+            case .usingTool:
+                // Whatever it wrote so far was it thinking aloud between searches.
+                if !text.isEmpty {
+                    text = ""
+                    phase = .searching(query)
                 }
+            case .result(let page):
+                // Search hits: a few on the live list while it works, the rest
+                // kept in case the answer cites nothing.
+                guard !found.contains(where: { $0.url.displayHost == page.url.displayHost }) else { break }
+                found.append(page)
+                if steps.count < 8 { steps.append(Step(url: page.url, state: .read)) }
+            case .source(let page):
+                // Cited by the answer: these are its sources.
+                if !sources.contains(where: { $0.url.displayHost == page.url.displayHost }) { sources.append(page) }
             case .text(let chunk):
                 text += chunk
                 phase = .writing
             }
         }
     }
+
+    /// Pages Claude's searches turned up, whether or not the answer used them.
+    private var found: [Source] = []
 }
 
 /// How much digging a question deserves, judged from its words alone: on the

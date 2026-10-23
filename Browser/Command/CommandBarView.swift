@@ -330,7 +330,8 @@ enum CommandRanker {
         var ranked: [(score: Int, item: CommandItem)] = []
 
         // A sum, conversion or time question gets answered on top, Raycast-style.
-        if let answer = Calculator.answer(query) {
+        let calculation = Calculator.answer(query)
+        if let answer = calculation {
             ranked.append((1000, CommandItem(id: "calc", title: answer.result, subtitle: answer.question,
                                              kind: "Copy", icon: .glyph(.equals), action: .copy(answer.result))))
         }
@@ -344,7 +345,8 @@ enum CommandRanker {
             ranked.append((900, CommandItem(id: "search-\(query)", title: query, subtitle: "Search \(SearchEngine.current.name)",
                                             kind: "Search", icon: .glyph(.search), action: .search(query))))
             // A question, not a word: one word is usually an address being typed.
-            if query.contains(" ") {
+            // Not when the calculator already answered it ("25$ in €").
+            if query.contains(" "), calculation == nil {
                 // A question, a comparison or a decision is better answered than
                 // searched: then Browse for Me goes first, so Return runs it,
                 // with the plain search right under it.

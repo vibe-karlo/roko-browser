@@ -53,6 +53,11 @@ enum Conversion {
             let rest = text.dropFirst().trimmingCharacters(in: .whitespaces)
             if let amount = Expression.evaluate(rest) { return (amount, .currency(code)) }
         }
+        // Trailing currency symbol, the way most of Europe writes it: "25$", "12,50 €".
+        if let last = text.last, let code = symbols[last] {
+            let rest = text.dropLast().trimmingCharacters(in: .whitespaces)
+            if !rest.isEmpty, let amount = Expression.evaluate(rest) { return (amount, .currency(code)) }
+        }
         // Leading currency code: "usd 10", "eur1k".
         if text.count > 3, let next = text.dropFirst(3).first, !next.isLetter {
             let code = text.prefix(3).uppercased()
@@ -152,16 +157,33 @@ enum Conversion {
 
     // MARK: Tables
 
-    private static let symbols: [Character: String] = [
+    /// One-character symbols, before or after the amount. Calculator's quick
+    /// gate reads this table too.
+    static let symbols: [Character: String] = [
         "$": "USD", "€": "EUR", "£": "GBP", "¥": "JPY", "₹": "INR", "₩": "KRW", "₺": "TRY", "₽": "RUB",
+        "₴": "UAH", "₪": "ILS", "₫": "VND", "฿": "THB", "₱": "PHP",
     ]
 
+    /// Names, in English and in Croatian with its case endings ("u eurima",
+    /// "20 dolara", "u kune"), plus symbols longer than one character.
     private static let currencyWords: [String: String] = [
-        "dollar": "USD", "dollars": "USD", "bucks": "USD", "euro": "EUR", "euros": "EUR", "eura": "EUR",
-        "yen": "JPY", "franc": "CHF", "francs": "CHF", "rupee": "INR", "rupees": "INR",
-        "kuna": "HRK", "kune": "HRK", "kn": "HRK", "dinar": "RSD", "dinars": "RSD", "dinara": "RSD", "din": "RSD",
-        "lira": "TRY", "yuan": "CNY", "rmb": "CNY", "won": "KRW", "zloty": "PLN", "forint": "HUF",
-        "rubles": "RUB", "ruble": "RUB", "rand": "ZAR", "real": "BRL", "reais": "BRL", "dirham": "AED",
+        "dollar": "USD", "dollars": "USD", "bucks": "USD", "us dollar": "USD", "us dollars": "USD", "us$": "USD",
+        "dolar": "USD", "dolara": "USD", "dolare": "USD", "dolari": "USD", "dolarima": "USD",
+        "euro": "EUR", "euros": "EUR", "eura": "EUR", "eure": "EUR", "euri": "EUR", "eurima": "EUR",
+        "british pound": "GBP", "british pounds": "GBP", "sterling": "GBP", "pound sterling": "GBP", "quid": "GBP",
+        "funta": "GBP", "funte": "GBP", "funti": "GBP", "funtama": "GBP",
+        "yen": "JPY", "jen": "JPY", "jena": "JPY", "jeni": "JPY",
+        "franc": "CHF", "francs": "CHF", "swiss franc": "CHF", "swiss francs": "CHF",
+        "franak": "CHF", "franka": "CHF", "franke": "CHF", "franaka": "CHF", "francima": "CHF",
+        "rupee": "INR", "rupees": "INR", "rupija": "INR", "rupije": "INR",
+        "kuna": "HRK", "kune": "HRK", "kunama": "HRK", "kn": "HRK",
+        "dinar": "RSD", "dinars": "RSD", "dinara": "RSD", "dinare": "RSD", "dinarima": "RSD", "din": "RSD",
+        "lira": "TRY", "lire": "TRY", "yuan": "CNY", "juan": "CNY", "rmb": "CNY", "won": "KRW",
+        "zloty": "PLN", "zlota": "PLN", "zł": "PLN", "forint": "HUF", "forinta": "HUF", "forinti": "HUF",
+        "rubles": "RUB", "ruble": "RUB", "rubalj": "RUB", "rublja": "RUB", "rand": "ZAR",
+        "real": "BRL", "reais": "BRL", "r$": "BRL", "dirham": "AED",
+        "canadian dollar": "CAD", "canadian dollars": "CAD", "c$": "CAD",
+        "australian dollar": "AUD", "australian dollars": "AUD", "a$": "AUD", "hk$": "HKD",
         "bitcoin": "BTC", "bitcoins": "BTC", "ether": "ETH", "ethereum": "ETH", "marka": "BAM", "konvertibilna marka": "BAM",
     ]
 

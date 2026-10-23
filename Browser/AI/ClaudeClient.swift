@@ -8,8 +8,14 @@ struct Source: Hashable, Identifiable, Sendable {
 
 enum ClaudeEvent {
     case text(String)
+    /// A page the answer cites.
     case source(Source)
+    /// A page a search turned up, which may or may not end up used.
+    case result(Source)
     case searching(String)
+    /// Claude started another search or tool. Any text before it was it
+    /// thinking aloud ("let me read the key ones"), not the answer.
+    case usingTool
 }
 
 struct ClaudeError: LocalizedError {
@@ -142,10 +148,11 @@ struct ClaudeClient {
             switch type {
             case "content_block_start":
                 blocks[index] = event["content_block"] as? [String: Any] ?? [:]
-                if let results = blocks[index]?["content"] as? [[String: Any]],
-                   blocks[index]?["type"] as? String == "web_search_tool_result" {
+                let type = blocks[index]?["type"] as? String
+                if type == "server_tool_use" { continuation.yield(.usingTool) }
+                if let results = blocks[index]?["content"] as? [[String: Any]], type == "web_search_tool_result" {
                     for result in results {
-                        if let source = Self.source(from: result) { continuation.yield(.source(source)) }
+                        if let source = Self.source(from: result) { continuation.yield(.result(source)) }
                     }
                 }
 

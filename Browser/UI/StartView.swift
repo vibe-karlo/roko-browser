@@ -71,16 +71,8 @@ struct SiteIcon: View {
                 .scaledToFit()
                 .frame(width: size, height: size)
                 .clipShape(.rect(cornerRadius: size * 0.22))
-        } else if remote, let url = URL(string: "https://icons.duckduckgo.com/ip3/\(host).ico") {
-            AsyncImage(url: url) { phase in
-                if let image = phase.image {
-                    image.resizable().interpolation(.high).scaledToFit()
-                        .clipShape(.rect(cornerRadius: size * 0.22))
-                } else {
-                    letter
-                }
-            }
-            .frame(width: size, height: size)
+        } else if remote {
+            RemoteSiteIcon(host: host, size: size) { letter }
         } else {
             letter
         }
@@ -91,5 +83,58 @@ struct SiteIcon: View {
             .font(.system(size: size * 0.72, weight: .semibold))
             .foregroundStyle(Theme.secondaryInk)
             .frame(width: size, height: size)
+    }
+}
+
+/// The icon of a site you haven't visited, from an icon service: the letter
+/// until it arrives, and for good if there is none.
+private struct RemoteSiteIcon<Fallback: View>: View {
+    let host: String
+    let size: CGFloat
+    @ViewBuilder let fallback: Fallback
+    @State private var image: UIImage?
+
+    var body: some View {
+        Group {
+            if let image = image ?? RemoteIcons.cached(host) {
+                Image(uiImage: image)
+                    .resizable().interpolation(.high).scaledToFit()
+                    .frame(width: size, height: size)
+                    .clipShape(.rect(cornerRadius: size * 0.22))
+            } else {
+                fallback
+            }
+        }
+        .task(id: host) { image = await RemoteIcons.load(host) }
+    }
+}
+
+/// Icons for sites you haven't visited (Browse for Me's sources), fetched once
+/// per host and kept in memory: DuckDuckGo's icon service first, then Google's.
+/// Both answer "no icon" with a 404 that still carries a placeholder picture
+/// (DuckDuckGo's is a grey arrow), so only a 200 counts.
+enum RemoteIcons {
+    private static let cache = NSCache<NSString, UIImage>()
+    private static var missing: Set<String> = []
+
+    static func cached(_ host: String) -> UIImage? {
+        cache.object(forKey: host as NSString)
+    }
+
+    static func load(_ host: String) async -> UIImage? {
+        if let image = cached(host) { return image }
+        guard !missing.contains(host) else { return nil }
+        let services = ["https://icons.duckduckgo.com/ip3/\(host).ico",
+                        "https://www.google.com/s2/favicons?domain=\(host)&sz=64"]
+        for service in services {
+            guard let url = URL(string: service),
+                  let (data, response) = try? await URLSession.shared.data(from: url),
+                  (response as? HTTPURLResponse)?.statusCode == 200,
+                  let image = UIImage(data: data) else { continue }
+            cache.setObject(image, forKey: host as NSString)
+            return image
+        }
+        missing.insert(host)
+        return nil
     }
 }

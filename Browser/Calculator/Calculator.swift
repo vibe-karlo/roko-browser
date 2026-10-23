@@ -40,7 +40,7 @@ enum Calculator {
     /// questions the date and time answers understand.
     private static func mightBeAnswerable(_ lower: String) -> Bool {
         if lower.contains(where: \.isNumber) {
-            return lower.contains(where: { "+-*/×÷^%()!$€£¥₹₺".contains($0) || $0.isLetter })
+            return lower.contains(where: { "+-*/×÷^%()!".contains($0) || Conversion.symbols[$0] != nil || $0.isLetter })
         }
         if lower.hasSuffix(" time") || wordQuestions.contains(lower) { return true }
         return wordStarts.contains { lower.hasPrefix($0) }
@@ -148,9 +148,11 @@ enum Expression {
 
     fileprivate static func tokenize(_ text: String) -> [Token] {
         var tokens: [Token] = []
-        // Drop thousands separators: "1,000,000".
+        // Drop thousands separators ("1,000,000"); any other comma between
+        // digits is a decimal comma, as Croatia and most of Europe write it ("12,50").
         let chars = Array(text.contains(",")
             ? text.replacingOccurrences(of: #"(?<=\d),(?=\d{3}\b)"#, with: "", options: .regularExpression)
+                .replacingOccurrences(of: #"(?<=\d),(?=\d)"#, with: ".", options: .regularExpression)
             : text)
         var i = 0
         while i < chars.count {
