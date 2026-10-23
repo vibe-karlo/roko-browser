@@ -40,6 +40,10 @@ final class BrowserModel {
     func start(context: ModelContext) {
         guard self.context == nil else { return }
         self.context = context
+        NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification,
+                                               object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.relieveMemory() }
+        }
         // Build one web view now so the restored tab takes it, then build the
         // spare for the next new tab once launch has settled, not during it.
         WebViewFactory.prewarm()
@@ -52,11 +56,37 @@ final class BrowserModel {
             if let tab = selectedTab { select(tab) }
             try? await Task.sleep(for: .seconds(1.5))
             WebViewFactory.prewarm()
+            await tidyUp()
             // Pay the calculator's one-time setup (formatters, unit tables) now,
             // not on the first keystroke.
             _ = Calculator.answer("1 km + 1")
         }
         if tabs.isEmpty { panel = .command }
+    }
+
+    /// Launch housekeeping, once things are quiet: pictures of tabs that are
+    /// gone, and history older than 90 days, which would otherwise grow forever
+    /// and slow every address-bar search.
+    private func tidyUp() async {
+        await BrowserTab.pruneSnapshots(keeping: Set(tabs.map(\.id)))
+        let cutoff = Date.now.addingTimeInterval(-90 * 24 * 3600)
+        try? context?.delete(model: HistoryEntry.self, where: #Predicate { $0.visitedAt < cutoff })
+        try? context?.save()
+    }
+
+    /// iOS is short of memory: give back what can be rebuilt, before it has to
+    /// close roko. The tab on screen is never touched.
+    private func relieveMemory() {
+        for tab in tabs where tab.id != selectedID {
+            if tab.isLive {
+                // Its fresh picture is still being written; the web view is the big saving.
+                Task { await tab.hibernate() }
+            } else {
+                tab.releaseSnapshotMemory()
+            }
+        }
+        WebViewFactory.dropPrewarmed()
+        FaviconStore.shared.trimMemory()
     }
 
     private func restoreTabs() {
@@ -75,7 +105,23 @@ final class BrowserModel {
         selectedID = tabs.max(by: { $0.lastActive < $1.lastActive })?.id
     }
 
+    @ObservationIgnored private var pendingSave: Task<Void, Never>?
+
+    /// Saves the open tabs a moment after things settle. Pages often finish
+    /// in bursts (redirects, frames), and each save serializes every tab's
+    /// back/forward history, so one save covers the burst.
+    func scheduleSave() {
+        pendingSave?.cancel()
+        pendingSave = Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled else { return }
+            saveTabs()
+        }
+    }
+
     func saveTabs() {
+        pendingSave?.cancel()
+        pendingSave = nil
         guard let context else { return }
         try? context.delete(model: SavedTab.self)
         for (index, tab) in tabs.enumerated() where !tab.isPrivate {
@@ -119,7 +165,7 @@ final class BrowserModel {
             tab.discardSnapshot()
         }
         tabs.remove(at: index)
-        defer { saveTabs() }
+        defer { scheduleSave() }
         if selectedID == tab.id {
             if let next = tabs.max(by: { $0.lastActive < $1.lastActive }) {
                 select(next)
@@ -295,7 +341,7 @@ extension BrowserModel: BrowserTabDelegate {
         }
         guard !tab.isPrivate, let context, url.scheme?.hasPrefix("http") == true else { return }
         // Save open tabs as pages finish, so a force-quit or crash loses nothing.
-        saveTabs()
+        scheduleSave()
 
         let address = url.absoluteString
         var descriptor = FetchDescriptor<HistoryEntry>(predicate: #Predicate { $0.url == address })

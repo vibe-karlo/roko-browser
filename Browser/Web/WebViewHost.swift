@@ -169,7 +169,26 @@ struct WebViewHost: UIViewRepresentable {
 
         /// Pinned headers often appear or change colour once you scroll, so the
         /// status bar re-reads it a moment after scrolling stops.
-        private var settle: DispatchWorkItem?
+        private var lastScrollAt: CFTimeInterval = 0
+        private var settleScheduled = false
+
+        /// Once scrolling has been still for 0.3 s, re-read the page's edge colours.
+        private func scheduleSettleCheck(_ scrollView: UIScrollView) {
+            settleScheduled = true
+            let wait = max(0.05, lastScrollAt + 0.3 - CACurrentMediaTime())
+            DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak self, weak scrollView] in
+                guard let self, let scrollView else { return }
+                if CACurrentMediaTime() - self.lastScrollAt < 0.3 {
+                    self.scheduleSettleCheck(scrollView)
+                    return
+                }
+                self.settleScheduled = false
+                // Not mid-pull: while the page is stretched past its top, a fixed
+                // header reads as not touching the top and the colour would flicker.
+                guard scrollView.contentOffset.y >= -scrollView.adjustedContentInset.top - 1 else { return }
+                self.parent.tab.samplePageColors()
+            }
+        }
 
         private func scrolled(_ scrollView: UIScrollView) {
             pulled(scrollView)
@@ -182,15 +201,9 @@ struct WebViewHost: UIViewRepresentable {
             let resting = scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 1
             parent.tab.showFooterColor(nearEnd && !resting)
             guard scrollView.isTracking || scrollView.isDecelerating else { return }
-            settle?.cancel()
-            let item = DispatchWorkItem { [weak self, weak scrollView] in
-                // Not mid-pull: while the page is stretched past its top, a fixed
-                // header reads as not touching the top and the colour would flicker.
-                guard let scrollView, scrollView.contentOffset.y >= -scrollView.adjustedContentInset.top - 1 else { return }
-                self?.parent.tab.samplePageColors()
-            }
-            settle = item
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: item)
+            // One pending check at a time, not a new one every frame.
+            lastScrollAt = CACurrentMediaTime()
+            if !settleScheduled { scheduleSettleCheck(scrollView) }
 
             let offset = scrollView.contentOffset.y
             let delta = offset - lastOffset

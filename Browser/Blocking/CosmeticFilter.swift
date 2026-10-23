@@ -20,6 +20,9 @@ final class CosmeticFilter: NSObject, WKScriptMessageHandlerWithReply {
     }
 
     private var indexes: [ContentBlocker.Category: Index] = [:]
+    /// The indexes, decoded once, all at the same time. Pages don't wait for
+    /// this: their first hiding request does, a few milliseconds later at most.
+    private lazy var loading = Task { await decodeAll() }
 
     lazy var script: WKUserScript? = {
         guard let url = Bundle.main.url(forResource: "cosmetic-filter", withExtension: "js"),
@@ -27,15 +30,25 @@ final class CosmeticFilter: NSObject, WKScriptMessageHandlerWithReply {
         return WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: Self.world)
     }()
 
-    /// Loads the hiding indexes off the main thread (about 2 MB of JSON).
+    /// Starts loading the hiding indexes, or waits for the load under way.
     func load() async {
-        for category in ContentBlocker.Category.allCases {
-            guard let url = Bundle.main.url(forResource: "\(category.rawValue)-hide", withExtension: "json") else { continue }
-            let index = try? await Task.detached(priority: .userInitiated) {
-                try JSONDecoder().decode(Index.self, from: Data(contentsOf: url))
-            }.value
-            indexes[category] = index
+        await loading.value
+    }
+
+    /// Decodes the indexes (about 3 MB of JSON) off the main thread, in parallel.
+    private func decodeAll() async {
+        let files = ContentBlocker.Category.allCases.compactMap { category in
+            Bundle.main.url(forResource: "\(category.rawValue)-hide", withExtension: "json").map { (category, $0) }
         }
+        await withTaskGroup(of: (ContentBlocker.Category, Index?).self) { group in
+            for (category, url) in files {
+                group.addTask(priority: .userInitiated) {
+                    (category, try? JSONDecoder().decode(Index.self, from: Data(contentsOf: url)))
+                }
+            }
+            for await (category, index) in group { indexes[category] = index }
+        }
+        LaunchClock.mark("hidingReady")
     }
 
     func userContentController(_ userContentController: WKUserContentController,
@@ -43,6 +56,7 @@ final class CosmeticFilter: NSObject, WKScriptMessageHandlerWithReply {
         guard let body = message.body as? [String: Any], let keys = body["keys"] as? [String] else {
             return (nil, nil)
         }
+        await load()
         let host = (body["host"] as? String ?? "").lowercased()
         let isFirst = body["first"] as? Bool ?? false
         let hosts = Self.suffixes(of: host)

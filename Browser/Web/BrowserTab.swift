@@ -69,9 +69,32 @@ final class BrowserTab: NSObject, Identifiable {
     private func keep(_ image: UIImage?) {
         guard let image else { return }
         snapshot = image
-        guard !isPrivate, let data = image.jpegData(compressionQuality: 0.7) else { return }
+        guard !isPrivate else { return }
         let file = snapshotFile
-        Task.detached(priority: .utility) { try? data.write(to: file) }
+        // Compressing a JPEG takes a few milliseconds: never on the main thread.
+        Task.detached(priority: .utility) {
+            try? image.jpegData(compressionQuality: 0.7)?.write(to: file)
+        }
+    }
+
+    /// Deletes saved pictures of tabs that no longer exist (closed while the
+    /// app was gone, or archived). Runs in the background after launch.
+    nonisolated static func pruneSnapshots(keeping ids: Set<UUID>) async {
+        let directory = await snapshotDirectory
+        await Task.detached(priority: .background) {
+            let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+            for file in files where !ids.contains(where: { file.lastPathComponent == "\($0.uuidString).jpg" }) {
+                try? FileManager.default.removeItem(at: file)
+            }
+        }.value
+    }
+
+    /// Swaps the decoded picture (about 10 MB at full resolution) for one read
+    /// lazily from disk, which iOS can drop and reload as needed.
+    func releaseSnapshotMemory() {
+        guard !isPrivate, snapshot != nil, FileManager.default.fileExists(atPath: snapshotFile.path),
+              let light = UIImage(contentsOfFile: snapshotFile.path) else { return }
+        snapshot = light
     }
 
     func discardSnapshot() {

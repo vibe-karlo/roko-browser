@@ -94,8 +94,9 @@ final class ContentBlocker {
     }
 
     private func load() async {
-        // The hiding index loads alongside the request lists, not before them.
-        async let hidingIndex: Void = CosmeticFilter.shared.load()
+        // The hiding indexes load alongside the request lists; pages only wait
+        // for the request lists, so nothing loads unfiltered.
+        Task { await CosmeticFilter.shared.load() }
         var current: Set<String> = []
         for category in Category.allCases {
             guard let url = Bundle.main.url(forResource: category.rawValue, withExtension: "json") else { continue }
@@ -117,7 +118,7 @@ final class ContentBlocker {
                 print("Blocklist \(category.rawValue) failed to compile: \(error)")
             }
         }
-        await hidingIndex
+        LaunchClock.mark("ruleListsReady")
 
         // Drop lists left over from older app versions.
         for identifier in await store.availableIdentifiers() ?? [] where !current.contains(identifier) {
@@ -146,11 +147,23 @@ final class ContentBlocker {
         apply(to: controller, host: host)
     }
 
+    /// What each controller was last set up for, so a navigation that needs
+    /// the same setup (most of them) doesn't tear it down and resend it.
+    private let applied = NSMapTable<WKUserContentController, NSString>.weakToStrongObjects()
+
     private func apply(to controller: WKUserContentController, host: String?) {
         let allowed = host.map { isAllowed(host: $0) } ?? false
+        let exempt = Category.allCases.filter { category in
+            !isEnabled(category) || host.map { isAllowed(host: $0, category: category) } == true
+        }
+        let signature = "\(allowed)|\(exempt.map(\.rawValue).joined(separator: ","))|\(compiled.count)"
+        if applied.object(forKey: controller) as String? == signature { return }
+        applied.setObject(signature as NSString, forKey: controller)
+
         controller.removeAllContentRuleLists()
         controller.removeAllUserScripts()
-        controller.removeAllScriptMessageHandlers()
+        // Only the blocker's own handler: page translation keeps its own.
+        controller.removeScriptMessageHandler(forName: CosmeticFilter.handlerName, contentWorld: CosmeticFilter.world)
         guard !allowed else { return }
 
         for category in Category.allCases where isEnabled(category) {

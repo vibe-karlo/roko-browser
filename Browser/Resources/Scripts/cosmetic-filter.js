@@ -115,7 +115,6 @@
   const settled = new WeakSet();
 
   const collapsePass = () => {
-    collapseTimer = 0;
     lastPass = Date.now();
     const body = document.body;
     if (!body) return;
@@ -149,11 +148,17 @@
     if (shift) window.scrollBy(0, -shift);
   };
 
+  // Never during a scroll: a pass reads layout, and the scroll needs every frame.
+  let lastScroll = 0;
+  addEventListener("scroll", () => { lastScroll = Date.now(); }, { passive: true, capture: true });
+
   const scheduleCollapse = (delay) => {
     if (!collapsing || collapseTimer) return;
     // At most one pass every two seconds, however busy the page is.
     const wait = Math.max(delay, 2000 - (Date.now() - lastPass));
     collapseTimer = setTimeout(() => {
+      collapseTimer = 0;
+      if (Date.now() - lastScroll < 250) return scheduleCollapse(300);
       if (window.requestIdleCallback) requestIdleCallback(collapsePass, { timeout: 500 });
       else collapsePass();
     }, wait);

@@ -16,7 +16,17 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Phosphor icons throughout.
 - The page menu is a panel flush with the bottom edge.
 
+### Performance
+- The first page after launch starts about 0.16 s sooner: it waits only for the request rules; the hiding indexes now decode in parallel.
+- Tab saves are batched and no longer run on every page load; tab pictures compress off the main thread.
+- Page loads skip resending unchanged blocker settings to WebKit.
+- Site icons are no longer re-read from disk on every redraw.
+- Scrolling no longer creates a timer per frame; the empty-ad-box check waits for scrolling to pause.
+
 ### Fixed
+- Low memory: background tabs hibernate and tab pictures are released before iOS has to close roko.
+- Old tab pictures and history older than 90 days are cleaned up after launch.
+- Translation no longer loses its hook when a page in a translated tab navigates.
 - The page no longer zooms out under the summary card while pinching.
 - Summarize opens and closes seamlessly: the card and the page swap only where they match exactly.
 - A site's header colour no longer shows at the bottom of the screen.

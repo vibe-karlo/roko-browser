@@ -11,6 +11,11 @@ enum WebViewFactory {
         prewarmed = build(isPrivate: false)
     }
 
+    /// Under memory pressure the spare web view goes; the next tab builds its own.
+    static func dropPrewarmed() {
+        prewarmed = nil
+    }
+
     static func make(isPrivate: Bool) -> WKWebView {
         if !isPrivate, let webView = prewarmed {
             prewarmed = nil

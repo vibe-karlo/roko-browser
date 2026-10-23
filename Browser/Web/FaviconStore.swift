@@ -7,7 +7,13 @@ import WebKit
 final class FaviconStore {
     static let shared = FaviconStore()
 
-    private(set) var icons: [String: UIImage] = [:]
+    /// Bumped when a new icon arrives, so views showing that site redraw.
+    /// Reading an icon never changes observed state (that would be a state
+    /// change during drawing, which SwiftUI can loop on).
+    private(set) var version = 0
+    @ObservationIgnored private let memory = NSCache<NSString, UIImage>()
+    /// Hosts with no icon on disk, so a redraw doesn't look again.
+    @ObservationIgnored private var missing: Set<String> = []
     @ObservationIgnored private var inFlight: Set<String> = []
     @ObservationIgnored private let directory: URL
 
@@ -18,11 +24,22 @@ final class FaviconStore {
     }
 
     func icon(for host: String) -> UIImage? {
-        if let icon = icons[host] { return icon }
+        _ = version  // redraw when icons arrive
+        if let icon = memory.object(forKey: host as NSString) { return icon }
+        guard !missing.contains(host) else { return nil }
         let file = directory.appendingPathComponent(host)
-        guard let data = try? Data(contentsOf: file), let image = UIImage(data: data) else { return nil }
-        icons[host] = image
+        // Small files (a few KB); read once per host, then served from memory.
+        guard let data = try? Data(contentsOf: file), let image = UIImage(data: data) else {
+            missing.insert(host)
+            return nil
+        }
+        memory.setObject(image, forKey: host as NSString)
         return image
+    }
+
+    /// Under memory pressure: drop the decoded icons; they reload from disk.
+    func trimMemory() {
+        memory.removeAllObjects()
     }
 
     func refresh(from webView: WKWebView) async {
@@ -40,7 +57,10 @@ final class FaviconStore {
               let (data, _) = try? await URLSession.shared.data(from: url),
               let image = UIImage(data: data) else { return }
 
-        icons[host] = image
-        try? data.write(to: directory.appendingPathComponent(host))
+        memory.setObject(image, forKey: host as NSString)
+        missing.remove(host)
+        version += 1
+        let file = directory.appendingPathComponent(host)
+        Task.detached(priority: .utility) { try? data.write(to: file) }
     }
 }
