@@ -8,6 +8,8 @@ struct WebViewHost: UIViewRepresentable {
     /// Where the floating bar's top edge is, in screen coordinates.
     var barTop: CGFloat
     var onPinchIn: () -> Void
+    /// While a summarizing pinch is under way: how small the page should be (nil: back to full).
+    var onPinchChange: (CGFloat?) -> Void = { _ in }
     var onScrollDirection: (_ down: Bool) -> Void
 
     func makeUIView(context: Context) -> UIView {
@@ -211,8 +213,22 @@ struct WebViewHost: UIViewRepresentable {
                 // Only a pinch that starts on an un-zoomed page means "summarize";
                 // otherwise it's an ordinary zoom out.
                 pinchStartedAtMinimumZoom = scrollView.zoomScale <= scrollView.minimumZoomScale + 0.01
-            case .ended where pinchStartedAtMinimumZoom && recognizer.scale < 0.7:
+            case .changed where pinchStartedAtMinimumZoom:
+                let scale = recognizer.scale
+                // A pinch inward from the page's own size is ours: stop WebKit
+                // zooming the page out as well (cancelling its recognizer), or
+                // the two shrink the page together.
+                if scale < 0.97, let zoom = scrollView.pinchGestureRecognizer, zoom.isEnabled {
+                    zoom.isEnabled = false
+                    zoom.isEnabled = true
+                    scrollView.setZoomScale(scrollView.minimumZoomScale, animated: false)
+                }
+                // The page follows the fingers, with resistance as it gets small.
+                parent.onPinchChange(scale < 1 ? max(0.55, 1 - (1 - scale) * 0.7) : nil)
+            case .ended where pinchStartedAtMinimumZoom && recognizer.scale < 0.75:
                 parent.onPinchIn()
+            case .ended, .cancelled, .failed:
+                if pinchStartedAtMinimumZoom { parent.onPinchChange(nil) }
             default:
                 break
             }

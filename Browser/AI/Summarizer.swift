@@ -2,12 +2,30 @@ import FoundationModels
 import UIKit
 import WebKit
 
-private let summaryInstructions = """
-You summarize web pages for a phone browser. Write in the page's own language.
-Open with one or two sentences that give the gist. Then three to five sections, each a \
-line starting with "## " and a two-to-four word heading, followed by one short paragraph \
-or two to three lines starting with "- ". Only facts from the page. No preamble, no sign-off.
+/// The shape every AI answer takes, so the app can lay it out as a page:
+/// a lead line, then a few sections each tagged with a topic the app draws as an icon.
+private let answerShape = """
+Format, in Markdown (angle brackets mark what you write):
+
+> <the gist, one or two sentences>
+## [<topic>] <heading for this answer>
+<one or two short sentences>
+## [<topic>] <heading for this answer>
+- **<key term>:** <detail>
+- **<key term>:** <detail>
+
+Rules: one "> " line with the gist. Then three to five "## " sections with headings written for \
+this answer. The word in brackets only chooses the section's icon: pick the closest from \
+[\(AnswerTopic.vocabulary)], and use each at most once. Under each heading, one or two short \
+sentences or two to four "- " lines. No emoji. No preamble, no sign-off.
 """
+
+private let summaryGuidance = """
+You summarize web pages for a phone browser. Write in the page's own language. \
+Only facts from the page. No preamble, no sign-off.
+"""
+
+private let summaryInstructions = summaryGuidance + "\n" + answerShape
 
 @Observable
 final class SummaryModel: Identifiable {
@@ -18,6 +36,8 @@ final class SummaryModel: Identifiable {
     let title: String
     let host: String
     var snapshot: UIImage?
+    /// The page's size when the summary opened (below 1 after a pinch).
+    var startScale: CGFloat = 1
     private(set) var text = ""
     private(set) var phase: Phase = .reading
     private(set) var engine = ""
@@ -41,7 +61,7 @@ final class SummaryModel: Identifiable {
                     let budget = await AppleModels.characterBudget(of: cloud)
                     if page.text.count > budget { note = "Long page: this covers the first part." }
                     let prompt = "Title: \(page.title)\nSite: \(page.site)\n\n\(page.text.prefix(budget))"
-                    for try await snapshot in AppleModels.stream(cloud, instructions: summaryInstructions, prompt: prompt) {
+                    for try await snapshot in AppleModels.streamAnswer(cloud, instructions: summaryGuidance, prompt: prompt, titled: false) {
                         text = snapshot
                     }
                     phase = .done
@@ -115,10 +135,10 @@ enum OnDeviceSummarizer {
                         material = notes.joined(separator: "\n")
                     }
 
-                    let session = LanguageModelSession(instructions: summaryInstructions)
                     let prompt = "Title: \(page.title)\nSite: \(page.site)\n\n\(material)"
-                    for try await snapshot in session.streamResponse(to: prompt) {
-                        continuation.yield(snapshot.content)
+                    for try await markdown in AppleModels.streamAnswer(SystemLanguageModel.default, instructions: summaryGuidance,
+                                                                       prompt: prompt, titled: false) {
+                        continuation.yield(markdown)
                     }
                     continuation.finish()
                 } catch {
@@ -151,9 +171,20 @@ final class BrowseForMeModel: Identifiable {
         case searching(String), reading(Int), writing, done, failed(String)
     }
 
+    /// One page being read, for the live list while you wait.
+    struct Step: Identifiable, Equatable {
+        enum State { case reading, read, skipped }
+        let url: URL
+        var state: State
+        var id: URL { url }
+    }
+
     let query: String
     private(set) var text = ""
     private(set) var sources: [Source] = []
+    private(set) var steps: [Step] = []
+    /// Pictures from the sources, shown above the answer.
+    private(set) var images: [URL] = []
     private(set) var phase: Phase = .searching("")
     private(set) var engine = ""
 
@@ -162,11 +193,9 @@ final class BrowseForMeModel: Identifiable {
     }
 
     private static let format = """
-    Write a compact answer page in Markdown. First line: "# " and a specific title. Then a \
-    two-sentence overview. Then three to six sections, each "## " plus a short heading and one \
-    short paragraph or two to four lines starting with "- ". Lead with what the person most \
-    likely wants to know. No preamble, no sign-off, no list of sources (the app shows them).
-    """
+    Write a compact answer page. First line: "# " and a specific title. Lead with what the \
+    person most likely wants to know. Don't list the sources (the app shows them).
+    """ + answerShape
 
     private static let claudeInstructions = """
     You are the "Browse for Me" feature of a phone browser. Search the web, read several \
@@ -177,8 +206,8 @@ final class BrowseForMeModel: Identifiable {
     You are the "Browse for Me" feature of a phone browser. The app has searched the web and \
     read the pages below for you. Answer the question using only these sources. Where they \
     disagree, say so; if they don't answer part of the question, say what is missing. Write in \
-    the language of the question.
-    """ + format
+    the language of the question. Lead with what the person most likely wants to know.
+    """
 
     func run() async {
         // Apple's cloud model, fed by our own search, is the default; Claude
@@ -211,9 +240,14 @@ final class BrowseForMeModel: Identifiable {
                 phase = .failed("The search came back empty. Try wording it differently.")
                 return true
             }
-            let candidates = Array(results.prefix(5))
+            let candidates = Array(results.prefix(6))
+            steps = candidates.map { Step(url: $0.url, state: .reading) }
             phase = .reading(candidates.count)
-            var pages = await WebResearcher.read(candidates, perPageLimit: perPage)
+            var pages = await WebResearcher.read(candidates, perPageLimit: perPage) { [weak self] url, useful in
+                guard let self, let index = self.steps.firstIndex(where: { $0.url == url }) else { return }
+                self.steps[index].state = useful ? .read : .skipped
+            }
+            images = Array(pages.compactMap(\.image).prefix(4))
             // Pages that wouldn't load still contribute their search snippet.
             if pages.count < 2 { pages = candidates.map { var page = $0; page.text = $0.snippet; return page } }
             sources = pages.map { Source(url: $0.url, title: $0.title) }
@@ -230,7 +264,7 @@ final class BrowseForMeModel: Identifiable {
 
             engine = label
             phase = .writing
-            for try await snapshot in AppleModels.stream(model, instructions: Self.appleInstructions, prompt: prompt) {
+            for try await snapshot in AppleModels.streamAnswer(model, instructions: Self.appleInstructions, prompt: prompt) {
                 text = snapshot
             }
             phase = .done
@@ -240,6 +274,8 @@ final class BrowseForMeModel: Identifiable {
         } catch {
             text = ""
             sources = []
+            steps = []
+            images = []
             phase = .searching(query)
             return false
         }
@@ -255,6 +291,7 @@ final class BrowseForMeModel: Identifiable {
                 case .source(let source):
                     if !sources.contains(where: { $0.url.displayHost == source.url.displayHost }) {
                         sources.append(source)
+                        steps.append(Step(url: source.url, state: .read))
                     }
                 case .text(let chunk):
                     text += chunk
@@ -268,4 +305,12 @@ final class BrowseForMeModel: Identifiable {
             phase = .failed(error.localizedDescription)
         }
     }
+}
+
+/// The topics a section can be tagged with; each is a Phosphor icon in the assets.
+nonisolated enum AnswerTopic {
+    static let all = ["idea", "check", "warning", "money", "time", "place", "people", "privacy", "speed", "star",
+                      "trend", "learn", "health", "tools", "world", "list", "question", "date", "battery", "device",
+                      "code", "nature", "food", "quote", "travel", "sport", "law", "news", "compare", "settings"]
+    static let vocabulary = all.joined(separator: ", ")
 }

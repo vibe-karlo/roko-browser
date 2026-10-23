@@ -59,6 +59,9 @@ struct PinTile: View {
 struct SiteIcon: View {
     let host: String
     var size: CGFloat = 18
+    /// For sites you haven't visited (Browse for Me's sources): fetch the icon
+    /// from DuckDuckGo's icon service, which roko already uses for search.
+    var remote = false
 
     var body: some View {
         if let image = FaviconStore.shared.icon(for: host) {
@@ -68,11 +71,25 @@ struct SiteIcon: View {
                 .scaledToFit()
                 .frame(width: size, height: size)
                 .clipShape(.rect(cornerRadius: size * 0.22))
+        } else if remote, let url = URL(string: "https://icons.duckduckgo.com/ip3/\(host).ico") {
+            AsyncImage(url: url) { phase in
+                if let image = phase.image {
+                    image.resizable().interpolation(.high).scaledToFit()
+                        .clipShape(.rect(cornerRadius: size * 0.22))
+                } else {
+                    letter
+                }
+            }
+            .frame(width: size, height: size)
         } else {
-            Text(host.prefix(1).uppercased())
-                .font(.system(size: size * 0.72, weight: .semibold))
-                .foregroundStyle(Theme.secondaryInk)
-                .frame(width: size, height: size)
+            letter
         }
+    }
+
+    private var letter: some View {
+        Text(host.prefix(1).uppercased())
+            .font(.system(size: size * 0.72, weight: .semibold))
+            .foregroundStyle(Theme.secondaryInk)
+            .frame(width: size, height: size)
     }
 }

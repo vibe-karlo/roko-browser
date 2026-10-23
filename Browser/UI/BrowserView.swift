@@ -6,6 +6,8 @@ struct BrowserView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
     @State private var barTop: CGFloat = 0
+    /// How far a pinch on the page has shrunk it toward a summary (1 = not at all).
+    @State private var pinchScale: CGFloat = 1
 
     var body: some View {
         @Bindable var browser = browser
@@ -13,7 +15,7 @@ struct BrowserView: View {
         ZStack {
             // Shows only behind the status bar: the page's own top colour, so
             // the site runs up to the top of the screen, as in Safari.
-            (browser.selectedTab?.topColor.map(Color.init) ?? Theme.canvas)
+            (pinchScale < 1 ? Theme.canvas : browser.selectedTab?.topColor.map(Color.init) ?? Theme.canvas)
                 .ignoresSafeArea()
                 .animation(.easeOut(duration: 0.2), value: browser.selectedTab?.topColor)
 
@@ -21,11 +23,31 @@ struct BrowserView: View {
                 WebViewHost(
                     tab: tab,
                     barTop: barTop,
-                    onPinchIn: { browser.summarize() },
+                    onPinchIn: {
+                        // Hand over at the size the fingers left the page; the
+                        // summary's card carries on from there.
+                        browser.summarize(fromScale: pinchScale)
+                    },
+                    onPinchChange: { scale in
+                        if let scale {
+                            pinchScale = scale
+                        } else if browser.summary == nil {
+                            withAnimation(.spring(duration: 0.35, bounce: 0.25)) { pinchScale = 1 }
+                        }
+                    },
                     onScrollDirection: { down in
                         if browser.isBarCollapsed != down { browser.isBarCollapsed = down }
                     })
                     .ignoresSafeArea(.container, edges: .bottom)
+                    // The page itself follows a pinch, shrinking into a card.
+                    .clipShape(.rect(cornerRadius: 40 * (1 - pinchScale)))
+                    .scaleEffect(pinchScale)
+                    .opacity(browser.summaryCoversPage ? 0 : 1)
+                    // Once the card has taken over, the hidden page returns to
+                    // full size, ready for the card to grow back into it.
+                    .onChange(of: browser.summaryCoversPage) { _, covered in
+                        if covered { pinchScale = 1 }
+                    }
 
                 // A restored tab shows its last snapshot until its page is live.
                 if !tab.isLive, let snapshot = tab.snapshot {
@@ -66,6 +88,13 @@ struct BrowserView: View {
                                             removal: .move(edge: .top).combined(with: .opacity)))
             }
         }
+        .overlay {
+            if let summary = browser.summary {
+                // Full screen; it animates the page into its card itself.
+                SummaryView(model: summary)
+                    .transition(.identity)
+            }
+        }
         .overlay(alignment: .bottom) {
             if let toast = browser.toast {
                 Text(toast)
@@ -87,9 +116,6 @@ struct BrowserView: View {
         }
         .sheet(isPresented: panelBinding(.settings)) {
             SettingsView()
-        }
-        .sheet(item: $browser.summary) { summary in
-            SummaryView(model: summary)
         }
         .sheet(item: $browser.browseForMe) { model in
             BrowseForMeView(model: model)
@@ -118,6 +144,7 @@ struct BrowserView: View {
 
     /// Text that reads on whatever is behind the status bar.
     private var statusBarStyle: UIStatusBarStyle {
+        if browser.summary != nil { return .default }  // the summary sits on graphite
         if browser.panel == .tabs { return .lightContent }  // the switcher is always dark
         guard let color = browser.selectedTab?.topColor else { return .default }
         return color.isLight ? .darkContent : .lightContent

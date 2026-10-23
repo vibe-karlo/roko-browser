@@ -23,6 +23,9 @@ final class BrowserModel {
     var commandMode: CommandMode = .newTab
     var isBarCollapsed = false
     var summary: SummaryModel?
+    /// True while the summary's card stands in for the page, which hides
+    /// underneath so the two never show at once.
+    var summaryCoversPage = false
     private(set) var toast: String?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
     var browseForMe: BrowseForMeModel?
@@ -174,13 +177,16 @@ final class BrowserModel {
         }
     }
 
-    func summarize() {
+    /// Opens the full-screen summary. `fromScale` is how far a pinch had already
+    /// shrunk the page, so the card continues from exactly there.
+    func summarize(fromScale: CGFloat = 1) {
         guard let tab = selectedTab, let webView = tab.webView, tab.url != nil else { return }
-        let model = SummaryModel(title: tab.displayTitle, host: tab.url?.displayHost ?? "", snapshot: tab.snapshot)
-        presentAfterPanelCloses { self.summary = model }
+        let model = SummaryModel(title: tab.displayTitle, host: tab.url?.displayHost ?? "", snapshot: nil)
+        model.startScale = fromScale
         Task {
-            await tab.captureSnapshot()
-            model.snapshot = tab.snapshot
+            // The page as it is on screen, so it can shrink into the card.
+            model.snapshot = await tab.viewportSnapshot() ?? tab.snapshot
+            presentAfterPanelCloses { self.summary = model }
             await model.run(webView: webView)
         }
     }

@@ -54,3 +54,60 @@ enum AppleModels {
         }
     }
 }
+
+/// The answer shape for Apple's models, enforced by guided generation: the
+/// model fills these fields rather than being asked to follow a text format,
+/// which the small on-device model doesn't reliably do.
+@Generable
+nonisolated struct GeneratedAnswer {
+    @Guide(description: "A specific title for the answer, a few words")
+    var title: String
+    @Guide(description: "The gist in one or two plain sentences")
+    var gist: String
+    @Guide(description: "Three to five sections, each about a different aspect", .count(3...5))
+    var sections: [GeneratedSection]
+}
+
+@Generable
+nonisolated struct GeneratedSection {
+    @Guide(description: "The topic that best fits this section, used for its icon", .anyOf(AnswerTopic.all))
+    var topic: String
+    @Guide(description: "A heading of two to four words, written for this answer")
+    var heading: String
+    @Guide(description: "Two to four short points, one sentence each; start with a key term in **bold** when there is one", .count(2...4))
+    var points: [String]
+}
+
+extension AppleModels {
+    /// Streams a structured answer, as Markdown the app's renderer lays out.
+    /// `titled` false leaves the title out (a page summary has the page's own).
+    static func streamAnswer(_ model: some LanguageModel, instructions: String, prompt: String,
+                             titled: Bool = true) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    let session = LanguageModelSession(model: model, instructions: instructions)
+                    for try await snapshot in session.streamResponse(to: prompt, generating: GeneratedAnswer.self) {
+                        continuation.yield(markdown(snapshot.content, titled: titled))
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    private static func markdown(_ answer: GeneratedAnswer.PartiallyGenerated, titled: Bool) -> String {
+        var lines: [String] = []
+        if titled, let title = answer.title, !title.isEmpty { lines.append("# \(title)") }
+        if let gist = answer.gist, !gist.isEmpty { lines.append("> \(gist)") }
+        for section in answer.sections ?? [] {
+            guard let heading = section.heading, !heading.isEmpty else { continue }
+            lines.append("## [\(section.topic ?? "")] \(heading)")
+            for point in section.points ?? [] where !point.isEmpty { lines.append("- \(point)") }
+        }
+        return lines.joined(separator: "\n")
+    }
+}

@@ -51,6 +51,8 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         # Drawn by Scripts/make_app_icon.swift from the roko logo design.
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # The alternates in Settings → App Icon (Scripts/make_alternate_icons.swift).
+        ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: YES
         CODE_SIGN_STYLE: Automatic
         # Your team, kept here so regenerating the project doesn't drop it.
         DEVELOPMENT_TEAM: 6ZQC2F6CF2

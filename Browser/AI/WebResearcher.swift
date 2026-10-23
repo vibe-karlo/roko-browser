@@ -9,6 +9,8 @@ nonisolated enum WebResearcher {
         let title: String
         let snippet: String
         var text = ""
+        /// The page's share image (og:image), shown above the answer.
+        var image: URL?
     }
 
     private static let session: URLSession = {
@@ -44,21 +46,42 @@ nonisolated enum WebResearcher {
 
     // MARK: Reading
 
-    /// Fetches pages concurrently and keeps the ones with real text.
-    static func read(_ pages: [Page], perPageLimit: Int) async -> [Page] {
-        await withTaskGroup(of: (Int, String).self) { group in
+    /// Fetches pages concurrently and keeps the ones with real text. `onRead`
+    /// hears about each page as it finishes, so the app can show the reading live.
+    static func read(_ pages: [Page], perPageLimit: Int,
+                     onRead: @escaping @MainActor (_ url: URL, _ useful: Bool) -> Void = { _, _ in }) async -> [Page] {
+        await withTaskGroup(of: (Int, String, URL?).self) { group in
             for (index, page) in pages.enumerated() {
                 group.addTask {
                     guard let (data, response) = try? await session.data(from: page.url),
                           (response as? HTTPURLResponse)?.statusCode == 200,
-                          (response.mimeType ?? "").contains("html") else { return (index, "") }
-                    return (index, articleText(String(decoding: data, as: UTF8.self), limit: perPageLimit))
+                          (response.mimeType ?? "").contains("html") else { return (index, "", nil) }
+                    let html = String(decoding: data, as: UTF8.self)
+                    return (index, articleText(html, limit: perPageLimit), shareImage(html, base: page.url))
                 }
             }
             var read = pages
-            for await (index, text) in group { read[index].text = text }
+            for await (index, text, image) in group {
+                read[index].text = text
+                read[index].image = image
+                await onRead(read[index].url, text.count > 300)
+            }
             return read.filter { $0.text.count > 300 }
         }
+    }
+
+    /// The page's og:image (or twitter:image), when it has one.
+    static func shareImage(_ html: String, base: URL) -> URL? {
+        let head = String(html.prefix(60_000))
+        for pattern in [#"<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']+)["']"#,
+                        #"<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["'](?:og:image|twitter:image)["']"#] {
+            if let raw = matches(pattern, in: head).first?.first,
+               let url = URL(string: decodeEntities(raw), relativeTo: base)?.absoluteURL,
+               url.scheme == "https" {
+                return url
+            }
+        }
+        return nil
     }
 
     /// Paragraph-level text from an HTML page, skipping scripts and page chrome.

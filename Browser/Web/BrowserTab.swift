@@ -143,6 +143,15 @@ final class BrowserTab: NSObject, Identifiable {
         }
     }
 
+    /// What's on screen right now, at full resolution, for the page-to-card
+    /// animation. Not cached: it's used once.
+    func viewportSnapshot() async -> UIImage? {
+        guard let webView else { return nil }
+        let configuration = WKSnapshotConfiguration()
+        configuration.afterScreenUpdates = false
+        return try? await webView.takeSnapshot(configuration: configuration)
+    }
+
     func setDesktopSite(_ desktop: Bool) {
         wantsDesktopSite = desktop
         // A fresh load rather than reload(), so the new content mode is asked for.

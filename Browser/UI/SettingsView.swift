@@ -21,6 +21,10 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("App icon") {
+                    AppIconPicker()
+                }
+
                 Section("Search") {
                     Picker("Search engine", selection: $engine) {
                         ForEach(SearchEngine.allCases) { Text($0.name).tag($0) }
@@ -100,5 +104,43 @@ struct SettingsView: View {
         }
         .presentationBackground(Theme.panel)
         .onDisappear { Keychain.claudeAPIKey = apiKey }
+    }
+}
+
+/// The home screen icon: roko's marks in a few colours, from the logo design.
+private struct AppIconPicker: View {
+    /// Asset names; "AppIcon" is the default.
+    private static let icons = ["AppIcon", "AppIcon-StarOrange", "AppIcon-StarLight", "AppIcon-StarFlame",
+                                "AppIcon-StarBlue", "AppIcon-StarGreen", "AppIcon-StarGold", "AppIcon-Chevrons",
+                                "AppIcon-ChevronsGraphite", "AppIcon-Plus", "AppIcon-RollingO"]
+    @State private var current = UIApplication.shared.alternateIconName ?? "AppIcon"
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 14) {
+            ForEach(Self.icons, id: \.self) { name in
+                Button {
+                    guard name != current else { return }
+                    current = name
+                    UIApplication.shared.setAlternateIconName(name == "AppIcon" ? nil : name)
+                } label: {
+                    Image("iconpreview/\(name)")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 58, height: 58)
+                        // The chosen one sits in a ring of the accent, clear of its edge.
+                        .padding(4)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 17)
+                                .strokeBorder(name == current ? Theme.accent : .clear, lineWidth: 2)
+                        }
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(name == "AppIcon" ? "Default icon" : String(name.dropFirst(8)))
+                .accessibilityAddTraits(name == current ? .isSelected : [])
+            }
+        }
+        .padding(.vertical, 6)
     }
 }
