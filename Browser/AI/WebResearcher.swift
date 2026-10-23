@@ -133,7 +133,7 @@ nonisolated enum WebResearcher {
 
     // MARK: Helpers
 
-    private static func matches(_ pattern: String, in text: String) -> [[String]] {
+    static func matches(_ pattern: String, in text: String) -> [[String]] {
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) else { return [] }
         let range = NSRange(text.startIndex..., in: text)
         return regex.matches(in: text, range: range).map { result in
@@ -141,7 +141,7 @@ nonisolated enum WebResearcher {
         }
     }
 
-    private static func plain(_ html: String) -> String {
+    static func plain(_ html: String) -> String {
         decodeEntities(html.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression))
             .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)

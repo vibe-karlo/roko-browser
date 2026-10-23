@@ -6,7 +6,7 @@ import WebKit
 @Observable
 final class BrowserModel {
     enum Panel: Equatable {
-        case none, command, tabs, tools, settings
+        case none, command, tabs, tools, settings, notifyMe
     }
 
     enum CommandMode {
@@ -55,6 +55,8 @@ final class BrowserModel {
         // spare for the next new tab once launch has settled, not during it.
         WebViewFactory.prewarm()
         restoreTabs()
+        // A Notify Me notification opens its page.
+        NotificationRouter.shared.open = { [weak self] url in self?.open(url, inNewTab: true) }
         Task {
             await ContentBlocker.shared.prepare()
             LaunchClock.mark("blockerReady")

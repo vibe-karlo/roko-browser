@@ -52,6 +52,37 @@ final class SavedTab {
     }
 }
 
+/// A page roko checks for you (Notify Me), with what to look for on it.
+@Model
+final class Watch {
+    var url: String = ""
+    var title: String = ""
+    /// In the person's own words; empty means anything new.
+    var lookFor: String = ""
+    var everyHours: Int = 24
+    var createdAt: Date = Date.now
+    var lastChecked: Date?
+    /// The page as last read, one line per paragraph, item or offer.
+    var snapshot: String = ""
+    /// Its text only appears once its scripts run, so it's read in a hidden
+    /// web view, which only works while roko is open.
+    var needsRendering: Bool = false
+    /// The last thing it noticed, for the list in Settings.
+    var lastNews: String?
+    var lastNewsAt: Date?
+
+    init(url: URL, title: String) {
+        self.url = url.absoluteString
+        self.title = title
+    }
+
+    var host: String { URL(string: url)?.displayHost ?? url }
+
+    var nextCheck: Date {
+        (lastChecked ?? .distantPast).addingTimeInterval(Double(everyHours) * 3600)
+    }
+}
+
 nonisolated extension URL {
     /// Host without the "www." that tells the reader nothing.
     var displayHost: String {

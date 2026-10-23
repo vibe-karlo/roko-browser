@@ -9,7 +9,9 @@ struct Glyph: View {
              openLink, summarize, browse, share, reload, blocking, settings, copy, popup, equals, link, textSize,
              desktop, reader, translate,
              // Private browsing, as in Arc: an open eye for a normal tab, a closed one for private.
-             eye, eyeClosed
+             eye, eyeClosed,
+             // Notify Me.
+             bell
     }
 
     let kind: Kind

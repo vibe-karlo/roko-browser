@@ -1,7 +1,10 @@
+import SwiftData
 import SwiftUI
 
 struct SettingsView: View {
     @Environment(BrowserModel.self) private var browser
+    @Environment(\.modelContext) private var context
+    @Query(sort: \Watch.createdAt) private var watches: [Watch]
     @AppStorage("searchEngine") private var engine: SearchEngine = .google
     @AppStorage("suggestions") private var suggestions = true
     @AppStorage("archivePolicy") private var archive: ArchivePolicy = .day
@@ -31,6 +34,29 @@ struct SettingsView: View {
                         ForEach(SearchEngine.allCases) { Text($0.name).tag($0) }
                     }
                     Toggle("Suggestions while typing", isOn: $suggestions)
+                }
+
+                Section {
+                    if watches.isEmpty {
+                        Text("None yet. In a page's menu, choose Notify Me.")
+                            .foregroundStyle(Theme.secondaryInk)
+                    }
+                    ForEach(watches) { watch in
+                        Button {
+                            if let url = URL(string: watch.url) { browser.open(url, inNewTab: true) }
+                        } label: {
+                            WatchRow(watch: watch)
+                        }
+                    }
+                    .onDelete { offsets in
+                        offsets.map { watches[$0] }.forEach(context.delete)
+                        try? context.save()
+                        WatchScheduler.schedule(in: context)
+                    }
+                } header: {
+                    Text("Notify Me")
+                } footer: {
+                    Text("roko checks these pages and notifies you when it finds what you asked for. iOS picks the exact times; pages that need their scripts run are checked while roko is open.")
                 }
 
                 Section {
@@ -110,6 +136,42 @@ struct SettingsView: View {
         }
         .presentationBackground(Theme.panel)
         .onDisappear { Keychain.claudeAPIKey = apiKey }
+    }
+}
+
+/// A watched page: which, what for and how often, then the last thing found.
+private struct WatchRow: View {
+    let watch: Watch
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            SiteIcon(host: watch.host, size: 20, remote: true)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(watch.title.isEmpty ? watch.host : watch.title)
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(1)
+                Text((watch.lookFor.isEmpty ? "Anything new" : watch.lookFor) + " · "
+                     + (WatchFrequency(rawValue: watch.everyHours)?.name ?? "Daily"))
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.secondaryInk)
+                    .lineLimit(2)
+                Text(status)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.faintInk)
+                    .lineLimit(2)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var status: String {
+        if let news = watch.lastNews, let at = watch.lastNewsAt {
+            return "\(news) · \(at.formatted(.relative(presentation: .named)))"
+        }
+        guard let checked = watch.lastChecked else { return "Not checked yet" }
+        return "Nothing yet · checked \(checked.formatted(.relative(presentation: .named)))"
     }
 }
 

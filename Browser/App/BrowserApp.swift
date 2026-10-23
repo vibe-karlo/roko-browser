@@ -1,12 +1,19 @@
 import SwiftData
 import SwiftUI
+import UserNotifications
 
 @main
 struct BrowserApp: App {
     @State private var browser = BrowserModel()
+    /// Made here rather than by .modelContainer(for:), so Notify Me's
+    /// background checks reach the same store as the app.
+    private let container: ModelContainer
 
     init() {
         LaunchClock.mark("appInit")
+        container = try! ModelContainer(for: Pin.self, HistoryEntry.self, SavedTab.self, Watch.self)
+        // Before launch finishes, so a tap on a notification that opens roko isn't missed.
+        UNUserNotificationCenter.current().delegate = NotificationRouter.shared
     }
 
     var body: some Scene {
@@ -15,6 +22,10 @@ struct BrowserApp: App {
                 .environment(browser)
                 .tint(Theme.accent)
         }
-        .modelContainer(for: [Pin.self, HistoryEntry.self, SavedTab.self])
+        .modelContainer(container)
+        // Notify Me while roko isn't open: iOS wakes it for a few seconds.
+        .backgroundTask(.appRefresh(WatchScheduler.taskID)) { [container] in
+            await Watcher.runDue(in: container, inBackground: true)
+        }
     }
 }

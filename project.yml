@@ -40,6 +40,9 @@ targets:
           # A browser has to open plain-http sites; this only relaxes ATS inside web views.
           NSAllowsArbitraryLoadsInWebContent: true
         ITSAppUsesNonExemptEncryption: false
+        # Notify Me: iOS wakes roko now and then to check watched pages.
+        UIBackgroundModes: [fetch]
+        BGTaskSchedulerPermittedIdentifiers: [com.growthstudio.roko.watch]
         # Required before Apple will grant the browser entitlements (default
         # browser, passkeys): the app must declare it opens http and https.
         CFBundleURLTypes:

@@ -104,6 +104,11 @@ struct BrowserView: View {
             }
         }
         .overlay {
+            if browser.panel == .notifyMe, let tab = browser.selectedTab {
+                BottomPanel { browser.panel = .none } content: { NotifyMeSheet(tab: tab) }
+            }
+        }
+        .overlay {
             if let session = browser.browseForMe {
                 // Full screen, rising from the bar where the question was asked.
                 BrowseForMeView(session: session)
@@ -153,8 +158,14 @@ struct BrowserView: View {
         }
         #endif
         .onChange(of: scenePhase) { _, phase in
-            if phase == .background { browser.saveTabs() }
+            if phase == .background {
+                browser.saveTabs()
+                WatchScheduler.schedule(in: context)
+            }
+            if phase == .active { checkWatches(after: .seconds(2)) }
         }
+        // Launch: Notify Me catches up once the first page has had its moment.
+        .task { checkWatches(after: .seconds(4)) }
         // Coming back to the app always shows the bar; scrolling hides it again.
         // UIKit's own signal: it arrives whatever wraps the SwiftUI scene.
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
@@ -164,6 +175,21 @@ struct BrowserView: View {
         // pinch or scroll that led there may have folded it away.
         .onChange(of: browser.summary == nil && browser.browseForMe == nil && browser.reader == nil) { _, backOnPage in
             if backOnPage, browser.isBarCollapsed { browser.isBarCollapsed = false }
+        }
+    }
+
+    /// With roko open, Notify Me checks whatever is due, including the pages
+    /// that need their scripts run, which the background can't do.
+    private func checkWatches(after delay: Duration) {
+        let container = context.container
+        Task {
+            try? await Task.sleep(for: delay)
+            #if DEBUG
+            let force = ProcessInfo.processInfo.arguments.contains("-checkWatches")
+            #else
+            let force = false
+            #endif
+            await Watcher.runDue(in: container, inBackground: false, force: force)
         }
     }
 

@@ -24,6 +24,12 @@ enum WebViewFactory {
         return build(isPrivate: isPrivate)
     }
 
+    /// For reading a page out of sight (Notify Me): with your cookies, as the
+    /// page would be for you, and without taking the spare.
+    static func makeOffscreen() -> WKWebView {
+        build(isPrivate: false)
+    }
+
     private static func build(isPrivate: Bool) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = isPrivate ? privateStore : .default()

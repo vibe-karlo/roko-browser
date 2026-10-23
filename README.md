@@ -113,6 +113,23 @@ on a phone. Our own search uses DuckDuckGo's HTML results and reads the pages in
 To time Browse for Me on a phone, launch a Debug build over the cable:
 `xcrun devicectl device process launch --console --device <id> com.growthstudio.roko -- -perf -browse "question"`.
 
+## Notify Me
+
+Like Safari's: in a page's menu, say what to look for (or nothing, for anything new) and how
+often to check. `Watcher` reads the page with plain HTTP, off the main thread: one line per
+paragraph, list item or heading, plus the page's JSON-LD offers ("Offer: Linen Shirt M, 39.95
+EUR, in stock") and its `<option>` choices, marked when unavailable. It compares the lines with
+the last reading. For anything new, new lines of real text (not a clock or a counter) go to
+Apple's on-device model, which writes the notification. For something specific, the model
+answers about one version of the page at a time ("does it show it? quote the line"), and roko
+notifies only when the answer turns from no to yes; asked about added and removed lines at once,
+the small model announced "back in stock" for a size that had just sold out.
+
+iOS wakes roko for these checks (`BGAppRefreshTask`) when it chooses, so "hourly" means at most
+hourly; roko also checks whatever is due when you open it. Pages that only show their text once
+their scripts run are read in a hidden web view, which works only while roko is open. To force
+every check in a Debug build, launch with `-checkWatches`.
+
 ## Not done yet
 
 - iCloud sync (the data model is already CloudKit-compatible).

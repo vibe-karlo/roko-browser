@@ -23,6 +23,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Answers written by Claude show pictures too, from the pages its searches found, fetched alongside while it works.
 - A weather topic, with a sun, for answer sections about weather and seasons.
 - Site Settings → Pinch to summarize: turn it off for a site where you need the pinch to zoom.
+- Notify Me, as in Safari: in a page's menu, say what to look for ("size M in stock", or nothing for anything new) and check hourly, daily or weekly. roko reads the page in the background, Apple's on-device model decides whether it's what you asked for, and a notification opens the page. Settings lists the watched pages.
 
 ### Changed
 - Croatian pages are summarized by Claude Haiku when there's an API key; Apple's on-device model writes poor Croatian. English stays on the iPhone.

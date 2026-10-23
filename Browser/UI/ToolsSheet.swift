@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 /// Everything about the current page, one tap from ⌃: where you are (address,
@@ -5,6 +6,7 @@ import SwiftUI
 /// site is treated by the blocker.
 struct ToolsSheet: View {
     @Environment(BrowserModel.self) private var browser
+    @Query private var watches: [Watch]
     @State private var blockingOn = true
     @State private var popupsOn = true
     @State private var pinchOn = true
@@ -112,6 +114,11 @@ struct ToolsSheet: View {
         VStack(spacing: 0) {
             ToolRow(glyph: .reader, title: "Reader Mode") { browser.openReader() }
 
+            // Not for private tabs: watching keeps the page's address.
+            if !tab.isPrivate {
+                ToolRow(glyph: .bell, title: "Notify Me", detail: isWatched(tab) ? "On" : "") { browser.panel = .notifyMe }
+            }
+
             translateRow(tab)
 
             HStack(spacing: 14) {
@@ -170,6 +177,11 @@ struct ToolsSheet: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
+    }
+
+    private func isWatched(_ tab: BrowserTab) -> Bool {
+        guard let url = tab.url?.absoluteString else { return false }
+        return watches.contains { $0.url == url }
     }
 
     private func zoomButton(_ symbol: String, _ label: String, action: @escaping () -> Void) -> some View {
