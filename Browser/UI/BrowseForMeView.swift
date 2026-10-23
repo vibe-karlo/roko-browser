@@ -66,14 +66,11 @@ struct BrowseForMeView: View {
                     HStack(spacing: 12) {
                         SiteIcon(host: step.url.displayHost, size: 18, remote: true)
                             .opacity(step.state == .reading ? 0.45 : 1)
+                        // Read: the site lights up from faint to ink. Nothing tacked on beside it.
                         Text(step.url.displayHost)
                             .font(.system(size: 17))
                             .foregroundStyle(step.state == .read ? Theme.ink : Theme.faintInk)
                             .strikethrough(step.state == .skipped, color: Theme.faintInk)
-                        if step.state == .read {
-                            Circle().fill(Theme.accent).frame(width: 6, height: 6)
-                                .transition(.scale.combined(with: .opacity))
-                        }
                     }
                     .transition(.offset(y: 8).combined(with: .opacity))
                 }
@@ -197,6 +194,7 @@ struct BrowseForMeView: View {
         .padding(.horizontal, 22)
         .padding(.vertical, 10)
         .background(Theme.panel)
+        .background(alignment: .top) { FadeEdge(color: Theme.panel) }
     }
 
     private var credit: String {

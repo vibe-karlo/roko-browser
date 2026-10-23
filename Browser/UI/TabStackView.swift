@@ -45,6 +45,8 @@ struct TabStackView: View {
         .environment(\.colorScheme, .dark)
         .offset(y: lift)
         .opacity(1 + lift / 600)
+        // A thrown-away tab lands with a thud.
+        .sensoryFeedback(.impact(weight: .medium), trigger: browser.tabs.count) { old, new in new < old }
         .onAppear { focused = browser.selectedID ?? browser.tabs.last?.id }
     }
 
@@ -122,7 +124,7 @@ struct TabStackView: View {
 
     private var bottomRow: some View {
         HStack(spacing: 0) {
-            roundButton(.privacy, "New private tab") {
+            roundButton(.eyeClosed, "New private tab") {
                 browser.showCommandBar(mode: .privateTab)
             }
             Spacer(minLength: 8)
@@ -210,7 +212,7 @@ private struct TabCard: View {
         HStack(spacing: 8) {
             SiteIcon(host: tab.url?.displayHost ?? "", size: 20)
             if tab.isPrivate {
-                Glyph(.privacy, size: 15).foregroundStyle(Theme.secondaryInk)
+                Glyph(.eyeClosed, size: 15).foregroundStyle(Theme.secondaryInk)
             }
             if isFocused {
                 Text(tab.displayTitle)

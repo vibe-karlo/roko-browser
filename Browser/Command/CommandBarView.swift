@@ -30,6 +30,8 @@ struct CommandBarView: View {
     @State private var suggestions: [String] = []
     @State private var selection = 0
     @State private var resultsHeight: CGFloat = 0
+    /// Mid-blink of the private switch's eye.
+    @State private var blink = false
     @FocusState private var focused: Bool
 
     /// Panel corner, and the row inset inside it. Rows round by the difference,
@@ -144,7 +146,7 @@ struct CommandBarView: View {
         HStack(spacing: 12) {
             // While typing hides the switch, the leading mark keeps private mode visible.
             let showsPrivate = browser.commandMode == .privateTab && !query.isEmpty
-            Glyph(showsPrivate ? .privacy : .search, size: 18)
+            Glyph(showsPrivate ? .eyeClosed : .search, size: 18)
                 .foregroundStyle(showsPrivate ? Theme.accent : Theme.secondaryInk)
                 .frame(width: 22)
             TextField(placeholder, text: $query)
@@ -189,17 +191,24 @@ struct CommandBarView: View {
         .frame(height: 56)
     }
 
-    /// Arc-style private switch: the glasses light up in the accent when on.
+    /// Arc-style private switch: an open eye, which blinks shut (in the accent)
+    /// for private, and blinks open again for a normal tab.
     private var privateSwitch: some View {
         let isPrivate = browser.commandMode == .privateTab
         return Button {
-            browser.commandMode = isPrivate ? .newTab : .privateTab
+            // Lids close on the old eye, the new one opens.
+            withAnimation(.easeIn(duration: 0.09)) { blink = true } completion: {
+                browser.commandMode = isPrivate ? .newTab : .privateTab
+                withAnimation(.easeOut(duration: 0.14)) { blink = false }
+            }
         } label: {
-            Glyph(.privacy, size: 22)
+            Glyph(isPrivate ? .eyeClosed : .eye, size: 22)
                 .foregroundStyle(isPrivate ? Theme.accent : Theme.secondaryInk)
+                .scaleEffect(x: 1, y: blink ? 0.12 : 1)
                 .frame(width: 40, height: 44)
                 .contentShape(.rect)
         }
+        .sensoryFeedback(.selection, trigger: isPrivate)
         .buttonStyle(.plain)
         .accessibilityLabel("Private")
         .accessibilityValue(isPrivate ? "On" : "Off")
@@ -339,7 +348,8 @@ enum CommandRanker {
         } else {
             ranked.append((900, CommandItem(id: "search-\(query)", title: query, subtitle: "Search \(SearchEngine.current.name)",
                                             kind: "Search", icon: .glyph(.search), action: .search(query))))
-            if query.count >= 3 {
+            // A question, not a word: one word is usually an address being typed.
+            if query.contains(" ") {
                 ranked.append((850, CommandItem(id: "browse-\(query)", title: "Browse for me", subtitle: query,
                                                 kind: "Answer", icon: .glyph(.browse), action: .browse(query))))
             }
@@ -391,9 +401,11 @@ enum CommandRanker {
         if needle.count >= 2, !needle.contains(" ") {
             for (offset, site) in PopularSites.matching(needle).enumerated() where !offeredHosts.contains(site.host) {
                 guard let url = URL(string: "https://\(site.host)") else { continue }
+                // "index.hr/oglasi" wears index.hr's icon.
+                let iconHost = String(site.host.prefix { $0 != "/" })
                 ranked.append(((needle.count >= 3 ? 905 : 870) - offset, CommandItem(
                     id: "popular-\(site.host)", title: site.name, subtitle: site.host,
-                    kind: "Open", icon: .site(site.host), action: .open(url))))
+                    kind: "Open", icon: .site(iconHost), action: .open(url))))
             }
         }
 
@@ -411,7 +423,14 @@ enum CommandRanker {
             ranked.append((needle.count >= 3 ? 880 : 500, item))
         }
 
-        for (offset, suggestion) in suggestions.enumerated() {
+        // The engine often suggests exactly what was typed (give or take a
+        // space or a capital); the Search row already covers that.
+        func folded(_ text: String) -> String {
+            text.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil)
+                .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        }
+        let typed = folded(query)
+        for (offset, suggestion) in suggestions.enumerated() where folded(suggestion) != typed {
             ranked.append((400 - offset, CommandItem(id: "suggest-\(suggestion)", title: suggestion, subtitle: "",
                                                      kind: "", icon: .glyph(.search), action: .search(suggestion))))
         }

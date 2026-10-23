@@ -29,12 +29,22 @@ final class FaviconStore {
         guard !missing.contains(host) else { return nil }
         let file = directory.appendingPathComponent(host)
         // Small files (a few KB); read once per host, then served from memory.
-        guard let data = try? Data(contentsOf: file), let image = UIImage(data: data) else {
+        // The site's own icon first; for well-known sites never visited, the
+        // one bundled with the app (Scripts/fetch_site_icons.py).
+        guard let image = (try? Data(contentsOf: file)).flatMap(UIImage.init(data:)) ?? Self.bundled(host) else {
             missing.insert(host)
             return nil
         }
         memory.setObject(image, forKey: host as NSString)
         return image
+    }
+
+    /// "web.whatsapp.com" falls back to whatsapp.com's mark.
+    private static func bundled(_ host: String) -> UIImage? {
+        if let image = UIImage(named: "site/\(host)") { return image }
+        let labels = host.split(separator: ".")
+        guard labels.count > 2 else { return nil }
+        return UIImage(named: "site/\(labels.dropFirst().joined(separator: "."))")
     }
 
     /// Under memory pressure: drop the decoded icons; they reload from disk.
@@ -43,7 +53,9 @@ final class FaviconStore {
     }
 
     func refresh(from webView: WKWebView) async {
-        guard let host = webView.url?.displayHost, icon(for: host) == nil, !inFlight.contains(host) else { return }
+        // A bundled icon doesn't count: the site's own (often sharper) one still replaces it.
+        guard let host = webView.url?.displayHost, !inFlight.contains(host),
+              !FileManager.default.fileExists(atPath: directory.appendingPathComponent(host).path) else { return }
         inFlight.insert(host)
         defer { inFlight.remove(host) }
 

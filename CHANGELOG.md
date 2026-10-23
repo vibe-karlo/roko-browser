@@ -11,10 +11,15 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Browse for Me shows each site as it's read, with source cards, pictures and real site icons.
 - Settings → App icon: ten alternates from the logo designs.
 - Translate any page into English or Croatian, in place.
+- Address suggestions show the real icon of 150 popular sites, bundled, with no network request.
+- Haptics when a toast confirms an action, a tab is thrown away, or the bar swipes to the next tab.
 
 ### Changed
 - Phosphor icons throughout.
 - The page menu is a panel flush with the bottom edge.
+- Private mode is an eye that blinks shut, instead of glasses.
+- Browse for Me is offered for questions of more than one word, not for a single word being typed.
+- Text scrolling under the Summary and Browse for Me footers fades out instead of being cut off.
 
 ### Performance
 - The first page after launch starts about 0.16 s sooner: it waits only for the request rules; the hiding indexes now decode in parallel.
@@ -30,6 +35,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - The page no longer zooms out under the summary card while pinching.
 - Summarize opens and closes seamlessly: the card and the page swap only where they match exactly.
 - A site's header colour no longer shows at the bottom of the screen.
+- The status bar stays readable over the address bar in light mode.
+- The bar comes back after closing a summary, an answer or Reader Mode.
+- Search suggestions no longer repeat exactly what you typed.
 
 ## [0.1.0] - 2026-10-23
 

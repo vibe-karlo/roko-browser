@@ -144,6 +144,7 @@ struct SummaryView: View {
         .padding(.horizontal, 22)
         .padding(.vertical, 10)
         .background(Theme.canvas)
+        .background(alignment: .top) { FadeEdge(color: Theme.canvas) }
     }
 
     /// The card grows back to exactly the page's size and place; only then is
@@ -168,6 +169,22 @@ struct SummaryView: View {
         case "Apple Intelligence": "Summarized by Apple Intelligence, privately in Apple's cloud"
         default: "Summarized on this iPhone"
         }
+    }
+}
+
+/// Sits just above a footer so text scrolling under it dissolves rather than
+/// being sliced off at the footer's edge. Eased over several stops so it can't band.
+struct FadeEdge: View {
+    let color: Color
+    var height: CGFloat = 32
+
+    var body: some View {
+        LinearGradient(stops: [0, 0.1, 0.3, 0.55, 0.8, 1].map { position in
+            .init(color: color.opacity(position * position * (3 - 2 * position)), location: position)
+        }, startPoint: .top, endPoint: .bottom)
+        .frame(height: height)
+        .offset(y: -height)
+        .allowsHitTesting(false)
     }
 }
 

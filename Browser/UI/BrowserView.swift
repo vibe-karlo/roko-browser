@@ -123,6 +123,8 @@ struct BrowserView: View {
             }
         }
         .background(StatusBarStyler(style: statusBarStyle))
+        // Every toast confirms something done (copied, pinned, translating): a tick to feel it.
+        .sensoryFeedback(.impact(weight: .light), trigger: browser.toast) { _, toast in toast != nil }
         .animation(.snappy(duration: 0.25), value: browser.toast)
         .animation(.snappy(duration: 0.3), value: browser.panel)
         .sheet(isPresented: panelBinding(.settings)) {
@@ -151,11 +153,17 @@ struct BrowserView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             if browser.isBarCollapsed { browser.isBarCollapsed = false }
         }
+        // So does coming back from a summary, an answer or the reader: the
+        // pinch or scroll that led there may have folded it away.
+        .onChange(of: browser.summary == nil && browser.browseForMe == nil && browser.reader == nil) { _, backOnPage in
+            if backOnPage, browser.isBarCollapsed { browser.isBarCollapsed = false }
+        }
     }
 
     /// Text that reads on whatever is behind the status bar.
     private var statusBarStyle: UIStatusBarStyle {
-        if browser.summary != nil { return .default }  // the summary sits on graphite
+        // The summary and the command bar sit on the app's own canvas, whatever the page's colour.
+        if browser.summary != nil || browser.panel == .command { return .default }
         if browser.panel == .tabs { return .lightContent }  // the switcher is always dark
         guard let color = browser.selectedTab?.topColor else { return .default }
         return color.isLight ? .darkContent : .lightContent

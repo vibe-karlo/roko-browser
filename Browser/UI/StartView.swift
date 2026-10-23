@@ -13,7 +13,7 @@ struct StartView: View {
         VStack {
             if pins.isEmpty {
                 Spacer()
-                Text("Pin a site from the page tools and it lives here.")
+                Text("Pin a site from its page menu and it lives here.")
                     .font(.subheadline)
                     .foregroundStyle(Theme.secondaryInk)
                     .multilineTextAlignment(.center)

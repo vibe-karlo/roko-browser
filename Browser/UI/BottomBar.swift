@@ -5,6 +5,8 @@ import SwiftUI
 /// back as soon as you scroll up.
 struct BottomBar: View {
     @Environment(BrowserModel.self) private var browser
+    /// Tabs switched by swiping the bar; each one ticks.
+    @State private var switches = 0
 
     var body: some View {
         Group {
@@ -60,6 +62,7 @@ struct BottomBar: View {
         .overlay(alignment: .bottom) { progressLine }
         .barSurface(cornerRadius: 24)
         .highPriorityGesture(swipes)
+        .sensoryFeedback(.selection, trigger: switches)
     }
 
     private var recentTabs: [BrowserTab] {
@@ -90,7 +93,9 @@ struct BottomBar: View {
                 if dy < -40, abs(dy) > abs(dx) {
                     browser.showTabs()
                 } else if abs(dx) > 60, abs(dx) > abs(dy) {
+                    let before = browser.selectedID
                     withAnimation(.snappy) { browser.selectNeighbor(offset: dx < 0 ? 1 : -1) }
+                    if browser.selectedID != before { switches += 1 }
                 }
             }
     }
