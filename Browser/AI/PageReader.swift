@@ -8,6 +8,8 @@ struct ReadablePage: Sendable {
     let text: String
     /// False for homepages and index pages, where "the article" is a list of links.
     let isArticle: Bool
+    /// The language the page says it's in (`<html lang>`), when it says.
+    var declaredLanguage: String? = nil
 }
 
 /// Pulls the article text out of a page with Mozilla's Readability, loaded only
@@ -41,7 +43,8 @@ enum PageReader {
       title: (article && article.title) || document.title,
       site: (article && article.siteName) || location.hostname,
       text: text,
-      isArticle: isArticle
+      isArticle: isArticle,
+      lang: document.documentElement.lang || ""
     };
     """
 
@@ -57,6 +60,7 @@ enum PageReader {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard text.count > 200 else { throw ClaudeError(message: "This page has too little text to summarize.") }
         return ReadablePage(title: fields["title"] as? String ?? "", site: fields["site"] as? String ?? "",
-                            text: String(text.prefix(200_000)), isArticle: fields["isArticle"] as? Bool ?? false)
+                            text: String(text.prefix(200_000)), isArticle: fields["isArticle"] as? Bool ?? false,
+                            declaredLanguage: (fields["lang"] as? String).flatMap { $0.isEmpty ? nil : $0 })
     }
 }

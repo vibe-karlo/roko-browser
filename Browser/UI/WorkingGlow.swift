@@ -1,5 +1,3 @@
-import CoreImage
-import CoreImage.CIFilterBuiltins
 import SwiftUI
 
 /// Warm light rising from the bottom edge while Browse for Me finds an answer.
@@ -17,9 +15,13 @@ import SwiftUI
 /// It stays in place and leaves on its own (`isActive` false): it sinks back
 /// into the edge as it fades, then stops breathing, so a hidden light costs
 /// nothing. (Removing it with a transition instead skipped the animation.)
+/// When it leaves because the answer arrived (`finished`), it floods the
+/// whole screen instead, and dissolves as the answer settles in.
 struct WorkingGlow: View {
     let progress: Double
     var isActive = true
+    /// The work it stood for is done: it leaves by flooding, not sinking.
+    var finished = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     /// The progress actually drawn, easing after `progress`.
@@ -27,31 +29,39 @@ struct WorkingGlow: View {
     @State private var breathing = false
     /// Faded in once on first appearance.
     @State private var appeared = false
+    /// The flood: its layer is in (`flooding`), risen over the screen (`floodUp`), gone (`dissolved`).
+    @State private var flooding = false
+    @State private var floodUp = false
+    @State private var dissolved = false
 
-    /// From a low dawn to about half the screen, as a share of the full light.
-    private static let lowest = 0.2, highest = 0.52
+    /// From a low dawn to most of the screen, as a share of the full light.
+    private static let lowest = 0.25, highest = 0.85
     /// The warm end of the light's falloff on the light canvas.
     private static let amber = Color(red: 0.96, green: 0.65, blue: 0.14)
 
     var body: some View {
-        GeometryReader { proxy in
-            let width = proxy.size.width, height = proxy.size.height
-            let reach = (Self.lowest + (Self.highest - Self.lowest) * (shown ?? progress)) / Self.highest
+        ZStack {
+            GeometryReader { proxy in
+                let width = proxy.size.width, height = proxy.size.height
+                let reach = (Self.lowest + (Self.highest - Self.lowest) * (shown ?? progress)) / Self.highest
 
-            light
-                // An ellipse centred on the bottom edge: only its top half shows,
-                // as light coming from below the screen rather than a blob on it.
-                .frame(width: width * 1.9, height: height * Self.highest * 2)
-                // Scaled about that centre, it rises from and sinks into the edge.
-                .scaleEffect(x: 1, y: reach)
-                .scaleEffect(x: breathing ? 1.02 : 0.99, y: breathing ? 1.06 : 0.97)
-                .position(x: width / 2, y: height)
-                .opacity((breathing ? 1 : 0.84) * (0.8 + 0.2 * (shown ?? progress)))
+                light
+                    // An ellipse centred on the bottom edge: only its top half shows,
+                    // as light coming from below the screen rather than a blob on it.
+                    .frame(width: width * 1.9, height: height * Self.highest * 2)
+                    // Scaled about that centre, it rises from and sinks into the edge.
+                    .scaleEffect(x: 1, y: reach)
+                    .scaleEffect(x: breathing ? 1.02 : 0.99, y: breathing ? 1.06 : 0.97)
+                    .position(x: width / 2, y: height)
+                    .opacity((breathing ? 1 : 0.84) * (0.8 + 0.2 * (shown ?? progress)))
+            }
+            // Arriving it rises out of the edge; leaving, it sinks back into it.
+            .scaleEffect(x: 1, y: lit ? 1 : 0.6, anchor: .bottom)
+            .opacity(lit ? 1 : 0)
+            .animation(.easeInOut(duration: lit ? 0.7 : 0.9), value: lit)
+
+            if flooding { floodLayer }
         }
-        // Arriving it rises out of the edge; leaving, it sinks back into it.
-        .scaleEffect(x: 1, y: lit ? 1 : 0.6, anchor: .bottom)
-        .opacity(lit ? 1 : 0)
-        .animation(.easeInOut(duration: lit ? 0.7 : 0.9), value: lit)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
         .onAppear {
@@ -66,16 +76,48 @@ struct WorkingGlow: View {
             if active {
                 breathe()
             } else {
-                // Once it has faded out, stop the breathing: no frames for a hidden light.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                if finished, !reduceMotion { flood() }
+                // Once it has gone, stop the breathing: no frames for a hidden light.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
                     guard !isActive else { return }
-                    withTransaction(Transaction(animation: nil)) { breathing = false }
+                    withTransaction(Transaction(animation: nil)) {
+                        breathing = false
+                        flooding = false
+                        floodUp = false
+                        dissolved = false
+                    }
                 }
             }
         }
     }
 
     private var lit: Bool { appeared && isActive }
+
+    /// The flood, a layer of its own: the same light drawn big enough to
+    /// cover the screen, so its grain stays fine. Stretching the rising
+    /// light up to the top instead turned the grain into coarse static.
+    private var floodLayer: some View {
+        GeometryReader { proxy in
+            light
+                .frame(width: proxy.size.width * 2.2, height: proxy.size.height * 4)
+                .position(x: proxy.size.width / 2, y: proxy.size.height)
+        }
+        .scaleEffect(x: 1, y: floodUp ? 1 : 0.45, anchor: .bottom)
+        .opacity(floodUp && !dissolved ? 1 : 0)
+    }
+
+    /// Up over the screen fast as the rising light gives way to it, then gone
+    /// more slowly, so the answer arrives in the light.
+    private func flood() {
+        flooding = true
+        DispatchQueue.main.async {
+            withAnimation(.easeOut(duration: 0.45)) { floodUp = true }
+            withAnimation(.easeInOut(duration: 0.75).delay(0.4)) { dissolved = true }
+        }
+    }
+
+    /// How long a flood lasts, for views that keep their edges clear meanwhile.
+    static let floodDuration: TimeInterval = 1.2
 
     private func breathe() {
         guard !reduceMotion, !breathing else { return }
@@ -114,13 +156,19 @@ struct WorkingGlow: View {
     }
 }
 
-/// A small tile of fine monochrome noise, made once with Core Image.
-enum Grain {
+/// A small tile of fine monochrome noise, made once from random bytes.
+/// (Core Image made it in 90 ms, most of it setting up a CIContext: a hitch
+/// the first time a light showed. This takes well under a millisecond.)
+nonisolated enum Grain {
     static let image: UIImage? = {
-        let noise = CIFilter.randomGenerator().outputImage?
-            .cropped(to: CGRect(x: 0, y: 0, width: 128, height: 128))
-            .applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0])
-        guard let noise, let cgImage = CIContext().createCGImage(noise, from: noise.extent) else { return nil }
+        let side = 128
+        var pixels = [UInt8](repeating: 0, count: side * side)
+        arc4random_buf(&pixels, pixels.count)
+        guard let provider = CGDataProvider(data: Data(pixels) as CFData),
+              let cgImage = CGImage(width: side, height: side, bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: side,
+                                    space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGBitmapInfo(rawValue: 0),
+                                    provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
+        else { return nil }
         return UIImage(cgImage: cgImage)
     }()
 }

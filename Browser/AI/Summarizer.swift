@@ -41,6 +41,11 @@ private func englishNote(_ language: WritingLanguage) -> String {
 final class SummaryModel: Identifiable {
     enum Phase: Equatable {
         case reading, writing, done, failed(String)
+
+        var isFailure: Bool {
+            if case .failed = self { return true }
+            return false
+        }
     }
 
     let title: String
@@ -96,7 +101,7 @@ final class SummaryModel: Identifiable {
         // when Apple's models write it anyway (no key, Claude off or failing),
         // it's in English. Everything else stays on Apple's models, free and
         // private, with Claude as the fallback.
-        let language = AnswerLanguage.target(for: page.text, host: host)
+        let language = AnswerLanguage.target(for: page.text, host: host, declared: page.declaredLanguage)
         let appleWritesIt = language?.appleWritesWell ?? true
         var engines: [Engine] = [.appleCloud, .onDevice]
         if ClaudeClient.configured != nil { appleWritesIt ? engines.append(.claude) : engines.insert(.claude, at: 0) }
@@ -249,6 +254,11 @@ enum OnDeviceSummarizer {
 final class BrowseForMeModel: Identifiable {
     enum Phase: Equatable {
         case searching(String), reading(Int), writing, done, failed(String)
+
+        var isFailure: Bool {
+            if case .failed = self { return true }
+            return false
+        }
     }
 
     /// One page being read, for the live list while you wait.

@@ -71,11 +71,24 @@ nonisolated struct WritingLanguage: Hashable, Identifiable {
         all.first { $0.code == code }
     }
 
-    /// The language a page or question is written in.
-    static func detected(in text: String, host: String = "") -> WritingLanguage? {
+    /// A page's `lang` ("en-US", "hr", "sr-Latn-RS") as one of the listed languages.
+    private static func stated(_ tag: String) -> WritingLanguage? {
+        let parts = tag.split(separator: "-").map(String.init)
+        guard let base = parts.first?.lowercased() else { return nil }
+        if base == "sr" { return with(code: parts.contains("Cyrl") ? "sr-Cyrl" : "sr-Latn") }
+        if base == "zh" { return with(code: "zh-Hans") }
+        return with(code: base)
+    }
+
+    /// The language a page or question is written in. `declared`: what the
+    /// page says it's in, trusted when the text alone isn't clear: an English
+    /// Wikipedia article opening on a town's names in five languages read as Catalan.
+    static func detected(in text: String, host: String = "", declared: String? = nil) -> WritingLanguage? {
         let recognizer = NLLanguageRecognizer()
-        recognizer.processString(String(text.prefix(2_000)))
-        guard let code = recognizer.dominantLanguage?.rawValue else { return nil }
+        recognizer.processString(String(text.prefix(4_000)))
+        let best = recognizer.languageHypotheses(withMaximum: 1).first
+        if (best?.value ?? 0) < 0.8, let declared, let stated = stated(declared) { return stated }
+        guard let code = best?.key.rawValue else { return nil }
         // Croatian, Serbian and Bosnian in Latin script read so alike that the
         // recognizer mixes them up: the site's country says which, else the phone's.
         if ["hr", "sr", "bs"].contains(code) {
@@ -105,7 +118,7 @@ nonisolated enum AnswerLanguage {
 
     /// What to write in for this page or question; nil when it can't be told,
     /// and the models are left to follow it themselves.
-    static func target(for text: String, host: String = "") -> WritingLanguage? {
-        chosen ?? WritingLanguage.detected(in: text, host: host)
+    static func target(for text: String, host: String = "", declared: String? = nil) -> WritingLanguage? {
+        chosen ?? WritingLanguage.detected(in: text, host: host, declared: declared)
     }
 }

@@ -15,6 +15,11 @@ struct BrowseForMeView: View {
     /// Pairs each site's icon in a reading list with the same icon in its source row.
     @Namespace private var icons
     @State private var viewportHeight: CGFloat = 0
+    /// No canvas under the footer or the status bar: while the light is up,
+    /// and on through its flood when an answer arrives. Set here, not worked
+    /// out from the answer's state, so it never flickers solid for the frame
+    /// between the work ending and the flood starting.
+    @State private var edgesClear = true
 
     private var latest: BrowseForMeModel { session.latest }
 
@@ -30,11 +35,26 @@ struct BrowseForMeView: View {
         }
         .animation(.easeOut(duration: 0.2), value: session.showsSearch)
         .safeAreaInset(edge: .bottom, spacing: 0) { footer }
-        .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas).opacity(session.showsSearch ? 0 : 1) }
+        .overlay(alignment: .top) {
+            StatusBarFade(color: Theme.canvas).opacity(session.showsSearch || edgesClear ? 0 : 1)
+        }
         .background { background }
         .foregroundStyle(Theme.ink)
         .accessibilityAddTraits(.isModal)
         .sensoryFeedback(.success, trigger: latest.phase == .done)
+        .onAppear { edgesClear = latest.isWorking }
+        .onChange(of: latest.isWorking) { _, working in
+            if working {
+                withAnimation(.easeInOut(duration: 0.9)) { edgesClear = true }
+                return
+            }
+            // A flood first, when the answer arrived; otherwise at the light's own pace.
+            let flooded = !session.showsSearch && !latest.phase.isFailure
+            DispatchQueue.main.asyncAfter(deadline: .now() + (flooded ? WorkingGlow.floodDuration : 0)) {
+                guard !latest.isWorking else { return }
+                withAnimation(.easeInOut(duration: 0.9)) { edgesClear = false }
+            }
+        }
     }
 
     /// The canvas, and while the latest question is being worked on, the light.
@@ -42,7 +62,8 @@ struct BrowseForMeView: View {
         ZStack {
             Theme.canvas
             // Always in place; it rises and sinks by itself as work starts and ends.
-            WorkingGlow(progress: latest.progress, isActive: latest.isWorking && !session.showsSearch)
+            WorkingGlow(progress: latest.progress, isActive: latest.isWorking && !session.showsSearch,
+                        finished: !latest.isWorking && !session.showsSearch && !latest.phase.isFailure)
         }
         .ignoresSafeArea()
     }
@@ -130,11 +151,10 @@ struct BrowseForMeView: View {
         .padding(.vertical, 10)
         // See-through while the light is up, so its brightest part shows.
         // It turns solid at the light's own pace, so no dark band crosses the light as it sinks.
-        .background(Theme.canvas.opacity(latest.isWorking && !session.showsSearch ? 0 : 1))
+        .background(Theme.canvas.opacity(edgesClear && !session.showsSearch ? 0 : 1))
         .background(alignment: .top) {
-            FadeEdge(color: Theme.canvas).opacity(latest.isWorking || session.showsSearch ? 0 : 1)
+            FadeEdge(color: Theme.canvas).opacity(edgesClear || session.showsSearch ? 0 : 1)
         }
-        .animation(.easeInOut(duration: 0.9), value: latest.isWorking)
     }
 
     private func close() {
@@ -168,7 +188,9 @@ private struct AnswerOrSearch: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            segment(.browse, "Answer", isOn: !showsSearch) { showsSearch = false }
+            // "AI" beside "Google": both name where the page comes from.
+            segment(.browse, "AI", isOn: !showsSearch) { showsSearch = false }
+                .accessibilityLabel("AI answer")
             segment(.search, SearchEngine.current.name, isOn: showsSearch) { showsSearch = true }
         }
         .padding(3)

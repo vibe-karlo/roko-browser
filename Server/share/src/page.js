@@ -17,8 +17,8 @@ export const FAVICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600
 
 // Theme.swift's tokens: graphite greys with no blue in them, one orange.
 const CSS = `
-:root{color-scheme:light dark;--canvas:#E6E6E3;--raised:#FCFCFB;--ink:#0E0E0F;--ink2:#5C5C59;--ink3:#737370;--accent:#D4570C;--edge:rgb(14 14 15/.08)}
-@media(prefers-color-scheme:dark){:root{--canvas:#0E0E0F;--raised:#252527;--ink:#E7E7E4;--ink2:#8C8C88;--ink3:#7E7E7A;--accent:#FF7A38;--edge:rgb(231 231 228/.08)}}
+:root{color-scheme:light dark;--canvas:#E6E6E3;--raised:#FCFCFB;--ink:#0E0E0F;--ink2:#5C5C59;--ink3:#737370;--accent:#D4570C;--edge:rgb(14 14 15/.08);--l0:rgb(232 74 16/.85);--l1:rgb(235 97 21/.6);--l2:rgb(238 120 26/.38);--l3:rgb(240 134 29/.2);--l4:rgb(242 148 32/.08)}
+@media(prefers-color-scheme:dark){:root{--canvas:#0E0E0F;--raised:#252527;--ink:#E7E7E4;--ink2:#8C8C88;--ink3:#7E7E7A;--accent:#FF7A38;--edge:rgb(231 231 228/.08);--l0:rgb(255 91 31/.85);--l1:rgb(255 91 31/.6);--l2:rgb(255 91 31/.38);--l3:rgb(255 91 31/.2);--l4:rgb(255 91 31/.08)}}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--canvas);color:var(--ink);font:17px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
@@ -53,7 +53,14 @@ a{color:inherit}
 strong{font-weight:600;color:var(--ink)}
 code{font-size:.9em}
 .answer a{color:var(--accent);text-decoration:none}
-.signature{max-width:640px;margin:72px auto 0;padding:0 22px 40px;font-size:14px;color:var(--ink2)}
+.signature{position:relative;overflow:hidden;margin-top:72px;padding:0 22px 230px;font-size:14px;color:var(--ink2)}
+.signature .inner{position:relative;z-index:1;max-width:596px;margin:0 auto}
+/* roko's light, rising from the bottom edge as it does behind Browse for Me:
+   the top of an ellipse centred on the edge, falling off over many stops,
+   with grain so it can't band. Faded out well below the text's top. */
+.signature::before,.signature::after{content:"";position:absolute;left:-60%;right:-60%;bottom:-320px;height:640px;pointer-events:none}
+.signature::before{background:radial-gradient(closest-side,var(--l0) 0%,var(--l1) 16%,var(--l2) 34%,var(--l3) 52%,var(--l4) 72%,transparent 100%)}
+.signature::after{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");mix-blend-mode:overlay;opacity:.35;-webkit-mask-image:radial-gradient(closest-side,#000 0%,transparent 100%);mask-image:radial-gradient(closest-side,#000 0%,transparent 100%)}
 .signature .brand{display:inline-flex;align-items:center;gap:10px;font-size:17px;color:var(--ink);text-decoration:none}
 .signature .brand strong{font-weight:700;letter-spacing:.01em}
 .mark{flex:none;width:20px;height:20px;fill:currentColor}
@@ -148,9 +155,9 @@ export function answerPage(record, { url, appURL, reportEmail }) {
   const report = reportEmail
     ? ` · <a href="mailto:${escapeHTML(reportEmail)}?subject=${encodeURIComponent(`Report ${url}`)}">Report</a>` : "";
   const body = `<main>${record.turns.map(turn).join("")}</main><script>${PICTURE_SCRIPT}</script>`
-    + `<footer class="signature"><a class="brand" href="${escapeHTML(appURL)}">${mark("mark")}<span>Answered by <strong>roko</strong></span></a>`
+    + `<footer class="signature"><div class="inner"><a class="brand" href="${escapeHTML(appURL)}">${mark("mark")}<span>Answered by <strong>roko</strong></span></a>`
     + `<p>The iPhone browser that reads the web for you.</p>`
-    + `<p class="meta">Shared ${escapeHTML(shared)}. Answers are written by AI from the pages above and can be wrong.${report}</p></footer>`;
+    + `<p class="meta">Shared ${escapeHTML(shared)}. Answers are written by AI from the pages above and can be wrong.${report}</p></div></footer>`;
   return document({ title, description, url, image: record.turns[0].images[0] ?? "", lang: record.lang, body });
 }
 

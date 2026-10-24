@@ -72,6 +72,8 @@ struct WebViewHost: UIViewRepresentable {
 
         private weak var webView: WKWebView?
         private let indicator = PullIndicator()
+        /// roko's orange light from the top edge, past the reload point.
+        private let light = PullLight()
         private var loadObservations: [NSKeyValueObservation] = []
         private let haptic = UIImpactFeedbackGenerator(style: .light)
         private let firmHaptic = UIImpactFeedbackGenerator(style: .medium)
@@ -87,6 +89,8 @@ struct WebViewHost: UIViewRepresentable {
         private var summarizeArmed = false
         /// Let go to summarize: waiting for the page to spring back to its top.
         private var summarizePending = false
+        /// The page behind the pull is light (white, mostly): the light's colours follow it.
+        private var pageIsLight = true
         /// Reloading for a pull; `sawLoading` once WebKit has actually started.
         private var refreshing = false, sawLoading = false
 
@@ -99,6 +103,9 @@ struct WebViewHost: UIViewRepresentable {
             webView.scrollView.refreshControl = nil
             indicator.hide(animated: false)
             container.addSubview(indicator)
+            light.alpha = 0
+            container.insertSubview(light, belowSubview: indicator)
+            PullLight.prepare()
             indicator.translatesAutoresizingMaskIntoConstraints = false
             // Its own width: a circle, or a capsule once it says "Summarize".
             NSLayoutConstraint.activate([
@@ -125,6 +132,8 @@ struct WebViewHost: UIViewRepresentable {
             indicator.setProgress(pull <= pullDistance
                                   ? pull / pullDistance
                                   : 1 + (pull - pullDistance) / (summarizeDistance - pullDistance))
+            // Past the reload point the light pours in, full once a release summarizes.
+            light.setStrength((pull - pullDistance) / (summarizeDistance - pullDistance), onLightPage: pageIsLight)
             if pull >= pullDistance, !refreshArmed {
                 refreshArmed = true
                 haptic.impactOccurred()
@@ -149,13 +158,28 @@ struct WebViewHost: UIViewRepresentable {
             case .began:
                 haptic.prepare()
                 firmHaptic.prepare()
+                // A pull from the top may reach the light: draw it now (once
+                // per appearance, a millisecond or two), not mid-pull.
+                if let scrollView = pan.view as? UIScrollView,
+                   scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 1 {
+                    let start = CACurrentMediaTime()
+                    pageIsLight = Self.isLight(webView?.underPageBackgroundColor)
+                    _ = PullLight.image(onLightPage: pageIsLight)
+                    if LaunchClock.isEnabled { print(String(format: "PERF pullLight %.2fms", (CACurrentMediaTime() - start) * 1000)) }
+                }
             case .ended, .cancelled, .failed:
                 if summarizeArmed {
+                    // The light goes as the page springs back; the summary
+                    // brings its own.
+                    light.fadeOut(duration: 0.45)
                     startSummarize()
-                } else if refreshArmed {
-                    startReload()
-                } else if !refreshing {
-                    indicator.hide()
+                } else {
+                    light.fadeOut(duration: 0.2)
+                    if refreshArmed {
+                        startReload()
+                    } else if !refreshing {
+                        indicator.hide()
+                    }
                 }
             default: break
             }
@@ -177,6 +201,12 @@ struct WebViewHost: UIViewRepresentable {
             summarizePending = false
             indicator.hide()
             parent.onSummarize()
+        }
+
+        private static func isLight(_ color: UIColor?) -> Bool {
+            var white: CGFloat = 1, alpha: CGFloat = 1
+            guard let color, color.getWhite(&white, alpha: &alpha) else { return true }
+            return white > 0.5
         }
 
         private func startReload() {

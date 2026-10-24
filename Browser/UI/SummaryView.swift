@@ -12,6 +12,10 @@ struct SummaryView: View {
     @State private var settled = false
     /// The title and summary show only once the card has come to rest.
     @State private var textShown = false
+    /// No canvas under the footer or the status bar while the light is up and
+    /// on through its flood. Set here, so it never flickers solid for the frame
+    /// between the light going and the flood starting.
+    @State private var edgesClear = false
     private let cardHeight: CGFloat = 210
 
     var body: some View {
@@ -21,10 +25,11 @@ struct SummaryView: View {
                     .opacity(settled ? 1 : 0)
                     .ignoresSafeArea()
 
-                // roko's light while it works: rising as the page is read, sinking
-                // away as the summary starts. Not while the card is still moving.
+                // roko's light while it works: rising as the page is read, flooding
+                // the screen as the summary starts. Not while the card is still moving.
                 if textShown {
-                    WorkingGlow(progress: model.progress, isActive: showsLight)
+                    WorkingGlow(progress: model.progress, isActive: showsLight,
+                                finished: !model.isWorking && !model.isClosing && !model.phase.isFailure)
                         .ignoresSafeArea()
                 }
 
@@ -52,10 +57,23 @@ struct SummaryView: View {
                     .opacity(textShown ? 1 : 0)
             }
             // Only once settled: while opening and closing, the page card owns the top.
-            .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas).opacity(textShown ? 1 : 0) }
+            .overlay(alignment: .top) {
+                StatusBarFade(color: Theme.canvas).opacity(textShown && !edgesClear ? 1 : 0)
+            }
         }
         .animation(.easeInOut(duration: 0.4), value: showsLight)
         .sensoryFeedback(.success, trigger: model.phase == .done)
+        .onChange(of: showsLight) { _, lit in
+            if lit {
+                withAnimation(.easeInOut(duration: 0.9)) { edgesClear = true }
+                return
+            }
+            let flooded = !model.isClosing && !model.phase.isFailure
+            DispatchQueue.main.asyncAfter(deadline: .now() + (flooded ? WorkingGlow.floodDuration : 0)) {
+                guard !showsLight else { return }
+                withAnimation(.easeInOut(duration: 0.9)) { edgesClear = false }
+            }
+        }
         .onAppear {
             // The card now sits exactly where the page was: hide the page.
             browser.summaryCoversPage = true
@@ -165,10 +183,9 @@ struct SummaryView: View {
         .padding(.horizontal, 22)
         .padding(.vertical, 10)
         // See-through while the light is up, so its brightest part shows.
-        .background(Theme.canvas.opacity(showsLight ? 0 : 1))
-        .background(alignment: .top) { FadeEdge(color: Theme.canvas).opacity(showsLight ? 0 : 1) }
-        // At the light's own pace, so no dark band crosses it as it sinks.
-        .animation(.easeInOut(duration: 0.9), value: showsLight)
+        // At the light's own pace, so no dark band crosses it as it sinks or floods.
+        .background(Theme.canvas.opacity(edgesClear ? 0 : 1))
+        .background(alignment: .top) { FadeEdge(color: Theme.canvas).opacity(edgesClear ? 0 : 1) }
     }
 
     /// The card grows back to exactly the page's size and place; only then is

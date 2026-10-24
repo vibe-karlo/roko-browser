@@ -200,8 +200,9 @@ function html(body, status, env, maxAge, script = null) {
   const headers = {
     "content-type": "text/html; charset=utf-8",
     "cache-control": `public, max-age=${maxAge}`,
-    // No scripts but the one named by its hash; pictures from anywhere over https, styles inline.
-    "content-security-policy": `default-src 'none'; img-src 'self' https:; style-src 'unsafe-inline'; script-src ${script ?? "'none'"}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+    // No scripts but the one named by its hash; pictures from anywhere over https (and the
+    // light's grain, an inline SVG), styles inline.
+    "content-security-policy": `default-src 'none'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src ${script ?? "'none'"}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
     "x-content-type-options": "nosniff",
     "referrer-policy": "no-referrer",
   };

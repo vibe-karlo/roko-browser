@@ -13,6 +13,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Settings → Appearance: Automatic, Light or Dark, for the whole app and the pages in it.
 - Settings → Answer language: Automatic, or one of about thirty languages (Hrvatski, Srpski in Latin or Cyrillic, Bosanski, Slovenščina, Deutsch...) for summaries, Browse for Me and Notify Me. A language Apple's models write badly goes to Claude, and the setting says that's slower and paid.
 - Text in Summarize and Browse for Me can be selected: long-press a word, drag the handles, then Copy, Look Up or Translate.
+- roko's orange light in more places: it pours in from the top while a long pull would summarize (warming to amber on light pages), floods the whole screen as a Browse for Me answer or a summary arrives, then dissolves so the answer is read on dark; and it rises under "Answered by roko" at the end of a shared page.
 - Share in Browse for Me, as in Arc: the page becomes a short link anyone can open, laid out as in the app (opening on the answer, without the question above it), light or dark, signed "Answered by roko" with the Eclipse mark. Sharing again after a follow-up updates the same link. Settings → Shared pages lists them; swipe to unshare. The server is in `Server/share` (Cloudflare Worker and D1), ready to deploy once there's a domain; until then Share is hidden.
 - Full-screen Summarize: the page shrinks into a card, then the summary writes itself.
 - Structured answers for Summarize and Browse for Me: a gist, then sections with topic icons.
@@ -24,7 +25,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Settings → Use Claude: turn Claude off without deleting the API key; Apple's models then do everything.
 - Browse for Me suggests two or three follow-up questions under the answer when they'd help. Asking one adds a new section to the same page, answered with the earlier answers as context.
 - Tap a question in Browse for Me to reword it; that section and the ones after it are asked again.
-- An Answer / Google switch flips the Browse for Me page to the search results and back, from the start, losing neither. Closing the page stops any answer still being written.
+- An AI / Google switch flips the Browse for Me page to the search results and back, from the start, losing neither. Closing the page stops any answer still being written.
 - roko's orange light: while Browse for Me or Summarize works, a warm light rises from the bottom edge as pages are read, in one continuous motion, and sinks back into the edge when the answer starts.
 - Browse for Me's answer arrives in order: the question shrinks to its heading, then pictures, sources and text ease in one after another.
 - Browse for Me matches the question: a quick fact gets a short answer from three sources; a comparison, a "best" or a plan reads more sites and writes more.
@@ -61,11 +62,14 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - A pin always opens the page that was pinned, not whatever page of that site is open; two pages of one site can both be pinned.
 - Summarize with a long pull from the top of a page instead of a pinch: past the reload point the ring closes and opens into "Summarize", with a firmer tap, and letting go there summarizes. Easing back off reloads instead. A pinch always zooms again.
 - Apple's models write in English when they summarize a Croatian page or answer a Croatian question, and say why; Claude still writes Croatian.
+- Browse for Me's light rises higher while it reads, to most of the screen, and is stronger.
+- The Browse for Me switch says AI / Google instead of Answer / Google.
 - The copied-link offer reads like the cookie one: what it is, then "Paste" or "Open" in orange, instead of a filled orange capsule. In the address bar it's a row like the others.
 - Pins are just their sites' icons, above the field and on the start screen, on the same line as the icons in the list; a long press names the page.
 - The address field's icons line up with the rows above it.
 
 ### Performance
+- The light's grain is made from random bytes in well under a millisecond, instead of 90 ms through Core Image: a hitch the first time a light showed. The pull's light is drawn off the main thread after the first page; the first pull took 92 ms to draw it, now 0.2 ms.
 - The first page after launch starts about 0.16 s sooner: it waits only for the request rules; the hiding indexes now decode in parallel.
 - Tab saves are batched and no longer run on every page load; tab pictures compress off the main thread.
 - Page loads skip resending unchanged blocker settings to WebKit.
@@ -103,6 +107,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Pages pushed down by a "Get our app" banner (smartbanner.js) no longer keep an empty band at the top once the banner is hidden.
 - A Browse for Me follow-up on Apple's models searches with the page's question too: "how long does the festival last?" after Oktoberfest found Diwali.
 - A page never waits more than three seconds for the block lists before loading.
+- An English page that opens on foreign names (a Wikipedia town article) is summarized as English: when the text alone isn't clear, the page's own language tag decides. It was read as Catalan and summarized "in English" with a note.
 - Claude pasted English and Serbian sentences from its sources into Croatian answers; it's now told to write every sentence in the answer's language and restate what sources say.
 - A dropped connection while Haiku answers no longer starts the whole answer again on Sonnet, slower and dearer; only a refusal does.
 
