@@ -117,6 +117,8 @@ struct BrowseForMeView: View {
 
     private var footer: some View {
         HStack(spacing: 12) {
+            // Signed, so a screenshot says where it came from.
+            RokoSignature()
             AnswerOrSearch(showsSearch: $session.showsSearch)
             Spacer(minLength: 8)
             // Once there's an answer to show for it.
@@ -126,10 +128,10 @@ struct BrowseForMeView: View {
                         if session.isSharing {
                             ProgressView().tint(Theme.ink)
                         } else {
-                            Glyph(.share, size: 17, weight: 2)
+                            Glyph(.share, size: 16, weight: 2)
                         }
                     }
-                    .frame(width: 44, height: 44)
+                    .frame(width: 40, height: 40)
                     .background(Theme.raised, in: .circle)
                     .contentShape(.circle)
                 }
@@ -139,8 +141,8 @@ struct BrowseForMeView: View {
                 .transition(.opacity)
             }
             Button(action: close) {
-                Glyph(.close, size: 16, weight: 2)
-                    .frame(width: 44, height: 44)
+                Glyph(.close, size: 15, weight: 2)
+                    .frame(width: 40, height: 40)
                     .background(Theme.raised, in: .circle)
                     .contentShape(.circle)
             }
@@ -148,7 +150,9 @@ struct BrowseForMeView: View {
             .accessibilityLabel("Close")
         }
         .padding(.horizontal, 22)
-        .padding(.vertical, 10)
+        // Low: the home indicator is thin, its whole strip needn't stay empty.
+        .padding(.top, 6)
+        .padding(.bottom, -10)
         // See-through while the light is up, so its brightest part shows.
         // It turns solid at the light's own pace, so no dark band crosses the light as it sinks.
         .background(Theme.canvas.opacity(edgesClear && !session.showsSearch ? 0 : 1))

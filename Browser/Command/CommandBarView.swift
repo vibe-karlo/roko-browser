@@ -69,6 +69,10 @@ struct CommandBarView: View {
                 .ignoresSafeArea()
                 .contentShape(.rect)
                 .onTapGesture { dismiss() }
+                // A swipe down anywhere on the page closes the bar too.
+                .gesture(DragGesture(minimumDistance: 20).onEnded { value in
+                    if value.translation.height > 50 { dismiss() }
+                })
 
             VStack(spacing: 6) {
                 field
@@ -185,6 +189,12 @@ struct CommandBarView: View {
             }
         }
         .frame(height: Self.listHeight)
+        // Pulled down past its top, the list closes the bar, as a sheet would.
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y < -geometry.contentInsets.top - 60
+        } action: { _, pulled in
+            if pulled { dismiss() }
+        }
         .onChange(of: scrollRequest) { _, target in
             guard let target else { return }
             withAnimation(.snappy(duration: 0.25)) { proxy.scrollTo(target, anchor: .top) }

@@ -6,6 +6,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Summaries and Browse for Me answers are signed with roko's Eclipse mark and name in the footer, so a screenshot says where it came from. The footer is slimmer and sits lower, into the home indicator's strip.
+- Swipe down on the open address bar (on its list or the page behind) to close it.
 - The address bar, after Arc Search: the field sits on top and the rows below it, nearer the thumb, over the page frosted and dimmed behind them. The list snaps row by row like a picker; the row under the field is the one Return opens, and the field shows it (its icon, title and address) with a light tick as it changes, so a flick chooses. Typing brings your text back; the clear button returns to the top. With nothing typed: your pins, a link you copied, and your last pages to pick from.
 - Done, at the bottom of To-do: folded under its count, it opens on what you ticked off in the last two weeks, the latest first, each a tap from being undone.
 - Pull to summarize is one motion with the summary. From the first point of the pull the page is a picture of itself over the summary's dark (no grey strip, no site header left behind at the top); past the reload point it starts becoming the summary's card, and letting go carries on from that exact frame: the card tips back as it flies into place and comes upright as it lands, roko's light already rising behind it, and the summary sharpens out of a blur. Ease off and it settles back into the page. Shorter, too: about 300 points of pull instead of 370.

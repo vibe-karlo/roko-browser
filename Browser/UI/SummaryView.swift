@@ -192,14 +192,16 @@ struct SummaryView: View {
     /// Who wrote it, and the way back to the page, always in reach.
     private var footer: some View {
         HStack(spacing: 12) {
+            // Signed, so a screenshot says where it came from; who wrote it beside.
+            RokoSignature()
             Text(model.phase == .done ? Self.credit(model.engine) + (model.note.map { " · \($0)" } ?? "") : "")
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.faintInk)
                 .lineLimit(2)
             Spacer(minLength: 8)
             Button(action: close) {
-                Glyph(.close, size: 16, weight: 2)
-                    .frame(width: 44, height: 44)
+                Glyph(.close, size: 15, weight: 2)
+                    .frame(width: 40, height: 40)
                     .background(Theme.raised, in: .circle)
                     .contentShape(.circle)
             }
@@ -207,7 +209,9 @@ struct SummaryView: View {
             .accessibilityLabel("Back to the page")
         }
         .padding(.horizontal, 22)
-        .padding(.vertical, 10)
+        // Low: the home indicator is thin, its whole strip needn't stay empty.
+        .padding(.top, 6)
+        .padding(.bottom, -10)
         // See-through while the light is up, so its brightest part shows.
         // At the light's own pace, so no dark band crosses it as it sinks or floods.
         .background(Theme.canvas.opacity(edgesClear ? 0 : 1))
@@ -231,9 +235,9 @@ struct SummaryView: View {
 
     private static func credit(_ engine: String) -> String {
         switch engine {
-        case "Claude": "Summarized by Claude"
-        case "Apple Intelligence": "Summarized by Apple Intelligence, privately in Apple's cloud"
-        default: "Summarized on this iPhone"
+        case "Claude": "Written by Claude"
+        case "Apple Intelligence": "Written by Apple Intelligence, privately in Apple's cloud"
+        default: "Written on this iPhone"
         }
     }
 }
