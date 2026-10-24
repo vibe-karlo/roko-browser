@@ -11,6 +11,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Copy a link on your Mac and roko offers it ("Link you copied"), through Universal Clipboard: above the bar once when you open roko, then in the address bar for five minutes. It opens with the system Paste button, so iOS never asks for permission to paste.
 - Settings → Show the link you copied: the offer and the address bar show the link itself, with its site's icon, before you open it. Set Paste from Other Apps to Allow in iOS Settings and iOS doesn't ask; links copied in roko always show.
 - Settings → Appearance: Automatic, Light or Dark, for the whole app and the pages in it.
+- Settings → Answer language: Automatic, or one of about thirty languages (Hrvatski, Srpski in Latin or Cyrillic, Bosanski, Slovenščina, Deutsch...) for summaries, Browse for Me and Notify Me. A language Apple's models write badly goes to Claude, and the setting says that's slower and paid.
+- Text in Summarize and Browse for Me can be selected: long-press a word, drag the handles, then Copy, Look Up or Translate.
 - Full-screen Summarize: the page shrinks into a card, then the summary writes itself.
 - Structured answers for Summarize and Browse for Me: a gist, then sections with topic icons.
 - Browse for Me shows each site as it's read, with source cards, pictures and real site icons.
@@ -97,6 +99,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - A copied link to the page already on screen isn't offered; nor is a link copied in roko, above the bar.
 - A link copied long ago is no longer offered as new after roko restarts.
 - The copied-link and cookie offers no longer stay on top of the page menu.
+- Claude pasted English and Serbian sentences from its sources into Croatian answers; it's now told to write every sentence in the answer's language and restate what sources say.
+- A dropped connection while Haiku answers no longer starts the whole answer again on Sonnet, slower and dearer; only a refusal does.
 
 ## [0.1.0] - 2026-10-23
 

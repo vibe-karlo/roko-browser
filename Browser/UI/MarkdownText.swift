@@ -74,6 +74,7 @@ struct MarkdownText: View {
             }
         }
         .animation(.easeOut(duration: 0.35), value: page.sections.count)
+        .textSelection(.enabled)
         .tint(Theme.accent)
         .frame(maxWidth: .infinity, alignment: .leading)
     }

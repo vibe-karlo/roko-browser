@@ -350,11 +350,14 @@ enum WatchJudge {
         return picked
     }
 
-    /// Apple's models write poor Croatian (see Summarizer).
+    /// In the answer language, unless Apple's models write it badly (see WritingLanguage).
     private static func language(of lines: [String]) -> String {
-        AnswerLanguage.of(lines.joined(separator: "\n")) == .croatian
-            ? "Write the notification in English, quoting names and headlines as they appear."
-            : "Write the notification in the language of the page."
+        switch AnswerLanguage.target(for: lines.joined(separator: "\n")) {
+        case .some(let language) where !language.appleWritesWell:
+            "Write the notification in English, quoting names and headlines as they appear."
+        case .some(let language): language.instruction
+        case nil: "Write the notification in the language of the page."
+        }
     }
 
     private static func keywords(_ text: String) -> [String] {

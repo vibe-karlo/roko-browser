@@ -10,6 +10,7 @@ struct SettingsView: View {
     @AppStorage("suggestions") private var suggestions = true
     @AppStorage(CopiedLink.showKey) private var showsCopiedLink = false
     @AppStorage(Appearance.key) private var appearance: Appearance = .system
+    @AppStorage(AnswerLanguage.key) private var answerLanguage = ""
     @AppStorage("archivePolicy") private var archive: ArchivePolicy = .day
     @AppStorage(ClaudeClient.enabledKey) private var claudeEnabled = true
     @State private var apiKey = Keychain.claudeAPIKey ?? ""
@@ -31,6 +32,17 @@ struct SettingsView: View {
         #else
         return "Off"
         #endif
+    }
+
+    /// Says what the choice costs: a language Apple's models write badly goes
+    /// to Claude every time, which is slower and paid.
+    private var answerLanguageFooter: String {
+        guard let language = WritingLanguage.with(code: answerLanguage) else {
+            return "Summaries, Browse for Me and Notify Me write in the language of the page or the question."
+        }
+        return language.appleWritesWell
+            ? "Summaries, Browse for Me and Notify Me write in \(language.english)."
+            : "Apple's models write \(language.english) poorly, so Claude writes summaries and answers: a few seconds slower than on the iPhone, and paid with your API key. Without a key, they're in English."
     }
 
     private var passkeyLabel: String {
@@ -62,6 +74,18 @@ struct SettingsView: View {
                         ForEach(SearchEngine.allCases) { Text($0.name).tag($0) }
                     }
                     Toggle("Suggestions while typing", isOn: $suggestions)
+                }
+
+                Section {
+                    Picker("Answer language", selection: $answerLanguage) {
+                        Text("Automatic").tag("")
+                        ForEach(WritingLanguage.all) { Text($0.name).tag($0.code) }
+                    }
+                    .pickerStyle(.navigationLink)
+                } header: {
+                    Text("Summaries and answers")
+                } footer: {
+                    Text(answerLanguageFooter)
                 }
 
                 Section {

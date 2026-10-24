@@ -23,29 +23,19 @@ private func answerShape(sections: String = "three to five") -> String {
     """
 }
 
-/// Claude writes Croatian well when told which standard to keep to.
-private let croatianStandard = """
-In Croatian, write standard Croatian (ijekavica): Croatian words, never Serbian or Bosnian ones.
-"""
+/// The instructions stay in English whatever the summary is written in:
+/// Apple's on-device model refused every request whose instructions were in Croatian.
+private func summaryGuidance(_ language: WritingLanguage?) -> String {
+    """
+    You summarize web pages for a phone browser. \(language?.instruction ?? "Write in the page's own language.") \
+    Only facts from the page, and each fact once: never repeat a point. No preamble, no sign-off.
+    """
+}
 
-private let summaryGuidance = """
-You summarize web pages for a phone browser. Write in the page's own language. \
-Only facts from the page, and each fact once: never repeat a point. No preamble, no sign-off.
-"""
-
-/// Apple's models read Croatian well enough but write it badly (Serbian words,
-/// broken endings), so when they summarize a Croatian page, it's in English.
-private let summaryGuidanceInEnglish = """
-You summarize web pages for a phone browser. The page is in Croatian: write the summary in English. \
-Only facts from the page, and each fact once: never repeat a point. No preamble, no sign-off.
-"""
-
-/// Says why a summary or answer of something Croatian is in English.
-private let englishNote = "In English: Apple's models write poor Croatian."
-
-/// For Claude. (Apple's on-device model refused every request whose
-/// instructions were written in Croatian, so it keeps the plain guidance above.)
-private let summaryInstructions = summaryGuidance + " " + croatianStandard + "\n\n" + answerShape()
+/// Says why a summary is in English when it was to be in another language.
+private func englishNote(_ language: WritingLanguage) -> String {
+    "In English: Apple's models write poor \(language.english)."
+}
 
 @Observable
 final class SummaryModel: Identifiable {
@@ -100,20 +90,22 @@ final class SummaryModel: Identifiable {
         }
         phase = .writing
 
-        // Apple's models write good English and poor Croatian (Serbian words,
-        // broken endings), and no prompt fixes that. So a Croatian page goes
-        // to Claude first, and when Apple's models summarize it anyway (no key,
-        // Claude off or failing), they write in English. Everything else stays
-        // on Apple's models, free and private, with Claude as the fallback.
-        let croatian = AnswerLanguage.of(page.text, host: host) == .croatian
+        // Apple's models write some languages well and others badly (Croatian
+        // with Serbian words and broken endings), and no prompt fixes that. So
+        // a summary in a language they write badly goes to Claude first, and
+        // when Apple's models write it anyway (no key, Claude off or failing),
+        // it's in English. Everything else stays on Apple's models, free and
+        // private, with Claude as the fallback.
+        let language = AnswerLanguage.target(for: page.text, host: host)
+        let appleWritesIt = language?.appleWritesWell ?? true
         var engines: [Engine] = [.appleCloud, .onDevice]
-        if ClaudeClient.configured != nil { croatian ? engines.insert(.claude, at: 0) : engines.append(.claude) }
+        if ClaudeClient.configured != nil { appleWritesIt ? engines.append(.claude) : engines.insert(.claude, at: 0) }
 
         var lastError: Error = ClaudeError(
             message: "Summaries need Apple Intelligence on this iPhone, or a Claude API key in Settings.")
         for engine in engines {
             do {
-                guard try await write(page, with: engine, croatian: croatian) else { continue }
+                guard try await write(page, with: engine, in: language, appleWritesIt: appleWritesIt) else { continue }
                 phase = .done
                 return
             } catch is CancellationError {
@@ -133,16 +125,20 @@ final class SummaryModel: Identifiable {
     private enum Engine { case appleCloud, onDevice, claude }
 
     /// Writes the summary with one engine; false when that engine isn't available here.
-    private func write(_ page: ReadablePage, with engine: Engine, croatian: Bool) async throws -> Bool {
+    private func write(_ page: ReadablePage, with engine: Engine, in language: WritingLanguage?,
+                       appleWritesIt: Bool) async throws -> Bool {
         let longNote = "Long page: this covers the first part."
+        // Apple's models write English rather than a language they write badly, and say so.
+        let appleLanguage = appleWritesIt ? language : .english
+        let languageNote = appleWritesIt ? nil : language.map(englishNote)
         switch engine {
         case .appleCloud:
             guard let cloud = AppleModels.cloudIfAvailable else { return false }
             self.engine = "Apple Intelligence"
             let budget = await AppleModels.characterBudget(of: cloud)
-            note = Self.note(page.text.count > budget ? longNote : nil, croatian ? englishNote : nil)
+            note = Self.note(page.text.count > budget ? longNote : nil, languageNote)
             let prompt = "Title: \(page.title)\nSite: \(page.site)\n\n\(page.text.prefix(budget))"
-            for try await snapshot in AppleModels.streamAnswer(cloud, instructions: croatian ? summaryGuidanceInEnglish : summaryGuidance,
+            for try await snapshot in AppleModels.streamAnswer(cloud, instructions: summaryGuidance(appleLanguage),
                                                                prompt: prompt, titled: false) {
                 text = snapshot
             }
@@ -150,8 +146,8 @@ final class SummaryModel: Identifiable {
         case .onDevice:
             guard OnDeviceSummarizer.isAvailable else { return false }
             self.engine = "On-device"
-            let (stream, truncated) = OnDeviceSummarizer.summarize(page, inEnglish: croatian)
-            note = Self.note(truncated ? longNote : nil, croatian ? englishNote : nil)
+            let (stream, truncated) = OnDeviceSummarizer.summarize(page, in: appleLanguage)
+            note = Self.note(truncated ? longNote : nil, languageNote)
             for try await snapshot in stream { text = snapshot }
 
         case .claude:
@@ -161,10 +157,10 @@ final class SummaryModel: Identifiable {
             // Haiku: a summary needs no more. Sonnet only if Haiku declines,
             // since Sonnet has a fallback of its own for refusals.
             do {
-                try await stream(client, prompt: prompt, model: .haiku)
+                try await stream(client, prompt: prompt, model: .haiku, language: language)
             } catch let error as ClaudeError where error.isRefusal {
                 text = ""
-                try await stream(client, prompt: prompt, model: .sonnet)
+                try await stream(client, prompt: prompt, model: .sonnet, language: language)
             }
         }
         // Cancelled, a stream just ends: closed, not done.
@@ -178,8 +174,10 @@ final class SummaryModel: Identifiable {
         return text.isEmpty ? nil : text
     }
 
-    private func stream(_ client: ClaudeClient, prompt: String, model: ClaudeClient.Model) async throws {
-        for try await event in client.stream(system: summaryInstructions, prompt: prompt, model: model,
+    private func stream(_ client: ClaudeClient, prompt: String, model: ClaudeClient.Model,
+                        language: WritingLanguage?) async throws {
+        let instructions = summaryGuidance(language) + "\n\n" + answerShape()
+        for try await event in client.stream(system: instructions, prompt: prompt, model: model,
                                              effort: "low", maxTokens: 4_096) {
             if case .text(let chunk) = event { text += chunk }
         }
@@ -197,8 +195,8 @@ enum OnDeviceSummarizer {
     }
 
     /// Streams the growing summary text; `truncated` is true when the page was too long to read in full.
-    /// `inEnglish`: the page is Croatian, which the model reads but writes badly.
-    static func summarize(_ page: ReadablePage, inEnglish: Bool) -> (AsyncThrowingStream<String, Error>, truncated: Bool) {
+    /// `language`: what to write in; nil follows the page.
+    static func summarize(_ page: ReadablePage, in language: WritingLanguage?) -> (AsyncThrowingStream<String, Error>, truncated: Bool) {
         let chunks = chunked(page.text)
         let truncated = chunks.count > maxChunks
         let stream = AsyncThrowingStream<String, Error> { continuation in
@@ -210,7 +208,7 @@ enum OnDeviceSummarizer {
                         for chunk in chunks.prefix(maxChunks) {
                             let session = LanguageModelSession(
                                 model: AppleModels.summarizing,
-                                instructions: "List the key facts in this part of a web page\(inEnglish ? ", in English," : "") as three to five short lines starting with \"- \". Nothing else.")
+                                instructions: "List the key facts in this part of a web page\(language.map { ", in \($0.english)," } ?? "") as three to five short lines starting with \"- \". Nothing else.")
                             notes.append(try await session.respond(to: chunk).content)
                         }
                         material = notes.joined(separator: "\n")
@@ -218,7 +216,7 @@ enum OnDeviceSummarizer {
 
                     let prompt = "Title: \(page.title)\nSite: \(page.site)\n\n\(material)"
                     for try await markdown in AppleModels.streamAnswer(AppleModels.summarizing,
-                                                                       instructions: inEnglish ? summaryGuidanceInEnglish : summaryGuidance,
+                                                                       instructions: summaryGuidance(language),
                                                                        prompt: prompt, titled: false) {
                         continuation.yield(markdown)
                     }
@@ -340,7 +338,7 @@ final class BrowseForMeModel: Identifiable {
 
     static let followUpMark = "??"
 
-    private static func claudeInstructions(_ depth: ResearchDepth) -> String {
+    private static func claudeInstructions(_ depth: ResearchDepth, language: WritingLanguage?) -> String {
         let task = switch depth {
         case .quick: """
             Answer briefly. One or two searches and two or three good sources are enough. First \
@@ -362,31 +360,39 @@ final class BrowseForMeModel: Identifiable {
         }
         // Haiku answered "why is the sky blue" from memory, with no search and
         // so no sources; the feature promises an answer read from the web.
+        // It also copied sentences from English and Serbian sources straight
+        // into Croatian answers, so the language rule covers every sentence.
+        let writeIn = language.map { "in \($0.standard ?? $0.english)" } ?? "in the language of the question"
         return """
         You are the "Browse for Me" feature of a phone browser. Always search the web before \
         answering, even when you already know the answer: the person wants current facts with \
-        sources they can open. Answer in the language of the question. \(croatianStandard) \
+        sources they can open. Write every sentence \(writeIn), including facts from sources in \
+        other languages: put them in your own words, never copy a source's sentences. \
         Don't list the sources (the app shows them).
 
         """ + task + """
 
 
         After the answer, only if they would genuinely help: two or three short follow-up \
-        questions the person is likely to ask next, in the language of the question, each on \
+        questions the person is likely to ask next, in the language of the answer, each on \
         its own line starting with "\(followUpMark) ". Nothing after them.
         """
     }
 
-    private static func appleInstructions(_ depth: ResearchDepth, question: String) -> String {
+    private static func appleInstructions(_ depth: ResearchDepth, language: WritingLanguage?) -> String {
         let length = switch depth {
         case .quick: "Answer in one to three sentences."
         case .standard: "Lead with what the person most likely wants to know."
         case .deep: "Lead with what the person most likely wants to know, then the specifics the sources give: names, numbers, prices, dates and trade-offs."
         }
-        // Apple's models write poor Croatian, so a Croatian question gets its
-        // answer in English from them (Claude answers it in Croatian).
-        let language = AnswerLanguage.of(question) == .croatian
-            ? "The question is in Croatian: write the whole answer in English." : "Write in the language of the question."
+        // In a language Apple's models write badly (Croatian, say), they answer
+        // in English; Claude answers in the language itself.
+        let language = switch language {
+        case .some(let language) where !language.appleWritesWell:
+            "The answer was to be in \(language.english), which you write poorly: write the whole answer in English."
+        case .some(let language): language.instruction
+        case nil: "Write in the language of the question."
+        }
         return """
         You are the "Browse for Me" feature of a phone browser. The app has searched the web and \
         read the pages below for you. Answer the question using only these sources. Where they \
@@ -398,21 +404,30 @@ final class BrowseForMeModel: Identifiable {
     }
 
     func run() async {
+        // The language to answer in: chosen in Settings, or the question's own
+        // (a follow-up like "i zimi?" is too short to tell, so the page's first
+        // question counts too).
+        let language = AnswerLanguage.target(for: ([query] + context.map(\.question)).joined(separator: "\n"))
         // Apple's cloud model, fed by our own search, is the default; Claude
         // (which searches by itself) is the fallback; the small on-device model
         // is the last resort, working from search snippets and short excerpts.
+        // A language Apple's models write badly goes to Claude first.
+        if language?.appleWritesWell == false, let client = ClaudeClient.configured {
+            await runClaude(client, language: language)
+            return
+        }
         if let cloud = AppleModels.cloudIfAvailable,
            await runApple(cloud, budget: await AppleModels.characterBudget(of: cloud, reservingTokens: 1_500),
-                          perPage: 6_000, label: "Apple Intelligence") {
+                          perPage: 6_000, label: "Apple Intelligence", language: language) {
             return
         }
         if let client = ClaudeClient.configured {
-            await runClaude(client)
+            await runClaude(client, language: language)
             return
         }
         if AppleModels.onDeviceAvailable,
            await runApple(SystemLanguageModel.default, budget: AppleModels.onDeviceCharacterBudget(),
-                          perPage: 700, label: "On-device") {
+                          perPage: 700, label: "On-device", language: language) {
             return
         }
         if case .failed = phase { return }
@@ -420,7 +435,8 @@ final class BrowseForMeModel: Identifiable {
     }
 
     /// Returns false (leaving the next engine to try) when the model itself fails.
-    private func runApple(_ model: some LanguageModel, budget: Int, perPage: Int, label: String) async -> Bool {
+    private func runApple(_ model: some LanguageModel, budget: Int, perPage: Int, label: String,
+                          language: WritingLanguage?) async -> Bool {
         do {
             phase = .searching(query)
             let results = try await WebResearcher.search(query)
@@ -456,7 +472,7 @@ final class BrowseForMeModel: Identifiable {
 
             engine = label
             phase = .writing
-            let instructions = Self.appleInstructions(depth, question: query)
+            let instructions = Self.appleInstructions(depth, language: language)
             // A quick question gets the short shape: no sections to fill out.
             let answer = depth == .quick
                 ? AppleModels.streamAnswer(model, shape: BriefAnswer.self, instructions: instructions, prompt: prompt)
@@ -481,13 +497,15 @@ final class BrowseForMeModel: Identifiable {
         }
     }
 
-    private func runClaude(_ client: ClaudeClient) async {
+    private func runClaude(_ client: ClaudeClient, language: WritingLanguage?) async {
         engine = "Claude"
         do {
             do {
-                try await streamClaude(client, model: depth.model)
-            } catch where depth.model == .haiku && !Task.isCancelled {
+                try await streamClaude(client, model: depth.model, language: language)
+            } catch let error as ClaudeError where error.isRefusal && depth.model == .haiku && !Task.isCancelled {
                 // Haiku declined (it has no fallback of its own): Sonnet answers instead.
+                // Only then: a dropped connection isn't helped by the slower,
+                // dearer model, and retrying on it spent half a minute for nothing.
                 text = ""
                 sources = []
                 steps = []
@@ -495,7 +513,7 @@ final class BrowseForMeModel: Identifiable {
                 images = []
                 stopLookingForPictures()
                 phase = .searching(query)
-                try await streamClaude(client, model: .sonnet)
+                try await streamClaude(client, model: .sonnet, language: language)
             }
             try Task.checkCancellation()
             // An answer that cites nothing still shows where it looked.
@@ -508,8 +526,8 @@ final class BrowseForMeModel: Identifiable {
         }
     }
 
-    private func streamClaude(_ client: ClaudeClient, model: ClaudeClient.Model) async throws {
-        for try await event in client.stream(system: Self.claudeInstructions(depth), prompt: query, history: context,
+    private func streamClaude(_ client: ClaudeClient, model: ClaudeClient.Model, language: WritingLanguage?) async throws {
+        for try await event in client.stream(system: Self.claudeInstructions(depth, language: language), prompt: query, history: context,
                                              model: model, effort: depth.effort, searches: depth.searches) {
             switch event {
             case .searching(let query):
@@ -659,29 +677,6 @@ nonisolated enum ResearchDepth: Equatable {
 }
 
 /// The language an answer will be written in, as far as choosing a model goes:
-/// Apple's on-device model writes Croatian with Serbian words and broken
-/// endings, so Croatian goes to Claude when there's a key.
-nonisolated enum AnswerLanguage {
-    case croatian, other
-
-    /// From the page's (or question's) own text. Croatian, Serbian and Bosnian
-    /// in Latin script are close enough to be confused for one another, so
-    /// those count as Croatian on a .hr site or on a phone set to Croatia.
-    static func of(_ text: String, host: String = "") -> AnswerLanguage {
-        let recognizer = NLLanguageRecognizer()
-        recognizer.processString(String(text.prefix(2_000)))
-        guard let language = recognizer.dominantLanguage else { return .other }
-        if language == .croatian { return .croatian }
-        let neighbours: Set<NLLanguage> = [NLLanguage("sr"), NLLanguage("bs")]
-        let isCyrillic = text.prefix(400).unicodeScalars.contains { (0x0400...0x04FF).contains($0.value) }
-        if neighbours.contains(language), !isCyrillic,
-           host.hasSuffix(".hr") || Locale.current.region?.identifier == "HR" {
-            return .croatian
-        }
-        return .other
-    }
-}
-
 /// The topics a section can be tagged with; each is a Phosphor icon in the assets.
 nonisolated enum AnswerTopic {
     static let all = ["idea", "check", "warning", "money", "time", "place", "people", "privacy", "speed", "star",

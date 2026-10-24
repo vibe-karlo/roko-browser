@@ -96,13 +96,21 @@ app rather than reporting an error.
 | Feature | First choice | Then | Last resort |
 | --- | --- | --- | --- |
 | Summarize | Apple's cloud model (needs the entitlement) | On-device model | Claude Haiku (API key) |
-| Summarize, Croatian page | Claude Haiku (API key) | Apple's cloud model | On-device model |
+| Summarize, in a language Apple's models write badly | Claude Haiku (API key) | Apple's cloud model | On-device model |
 | Browse for Me | Our search and page reading, then Apple's cloud model | Claude with its own web search | Our search and reading, then the on-device model |
+| Browse for Me, in a language Apple's models write badly | Claude with its own web search | Apple's cloud model | On-device model |
 
-Apple's on-device model writes poor Croatian (Serbian words, broken endings) and no prompt
-fixes it, so with a key Croatian pages go to Claude first. When Apple's models do handle a
-Croatian page or question (no key, Claude off or failing), they write in English and say why.
-Claude summaries use Haiku 5.5, retried on Sonnet 5.5 if Haiku declines.
+Settings → Answer language picks what summaries, Browse for Me and Notify Me write in:
+Automatic (the page's or the question's own language) or one of about thirty languages
+(`AI/AnswerLanguage.swift`). Whether Apple's models write a language well comes from
+`SystemLanguageModel.supportsLocale`, except Croatian, Serbian and Bosnian: tested, they write
+those with mixed-up words and broken endings whatever the prompt says, so those go to Claude
+first when there's a key. When Apple's models do handle one (no key, Claude off or failing),
+they write in English and say why. Croatian, Serbian (Latin or Cyrillic) and Bosnian each
+name their standard in the prompt, and Claude is told to restate source facts in the answer's
+language rather than copy them, since Haiku pasted English and Serbian sentences into Croatian
+answers. Claude summaries and answers use Haiku 5.5, retried on Sonnet 5.5 only if Haiku
+declines (not when the connection drops).
 
 Browse for Me judges each question from its words (`ResearchDepth`): a quick fact reads three
 pages (Claude: Haiku, low effort, two searches); an ordinary question six (Haiku, three
