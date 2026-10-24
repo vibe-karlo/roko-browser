@@ -73,7 +73,7 @@ struct CommandBarView: View {
     }
 
     /// How long the field takes to fly up, for what waits on it.
-    private static let flight: Double = 0.26
+    private static let flight: Double = 0.2
 
     private static var safeTop: CGFloat {
         let window = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first
@@ -533,8 +533,8 @@ struct CommandBarView: View {
                 opened = true
                 browser.launcherShown = true
             }
-            withAnimation(.easeOut(duration: 0.16).delay(Self.flight * 0.6)) { rowsShown = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { focused = true }
+            withAnimation(.easeOut(duration: 0.12).delay(Self.flight * 0.55)) { rowsShown = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { focused = true }
         }
     }
 
@@ -844,11 +844,28 @@ enum CommandRanker {
 
         // Typing for a private tab, a normal tab isn't offered: Return would
         // switch to it and leave private browsing.
+        // Sites whose address starts with what's typed, front page first (below).
+        var sites: [String: (url: URL, title: String?, visits: Int)] = [:]
+        func noteSite(_ url: URL, title: String?, visits: Int) -> Bool {
+            let host = url.displayHost
+            guard needle.count >= 2, host.lowercased().hasPrefix(needle) else { return false }
+            var site = sites[host] ?? (URL(string: "\(url.scheme ?? "https")://\(url.host() ?? host)/") ?? url, nil, 0)
+            site.visits += visits
+            if url.path.count <= 1, let title { site.title = title }
+            sites[host] = site
+            return true
+        }
+        var tabPages = Set<String>()
         for tab in browser.tabs where tab.id != browser.selectedID
             && (browser.commandMode != .privateTab || tab.isPrivate) {
-            if let value = score(title: tab.displayTitle, host: tab.url?.displayHost ?? "", base: 760) {
+            // One row per page, however many tabs have it open.
+            guard tabPages.insert(tab.url?.absoluteString ?? tab.id.uuidString).inserted else { continue }
+            let onSite = tab.url.map { noteSite($0, title: tab.displayTitle, visits: 1) } ?? false
+            // An article open in a tab comes after its site, as in history.
+            let base = onSite && (tab.url?.path.count ?? 0) > 1 ? 560 : 760
+            if let value = score(title: tab.displayTitle, host: onSite && base == 560 ? "" : tab.url?.displayHost ?? "", base: base)
+                ?? (onSite ? base : nil) {
                 ranked.append((value, tabItem(tab)))
-                offeredHosts.insert(tab.url?.displayHost ?? "")
             }
         }
         for pin in pins {
@@ -861,13 +878,34 @@ enum CommandRanker {
         // address differs slightly (index.hr vs index.hr/mobile).
         let openPages = Set(browser.tabs.compactMap { tab in tab.url.map { "\($0.displayHost)|\(tab.displayTitle)" } })
         let openURLs = Set(browser.tabs.compactMap { $0.url?.absoluteString })
-        for entry in browser.history(matching: query, limit: 8) where !openURLs.contains(entry.url) {
+        // A site whose address starts with what you typed: the site itself (its
+        // front page) is the best guess, ahead of searching for the letters and
+        // ahead of any one article on it, however often that was read.
+        var articles: [(entry: HistoryEntry, url: URL)] = []
+        for entry in browser.history(matching: query, limit: 16) where !openURLs.contains(entry.url) {
             guard let url = URL(string: entry.url) else { continue }
-            if openPages.contains("\(url.displayHost)|\(entry.title.isEmpty ? url.displayHost : entry.title)") { continue }
-            // A site you've been to whose address starts with what you typed is
-            // the best guess of all, ahead of searching for the letters.
-            let value = url.displayHost.lowercased().hasPrefix(needle) && needle.count >= 2
-                ? 910 : score(title: entry.title, host: url.displayHost, base: 600) ?? 560
+            let host = url.displayHost
+            if noteSite(url, title: entry.title, visits: entry.visitCount), url.path.count <= 1 { continue }
+            if openPages.contains("\(host)|\(entry.title.isEmpty ? host : entry.title)") { continue }
+            articles.append((entry, url))
+        }
+        for (host, site) in sites where !offeredHosts.contains(host) {
+            // Its front page open in a tab: that tab is the row instead.
+            if browser.tabs.contains(where: { $0.url?.displayHost == host && ($0.url?.path.count ?? 0) <= 1 }) {
+                if let index = ranked.firstIndex(where: { if case .switchTab(let tab) = $0.item.action { return tab.url?.displayHost == host && (tab.url?.path.count ?? 0) <= 1 } else { return false } }) {
+                    ranked[index].score = 960
+                }
+                continue
+            }
+            ranked.append((910 + min(site.visits, 40), CommandItem(
+                id: "site-\(host)", title: site.title.flatMap { $0.isEmpty ? nil : $0 } ?? host,
+                subtitle: host, kind: "Open", icon: .site(host), action: .open(site.url))))
+            offeredHosts.insert(host)
+        }
+        // Articles and sub-pages: under the site and the search, unless their
+        // own title is what's being typed.
+        for (entry, url) in articles.prefix(8) {
+            let value = score(title: entry.title, host: sites[url.displayHost] == nil ? url.displayHost : "", base: 600) ?? 560
             ranked.append((value + min(entry.visitCount, 20), CommandItem(
                 id: "history-\(entry.url)", title: entry.title.isEmpty ? url.displayHost : entry.title,
                 subtitle: url.displayHost, kind: "History", icon: .site(url.displayHost), action: .open(url))))

@@ -2,7 +2,7 @@ import SwiftUI
 
 extension Animation {
     /// The bar opening into the launcher and closing back into it.
-    static let launcher = Animation.spring(duration: 0.26, bounce: 0.06)
+    static let launcher = Animation.spring(duration: 0.2, bounce: 0.04)
 }
 
 /// The launcher's field, drawn first exactly over the bar capsule that was
