@@ -78,7 +78,18 @@ final class SummaryModel: Identifiable {
 
     @ObservationIgnored private var task: Task<Void, Never>?
 
-    func start(webView: WKWebView) {
+    /// The page's address: a summary already written for it is shown at once.
+    @ObservationIgnored private var url: URL?
+
+    func start(webView: WKWebView, url: URL?) {
+        self.url = url
+        if let url, let cached = SummaryCache.entry(for: url) {
+            text = cached.text
+            engine = cached.engine
+            note = cached.note
+            phase = .done
+            return
+        }
         task = Task { await run(webView: webView) }
     }
 
@@ -121,6 +132,9 @@ final class SummaryModel: Identifiable {
             do {
                 guard try await write(page, with: engine, in: language, appleWritesIt: appleWritesIt) else { continue }
                 phase = .done
+                if let url, !text.isEmpty {
+                    SummaryCache.store(.init(text: text, engine: self.engine, note: note, at: .now), for: url)
+                }
                 return
             } catch is CancellationError {
                 return
@@ -162,7 +176,14 @@ final class SummaryModel: Identifiable {
             self.engine = "On-device"
             let (stream, truncated) = OnDeviceSummarizer.summarize(page, in: appleLanguage)
             note = Self.note(truncated ? longNote : nil, languageNote)
-            for try await snapshot in stream { text = snapshot }
+            let started = CFAbsoluteTimeGetCurrent()
+            for try await snapshot in stream {
+                if text.isEmpty, !snapshot.isEmpty, LaunchClock.isEnabled {
+                    print(String(format: "SUMMARY first words in %.1fs (%d characters on the page)", CFAbsoluteTimeGetCurrent() - started, page.text.count))
+                }
+                text = snapshot
+            }
+            if LaunchClock.isEnabled { print(String(format: "SUMMARY finished in %.1fs", CFAbsoluteTimeGetCurrent() - started)) }
 
         case .claude:
             guard let client = ClaudeClient.configured else { return false }
@@ -201,8 +222,13 @@ final class SummaryModel: Identifiable {
 /// Apple's on-device model: free, private and instant, with a small context
 /// window. Long pages are condensed chunk by chunk, then summarized as a whole.
 enum OnDeviceSummarizer {
-    private static let chunkLength = 7_000
-    private static let maxChunks = 6
+    /// What the on-device model reads at a time. The summary starts from the
+    /// page's opening, one pass, so its first words come quickly; then, while
+    /// it's being read, each later part adds a section or two below. (Reading
+    /// every part before writing a word took half a minute on a long feature.)
+    private static let partLength = 9_000
+    /// Parts read in all: about the first 27,000 characters.
+    private static let maxParts = 3
 
     static var isAvailable: Bool {
         AppleModels.onDeviceAvailable
@@ -211,28 +237,30 @@ enum OnDeviceSummarizer {
     /// Streams the growing summary text; `truncated` is true when the page was too long to read in full.
     /// `language`: what to write in; nil follows the page.
     static func summarize(_ page: ReadablePage, in language: WritingLanguage?) -> (AsyncThrowingStream<String, Error>, truncated: Bool) {
-        let chunks = chunked(page.text)
-        let truncated = chunks.count > maxChunks
+        let parts = split(page.text)
+        let truncated = parts.count > maxParts
         let stream = AsyncThrowingStream<String, Error> { continuation in
             let task = Task {
                 do {
-                    var material = chunks.first ?? ""
-                    if chunks.count > 1 {
-                        var notes: [String] = []
-                        for chunk in chunks.prefix(maxChunks) {
-                            let session = LanguageModelSession(
-                                model: AppleModels.summarizing,
-                                instructions: "List the key facts in this part of a web page\(language.map { ", in \($0.english)," } ?? "") as three to five short lines starting with \"- \". Nothing else.")
-                            notes.append(try await session.respond(to: chunk).content)
-                        }
-                        material = notes.joined(separator: "\n")
-                    }
-
-                    let prompt = "Title: \(page.title)\nSite: \(page.site)\n\n\(material)"
+                    var summary = ""
+                    let prompt = "Title: \(page.title)\nSite: \(page.site)\n\n\(parts.first ?? "")"
                     for try await markdown in AppleModels.streamAnswer(AppleModels.summarizing,
                                                                        instructions: summaryGuidance(language),
                                                                        prompt: prompt, titled: false) {
-                        continuation.yield(markdown)
+                        summary = markdown
+                        continuation.yield(summary)
+                    }
+                    // The rest, a part at a time, added below as it's read.
+                    for part in parts.dropFirst().prefix(maxParts - 1) {
+                        try Task.checkCancellation()
+                        let base = summary
+                        let further = "Already in the summary:\n\(base)\n\nA later part of the same page:\n\(part)"
+                        for try await more in AppleModels.streamAnswer(AppleModels.summarizing, shape: FurtherSections.self,
+                                                                       instructions: summaryGuidance(language) + " Add only what the summary doesn't already say.",
+                                                                       prompt: further, titled: false) where !more.isEmpty {
+                            summary = base + "\n\n" + more
+                            continuation.yield(summary)
+                        }
                     }
                     continuation.finish()
                 } catch {
@@ -244,18 +272,65 @@ enum OnDeviceSummarizer {
         return (stream, truncated)
     }
 
-    private static func chunked(_ text: String) -> [String] {
-        var chunks: [String] = []
-        var current = ""
-        for paragraph in text.components(separatedBy: "\n\n") {
-            if current.count + paragraph.count > chunkLength, !current.isEmpty {
-                chunks.append(current)
-                current = ""
+    /// The text in parts of about `partLength`, each ending at a paragraph where one is near.
+    private static func split(_ text: String) -> [String] {
+        var parts: [String] = []
+        var rest = Substring(text)
+        while !rest.isEmpty {
+            var cut = rest.prefix(partLength)
+            if cut.count == partLength, let end = cut.range(of: "\n\n", options: .backwards),
+               cut.distance(from: cut.startIndex, to: end.lowerBound) > partLength / 2 {
+                cut = cut[..<end.lowerBound]
             }
-            current += (current.isEmpty ? "" : "\n\n") + String(paragraph.prefix(chunkLength))
+            parts.append(String(cut))
+            rest = rest.dropFirst(cut.count).drop { $0.isWhitespace }
         }
-        if !current.isEmpty { chunks.append(current) }
-        return chunks
+        return parts
+    }
+}
+
+/// Summaries already written, by page and language: the same article again
+/// opens on its summary at once and costs nothing. Kept for a day (news
+/// pages change), a hundred at most, in Caches.
+@MainActor
+enum SummaryCache {
+    struct Entry: Codable {
+        let text: String
+        let engine: String
+        let note: String?
+        let at: Date
+    }
+
+    private static let lifetime: TimeInterval = 24 * 3600
+    private static var file: URL { URL.cachesDirectory.appending(path: "summaries.json") }
+    private static var entries: [String: Entry] = {
+        guard let data = try? Data(contentsOf: file),
+              let saved = try? JSONDecoder().decode([String: Entry].self, from: data) else { return [:] }
+        return saved.filter { Date.now.timeIntervalSince($0.value.at) < lifetime }
+    }()
+
+    /// The page without its fragment, and the language summaries are written in.
+    static func key(for url: URL) -> String {
+        var parts = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        parts?.fragment = nil
+        return (parts?.string ?? url.absoluteString) + "|" + (AnswerLanguage.chosen?.code ?? "auto")
+    }
+
+    static func entry(for url: URL) -> Entry? {
+        guard let entry = entries[key(for: url)], Date.now.timeIntervalSince(entry.at) < lifetime else { return nil }
+        return entry
+    }
+
+    static func store(_ entry: Entry, for url: URL) {
+        entries[key(for: url)] = entry
+        if entries.count > 100 {
+            for old in entries.sorted(by: { $0.value.at < $1.value.at }).prefix(entries.count - 100) { entries[old.key] = nil }
+        }
+        let snapshot = entries
+        let file = file
+        Task.detached(priority: .utility) {
+            if let data = try? JSONEncoder().encode(snapshot) { try? data.write(to: file, options: .atomic) }
+        }
     }
 }
 

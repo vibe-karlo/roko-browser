@@ -6,6 +6,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Summaries are kept for a day: summarizing the same page again opens on its summary at once, with nothing spent.
+- Long pages summarize fast on the iPhone: the summary starts from the page's opening, one pass (first words in about 2.5 s in the simulator), and while you read it, later parts of the page add a section or two below. It used to read every part before writing a word.
 - A town's weather from the address bar: "weather in London", "london weather", "vrijeme u Zagrebu" answers first with its weather now (found by name through Open-Meteo); Return searches it.
 - Today: tap the weather to open the Weather app (long-press it to choose the town), tap an event to open Calendar at its time.
 - Pins are the first rows under the address field, as in Arc, marked with a pin and part of the scroll-to-pick (long-press one to unpin), after To-do with how many are left today.

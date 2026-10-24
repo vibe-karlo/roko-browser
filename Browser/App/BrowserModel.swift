@@ -327,14 +327,14 @@ final class BrowserModel {
             model.snapshot = handoff.snapshot
             model.handoff = handoff
             summary = model
-            model.start(webView: webView)
+            model.start(webView: webView, url: tab.url)
             return
         }
         Task {
             // The page as it is on screen, so it can shrink into the card.
             model.snapshot = await tab.viewportSnapshot() ?? tab.snapshot
             presentAfterPanelCloses { self.summary = model }
-            model.start(webView: webView)
+            model.start(webView: webView, url: tab.url)
         }
     }
 

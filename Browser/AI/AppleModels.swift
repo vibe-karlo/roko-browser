@@ -120,6 +120,22 @@ private nonisolated let followUpsGuide =
     "Up to three short follow-up questions the person is likely to ask next, in the language of the answer; none if they wouldn't help"
 
 /// A partly written answer, shown as the app's Markdown while it streams.
+/// More of a summary, from a later part of the page: sections only, to add
+/// below what's already there.
+@Generable
+nonisolated struct FurtherSections {
+    @Guide(description: "One or two sections on what this part adds, each about a different aspect", .count(1...2))
+    var sections: [GeneratedSection]
+}
+
+extension FurtherSections.PartiallyGenerated: AnswerDraft {
+    var isUseful: Bool { sections?.isEmpty == false }
+
+    func markdown(titled: Bool, droppingUnfinished: Bool) -> String {
+        sectionedMarkdown(title: nil, gist: nil, sections: sections ?? [], followUps: [], droppingUnfinished: droppingUnfinished)
+    }
+}
+
 nonisolated protocol AnswerDraft {
     /// `droppingUnfinished` leaves out the last point, which may have been cut off.
     func markdown(titled: Bool, droppingUnfinished: Bool) -> String
