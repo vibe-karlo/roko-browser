@@ -98,6 +98,25 @@ struct BrowseForMeView: View {
         HStack(spacing: 12) {
             AnswerOrSearch(showsSearch: $session.showsSearch)
             Spacer(minLength: 8)
+            // Once there's an answer to show for it.
+            if AnswerSharing.isAvailable, session.turns.contains(where: { $0.phase == .done }) {
+                Button(action: share) {
+                    Group {
+                        if session.isSharing {
+                            ProgressView().tint(Theme.ink)
+                        } else {
+                            Glyph(.share, size: 17, weight: 2)
+                        }
+                    }
+                    .frame(width: 44, height: 44)
+                    .background(Theme.raised, in: .circle)
+                    .contentShape(.circle)
+                }
+                .buttonStyle(GlyphButtonStyle())
+                .disabled(session.isSharing)
+                .accessibilityLabel("Share this page")
+                .transition(.opacity)
+            }
             Button(action: close) {
                 Glyph(.close, size: 16, weight: 2)
                     .frame(width: 44, height: 44)
@@ -120,6 +139,20 @@ struct BrowseForMeView: View {
 
     private func close() {
         withAnimation(.spring(duration: 0.35, bounce: 0)) { browser.browseForMe = nil }
+    }
+
+    /// Uploads the page (or its follow-ups since), then offers the link.
+    private func share() {
+        session.isSharing = true
+        Task {
+            defer { session.isSharing = false }
+            do {
+                let url = try await AnswerSharing.share(session)
+                ShareSheet.present([url])
+            } catch {
+                browser.showToast(error.localizedDescription)
+            }
+        }
     }
 
     private func open(_ url: URL) {

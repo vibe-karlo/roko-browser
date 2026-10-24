@@ -50,6 +50,7 @@
       if (!style) style = document.createElement("style");
       style.appendChild(document.createTextNode(reply.css + "\n"));
       if (!style.isConnected) (document.head || document.documentElement).appendChild(style);
+      unpushIfHidden();
       if (reply.overlays && reply.overlays.length) {
         overlays.push(...reply.overlays);
         unlockIfNeeded();
@@ -98,6 +99,27 @@
   };
   // Sites often lock scrolling a moment after the pop-up would have appeared.
   for (const delay of [800, 2500, 6000]) setTimeout(() => overlays.length && unlockIfNeeded(), delay);
+
+  // "Get our app" banners (smartbanner.js, on countless sites) push the page
+  // down by their height and note the margin they replaced. Hidden, the banner
+  // leaves that push behind as an empty band at the top: put the margin back.
+  // A banner still showing (blocking off for the site) keeps its room.
+  const PUSHED = "[data-smartbanner-original-margin-top],[data-smartbanner-original-top]";
+  const unpushIfHidden = () => {
+    if (!document.querySelector(PUSHED)) return;
+    const banner = document.querySelector(".smartbanner, .js_smartbanner");
+    if (banner && banner.offsetHeight > 0) return;
+    for (const el of document.querySelectorAll("[data-smartbanner-original-margin-top]")) {
+      el.style.marginTop = (parseFloat(el.getAttribute("data-smartbanner-original-margin-top")) || 0) + "px";
+    }
+    for (const el of document.querySelectorAll("[data-smartbanner-original-top]")) {
+      el.style.top = (parseFloat(el.getAttribute("data-smartbanner-original-top")) || 0) + "px";
+    }
+  };
+  // Only those two attributes are watched, so pages without the banner pay nothing.
+  new MutationObserver(() => requestAnimationFrame(unpushIfHidden))
+    .observe(document, { subtree: true, attributes: true,
+      attributeFilter: ["data-smartbanner-original-margin-top", "data-smartbanner-original-top"] });
 
   // Empty ad boxes. With the ad blocked, many sites leave its box behind: a
   // grey rectangle saying "Oglas" or "Advertisement", or just a gap. Fold away

@@ -82,6 +82,28 @@ final class ContentBlocker {
         await preparation.value
     }
 
+    /// The lists are loaded and in place.
+    private(set) var isReady = false
+
+    /// Waits for the lists, but no longer than `limit`: a compile that's slow
+    /// (or stuck) must never hold a page that was asked for. Past the limit the
+    /// page loads, and blocking joins it as soon as the lists are ready.
+    func prepare(within limit: Duration) async {
+        guard !isReady else { return }
+        let once = Once()
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let resume = {
+                guard !once.done else { return }
+                once.done = true
+                continuation.resume()
+            }
+            Task { await self.prepare(); resume() }
+            Task { try? await Task.sleep(for: limit); resume() }
+        }
+    }
+
+    private final class Once { var done = false }
+
     private func load() async {
         // The hiding indexes load alongside the request lists; pages only wait
         // for the request lists, so nothing loads unfiltered.
@@ -108,6 +130,7 @@ final class ContentBlocker {
             }
         }
         LaunchClock.mark("ruleListsReady")
+        isReady = true
 
         // Drop lists left over from older app versions.
         for identifier in await store.availableIdentifiers() ?? [] where !current.contains(identifier) {

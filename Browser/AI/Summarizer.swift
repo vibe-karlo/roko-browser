@@ -439,7 +439,10 @@ final class BrowseForMeModel: Identifiable {
                           language: WritingLanguage?) async -> Bool {
         do {
             phase = .searching(query)
-            let results = try await WebResearcher.search(query)
+            // A follow-up leans on the page's question ("how long does the
+            // festival last?" after Oktoberfest); searched alone it found Diwali.
+            let searchFor = context.first.map { "\($0.question.prefix(100)) \(query)" } ?? query
+            let results = try await WebResearcher.search(searchFor)
             guard !results.isEmpty else {
                 phase = .failed("The search came back empty. Try wording it differently.")
                 return true

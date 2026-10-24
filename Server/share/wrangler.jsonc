@@ -1,0 +1,32 @@
+// roko's shared answers. See README.md "Sharing answers" for deploying.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "roko-share",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-01",
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "roko-shares",
+      // Replaced with the real id by `wrangler d1 create roko-shares` at deploy.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // Per address: ten new pages a minute (plus a daily cap in the code).
+  "ratelimits": [
+    { "name": "SHARE_LIMIT", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }
+  ],
+  "vars": {
+    // Where "Answered by roko" links to: the App Store page, once there is one.
+    "APP_URL": "/",
+    // The link's own address, e.g. "https://roko.app". Empty: whatever address served it.
+    "PUBLIC_URL": "",
+    // An address for "Report" under each page. Empty: no Report link.
+    "REPORT_EMAIL": "",
+    // "true" lets search engines list shared pages. Link previews work either way.
+    "INDEXABLE": "false"
+  }
+  // At deploy: "routes": [{ "pattern": "roko.app", "custom_domain": true }]
+}

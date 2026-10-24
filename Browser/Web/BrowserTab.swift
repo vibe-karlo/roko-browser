@@ -40,6 +40,8 @@ final class BrowserTab: NSObject, Identifiable {
     @ObservationIgnored weak var delegate: BrowserTabDelegate?
     /// Recent reloads of the page on screen (see noteReload).
     @ObservationIgnored fileprivate var reloads: [(url: URL, at: Date)] = []
+    /// When the current page was asked for, for the -perf load timings.
+    @ObservationIgnored fileprivate var navigationStarted: CFTimeInterval?
 
     init(id: UUID = UUID(), url: URL?, title: String = "", isPrivate: Bool = false,
          lastActive: Date = .now, restoreState: Data? = nil) {
@@ -382,10 +384,14 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
             noteReload(of: url)
         }
         if navigationAction.targetFrame?.isMainFrame == true {
+            let asked = CACurrentMediaTime()
+            navigationStarted = asked
             // Instant once the lists are loaded; on a fresh install it holds the
-            // first page until blocking is ready rather than loading it bare.
-            await ContentBlocker.shared.prepare()
+            // first page until blocking is ready rather than loading it bare,
+            // for three seconds at most.
+            await ContentBlocker.shared.prepare(within: .seconds(3))
             ContentBlocker.shared.configure(webView.configuration.userContentController, for: url.host())
+            perf("policy", url, since: asked)
         }
         preferences.preferredContentMode = wantsDesktopSite ? .desktop : .mobile
         return (.allow, preferences)
@@ -395,7 +401,14 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
         loadError = nil
     }
 
+    /// With -perf: milliseconds from asking for a page to each step of loading it.
+    fileprivate func perf(_ step: String, _ url: URL?, since start: CFTimeInterval? = nil) {
+        guard LaunchClock.isEnabled, let start = start ?? navigationStarted else { return }
+        print(String(format: "NAV %@ %@ %.0fms", step, url?.host() ?? "-", (CACurrentMediaTime() - start) * 1000))
+    }
+
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        perf("commit", webView.url)
         // Each site keeps the zoom you last chose for it.
         let zoom = PageZoom.level(for: webView.url?.host())
         if webView.pageZoom != zoom { webView.pageZoom = zoom }
@@ -413,6 +426,7 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        perf("finish", webView.url)
         samplePageColors()
         if let translation {
             Task { await PageTranslator.shared.translate(webView, to: translation) }
@@ -423,6 +437,7 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         let error = error as NSError
+        perf("fail \(error.code)", webView.url)
         // Cancelled loads (a new navigation replaced this one) aren't failures.
         guard error.code != NSURLErrorCancelled, error.code != 102 else { return }
         loadError = error.localizedDescription

@@ -39,6 +39,10 @@ targets:
         NSAppTransportSecurity:
           # A browser has to open plain-http sites; this only relaxes ATS inside web views.
           NSAllowsArbitraryLoadsInWebContent: true
+          # Lets a debug build reach a share server running on this Mac (127.0.0.1).
+          NSAllowsLocalNetworking: true
+        # Where shared Browse for Me pages go (Server/share); empty hides Share.
+        RokoShareServer: $(SHARE_SERVER)
         ITSAppUsesNonExemptEncryption: false
         # Notify Me: iOS wakes roko now and then to check watched pages.
         # iCloud sync: silent pushes bring other devices' changes.
@@ -52,6 +56,9 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.growthstudio.roko
+        # The share server's address, e.g. https://roko.app, once it's deployed
+        # (README, "Sharing answers"). Empty: Share isn't offered.
+        SHARE_SERVER: ""
         TARGETED_DEVICE_FAMILY: "1"
         # Drawn by Scripts/make_app_icon.swift from the roko logo design.
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

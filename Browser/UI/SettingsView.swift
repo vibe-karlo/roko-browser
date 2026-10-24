@@ -11,6 +11,7 @@ struct SettingsView: View {
     @AppStorage(CopiedLink.showKey) private var showsCopiedLink = false
     @AppStorage(Appearance.key) private var appearance: Appearance = .system
     @AppStorage(AnswerLanguage.key) private var answerLanguage = ""
+    @State private var shared = AnswerSharing.all
     @AppStorage("archivePolicy") private var archive: ArchivePolicy = .day
     @AppStorage(ClaudeClient.enabledKey) private var claudeEnabled = true
     @State private var apiKey = Keychain.claudeAPIKey ?? ""
@@ -32,6 +33,15 @@ struct SettingsView: View {
         #else
         return "Off"
         #endif
+    }
+
+    /// Takes a shared page down; the list shows what's still shared afterwards.
+    private func unshare(_ page: AnswerSharing.Shared) {
+        shared.removeAll { $0.id == page.id }
+        Task {
+            do { try await AnswerSharing.unshare(page) } catch { browser.showToast(error.localizedDescription) }
+            shared = AnswerSharing.all
+        }
     }
 
     /// Says what the choice costs: a language Apple's models write badly goes
@@ -185,6 +195,31 @@ struct SettingsView: View {
                         Text("Pins, history, settings and what you chose for each site, on every device signed in to your iCloud. Open tabs and Notify Me stay on this iPhone.")
                     }
                     .task { syncStatus = await Self.iCloudStatus() }
+                }
+
+                if !shared.isEmpty {
+                    Section {
+                        ForEach(shared) { page in
+                            Button {
+                                browser.open(page.url, inNewTab: true)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(page.title).foregroundStyle(Theme.ink).lineLimit(1)
+                                    Text("\(page.url.displayHost)\(page.url.path()) · \(page.date.formatted(.relative(presentation: .named)))")
+                                        .font(.footnote)
+                                        .foregroundStyle(Theme.secondaryInk)
+                                        .lineLimit(1)
+                                }
+                            }
+                            .swipeActions {
+                                Button("Unshare", role: .destructive) { unshare(page) }
+                            }
+                        }
+                    } header: {
+                        Text("Shared pages")
+                    } footer: {
+                        Text("Browse for Me pages you shared. Swipe one to unshare it: its link stops working.")
+                    }
                 }
 
                 Section("Tabs") {

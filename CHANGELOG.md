@@ -13,6 +13,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Settings → Appearance: Automatic, Light or Dark, for the whole app and the pages in it.
 - Settings → Answer language: Automatic, or one of about thirty languages (Hrvatski, Srpski in Latin or Cyrillic, Bosanski, Slovenščina, Deutsch...) for summaries, Browse for Me and Notify Me. A language Apple's models write badly goes to Claude, and the setting says that's slower and paid.
 - Text in Summarize and Browse for Me can be selected: long-press a word, drag the handles, then Copy, Look Up or Translate.
+- Share in Browse for Me, as in Arc: the page becomes a short link anyone can open, laid out as in the app, light or dark, signed "Answered by roko" with the Eclipse mark. Sharing again after a follow-up updates the same link. Settings → Shared pages lists them; swipe to unshare. The server is in `Server/share` (Cloudflare Worker and D1), ready to deploy once there's a domain; until then Share is hidden.
 - Full-screen Summarize: the page shrinks into a card, then the summary writes itself.
 - Structured answers for Summarize and Browse for Me: a gist, then sections with topic icons.
 - Browse for Me shows each site as it's read, with source cards, pictures and real site icons.
@@ -99,6 +100,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - A copied link to the page already on screen isn't offered; nor is a link copied in roko, above the bar.
 - A link copied long ago is no longer offered as new after roko restarts.
 - The copied-link and cookie offers no longer stay on top of the page menu.
+- Pages pushed down by a "Get our app" banner (smartbanner.js) no longer keep an empty band at the top once the banner is hidden.
+- A Browse for Me follow-up on Apple's models searches with the page's question too: "how long does the festival last?" after Oktoberfest found Diwali.
+- A page never waits more than three seconds for the block lists before loading.
 - Claude pasted English and Serbian sentences from its sources into Croatian answers; it's now told to write every sentence in the answer's language and restate what sources say.
 - A dropped connection while Haiku answers no longer starts the whole answer again on Sonnet, slower and dearer; only a refusal does.
 

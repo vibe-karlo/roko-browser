@@ -200,6 +200,40 @@ Cookie banners the cosmetic list hides are faded (opacity) for ten seconds befor
 removed, so Autoconsent can still find and answer them. Measured on an iPhone 17 Pro with the
 `-benchmark -benchConsent` harness, the scripts made no measurable difference to page loads.
 
+## Sharing answers
+
+Share in Browse for Me turns the page into a short link anyone can open, as Arc does. The
+server is `Server/share`, a Cloudflare Worker with a D1 database, both on Cloudflare's free
+plan. Nothing is uploaded until Share is tapped. Sharing again after a follow-up updates the
+same page. Settings → Shared pages lists what this iPhone shared; swipe one to unshare it.
+
+- **The page** (`src/page.js`) lays the answer out as the app does, in the app's palette,
+  light or dark, with the topic icons copied from the app (`npm run icons`). It has no
+  scripts but one that removes a picture that fails to load, allowed by its hash in a strict
+  Content Security Policy. Link previews (iMessage, WhatsApp, Slack) get the title, the gist
+  and the first picture. Site icons are fetched through the Worker, so readers' browsers only
+  talk to it. Search engines are told not to list pages until `INDEXABLE` is `"true"`.
+- **What's kept**: the page itself, a hash of its edit token (the app keeps the token), and a
+  salted hash of the sharer's IP address, used only to cap shares at ten a minute and a hundred
+  a day per address.
+- **Tests**: `npm test` (parsing and escaping), and with `npm run dev` running,
+  `node test/api.e2e.mjs` (create, view, update, unshare, bad input, limits).
+- **Testing the app against it**: `npm run dev`, then launch a debug build with
+  `-shareServer http://127.0.0.1:8787`.
+
+Deploying, once there's a domain:
+
+1. Add the domain to a Cloudflare account, then on this Mac: `cd Server/share && npm install
+   && npx wrangler login`.
+2. `npx wrangler d1 create roko-shares`, and put the id it prints in `wrangler.jsonc`.
+3. In `wrangler.jsonc`: set `PUBLIC_URL` (e.g. `https://roko.app`), `REPORT_EMAIL` if pages
+   should have a Report link, and uncomment `routes` with the domain.
+4. `npx wrangler secret put ADDRESS_SALT` with any long random string, then `npm run deploy`.
+5. In `project.yml`, set `SHARE_SERVER` to the same address, then `xcodegen generate` and build.
+
+To take a page down by hand: `npx wrangler d1 execute roko-shares --remote --command
+"DELETE FROM shares WHERE id='<id>'"`.
+
 ## Credits
 
 Icons: [Phosphor Icons](https://phosphoricons.com) (regular and bold), MIT License,
