@@ -193,13 +193,18 @@ struct TodoView: View {
                         Text("Someday").tag(TodoWhen.someday)
                     }
                 } label: {
-                    Text(Self.label(draftWhen))
+                    // What the words say when they say it ("… on Monday at 13"),
+                    // else the picked day.
+                    Text(whenLabel)
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(Theme.accentText)
+                        .lineLimit(1)
+                        .fixedSize()
                         .frame(minHeight: 44)
                         .contentShape(.rect)
+                        .animation(.snappy(duration: 0.2), value: whenLabel)
                 }
-                .accessibilityLabel("When: \(Self.label(draftWhen))")
+                .accessibilityLabel("When: \(whenLabel)")
             }
             .padding(.leading, 18)
             .padding(.trailing, 14)
@@ -214,14 +219,15 @@ struct TodoView: View {
         .background(alignment: .top) { FadeEdge(color: Theme.canvas) }
     }
 
-    private static func label(_ when: TodoWhen) -> String {
-        switch when {
-        case .today: "Today"
-        case .tomorrow: "Tomorrow"
-        case .thisWeek: "This week"
-        case .someday: "Someday"
-        case .date(let date): date.formatted(.dateTime.day().month(.abbreviated))
-        }
+    /// The draft's own day and time, if it names any.
+    private var understood: (title: String, when: TodoWhen?, time: DateComponents?)? {
+        guard let read = TodoDraft.read(draft), read.when != nil || read.time != nil else { return nil }
+        return read
+    }
+
+    private var whenLabel: String {
+        guard let understood else { return TodoDraft.label(draftWhen) }
+        return TodoDraft.label(understood.when ?? draftWhen, understood.time)
     }
 
     // MARK: Changes
@@ -229,7 +235,10 @@ struct TodoView: View {
     private func add() {
         let title = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return }
-        let todo = Todo(title: title, when: draftWhen)
+        // "Call Petra on Monday at 13:00": Monday, 13:00, as in the address bar.
+        let todo = understood.map { Todo(title: $0.title, when: $0.when ?? draftWhen, at: $0.time) }
+            ?? Todo(title: title, when: draftWhen)
+        if todo.time != nil { TodoAlerts.askIfNeeded() }
         todo.order = (todos.map(\.order).max() ?? 0) + 1
         withAnimation(.snappy) { context.insert(todo) }
         save()

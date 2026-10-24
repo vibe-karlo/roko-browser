@@ -207,8 +207,9 @@ store. Each to-do keeps only the day it's for (or none, for Someday, or a week's
 This week), and its section is worked out from that and today's date, so nothing needs moving
 as days pass. "to-do" or "todo" typed in full opens it, with today's to-dos listed under the row
 to tick off; "todo" and a task (`TodoDraft`) adds one, a trailing day word picking the day, and
-any other query offers Add to-do under Browse for Me; a trailing time ("at 15", "u 15h",
-"9:30") gives it one. A to-do with a time (`time`, an absolute date) gets a notification 15
+any other query offers Add to-do under Browse for Me. A trailing day and time ("on Monday at
+15", "u petak u 15h", "next week", "24.11.") are read off the words (`TodoDraft.read`), in the
+bar and in the To-do list's own field, whose chip shows what was understood. A to-do with a time (`time`, an absolute date) gets a notification 15
 minutes before (`Today/TodoAlerts.swift`): they're laid out again after every save that touches a
 to-do (`ModelContext.didSave`, filtered to Todo so page visits don't trigger it), at most 40.
 Dragging sets `order` across the section it lands in, and moves it to that section's day. While

@@ -7,6 +7,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Pull to summarize is one motion with the summary: past the reload point the page itself starts becoming the summary's card under your finger (narrowing, its corners rounding, the summary's dark filling in around it, the bar fading away), and letting go carries on from that exact frame into place, with no bounce back. Ease off and the card settles back into the page.
+- To-do days and times in words work in the To-do list too, not only the bar: "Call dentist on Monday at 13" is added for Monday at 13:00, and the chip beside the field shows what it understood as you type.
 - To-do days from the bar, in English or Croatian: weekdays ("on Monday", "u petak", "next Friday" for next week's), next week, the day after tomorrow ("prekosutra"), "in 3 days" ("za 3 dana") and dates ("24.11."), in either order with a time ("call Petra on Monday at 13:00").
 - Today and To-do in the tab switcher's bottom row, either side of the new-tab button; To-do carries how many are left today.
 - To-dos can have a time: long-press, Date and Time…, switch Time on. A notification (with sound, unlike the quiet daily reminders) comes 15 minutes before; it's withdrawn if the to-do is ticked off, moved or deleted. From the bar: "todo call Petra tomorrow at 15", "… u 15h", "… at 3pm" or "… 9:30". The time shows under the to-do, in Today and in the bar.

@@ -138,20 +138,27 @@ nonisolated enum TodoDraft {
     static func parse(_ query: String, now: Date = .now) -> (title: String, when: TodoWhen, time: DateComponents?)? {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         let lower = trimmed.lowercased()
-        guard let prefix = ["todo ", "to-do ", "to do ", "+"].first(where: { lower.hasPrefix($0) }) else { return nil }
-        var title = String(trimmed.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces)
-        var when = TodoWhen.today
+        guard let prefix = ["todo ", "to-do ", "to do ", "+"].first(where: { lower.hasPrefix($0) }),
+              let read = read(String(trimmed.dropFirst(prefix.count)), now: now) else { return nil }
+        return (read.title, read.when ?? .today, read.time)
+    }
+
+    /// A to-do's words, with any day and time at their end taken off and
+    /// read: "Call Petra on Monday at 13:00" is "Call Petra", Monday, 13:00.
+    /// `when` and `time` are nil where nothing said them. As typed in To-do,
+    /// with no "todo" in front.
+    static func read(_ text: String, now: Date = .now) -> (title: String, when: TodoWhen?, time: DateComponents?)? {
+        var title = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var when: TodoWhen?
         var time: DateComponents?
-        var dayFound = false
         // "tomorrow at 15" or "at 15 tomorrow": either order.
         for _ in 0..<2 {
             if time == nil, let (clock, rest) = trailingTime(title) {
                 time = clock
                 title = rest
-            } else if !dayFound, let (day, rest) = trailingDay(title, now: now) {
+            } else if when == nil, let (day, rest) = trailingDay(title, now: now) {
                 when = day
                 title = rest
-                dayFound = true
             }
         }
         guard !title.isEmpty else { return nil }
