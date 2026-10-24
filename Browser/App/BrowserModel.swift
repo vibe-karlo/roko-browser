@@ -36,6 +36,32 @@ final class BrowserModel {
     @ObservationIgnored private var cookieOfferTask: Task<Void, Never>?
     /// Offered once per site while roko is open.
     @ObservationIgnored private var cookieOffersMade = Set<String>()
+    /// A link copied a moment ago, offered above the bar on opening roko.
+    private(set) var copiedLinkOffer = false
+    @ObservationIgnored private var copiedLinkTask: Task<Void, Never>?
+
+    /// Opening roko (or coming back to it) with a link just copied, here or
+    /// on a Mac: offer it above the bar, once per copy. After that it waits in
+    /// the address bar for a few minutes.
+    func offerCopiedLinkIfFresh() {
+        // Only when it can be seen: checking marks this copy as offered.
+        guard panel == .none, summary == nil, browseForMe == nil else { return }
+        Task {
+            guard await CopiedLink.shouldOfferAboveBar() else { return }
+            copiedLinkOffer = true
+            copiedLinkTask?.cancel()
+            copiedLinkTask = Task {
+                try? await Task.sleep(for: .seconds(10))
+                if !Task.isCancelled { copiedLinkOffer = false }
+            }
+        }
+    }
+
+    func openCopiedLink(_ url: URL) {
+        copiedLinkOffer = false
+        copiedLinkTask?.cancel()
+        open(url, inNewTab: true)
+    }
     var browseForMe: BrowseSession? {
         // An answer that's closed or replaced stops working on the spot:
         // nobody will read it, so it shouldn't keep searching or spending tokens.
@@ -254,6 +280,8 @@ final class BrowserModel {
         commandPrefill = prefill
         commandMode = mode
         panel = .command
+        // The address bar offers the copied link itself.
+        copiedLinkOffer = false
     }
 
     /// Opens a URL from the command bar, honouring the mode it was opened in.

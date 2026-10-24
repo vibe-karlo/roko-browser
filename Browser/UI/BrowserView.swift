@@ -173,6 +173,24 @@ struct BrowserView: View {
             }
         }
         .animation(.snappy(duration: 0.3), value: browser.cookieOffer)
+        .overlay(alignment: .bottom) {
+            if browser.copiedLinkOffer, browser.cookieOffer == nil {
+                // Opening roko with a link just copied, here or on a Mac.
+                HStack(spacing: 14) {
+                    Text("Link you copied")
+                        .font(.system(size: 15, weight: .medium))
+                    CopiedLinkButton { browser.openCopiedLink($0) }
+                }
+                .lineLimit(1)
+                .padding(.leading, 18)
+                .padding(.trailing, 8)
+                .padding(.vertical, 6)
+                .barSurface(cornerRadius: 14)
+                .padding(.bottom, Theme.barHeight + 20)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy(duration: 0.3), value: browser.copiedLinkOffer)
         // Handoff: continue this page on a Mac or iPad.
         .userActivity(NSUserActivityTypeBrowsingWeb, element: browser.handoffPage) { page, activity in
             activity.webpageURL = page.url
@@ -216,6 +234,8 @@ struct BrowserView: View {
         // UIKit's own signal: it arrives whatever wraps the SwiftUI scene.
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             if browser.isBarCollapsed { browser.isBarCollapsed = false }
+            // Back with a link just copied, perhaps on a Mac: offer it.
+            browser.offerCopiedLinkIfFresh()
         }
         // So does coming back from a summary, an answer or the reader: the
         // pinch or scroll that led there may have folded it away.

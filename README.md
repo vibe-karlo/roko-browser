@@ -164,7 +164,9 @@ deploy the schema to production in the CloudKit Console.
 Continuing between devices: roko hands the page on screen off through Handoff (a Mac's Dock
 opens it in the Mac's default browser, private tabs never). iOS hands web pages from a Mac
 to Safari only, so the way back is Universal Clipboard: copy a link on the Mac, and roko
-offers it in the address bar for ten minutes, checking only that there is a link until you tap.
+offers it above the bar once when you open roko, then in the address bar for five minutes. It
+only checks that there is a link; the system Paste button hands the link over, which needs no
+permission prompt.
 
 ## Cookie pop-ups
 

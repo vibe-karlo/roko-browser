@@ -103,10 +103,14 @@ struct CommandBarView: View {
             LazyVStack(spacing: 2) {
                 // Best match last, so it lands next to the field.
                 ForEach(Array(items.enumerated()).reversed(), id: \.element.id) { index, item in
-                    Button { perform(item) } label: {
-                        CommandRow(item: item, isSelected: index == selection && !query.isEmpty)
+                    if case .pasteLink = item.action {
+                        copiedLinkRow
+                    } else {
+                        Button { perform(item) } label: {
+                            CommandRow(item: item, isSelected: index == selection && !query.isEmpty)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, Self.inset)
@@ -117,6 +121,24 @@ struct CommandBarView: View {
         .scrollBounceBehavior(.basedOnSize)
         // Hug the rows; scroll only past a comfortable height.
         .frame(height: items.isEmpty ? 0 : min(resultsHeight, 380))
+    }
+
+    /// A link copied a moment ago, here or on a Mac: the system Paste button
+    /// opens it without asking for permission.
+    private var copiedLinkRow: some View {
+        HStack(spacing: 12) {
+            Glyph(.link, size: 18).foregroundStyle(Theme.secondaryInk).frame(width: 22)
+            Text("Link you copied")
+                .font(.system(size: 16))
+                .foregroundStyle(Theme.ink)
+            Spacer(minLength: 8)
+            CopiedLinkButton { url in
+                focused = false
+                browser.openFromCommandBar(url)
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(minHeight: 52)
     }
 
     /// Your pins, one tap away, right above the field where the thumb already is.
@@ -277,39 +299,8 @@ struct CommandBarView: View {
             browser.panel = .none
             browser.showToast("Copied \(result)")
         case .pasteLink:
-            // Reading it is what asks permission to paste, so only on a tap.
-            if let url = CopiedLink.take() { browser.openFromCommandBar(url) } else { browser.panel = .none }
+            break  // its row has the system Paste button instead
         }
-    }
-}
-
-/// A link copied a moment ago: on this iPhone, or on a Mac through Universal
-/// Clipboard, the way to carry a page from Chrome on the Mac to roko (iOS
-/// hands web pages from a Mac to Safari only). Only whether there is one is
-/// checked, which needs no permission; the link itself is read on a tap.
-@MainActor
-enum CopiedLink {
-    /// When the clipboard last changed, as far as roko has seen.
-    private static var seen: (count: Int, at: Date)?
-    private static var taken = -1
-
-    static func isWaiting() async -> Bool {
-        let board = UIPasteboard.general
-        let count = board.changeCount
-        guard count != taken else { return false }
-        if seen?.count != count { seen = (count, .now) }
-        // Recent only: an old link isn't what you came to open.
-        guard let seen, Date.now.timeIntervalSince(seen.at) < 600 else { return false }
-        // Throws when the clipboard is empty.
-        let found = try? await board.detectedPatterns(for: [\.probableWebURL])
-        return found?.contains(\.probableWebURL) ?? false
-    }
-
-    static func take() -> URL? {
-        let board = UIPasteboard.general
-        taken = board.changeCount
-        if let url = board.url, url.scheme?.hasPrefix("http") == true { return url }
-        return board.string.flatMap { Omnibox.url(from: $0.trimmingCharacters(in: .whitespacesAndNewlines)) }
     }
 }
 
