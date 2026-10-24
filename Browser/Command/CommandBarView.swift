@@ -16,7 +16,7 @@ struct CommandItem: Identifiable {
     let action: Action
 
     enum Icon {
-        case glyph(Glyph.Kind), site(String)
+        case glyph(Glyph.Kind), site(String), image(String)
     }
 }
 
@@ -124,6 +124,7 @@ struct CommandBarView: View {
         }
         .sensoryFeedback(.selection, trigger: selection)
         .onChange(of: CurrencyRates.shared.date) { rebuild() }
+        .onChange(of: TodayModel.shared.weather) { rebuild() }
         .task(id: query) {
             // A short pause so suggestions aren't requested for every keystroke.
             let text = query.trimmingCharacters(in: .whitespaces)
@@ -469,6 +470,11 @@ struct CommandBarView: View {
 
     private func rebuild() {
         items = CommandRanker.rank(query: query, browser: browser, suggestions: suggestions)
+        // Asked for the weather and it's half an hour old: fetch it now (one small request).
+        if items.contains(where: { $0.id == "weather" }),
+           Date.now.timeIntervalSince(TodayModel.shared.weather?.fetchedAt ?? .distantPast) > 1800 {
+            Task { await TodayModel.shared.freshenWeather() }
+        }
         // Nothing typed yet: a link copied a moment ago, here or on a Mac,
         // then the last pages you were on, to scroll through and pick.
         if query.isEmpty {
@@ -544,6 +550,8 @@ private struct RowIcon: View {
         switch icon {
         case .glyph(let kind): Glyph(kind, size: 18).foregroundStyle(Theme.secondaryInk)
         case .site(let host): SiteIcon(host: host, size: 18)
+        case .image(let name):
+            Image(name).resizable().scaledToFit().frame(width: 20, height: 20).foregroundStyle(Theme.ink)
         }
     }
 }
@@ -698,6 +706,23 @@ enum CommandRanker {
                     id: "popular-\(site.host)", title: site.name, subtitle: site.host,
                     kind: "Open", icon: .site(iconHost), action: .open(url))))
             }
+        }
+
+        // "weather", "vrijeme": now, where Today's weather is for; Return opens Today.
+        let weatherWords = ["weather", "forecast", "vrijeme", "vreme", "prognoza"]
+        if needle.count >= 3, weatherWords.contains(where: { $0.hasPrefix(needle) }) {
+            let item: CommandItem
+            if let weather = TodayModel.shared.weather {
+                item = CommandItem(id: "weather", title: "\(Int(weather.temperature.rounded()))° " + weather.condition
+                                       + (weather.place.map { " in \($0)" } ?? ""),
+                                   subtitle: "\(Int(weather.low.rounded()))° to \(Int(weather.high.rounded()))°"
+                                       + (weather.rainChance >= 30 ? ", rain \(weather.rainChance)%" : ""),
+                                   kind: "Today", icon: .image("phosphor/\(weather.glyph)"), action: .today)
+            } else {
+                item = CommandItem(id: "weather", title: "Weather", subtitle: "In Today", kind: "Today",
+                                   icon: .glyph(.today), action: .today)
+            }
+            ranked.append((weatherWords.contains(needle) ? 1012 : 890, item))
         }
 
         let actions: [(words: [String], item: CommandItem)] = [

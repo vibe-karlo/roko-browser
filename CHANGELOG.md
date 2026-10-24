@@ -6,6 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Type "weather" or "vrijeme" (or "forecast", "prognoza") in the address bar: the weather now, where Today's is for, as the first row; Return opens Today. Half an hour old, it's fetched again as you type.
 - Summaries and Browse for Me answers are signed with roko's Eclipse mark and name in the footer, so a screenshot says where it came from. The footer is slimmer and sits lower, into the home indicator's strip.
 - Swipe down on the open address bar (on its list or the page behind) to close it.
 - The address bar, after Arc Search: the field sits on top and the rows below it, nearer the thumb, over the page frosted and dimmed behind them. The list snaps row by row like a picker; the row under the field is the one Return opens, and the field shows it (its icon, title and address) with a light tick as it changes, so a flick chooses. Typing brings your text back; the clear button returns to the top. With nothing typed: your pins, a link you copied, and your last pages to pick from.
