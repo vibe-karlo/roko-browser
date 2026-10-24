@@ -133,7 +133,14 @@ struct CommandBarView: View {
             // "weather in London", "vrijeme u Zagrebu": a town's weather, after a short pause.
             guard let place = WeatherQuery.place(in: query) else { return }
             try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled, let found = await WeatherPlace.search(place).first,
+            var found: WeatherPlace?
+            for name in WeatherQuery.lookups(for: place) where found == nil && !Task.isCancelled {
+                // A town of that exact name first: "Zagrebu" alone may find a village, "Zagreb" the city.
+                let results = await WeatherPlace.search(name)
+                found = results.first { $0.name.lowercased() == name.lowercased() } ?? (name == place ? nil : results.first)
+            }
+            if found == nil { found = await WeatherPlace.search(place).first }
+            guard !Task.isCancelled, let found,
                   let weather = try? await TodayWeather.fetch(at: found.coordinate, place: found.name),
                   !Task.isCancelled else { return }
             placeWeather = (query, weather)
@@ -459,8 +466,7 @@ struct CommandBarView: View {
             items.insert(CommandItem(id: "weather-place",
                                      title: "\(Int(weather.temperature.rounded()))° " + weather.condition
                                          + (weather.place.map { " in \($0)" } ?? ""),
-                                     subtitle: "\(Int(weather.low.rounded()))° to \(Int(weather.high.rounded()))°"
-                                         + (weather.rainChance >= 30 ? ", rain \(weather.rainChance)%" : ""),
+                                     subtitle: weather.dayLine,
                                      kind: "Weather", icon: .image("phosphor/\(weather.glyph)"), action: .search(query)),
                          at: 0)
         }
@@ -728,8 +734,7 @@ enum CommandRanker {
             if let weather = TodayModel.shared.weather {
                 item = CommandItem(id: "weather", title: "\(Int(weather.temperature.rounded()))° " + weather.condition
                                        + (weather.place.map { " in \($0)" } ?? ""),
-                                   subtitle: "\(Int(weather.low.rounded()))° to \(Int(weather.high.rounded()))°"
-                                       + (weather.rainChance >= 30 ? ", rain \(weather.rainChance)%" : ""),
+                                   subtitle: weather.dayLine,
                                    kind: "Today", icon: .image("phosphor/\(weather.glyph)"), action: .today)
             } else {
                 item = CommandItem(id: "weather", title: "Weather", subtitle: "In Today", kind: "Today",
@@ -803,7 +808,7 @@ extension Array {
 /// A weather question about a place: "weather in London", "london weather",
 /// "vrijeme u Zagrebu", "prognoza Split". Not one about a day ("vrijeme sutra").
 nonisolated enum WeatherQuery {
-    private static let words = ["weather", "forecast", "vrijeme", "vreme", "prognoza"]
+    private static let words = ["weather", "forecast", "vrijeme", "vrijme", "vreme", "prognoza"]
     private static let notPlaces: Set<String> = ["today", "tomorrow", "now", "weekend", "danas", "sutra", "sada",
                                                  "vikend", "prekosutra", "this week", "ovaj tjedan"]
 
@@ -822,5 +827,25 @@ nonisolated enum WeatherQuery {
         let place = rest.joined(separator: " ")
         guard place.count >= 2, !notPlaces.contains(place) else { return nil }
         return place
+    }
+
+    /// Croatian number-plate codes, as people write towns for short.
+    private static let plates = ["zg": "Zagreb", "st": "Split", "os": "Osijek", "ri": "Rijeka", "zd": "Zadar",
+                                 "pu": "Pula", "du": "Dubrovnik", "vž": "Varaždin", "vz": "Varaždin", "sb": "Slavonski Brod",
+                                 "ka": "Karlovac", "si": "Šibenik", "vk": "Vinkovci", "vu": "Vukovar", "đa": "Đakovo",
+                                 "da": "Đakovo", "ko": "Koprivnica", "čk": "Čakovec", "ck": "Čakovec", "bj": "Bjelovar"]
+
+    /// What to look the place up as, in order: a plate code's town, the words
+    /// as typed, then as the town would be named ("u Zagrebu" is Zagreb,
+    /// "u Rijeci" Rijeka, "u Puli" Pula, "u Zadru" Zadar).
+    static func lookups(for place: String) -> [String] {
+        if let town = plates[place] { return [town] }
+        var names = [place]
+        if place.hasSuffix("dru") { names.append(String(place.dropLast(3)) + "dar") }
+        if place.hasSuffix("ci") { names.append(String(place.dropLast(2)) + "ka") }
+        if place.hasSuffix("u") { names.append(String(place.dropLast())) }
+        if place.hasSuffix("i") { names.append(String(place.dropLast()) + "a") }
+        if place.hasSuffix("ju") { names.append(String(place.dropLast(2)) + "ja") }
+        return names
     }
 }

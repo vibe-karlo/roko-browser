@@ -17,6 +17,8 @@ nonisolated struct TodayWeather: Codable, Equatable, Sendable {
 
     let place: String?
     let temperature: Double
+    /// What it feels like, with wind and humidity; nil in weather saved before it was fetched.
+    var feelsLike: Double? = nil
     let code: Int
     let isDay: Bool
     let high: Double
@@ -28,6 +30,17 @@ nonisolated struct TodayWeather: Codable, Equatable, Sendable {
 
     var condition: String { Self.condition(code) }
     var glyph: String { Self.glyph(code, isDay: isDay) }
+
+    /// "Feels like 8°, 6° to 11°, rain 90%": the day in one short line.
+    var dayLine: String {
+        var parts: [String] = []
+        if let feelsLike, Int(feelsLike.rounded()) != Int(temperature.rounded()) {
+            parts.append("Feels like \(Int(feelsLike.rounded()))°")
+        }
+        parts.append("\(Int(low.rounded()))° to \(Int(high.rounded()))°")
+        if rainChance >= 30 { parts.append("rain \(rainChance)%") }
+        return parts.joined(separator: ", ")
+    }
 
     /// WMO weather codes, as Open-Meteo reports them.
     static func condition(_ code: Int) -> String {
@@ -66,7 +79,7 @@ nonisolated struct TodayWeather: Codable, Equatable, Sendable {
         parts.queryItems = [
             .init(name: "latitude", value: String(format: "%.3f", coordinate.latitude)),
             .init(name: "longitude", value: String(format: "%.3f", coordinate.longitude)),
-            .init(name: "current", value: "temperature_2m,weather_code,is_day"),
+            .init(name: "current", value: "temperature_2m,apparent_temperature,weather_code,is_day"),
             .init(name: "hourly", value: "temperature_2m,weather_code,precipitation_probability,is_day"),
             .init(name: "daily", value: "temperature_2m_max,temperature_2m_min,precipitation_probability_max"),
             .init(name: "timezone", value: "auto"),
@@ -90,7 +103,8 @@ nonisolated struct TodayWeather: Codable, Equatable, Sendable {
             hours.append(Hour(time: time, temperature: raw.hourly.temperature_2m[index], code: raw.hourly.weather_code[index],
                               isDay: raw.hourly.is_day[index] == 1, rainChance: raw.hourly.precipitation_probability[index] ?? 0))
         }
-        return TodayWeather(place: place, temperature: raw.current.temperature_2m, code: raw.current.weather_code,
+        return TodayWeather(place: place, temperature: raw.current.temperature_2m,
+                            feelsLike: raw.current.apparent_temperature, code: raw.current.weather_code,
                             isDay: raw.current.is_day == 1, high: raw.daily.temperature_2m_max.first ?? raw.current.temperature_2m,
                             low: raw.daily.temperature_2m_min.first ?? raw.current.temperature_2m,
                             rainChance: raw.daily.precipitation_probability_max.first.flatMap { $0 } ?? 0,
@@ -98,7 +112,12 @@ nonisolated struct TodayWeather: Codable, Equatable, Sendable {
     }
 
     private struct Raw: Decodable {
-        struct Current: Decodable { let temperature_2m: Double; let weather_code: Int; let is_day: Int }
+        struct Current: Decodable {
+            let temperature_2m: Double
+            let apparent_temperature: Double?
+            let weather_code: Int
+            let is_day: Int
+        }
         struct Hourly: Decodable {
             let time: [String]
             let temperature_2m: [Double]

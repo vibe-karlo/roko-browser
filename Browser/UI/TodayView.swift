@@ -151,8 +151,7 @@ struct TodayView: View {
                         Text(weather.condition + (weather.place.map { " in \($0)" } ?? ""))
                             .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(Theme.ink)
-                        Text("\(Int(weather.low.rounded()))° to \(Int(weather.high.rounded()))°"
-                             + (weather.rainChance >= 30 ? ", rain \(weather.rainChance)%" : ""))
+                        Text(weather.dayLine)
                             .font(.system(size: 14))
                             .foregroundStyle(Theme.secondaryInk)
                     }

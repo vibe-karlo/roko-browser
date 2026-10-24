@@ -6,6 +6,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Feels like: Today's weather and the bar's weather rows say what it feels like (with wind and humidity) when that's different from the temperature.
+- Town weather in Croatian forms and short: "vrijeme u Zagrebu", "u Rijeci", "u Zadru", and the plate codes "vrijeme zg", "os", "st", "ri"…; "vrijme" works too.
 - Summaries are kept for a day: summarizing the same page again opens on its summary at once, with nothing spent.
 - Long pages summarize fast on the iPhone: the summary starts from the page's opening, one pass (first words in about 2.5 s in the simulator), and while you read it, later parts of the page add a section or two below. It used to read every part before writing a word.
 - A town's weather from the address bar: "weather in London", "london weather", "vrijeme u Zagrebu" answers first with its weather now (found by name through Open-Meteo); Return searches it.
