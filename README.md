@@ -205,8 +205,10 @@ removed, so Autoconsent can still find and answer them. Measured on an iPhone 17
 To-do (`Models/Todo.swift`, `UI/TodoView.swift`) is one list of SwiftData models in the synced
 store. Each to-do keeps only the day it's for (or none, for Someday, or a week's last day for
 This week), and its section is worked out from that and today's date, so nothing needs moving
-as days pass. "to-do" or "todo" typed in full opens it; while anything is due today, the to-do
-icon leads the pins with a count.
+as days pass. "to-do" or "todo" typed in full opens it, with today's to-dos listed under the row
+to tick off; "todo" and a task (`TodoDraft`) adds one, a trailing day word picking the day, and
+any other query offers Add to-do under Browse for Me. While anything is due today, the to-do
+icon leads the bar's pins with a count.
 
 Today (`Today/`, `UI/TodayView.swift`) opens the first time roko comes up after 4 a.m. each
 day, and with "today". It reads:
@@ -214,6 +216,7 @@ day, and with "today". It reads:
 - **Weather** from [Open-Meteo](https://open-meteo.com) (free, no key, CC BY 4.0, credited on
   the page), at a reduced-accuracy location; the town name comes from MapKit.
 - **Calendar** with EventKit's full access, asked for from the page; events stay on the phone.
+  Calendars can be left out (Today → Calendars); the ones left out are stored, so new ones show.
 - **News** from the RSS or Atom feeds of the sites chosen in Settings → Today (thirteen
   suggested, any other found by its address). A page of a site (a club's news) is followed
   on its own: its section's feed if there is one, else its headlines read from the page
@@ -225,8 +228,8 @@ day, and with "today". It reads:
   their words count as one story. Without the model, each site's newest.
 
 What it last showed is kept in `today.json`, so it opens at once. It refreshes when opened
-more than an hour later, with a pull (in a task of its own: the gesture ending cancels its
-own task), and in a background refresh iOS runs from about 5:30. A refresh that brings
+more than half an hour later (there's no pull to refresh: a pull down closes it, as To-do and
+Browse for Me do), and in a background refresh iOS runs from about 5:30. A refresh that brings
 nothing (offline) leaves what was there. Measured in the simulator: weather and four sites,
 sixty stories and the pick, 4.6 to 5.6 s; nothing runs while Today isn't open or being
 prepared.

@@ -15,6 +15,7 @@ struct SettingsView: View {
     @AppStorage(TodayModel.openKey) private var opensToday = true
     @AppStorage(DailyReminders.key) private var reminders = true
     @State private var choosingNewsSites = false
+    @State private var choosingCalendars = false
     @AppStorage("archivePolicy") private var archive: ArchivePolicy = .day
     @AppStorage(ClaudeClient.enabledKey) private var claudeEnabled = true
     @State private var apiKey = Keychain.claudeAPIKey ?? ""
@@ -95,6 +96,10 @@ struct SettingsView: View {
                         .onChange(of: reminders) { DailyReminders.update(in: context) }
                     Button("News sites and topics") { choosingNewsSites = true }
                         .foregroundStyle(Theme.ink)
+                    if TodayCalendar.isAllowed {
+                        Button("Calendars") { choosingCalendars = true }
+                            .foregroundStyle(Theme.ink)
+                    }
                 } header: {
                     Text("Today")
                 } footer: {
@@ -102,6 +107,9 @@ struct SettingsView: View {
                 }
                 .sheet(isPresented: $choosingNewsSites) {
                     NewsSitesSheet { TodayModel.shared.sitesChanged() }
+                }
+                .sheet(isPresented: $choosingCalendars) {
+                    CalendarsSheet { TodayModel.shared.appeared() }
                 }
 
                 Section {

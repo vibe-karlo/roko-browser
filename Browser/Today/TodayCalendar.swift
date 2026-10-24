@@ -29,13 +29,28 @@ enum TodayCalendar {
         (try? await store.requestFullAccessToEvents()) ?? false
     }
 
+    /// Calendars left out of Today. Kept as the ones left out, so a calendar
+    /// added later shows up without a trip here.
+    static var hidden: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: "today.hiddenCalendars") ?? []) }
+        set { UserDefaults.standard.set(Array(newValue), forKey: "today.hiddenCalendars") }
+    }
+
+    /// Every calendar with events on this iPhone.
+    static func calendars() -> [EKCalendar] {
+        guard isAllowed else { return [] }
+        return store.calendars(for: .event)
+    }
+
     /// What's left of today: events that haven't ended, all-day ones first.
     static func events() -> [TodayEvent] {
         guard isAllowed else { return [] }
         let calendar = Calendar.current
         let start = calendar.startOfDay(for: .now)
         guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return [] }
-        let predicate = store.predicateForEvents(withStart: start, end: end, calendars: nil)
+        let shown = calendars().filter { !hidden.contains($0.calendarIdentifier) }
+        guard !shown.isEmpty else { return [] }
+        let predicate = store.predicateForEvents(withStart: start, end: end, calendars: shown)
         return store.events(matching: predicate)
             .filter { $0.isAllDay || $0.endDate > .now }
             .sorted { ($0.isAllDay ? 0 : 1, $0.startDate) < ($1.isAllDay ? 0 : 1, $1.startDate) }

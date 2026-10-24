@@ -1,3 +1,4 @@
+import EventKit
 import SwiftData
 import SwiftUI
 
@@ -11,6 +12,7 @@ struct TodayView: View {
     @Query(sort: \Todo.createdAt) private var todos: [Todo]
     @State private var today = TodayModel.shared
     @State private var choosingSites = false
+    @State private var choosingCalendars = false
     @State private var calendarAllowed = TodayCalendar.isAllowed
     /// Ticked a moment ago: still shown, struck through.
     @State private var justDone: Set<PersistentIdentifier> = []
@@ -27,11 +29,16 @@ struct TodayView: View {
                 if !dueTodos.isEmpty { toDos }
                 news
                 ForEach(today.followed) { section in followedView(section) }
-                if !today.newsSites.isEmpty || !NewsTopics.chosen.isEmpty {
-                    Button("News sites and topics") { choosingSites = true }
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(Theme.secondaryInk)
+                HStack(spacing: 22) {
+                    if !today.newsSites.isEmpty || !NewsTopics.chosen.isEmpty {
+                        Button("News sites and topics") { choosingSites = true }
+                    }
+                    if calendarAllowed {
+                        Button("Calendars") { choosingCalendars = true }
+                    }
                 }
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Theme.secondaryInk)
                 Text("Weather by Open-Meteo.com")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.faintInk)
@@ -39,22 +46,17 @@ struct TodayView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 22)
             .padding(.top, 26)
-            // Clear of the fade above the footer, scrolled to the end.
-            .padding(.bottom, 70)
+            .padding(.bottom, 40)
             .animation(.snappy(duration: 0.3), value: today.top)
             .animation(.snappy(duration: 0.3), value: justDone)
         }
-        .refreshable { await today.refreshFromPull() }
-        // The page fades out above the footer, rather than the footer getting
-        // a solid floor that would cut the morning light off with an edge.
-        .mask {
-            VStack(spacing: 0) {
-                Color.black
-                LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: 56)
-                Color.clear.frame(height: 64)
-            }
+        // No footer: pull down past the top to close, as To-do and Browse for
+        // Me do. It freshens itself when opened, so it needs no pull to refresh.
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y < -geometry.contentInsets.top - 90
+        } action: { _, pulled in
+            if pulled { browser.panel = .none }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) { footer }
         .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas) }
         .background {
             ZStack {
@@ -75,6 +77,9 @@ struct TodayView: View {
         .sheet(isPresented: $choosingSites) {
             NewsSitesSheet { today.sitesChanged() }
         }
+        .sheet(isPresented: $choosingCalendars) {
+            CalendarsSheet { today.appeared() }
+        }
     }
 
     // MARK: Header and weather
@@ -87,6 +92,16 @@ struct TodayView: View {
                 Text(Date.now.formatted(.dateTime.day().month(.wide)))
                     .font(.system(size: 20))
                     .foregroundStyle(Theme.secondaryInk)
+                Group {
+                    if today.isRefreshing {
+                        Text("Freshening…")
+                    } else if let refreshed = today.refreshedAt {
+                        Text("Updated \(refreshed.formatted(date: .omitted, time: .shortened))")
+                    }
+                }
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.faintInk)
+                .padding(.top, 4)
             }
             if let weather = today.weather {
                 weatherView(weather)
@@ -319,29 +334,60 @@ struct TodayView: View {
         }
     }
 
-    private var footer: some View {
-        HStack(spacing: 12) {
-            Group {
-                if today.isRefreshing {
-                    Text("Freshening…")
-                } else if let refreshed = today.refreshedAt {
-                    Text("Updated \(refreshed.formatted(date: .omitted, time: .shortened))")
+}
+
+/// Which calendars Today shows, by account, the way the Calendar app lists them.
+struct CalendarsSheet: View {
+    let changed: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var hidden = TodayCalendar.hidden
+    private let accounts: [(name: String, calendars: [EKCalendar])] = Dictionary(grouping: TodayCalendar.calendars()) {
+        $0.source?.title ?? "Other"
+    }
+    .map { (name: $0.key, calendars: $0.value.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }) }
+    .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                ForEach(accounts, id: \.name) { account in
+                    Section(account.name) {
+                        ForEach(account.calendars, id: \.calendarIdentifier) { calendar in
+                            let id = calendar.calendarIdentifier
+                            Button {
+                                if hidden.contains(id) { hidden.remove(id) } else { hidden.insert(id) }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Circle()
+                                        .fill(Color(cgColor: calendar.cgColor))
+                                        .frame(width: 10, height: 10)
+                                    Text(calendar.title).foregroundStyle(Theme.ink)
+                                    Spacer()
+                                    if !hidden.contains(id) {
+                                        Image(systemName: "checkmark").foregroundStyle(Theme.accent)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            .font(.system(size: 13))
-            .foregroundStyle(Theme.secondaryInk)
-            Spacer(minLength: 8)
-            Button { browser.panel = .none } label: {
-                Glyph(.close, size: 16, weight: 2)
-                    .frame(width: 44, height: 44)
-                    .background(Theme.raised, in: .circle)
-                    .contentShape(.circle)
+            .scrollContentBackground(.hidden)
+            .background(Theme.panel)
+            .navigationTitle("Calendars")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        if hidden != TodayCalendar.hidden {
+                            TodayCalendar.hidden = hidden
+                            changed()
+                        }
+                        dismiss()
+                    }
+                }
             }
-            .buttonStyle(GlyphButtonStyle())
-            .accessibilityLabel("Close")
         }
-        .padding(.horizontal, 22)
-        .padding(.vertical, 10)
     }
 }
 

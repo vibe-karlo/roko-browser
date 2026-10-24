@@ -100,3 +100,35 @@ extension Todo {
         return day <= Calendar.current.startOfDay(for: .now)
     }
 }
+
+/// A to-do typed into the address bar: "todo call Petra", "+ call Petra",
+/// "todo call Petra tomorrow". A trailing day word (today, tomorrow, this
+/// week, someday, or Croatian danas, sutra) says when; without one, today.
+nonisolated enum TodoDraft {
+    static func parse(_ query: String) -> (title: String, when: TodoWhen)? {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        let lower = trimmed.lowercased()
+        guard let prefix = ["todo ", "to-do ", "to do ", "+"].first(where: { lower.hasPrefix($0) }) else { return nil }
+        var title = String(trimmed.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces)
+        var when = TodoWhen.today
+        let endings: [(String, TodoWhen)] = [("this week", .thisWeek), ("ovaj tjedan", .thisWeek), ("tomorrow", .tomorrow),
+                                             ("sutra", .tomorrow), ("today", .today), ("danas", .today), ("someday", .someday)]
+        for (word, day) in endings where title.lowercased().hasSuffix(" " + word) {
+            title = String(title.dropLast(word.count + 1)).trimmingCharacters(in: .whitespaces)
+            when = day
+            break
+        }
+        guard !title.isEmpty else { return nil }
+        return (title.prefix(1).uppercased() + title.dropFirst(), when)
+    }
+
+    static func label(_ when: TodoWhen) -> String {
+        switch when {
+        case .today: "Today"
+        case .tomorrow: "Tomorrow"
+        case .thisWeek: "This week"
+        case .someday: "Someday"
+        case .date(let date): date.formatted(.dateTime.day().month(.abbreviated))
+        }
+    }
+}

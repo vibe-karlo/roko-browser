@@ -5,7 +5,7 @@ struct CommandItem: Identifiable {
     enum Action {
         case open(URL), switchTab(BrowserTab), openPin(Pin), search(String),
              browse(String), summarize, findOnPage, privateTab, settings, copy(String),
-             pasteLink, openCopied(URL), todos, today
+             pasteLink, openCopied(URL), todos, today, addTodo(String, TodoWhen)
     }
 
     let id: String
@@ -60,9 +60,10 @@ struct CommandBarView: View {
 
             VStack(spacing: 0) {
                 results
-                // Nothing typed and to-dos due: they take the place of suggestions.
-                if query.isEmpty && !dueTodos.isEmpty { todoWidget }
-                if query.isEmpty && !pins.isEmpty { pinRow }
+                // Typing "todo" brings today's to-dos up under the To-do row,
+                // to tick off there; otherwise the bar stays for searching.
+                if items.first?.id == "action-todos" && !dueTodos.isEmpty { todoWidget }
+                if query.isEmpty && (!pins.isEmpty || todos.contains(where: \.isDueNow)) { pinRow }
                 field
             }
             .foregroundStyle(Theme.ink)
@@ -87,6 +88,8 @@ struct CommandBarView: View {
             hasCopiedLink = true
             rebuild()
         }
+        // Offered once: closed without pasting it, it isn't offered again.
+        .onDisappear { if hasCopiedLink { CopiedLink.took() } }
         .onChange(of: query) {
             selection = 0
             rebuild()
@@ -166,27 +169,12 @@ struct CommandBarView: View {
         todos.filter { $0.isDueNow || justDone.contains($0.persistentModelID) }
     }
 
-    /// Today's to-dos, right in the bar: tick them off without opening the
-    /// list. The heading opens it. Four at most; the rest are counted.
+    /// Today's to-dos, under the To-do row: tick them off without opening the
+    /// list (the row opens it). Four at most; the rest are counted.
     private var todoWidget: some View {
         let due = dueTodos
         let shown = due.prefix(4)
         return VStack(alignment: .leading, spacing: 0) {
-            Button { focused = false; browser.panel = .todos } label: {
-                HStack(spacing: 12) {
-                    Glyph(.todo, size: 18).foregroundStyle(Theme.secondaryInk).frame(width: 22)
-                    Text("To-do").font(.system(size: 16, weight: .semibold))
-                    Spacer(minLength: 8)
-                    let left = due.filter { !$0.done }.count
-                    Text(left == 0 ? "All done" : "\(left) left today")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.faintInk)
-                }
-                .padding(.horizontal, 12)
-                .frame(minHeight: 44)
-                .contentShape(.rect)
-            }
-            .buttonStyle(RowButtonStyle())
             ForEach(Array(shown)) { todo in
                 HStack(spacing: 12) {
                     Button { toggle(todo) } label: {
@@ -216,7 +204,7 @@ struct CommandBarView: View {
             }
         }
         .padding(.horizontal, Self.inset)
-        .padding(.top, items.isEmpty ? Self.inset : 2)
+        .padding(.bottom, 4)
         .animation(.snappy(duration: 0.3), value: due.map(\.persistentModelID))
     }
 
@@ -241,6 +229,10 @@ struct CommandBarView: View {
     private var pinRow: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 0) {
+                // Today's to-dos first while any are left: the icon and how many.
+                TodoPin(size: 28) { icon in
+                    icon.frame(width: 52, height: 48).contentShape(.rect)
+                }
                 ForEach(pins) { pin in
                     let name = pin.title.isEmpty ? pin.host : pin.title
                     Button { focused = false; browser.open(pin) } label: {
@@ -394,6 +386,11 @@ struct CommandBarView: View {
         case .settings: browser.panel = .settings
         case .todos: browser.panel = .todos
         case .today: browser.panel = .today
+        case .addTodo(let title, let when):
+            context.insert(Todo(title: title, when: when))
+            try? context.save()
+            browser.panel = .none
+            browser.showToast(when == .today ? "Added to today's to-dos" : "To-do added for \(TodoDraft.label(when).lowercased())")
         case .copy(let result):
             UIPasteboard.general.string = result
             browser.panel = .none
@@ -466,6 +463,13 @@ enum CommandRanker {
 
         var ranked: [(score: Int, item: CommandItem)] = []
 
+        // "todo call Petra tomorrow": a new to-do, on top, so Return adds it.
+        if let draft = TodoDraft.parse(query) {
+            ranked.append((1020, CommandItem(id: "add-todo", title: draft.title, subtitle: "New to-do",
+                                             kind: TodoDraft.label(draft.when), icon: .glyph(.todo),
+                                             action: .addTodo(draft.title, draft.when))))
+        }
+
         // A sum, conversion or time question gets answered on top, Raycast-style.
         let calculation = Calculator.answer(query)
         if let answer = calculation {
@@ -491,6 +495,12 @@ enum CommandRanker {
                 // Says what it does; the question itself is already in the field.
                 ranked.append((score, CommandItem(id: "browse-\(query)", title: "Browse for me", subtitle: "Reads the web and answers",
                                                 kind: "AI", icon: .glyph(.browse), action: .browse(query))))
+                // Or keep it: what was typed becomes a to-do ("call Petra tomorrow" for tomorrow).
+                if TodoDraft.parse(query) == nil, let draft = TodoDraft.parse("todo " + query) {
+                    ranked.append((845, CommandItem(id: "keep-todo", title: "Add to-do",
+                                                    subtitle: draft.when == .someday ? "Someday" : "For \(TodoDraft.label(draft.when).lowercased())",
+                                                    kind: "To-do", icon: .glyph(.todo), action: .addTodo(draft.title, draft.when))))
+                }
             }
         }
 
@@ -558,7 +568,7 @@ enum CommandRanker {
                                                   kind: "Action", icon: .glyph(.search), action: .findOnPage)),
             (["settings", "preferences", "api key"], CommandItem(id: "action-settings", title: "Settings", subtitle: "",
                                                                  kind: "Action", icon: .glyph(.settings), action: .settings)),
-            (["to-do", "todo", "todos", "to do", "tasks"], CommandItem(id: "action-todos", title: "To-do", subtitle: "",
+            (["to-do", "todo", "todos", "to do", "tasks"], CommandItem(id: "action-todos", title: "To-do", subtitle: "Type \u{201C}todo\u{201D} and a task to add one",
                                                                        kind: "Action", icon: .glyph(.todo), action: .todos)),
             (["today", "danas"], CommandItem(id: "action-today", title: "Today", subtitle: "Weather, calendar, to-dos, news",
                                              kind: "Action", icon: .glyph(.today), action: .today)),

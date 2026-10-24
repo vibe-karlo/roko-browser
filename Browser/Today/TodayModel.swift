@@ -5,7 +5,7 @@ import Foundation
 /// What Today shows, and when it's fetched. The last of it is kept on disk,
 /// so the page opens at once with what was there and freshens behind it:
 /// in the morning before you look (iOS wakes roko in the background), when
-/// you open it more than an hour after the last time, or when you pull down.
+/// you open it more than half an hour after the last time.
 /// Nothing is fetched while Today isn't being looked at or prepared.
 @MainActor
 @Observable
@@ -20,8 +20,8 @@ final class TodayModel {
     private(set) var refreshedAt: Date?
     private(set) var isRefreshing = false
 
-    /// After this long, opening Today freshens it.
-    private static let staleAfter: TimeInterval = 3600
+    /// After this long, opening Today freshens it (there's no pull to refresh).
+    private static let staleAfter: TimeInterval = 1800
 
     private init() {
         load()
@@ -36,12 +36,6 @@ final class TodayModel {
         events = TodayCalendar.events()
         let stale = refreshedAt.map { Date.now.timeIntervalSince($0) > Self.staleAfter || !Calendar.current.isDateInToday($0) } ?? true
         if stale { Task { await refresh() } }
-    }
-
-    /// From pull to refresh: in a task of its own, so the gesture ending
-    /// (which cancels its own task) can't cancel the requests halfway.
-    func refreshFromPull() async {
-        await Task { await refresh() }.value
     }
 
     func refresh(inBackground: Bool = false) async {
