@@ -26,6 +26,7 @@ main{max-width:640px;margin:0 auto;padding:26px 22px 0}
 a{color:inherit}
 .turn+.turn{margin-top:56px}
 .question{margin:0;font-size:17px;font-weight:600;line-height:1.35;color:var(--ink2)}
+.turn>:first-child{margin-top:0}
 .strip{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -22px;padding:0 22px;scroll-padding:0 22px}
 .strip::-webkit-scrollbar{display:none}
 .pictures{margin-top:28px}
@@ -115,7 +116,9 @@ function section(section) {
 
 function turn(turn, index) {
   const answer = parseAnswer(turn.answer);
-  let html = `<article class="turn"><p class="question">${escapeHTML(turn.question)}</p>`;
+  // The page opens on the answer: its title says what was asked. A follow-up
+  // keeps its question, the only thing that marks where a new section starts.
+  let html = `<article class="turn">${index > 0 ? `<p class="question">${escapeHTML(turn.question)}</p>` : ""}`;
   if (turn.images.length) {
     html += `<div class="strip pictures">${turn.images.map((src) =>
       `<img src="${escapeHTML(src)}" alt="" width="240" height="160" loading="${index === 0 ? "eager" : "lazy"}" referrerpolicy="no-referrer">`).join("")}</div>`;
