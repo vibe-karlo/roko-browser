@@ -528,7 +528,7 @@ struct CommandBarView: View {
     /// covers the capsule the field is growing out of.
     private func open() {
         // A frame later: drawn in the bar's place first, so there's somewhere to grow from.
-        DispatchQueue.main.async {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
             withAnimation(.launcher) {
                 opened = true
                 browser.launcherShown = true
