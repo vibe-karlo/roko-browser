@@ -6,6 +6,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- The launcher grows out of the bar for real: its field starts exactly on the capsule you tapped and widens and rises into place, with the keyboard coming up under it, then sinks back into the capsule on close. (The capsule used to fade out while a field appeared at the top: the frames it measured included its own movement, so it never moved.)
+- To-do's field: the chip says when in short ("Wed 15:00") and is a menu (Today, Tomorrow, This Week, Someday, Date and Time…) for when the words don't say. "at 3" means 15:00 (1 to 6 are the afternoon), and a day typed first ("Wednesday at 3") is read too.
+
+### Fixed
+- A link copied on a Mac while roko is open is offered again: only copies made in roko itself are left out now.
 - The bar is one capsule with one edge: its buttons and launcher capsule are plain fills inside it, their curves parallel to its own, instead of each drawing an outline at a different roundness. In To-do the field fills the bar.
 - The launcher opens out of the bar: the bar's capsule is the launcher's field, so it widens and rises with the keyboard, and closing it sinks back into the bar, instead of one fading out while another fades in at the top.
 - To-do types in place: "New to-do" widens into a field right in the bar, the list stays in view above, the chip says when ("Fri, 30 Oct"), and Return adds it into the list with the keyboard still up for the next. ✕ finishes.

@@ -24,7 +24,7 @@ struct BrowserApp: App {
 
     var body: some Scene {
         WindowGroup {
-            LauncherSpace { BrowserView() }
+            BrowserView()
                 .environment(browser)
                 .tint(Theme.accent)
                 .task { Appearance.apply() }

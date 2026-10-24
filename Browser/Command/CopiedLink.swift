@@ -40,24 +40,30 @@ enum CopiedLink {
     private static var countWhenLeft = defaults.object(forKey: "copiedLink.left") as? Int {
         didSet { defaults.set(countWhenLeft, forKey: "copiedLink.left") }
     }
-    /// …and not since roko came back: a link copied in roko (from a page's
-    /// menu, the share sheet, anywhere) is never offered back.
-    private static var countWhenArrived: Int?
+    /// Copies made in roko itself (a page's menu, a selection, an answer):
+    /// never offered back. A copy on a Mac, arriving while roko is open, is.
+    private static var ownCounts: Set<Int> = []
+    private static var observer: NSObjectProtocol?
 
     /// roko is going to the background.
     static func left() {
         countWhenLeft = UIPasteboard.general.changeCount
     }
 
-    /// roko is in front again (or just launched).
+    /// roko is in front (or just launched): from now on, its own copies are noted.
     static func arrived() {
-        countWhenArrived = UIPasteboard.general.changeCount
+        guard observer == nil else { return }
+        // Posted for changes made in this app, not for another app's or a Mac's.
+        observer = NotificationCenter.default.addObserver(forName: UIPasteboard.changedNotification, object: nil,
+                                                          queue: .main) { _ in
+            MainActor.assumeIsolated { ownCounts.insert(UIPasteboard.general.changeCount) }
+        }
     }
 
-    /// Copied elsewhere (another app, a Mac) while roko was away.
+    /// Copied somewhere other than roko: another app, or a Mac.
     private static var cameFromElsewhere: Bool {
         let count = UIPasteboard.general.changeCount
-        return count == (countWhenArrived ?? count) && count != countWhenLeft
+        return !ownCounts.contains(count) && count != countWhenLeft
     }
     /// What reading the clipboard found, once per copy, so iOS asks at most once.
     private static var peeked: (count: Int, url: URL?)?
@@ -65,16 +71,12 @@ enum CopiedLink {
     static func isWaiting() async -> Bool {
         let board = UIPasteboard.general
         let count = board.changeCount
-        if LaunchClock.isEnabled {
-            print("COPIED count=\(count) taken=\(taken) left=\(String(describing: countWhenLeft)) arrived=\(String(describing: countWhenArrived))")
-        }
         guard count != taken, cameFromElsewhere else { return false }
         if seen?.count != count { seen = (count, .now) }
         // Recent only: an old link isn't what you came to open.
         guard let seen, Date.now.timeIntervalSince(seen.at) < window else { return false }
         // Throws when the clipboard is empty.
         let found = try? await board.detectedPatterns(for: [\.probableWebURL])
-        if LaunchClock.isEnabled { print("COPIED count=\(count) found=\(String(describing: found))") }
         return found?.contains(\.probableWebURL) ?? false
     }
 
@@ -90,6 +92,7 @@ enum CopiedLink {
 
     /// After roko copies a link, so the bar can show it as it is.
     static func copiedHere(_ url: URL) {
+        ownCounts.insert(UIPasteboard.general.changeCount)
         ownCopy = (UIPasteboard.general.changeCount, url)
     }
 
@@ -105,6 +108,11 @@ enum CopiedLink {
         let url = found.flatMap { Omnibox.url(from: $0.probableWebURL) }.flatMap(web)
         peeked = (count, url)
         return url
+    }
+
+    /// Something roko copied: never offered back.
+    static func copiedInRoko() {
+        ownCounts.insert(UIPasteboard.general.changeCount)
     }
 
     /// Opened: not offered again for this copy.

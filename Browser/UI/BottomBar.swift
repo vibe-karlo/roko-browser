@@ -5,7 +5,8 @@ import SwiftUI
 /// back as soon as you scroll up.
 struct BottomBar: View {
     @Environment(BrowserModel.self) private var browser
-    @Environment(\.launcherSpace) private var launcherSpace
+    /// Where the + capsule is on screen, for the launcher to grow out of.
+    @State private var capsuleFrame: CGRect = .zero
     /// Tabs switched by swiping the bar; each one ticks.
     @State private var switches = 0
 
@@ -35,17 +36,21 @@ struct BottomBar: View {
 
             Spacer(minLength: 8)
 
-            Button { browser.showCommandBar() } label: {
+            Button {
+                browser.launcherOrigin = capsuleFrame
+                browser.showCommandBar()
+            } label: {
                 Glyph(.plus, size: 22, weight: 2)
                     .frame(width: 104, height: 38)
                     .background {
                         // Becomes the launcher's field: there only while the launcher isn't,
                         // and only on a page (a screen over it has its own bar).
-                        if browser.panel != .command, onPage {
+                        // Hidden while the launcher's field stands in its place.
+                        if browser.panel != .command || !onPage {
                             Capsule().fill(Theme.raised)
-                                .launcherMorph(launcherSpace)
                         }
                     }
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { capsuleFrame = $0 }
                     .contentShape(.capsule)
             }
             .buttonStyle(GlyphButtonStyle())

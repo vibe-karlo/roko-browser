@@ -30,7 +30,6 @@ struct CommandItem: Identifiable {
 struct CommandBarView: View {
     @Environment(BrowserModel.self) private var browser
     @Environment(\.modelContext) private var context
-    @Environment(\.launcherSpace) private var launcherSpace
     @Query(sort: \Pin.order) private var pins: [Pin]
     @Query(sort: \Todo.createdAt) private var todos: [Todo]
     /// Ticked in the bar a moment ago: still shown, struck through.
@@ -41,7 +40,7 @@ struct CommandBarView: View {
     /// "weather in London": London's weather, found for what was typed.
     @State private var placeWeather: (query: String, weather: TodayWeather)?
     /// Pinned town-weather answers, fetched as the bar opens.
-    @State private var pinnedWeather: [String: TodayWeather] = [:]
+    @State private var pinnedWeather: [String: TodayWeather] = PinnedAnswers.lastWeather
     @State private var selection = 0
     /// The row in the slot under the field, as the list is scrolled.
     @State private var topRow: String?
@@ -59,6 +58,20 @@ struct CommandBarView: View {
     /// Mid-blink of the private switch's eye.
     @State private var blink = false
     @FocusState private var focused: Bool
+    /// Where the keyboard's top will be: the launcher is laid out there from
+    /// its first frame, so its field rises out of the bar in one move while
+    /// the keyboard slides up under it, rather than riding up behind it.
+    @State private var keyboardHeight = KeyboardHeight.last
+    /// Grown out of the bar (true) or still sitting in it (false): see LauncherMorph.
+    @State private var opened = false
+    /// Where the field ends up on screen, from the layout's own numbers: above
+    /// the keyboard, the list (a fixed height) and the gap between them. Worked
+    /// out rather than measured, so it's right on the very first frame.
+    private var fieldTarget: CGRect {
+        let screen = UIScreen.main.bounds
+        let top = screen.height - keyboardHeight - 4 - Self.listHeight - 6 - 56
+        return CGRect(x: 8, y: top, width: screen.width - 16, height: 56)
+    }
 
     /// Panel corner, and the row inset inside it. Rows round by the difference,
     /// so the two curves run parallel instead of a tight corner in a loose one.
@@ -74,6 +87,7 @@ struct CommandBarView: View {
                 // Deep enough that a white page reads as dusk, not grey.
                 .overlay(Theme.canvas.opacity(0.66))
                 .ignoresSafeArea()
+                .opacity(opened ? 1 : 0)
                 .contentShape(.rect)
                 .onTapGesture { dismiss() }
                 // A swipe down anywhere on the page closes the bar too.
@@ -83,20 +97,36 @@ struct CommandBarView: View {
 
             VStack(spacing: 6) {
                 field
+                    .modifier(LauncherMorph(from: browser.launcherOrigin, to: fieldTarget, opened: opened))
                     .gesture(DragGesture(minimumDistance: 30).onEnded { value in
                         if value.translation.height > 60 { dismiss() }
                     })
                 results
+                    .opacity(opened ? 1 : 0)
+                    .offset(y: opened ? 0 : 24)
             }
             .foregroundStyle(Theme.ink)
             .padding(.horizontal, 8)
-            .padding(.bottom, 4)
+            .padding(.bottom, keyboardHeight + 4)
+        }
+        .ignoresSafeArea(.keyboard)
+        .ignoresSafeArea(.container, edges: .bottom)
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
+            // Only a keyboard coming up (or changing height) moves it; one going
+            // away is the launcher closing, which sinks into the bar on its own.
+            guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
+                  let screen = UIScreen.main.bounds.height as CGFloat?, frame.minY < screen else { return }
+            let height = screen - frame.minY
+            guard abs(height - keyboardHeight) > 1 else { return }
+            KeyboardHeight.last = height
+            withAnimation(.smooth(duration: 0.25)) { keyboardHeight = height }
         }
         .onAppear {
             query = browser.commandPrefill
             rebuild()
-            focused = true
+            open()
         }
+        .onDisappear { browser.launcherShown = false }
         .task {
             guard browser.launcherContext == .web, await CopiedLink.isWaiting() else { return }
             copiedURL = await CopiedLink.peek()
@@ -147,7 +177,10 @@ struct CommandBarView: View {
                     group.addTask { (asked, await WeatherQuery.weather(for: asked)) }
                 }
                 for await (asked, weather) in group {
-                    if let weather { pinnedWeather[asked] = weather }
+                    if let weather {
+                        pinnedWeather[asked] = weather
+                        PinnedAnswers.lastWeather[asked] = weather
+                    }
                 }
             }
             rebuild()
@@ -421,12 +454,14 @@ struct CommandBarView: View {
         // Icons share one axis with the rows' icons below.
         .padding(.horizontal, 16)
         .frame(height: 56)
-        // Opened out of the bar's capsule, and closed back into it.
+        // What's in it comes in once it has nearly grown; the shape itself is the morph.
+        .opacity(opened ? 1 : 0)
+        .animation(opened ? .easeOut(duration: 0.18).delay(0.16) : .easeIn(duration: 0.1), value: opened)
         .background {
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Theme.panel)
-                .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.edge))
-                .launcherMorph(launcherSpace)
+            // Scaled from the capsule, the corners start at the capsule's roundness.
+            RoundedRectangle(cornerRadius: opened ? 18 : 28)
+                .fill(opened ? Theme.panel : Theme.raised)
+                .overlay(RoundedRectangle(cornerRadius: opened ? 18 : 28).strokeBorder(Theme.edge.opacity(opened ? 1 : 0)))
         }
     }
 
@@ -492,9 +527,32 @@ struct CommandBarView: View {
         return .handled
     }
 
+    /// Out of the bar: the field grows from the capsule up to its place, and
+    /// only then does the keyboard come, rising under it, so the keyboard never
+    /// covers the capsule the field is growing out of.
+    private func open() {
+        // A frame later: drawn in the bar's place first, so there's somewhere to grow from.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
+            withAnimation(.launcher) {
+                opened = true
+                browser.launcherShown = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) { focused = true }
+        }
+    }
+
+    /// Back into the bar: the field shrinks into the capsule it came from,
+    /// then the launcher is gone and the capsule is there in its place.
     private func dismiss() {
         focused = false
-        withAnimation(.launcher) { browser.panel = browser.launcherReturn }
+        withAnimation(.launcher) {
+            opened = false
+            browser.launcherShown = false
+        } completion: {
+            var still = Transaction()
+            still.disablesAnimations = true
+            withTransaction(still) { browser.panel = browser.launcherReturn }
+        }
     }
 
     // MARK: Ranking
@@ -508,7 +566,7 @@ struct CommandBarView: View {
         case .web:
             return []
         case .todo:
-            guard let read = TodoDraft.read(text) else { return [] }
+            guard let read = TodoDraft.read(text), !read.title.isEmpty else { return [] }
             let when = read.when ?? .today
             return [CommandItem(id: "add-todo", title: read.title, subtitle: "New to-do for " + TodoDraft.phrase(when, read.time),
                                 kind: "Add", icon: .glyph(.todo), action: .addTodo(read.title, when, read.time))]
@@ -649,6 +707,7 @@ struct CommandBarView: View {
             if let summary = browser.summary { browser.ask(question, about: summary) }
         case .copy(let result):
             UIPasteboard.general.string = result
+            CopiedLink.copiedInRoko()
             browser.panel = .none
             browser.showToast("Copied \(result)")
         case .pasteLink:
@@ -978,6 +1037,14 @@ nonisolated enum WeatherQuery {
 @MainActor
 enum PinnedAnswers {
     private static let key = "pinnedAnswers"
+    /// The pinned towns' weather as last fetched, shown at once next time.
+    static var lastWeather: [String: TodayWeather] {
+        get {
+            UserDefaults.standard.data(forKey: "pinnedAnswers.weather")
+                .flatMap { try? JSONDecoder().decode([String: TodayWeather].self, from: $0) } ?? [:]
+        }
+        set { UserDefaults.standard.set(try? JSONEncoder().encode(newValue), forKey: "pinnedAnswers.weather") }
+    }
 
     static var all: [String] { UserDefaults.standard.stringArray(forKey: key) ?? [] }
 
@@ -1004,5 +1071,16 @@ extension WeatherQuery {
         if found == nil { found = await WeatherPlace.search(place).first }
         guard let found else { return nil }
         return try? await TodayWeather.fetch(at: found.coordinate, place: found.name)
+    }
+}
+
+/// The keyboard's height, as last seen: a fair guess at where it will be
+/// before it says so (the system's own, with the bar of suggestions).
+@MainActor
+enum KeyboardHeight {
+    private static let key = "keyboardHeight"
+    static var last: CGFloat {
+        get { UserDefaults.standard.object(forKey: key) as? CGFloat ?? 336 }
+        set { UserDefaults.standard.set(newValue, forKey: key) }
     }
 }

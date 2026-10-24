@@ -1,31 +1,25 @@
 import SwiftUI
 
-/// The launcher opens out of the bar: the bar's middle capsule is the same
-/// shape as the launcher's field, matched across the two, so opening it the
-/// capsule widens and rises into the field, and closing it comes back down.
-/// One namespace for the whole app, held here.
-struct LauncherSpace<Content: View>: View {
-    @Namespace private var space
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        content.environment(\.launcherSpace, space)
-    }
-}
-
-extension EnvironmentValues {
-    @Entry var launcherSpace: Namespace.ID? = nil
-}
-
-extension View {
-    /// The shape that becomes the launcher's field (or comes from it).
-    @ViewBuilder
-    func launcherMorph(_ space: Namespace.ID?, id: String = "launcher") -> some View {
-        if let space { matchedGeometryEffect(id: id, in: space) } else { self }
-    }
-}
-
 extension Animation {
     /// The bar opening into the launcher and closing back into it.
-    static let launcher = Animation.spring(duration: 0.42, bounce: 0.08)
+    static let launcher = Animation.spring(duration: 0.36, bounce: 0.1)
+}
+
+/// The launcher's field, drawn first exactly over the bar capsule that was
+/// tapped (`from`, on screen), then grown into its own place (`to`): one
+/// shape widening and rising out of the bar, and shrinking back into it on
+/// close. Scaled and moved, not laid out again, so nothing reflows mid-way.
+struct LauncherMorph: ViewModifier {
+    let from: CGRect
+    let to: CGRect
+    let opened: Bool
+
+    func body(content: Content) -> some View {
+        let ready = from != .zero && to != .zero
+        content
+            .scaleEffect(x: opened || !ready ? 1 : from.width / to.width,
+                         y: opened || !ready ? 1 : from.height / to.height)
+            .offset(x: opened || !ready ? 0 : from.midX - to.midX,
+                    y: opened || !ready ? 0 : from.midY - to.midY)
+    }
 }

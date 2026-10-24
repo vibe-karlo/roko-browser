@@ -21,6 +21,10 @@ struct TodoView: View {
     /// Typing a new one: the bar's capsule has widened into a field, in place.
     @State private var adding = false
     @State private var draft = ""
+    /// Picked on the chip, for when the words don't say: they win when they do.
+    @State private var pickedWhen: TodoWhen?
+    @State private var pickedTime: DateComponents?
+    @State private var pickingDate = false
     @Namespace private var barSpace
     /// The Done list at the bottom is open.
     @State private var showsDone = false
@@ -80,6 +84,12 @@ struct TodoView: View {
         .background(Theme.canvas.ignoresSafeArea())
         .foregroundStyle(Theme.ink)
         .onAppear { DailyReminders.askIfNeeded() }
+        .sheet(isPresented: $pickingDate) {
+            DayPicker(initial: .now, time: nil) { date, clock in
+                pickedWhen = .date(date)
+                pickedTime = clock
+            }
+        }
         .sheet(item: $choosingDate) { todo in
             DayPicker(initial: todo.day ?? .now, time: todo.time) { date, clock in
                 withAnimation(.snappy) {
@@ -263,12 +273,24 @@ struct TodoView: View {
             HStack(spacing: 10) {
                 ReturnKeepingField(placeholder: "Call Petra on Monday at 15", text: $draft, onReturn: add)
                     .frame(height: 44)
-                Text(whenLabel)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Theme.accentText)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .animation(.snappy(duration: 0.2), value: whenLabel)
+                // When it's for: what the words say, else what's picked here.
+                Menu {
+                    Button("Today") { pick(.today) }
+                    Button("Tomorrow") { pick(.tomorrow) }
+                    Button("This Week") { pick(.thisWeek) }
+                    Button("Someday") { pick(.someday) }
+                    Button("Date and Time…") { pickingDate = true }
+                } label: {
+                    Text(whenLabel)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.accentText)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .frame(minHeight: 44)
+                        .contentShape(.rect)
+                        .animation(.snappy(duration: 0.2), value: whenLabel)
+                }
+                .accessibilityLabel("When: \(whenLabel)")
                 Button { finishAdding() } label: {
                     Glyph(.close, size: 13, weight: 2.2)
                         .frame(width: 30, height: 30)
@@ -304,6 +326,13 @@ struct TodoView: View {
     private func finishAdding() {
         withAnimation(.launcher) { adding = false }
         draft = ""
+        pickedWhen = nil
+        pickedTime = nil
+    }
+
+    private func pick(_ when: TodoWhen) {
+        pickedWhen = when
+        pickedTime = nil
     }
 
     /// The draft's own day and time, if it names any.
@@ -313,12 +342,12 @@ struct TodoView: View {
 
     private var whenLabel: String {
         let read = understood
-        return TodoDraft.label(read?.when ?? .today, read?.time)
+        return TodoDraft.short(read?.when ?? pickedWhen ?? .today, read?.time ?? pickedTime)
     }
 
     private func add() {
-        guard let read = understood else { return }
-        let todo = Todo(title: read.title, when: read.when ?? .today, at: read.time)
+        guard let read = understood, !read.title.isEmpty else { return }
+        let todo = Todo(title: read.title, when: read.when ?? pickedWhen ?? .today, at: read.time ?? pickedTime)
         if todo.time != nil { TodoAlerts.askIfNeeded() }
         todo.order = (todos.map(\.order).max() ?? 0) + 1
         withAnimation(.snappy) { context.insert(todo) }

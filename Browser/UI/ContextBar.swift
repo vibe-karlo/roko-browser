@@ -24,13 +24,16 @@ struct ContextBar: View {
     /// Where the capsule widens into a field of the screen's own (To-do's), if any.
     var fieldSpace: Namespace.ID? = nil
     @Environment(BrowserModel.self) private var browser
-    @Environment(\.launcherSpace) private var launcherSpace
+    @State private var capsuleFrame: CGRect = .zero
 
     var body: some View {
         HStack(spacing: 0) {
             place(leading)
             Spacer(minLength: 8)
-            Button(action: launch) {
+            Button {
+                browser.launcherOrigin = capsuleFrame
+                launch()
+            } label: {
                 HStack(spacing: 8) {
                     Glyph(glyph, size: 17, weight: 1.8)
                     Text(title).font(.system(size: 16, weight: .medium))
@@ -40,10 +43,14 @@ struct ContextBar: View {
                 .frame(height: 38)
                 .background {
                     if !(morphs && browser.panel == .command) {
-                        Capsule().fill(Theme.raised)
-                            .launcherMorph(fieldSpace ?? (morphs ? launcherSpace : nil), id: fieldSpace == nil ? "launcher" : "field")
+                        if let fieldSpace {
+                            Capsule().fill(Theme.raised).matchedGeometryEffect(id: "field", in: fieldSpace)
+                        } else {
+                            Capsule().fill(Theme.raised)
+                        }
                     }
                 }
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { capsuleFrame = $0 }
                 .contentShape(.capsule)
             }
             .buttonStyle(GlyphButtonStyle())

@@ -36,6 +36,10 @@ final class BrowserModel {
     var launcherContext: LauncherContext = .web
     /// The screen the launcher was opened over, shown again when it closes.
     var launcherReturn: Panel = .none
+    /// Where the bar's capsule that opened the launcher is on screen: its field grows out of it.
+    var launcherOrigin: CGRect = .zero
+    /// The launcher is open or opening (the bar steps back meanwhile).
+    var launcherShown = false
     var isBarCollapsed = false
     var summary: SummaryModel? {
         // Closed before it's finished: stop there, as Browse for Me does.
@@ -321,8 +325,8 @@ final class BrowserModel {
         commandMode = mode
         launcherContext = context
         launcherReturn = screen
-        // The bar's capsule opens into the field (LauncherMorph).
-        withAnimation(.launcher) { panel = .command }
+        // The launcher grows its field out of the bar's capsule itself (LauncherMorph).
+        panel = .command
         // The address bar offers the copied link itself.
         copiedLinkOffer = false
     }

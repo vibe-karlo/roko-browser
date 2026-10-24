@@ -139,7 +139,7 @@ nonisolated enum TodoDraft {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         let lower = trimmed.lowercased()
         guard let prefix = ["todo ", "to-do ", "to do ", "+"].first(where: { lower.hasPrefix($0) }),
-              let read = read(String(trimmed.dropFirst(prefix.count)), now: now) else { return nil }
+              let read = read(String(trimmed.dropFirst(prefix.count)), now: now), !read.title.isEmpty else { return nil }
         return (read.title, read.when ?? .today, read.time)
     }
 
@@ -161,7 +161,6 @@ nonisolated enum TodoDraft {
                 title = rest
             }
         }
-        guard !title.isEmpty else { return nil }
         return (title.prefix(1).uppercased() + title.dropFirst(), when, time)
     }
 
@@ -179,10 +178,12 @@ nonisolated enum TodoDraft {
         let suffix = (group(3) ?? group(6))?.lowercased()
         if suffix == "pm", hour < 12 { hour += 12 }
         if suffix == "am", hour == 12 { hour = 0 }
+        // "at 3", no am, no minutes past: the afternoon, as it's meant. 1 to 6 only:
+        // "at 7" or "at 8" may well be the morning.
+        if suffix == nil, group(2) == nil, group(5) == nil, (1...6).contains(hour) { hour += 12 }
         guard (0..<24).contains(hour), (0..<60).contains(minute),
               let whole = Range(match.range, in: text) else { return nil }
         let rest = String(text[..<whole.lowerBound]).trimmingCharacters(in: .whitespaces)
-        guard !rest.isEmpty else { return nil }
         return (DateComponents(hour: hour, minute: minute), rest)
     }
 
@@ -200,8 +201,7 @@ nonisolated enum TodoDraft {
         let today = calendar.startOfDay(for: now)
         let lower = text.lowercased()
         func rest(dropping phrase: String) -> String? {
-            let kept = String(text.dropLast(phrase.count)).trimmingCharacters(in: .whitespaces)
-            return kept.isEmpty ? nil : kept
+            String(text.dropLast(phrase.count)).trimmingCharacters(in: .whitespaces)
         }
         func day(_ offset: Int) -> Date { calendar.date(byAdding: .day, value: offset, to: today)! }
 
@@ -230,8 +230,9 @@ nonisolated enum TodoDraft {
                 phrases.append((prefix + name, nextWeeks))
             }
         }
-        for (phrase, when) in phrases.sorted(by: { $0.0.count > $1.0.count }) where lower.hasSuffix(" " + phrase) {
-            if let kept = rest(dropping: " " + phrase) { return (when, kept) }
+        for (phrase, when) in phrases.sorted(by: { $0.0.count > $1.0.count }) {
+            if lower.hasSuffix(" " + phrase), let kept = rest(dropping: " " + phrase) { return (when, kept) }
+            if lower == phrase { return (when, "") }
         }
 
         // "in 3 days", "za 3 dana".
@@ -278,6 +279,22 @@ nonisolated enum TodoDraft {
         case .someday: "Someday"
         case .date(let date): date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
         }
+    }
+
+    /// Short, for a chip beside a field: "Today", "Tmrw 9:00", "Wed 15:00", "3 Nov".
+    static func short(_ when: TodoWhen, _ time: DateComponents?, now: Date = .now) -> String {
+        var day: String
+        switch when {
+        case .today: day = time == nil ? "Today" : ""
+        case .tomorrow: day = "Tomorrow"
+        case .thisWeek: day = "This week"
+        case .someday: day = "Someday"
+        case .date(let date):
+            let ahead = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: now), to: date).day ?? 0
+            day = ahead < 7 ? date.formatted(.dateTime.weekday(.abbreviated)) : date.formatted(.dateTime.day().month(.abbreviated))
+        }
+        guard let time, let clock = Calendar.current.date(from: time) else { return day }
+        return (day.isEmpty ? "" : day + " ") + clock.formatted(date: .omitted, time: .shortened)
     }
 
     /// For a sentence: "today", "tomorrow at 15:00", "Monday", "Mon 9 Nov at 15:00".
