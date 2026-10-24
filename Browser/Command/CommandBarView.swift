@@ -38,6 +38,14 @@ struct CommandBarView: View {
     @State private var selection = 0
     /// The row in the slot under the field, as the list is scrolled.
     @State private var topRow: String?
+    /// Scrolled to a row other than the best match: the field shows that row,
+    /// as Arc's does, so what Return will open is never a guess.
+    @State private var previewing = false
+    /// The list is being put back at its top by roko, not scrolled by you:
+    /// the row it's going to, until it's there.
+    @State private var resetTarget: String?
+    /// Asks the list to go to a row (ScrollViewReader does it reliably).
+    @State private var scrollRequest: String?
     @State private var hasCopiedLink = false
     /// The copied link itself, when roko may read it (see CopiedLink.peek).
     @State private var copiedURL: URL?
@@ -94,11 +102,21 @@ struct CommandBarView: View {
             // Typing starts the list over at its best match.
             var reset = Transaction()
             reset.disablesAnimations = true
-            withTransaction(reset) { topRow = items.first?.id }
+            withTransaction(reset) { backToTop() }
         }
         .onChange(of: topRow) { _, row in
-            // Scrolled: the row now in the slot is the one Return runs.
-            if let row, let index = items.firstIndex(where: { $0.id == row }) { selection = index }
+            // Scrolled: the row now in the slot is the one Return runs, and the field shows it.
+            if let target = resetTarget {
+                if row == target { resetTarget = nil }
+                previewing = false
+                return
+            }
+            guard let row, let index = items.firstIndex(where: { $0.id == row }) else {
+                previewing = false
+                return
+            }
+            selection = index
+            withAnimation(.snappy(duration: 0.18)) { previewing = index > 0 || query.isEmpty }
         }
         .sensoryFeedback(.selection, trigger: selection)
         .onChange(of: CurrencyRates.shared.date) { rebuild() }
@@ -126,6 +144,7 @@ struct CommandBarView: View {
     private static let listHeight: CGFloat = 300
 
     private var results: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             LazyVStack(spacing: 2) {
                 // Nothing typed: your pins first, a tap away.
@@ -139,7 +158,7 @@ struct CommandBarView: View {
                             copiedLinkRow
                         } else {
                             Button { perform(item) } label: {
-                                CommandRow(item: item, isSelected: index == selection && !query.isEmpty)
+                                CommandRow(item: item, isSelected: index == selection && (!query.isEmpty || previewing))
                             }
                             .buttonStyle(.plain)
                         }
@@ -166,6 +185,12 @@ struct CommandBarView: View {
             }
         }
         .frame(height: Self.listHeight)
+        .onChange(of: scrollRequest) { _, target in
+            guard let target else { return }
+            withAnimation(.snappy(duration: 0.25)) { proxy.scrollTo(target, anchor: .top) }
+            scrollRequest = nil
+        }
+        }
     }
 
     /// A link copied a moment ago that roko can't read without iOS asking: a
@@ -294,10 +319,37 @@ struct CommandBarView: View {
         HStack(spacing: 12) {
             // While typing hides the switch, the leading mark keeps private mode visible.
             let showsPrivate = browser.commandMode == .privateTab && !query.isEmpty
-            Glyph(showsPrivate ? .eyeClosed : .search, size: 18)
-                .foregroundStyle(showsPrivate ? Theme.accent : Theme.secondaryInk)
-                .frame(width: 22)
+            let shown = previewing ? items[safe: selection] : nil
+            Group {
+                if let shown {
+                    RowIcon(icon: shown.icon)
+                } else {
+                    Glyph(showsPrivate ? .eyeClosed : .search, size: 18)
+                        .foregroundStyle(showsPrivate ? Theme.accent : Theme.secondaryInk)
+                }
+            }
+            .frame(width: 22)
             TextField(placeholder, text: $query)
+                // Scrolled to a row: it shows here in place of what was typed,
+                // which comes back with the next key.
+                .opacity(shown == nil ? 1 : 0)
+                .overlay(alignment: .leading) {
+                    if let shown {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(shown.title)
+                                .font(.system(size: 17))
+                                .foregroundStyle(Theme.ink)
+                            if !shown.subtitle.isEmpty {
+                                Text(shown.subtitle)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Theme.secondaryInk)
+                            }
+                        }
+                        .lineLimit(1)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                    }
+                }
                 .font(.system(size: 17))
                 .foregroundStyle(Theme.ink)
                 .focused($focused)
@@ -307,15 +359,22 @@ struct CommandBarView: View {
                 .autocorrectionDisabled()
                 .submitLabel(.go)
                 .onSubmit {
-                    guard !query.trimmingCharacters(in: .whitespaces).isEmpty,
+                    guard !query.trimmingCharacters(in: .whitespaces).isEmpty || previewing,
                           let item = items[safe: selection] else { return }
                     perform(item)
                 }
                 .onKeyPress(.upArrow) { move(-1) }
                 .onKeyPress(.downArrow) { move(1) }
                 .onKeyPress(.escape) { dismiss(); return .handled }
-            if !query.isEmpty {
-                Button { query = "" } label: {
+            if !query.isEmpty || previewing {
+                Button {
+                    if query.isEmpty {
+                        // Only a scrolled-to row showing: back to the top.
+                        backToTop()
+                    } else {
+                        query = ""
+                    }
+                } label: {
                     // A filled disc so it reads as a control at a glance; the
                     // whole 44-point square is tappable, not just the mark.
                     Circle()
@@ -335,6 +394,7 @@ struct CommandBarView: View {
             }
         }
         .animation(.easeOut(duration: 0.15), value: query.isEmpty)
+        .animation(.easeOut(duration: 0.15), value: previewing)
         // Icons share one axis with the rows' icons below.
         .padding(.horizontal, 16)
         .frame(height: 56)
@@ -373,10 +433,20 @@ struct CommandBarView: View {
         }
     }
 
+    /// The top of the list: the pins with nothing typed, else the best match.
+    private func backToTop() {
+        previewing = false
+        selection = 0
+        guard let top = query.isEmpty && (!pins.isEmpty || todos.contains(where: \.isDueNow)) ? "pins" : items.first?.id,
+              topRow != top else { return }
+        resetTarget = top
+        scrollRequest = top
+    }
+
     private func move(_ step: Int) -> KeyPress.Result {
         guard !items.isEmpty else { return .ignored }
         selection = min(max(selection + step, 0), items.count - 1)
-        withAnimation(.snappy(duration: 0.2)) { topRow = items[selection].id }
+        scrollRequest = items[selection].id
         return .handled
     }
 
@@ -456,6 +526,18 @@ struct CommandBarView: View {
     }
 }
 
+/// A row's mark: a glyph, or the site's own icon.
+private struct RowIcon: View {
+    let icon: CommandItem.Icon
+
+    var body: some View {
+        switch icon {
+        case .glyph(let kind): Glyph(kind, size: 18).foregroundStyle(Theme.secondaryInk)
+        case .site(let host): SiteIcon(host: host, size: 18)
+        }
+    }
+}
+
 private struct CommandRow: View {
     let item: CommandItem
     let isSelected: Bool
@@ -467,13 +549,8 @@ private struct CommandRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Group {
-                switch item.icon {
-                case .glyph(let kind): Glyph(kind, size: 18).foregroundStyle(Theme.secondaryInk)
-                case .site(let host): SiteIcon(host: host, size: 18)
-                }
-            }
-            .frame(width: 22)
+            RowIcon(icon: item.icon)
+                .frame(width: 22)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.title)
