@@ -6,6 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Pin answers like pages: long-press the weather ("vrijeme", "vrijeme u Zagrebu"), "days until 24.12.", "100 eur in usd" or any sum, and choose Pin. It sits with your pins under the empty address field, worked out again each time you open it; long-press to unpin.
 - Feels like: Today's weather and the bar's weather rows say what it feels like (with wind and humidity) when that's different from the temperature.
 - Town weather in Croatian forms and short: "vrijeme u Zagrebu", "u Rijeci", "u Zadru", and the plate codes "vrijeme zg", "os", "st", "ri"…; "vrijme" works too.
 - Summaries are kept for a day: summarizing the same page again opens on its summary at once, with nothing spent.

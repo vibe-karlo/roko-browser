@@ -39,6 +39,8 @@ struct CommandBarView: View {
     @State private var suggestions: [String] = []
     /// "weather in London": London's weather, found for what was typed.
     @State private var placeWeather: (query: String, weather: TodayWeather)?
+    /// Pinned town-weather answers, fetched as the bar opens.
+    @State private var pinnedWeather: [String: TodayWeather] = [:]
     @State private var selection = 0
     /// The row in the slot under the field, as the list is scrolled.
     @State private var topRow: String?
@@ -131,19 +133,22 @@ struct CommandBarView: View {
         .onChange(of: TodayModel.shared.weather) { rebuild() }
         .task(id: query) {
             // "weather in London", "vrijeme u Zagrebu": a town's weather, after a short pause.
-            guard let place = WeatherQuery.place(in: query) else { return }
+            guard WeatherQuery.place(in: query) != nil else { return }
             try? await Task.sleep(for: .milliseconds(300))
-            var found: WeatherPlace?
-            for name in WeatherQuery.lookups(for: place) where found == nil && !Task.isCancelled {
-                // A town of that exact name first: "Zagrebu" alone may find a village, "Zagreb" the city.
-                let results = await WeatherPlace.search(name)
-                found = results.first { $0.name.lowercased() == name.lowercased() } ?? (name == place ? nil : results.first)
-            }
-            if found == nil { found = await WeatherPlace.search(place).first }
-            guard !Task.isCancelled, let found,
-                  let weather = try? await TodayWeather.fetch(at: found.coordinate, place: found.name),
-                  !Task.isCancelled else { return }
+            guard !Task.isCancelled, let weather = await WeatherQuery.weather(for: query), !Task.isCancelled else { return }
             placeWeather = (query, weather)
+            rebuild()
+        }
+        .task {
+            // Pinned town weather: all at once, as the bar opens.
+            await withTaskGroup(of: (String, TodayWeather?).self) { group in
+                for asked in PinnedAnswers.all where WeatherQuery.place(in: asked) != nil {
+                    group.addTask { (asked, await WeatherQuery.weather(for: asked)) }
+                }
+                for await (asked, weather) in group {
+                    if let weather { pinnedWeather[asked] = weather }
+                }
+            }
             rebuild()
         }
         .task(id: query) {
@@ -192,6 +197,17 @@ struct CommandBarView: View {
                                 browser.unpin(pin)
                                 rebuild()
                             }
+                        } else if item.id.hasPrefix("answer-") {
+                            Button("Unpin", role: .destructive) {
+                                PinnedAnswers.remove(String(item.id.dropFirst("answer-".count)))
+                                rebuild()
+                            }
+                        } else if ["calc", "weather", "weather-place"].contains(item.id) {
+                            // An answer kept with your pins, worked out again each time.
+                            Button {
+                                PinnedAnswers.add(query.trimmingCharacters(in: .whitespaces))
+                                browser.showToast("Pinned")
+                            } label: { Label("Pin", systemImage: "pin") }
                         }
                     }
                     // Typing "todo" brings today's to-dos up under the To-do row, to tick off there.
@@ -459,16 +475,17 @@ struct CommandBarView: View {
 
     // MARK: Ranking
 
+    /// A weather answer: now, the day under it.
+    static func weatherRow(id: String, _ weather: TodayWeather, action: CommandItem.Action) -> CommandItem {
+        CommandItem(id: id, title: "\(Int(weather.temperature.rounded()))° " + weather.condition + (weather.place.map { " in \($0)" } ?? ""),
+                    subtitle: weather.dayLine, kind: "Weather", icon: .image("phosphor/\(weather.glyph)"), action: action)
+    }
+
     private func rebuild() {
         items = CommandRanker.rank(query: query, browser: browser, suggestions: suggestions)
         // A town's weather, asked for by name: first, as the answer.
         if let (asked, weather) = placeWeather, asked == query, WeatherQuery.place(in: query) != nil {
-            items.insert(CommandItem(id: "weather-place",
-                                     title: "\(Int(weather.temperature.rounded()))° " + weather.condition
-                                         + (weather.place.map { " in \($0)" } ?? ""),
-                                     subtitle: weather.dayLine,
-                                     kind: "Weather", icon: .image("phosphor/\(weather.glyph)"), action: .search(query)),
-                         at: 0)
+            items.insert(Self.weatherRow(id: "weather-place", weather, action: .search(query)), at: 0)
         }
         // Asked for the weather and it's half an hour old: fetch it now (one small request).
         if items.contains(where: { $0.id == "weather" }),
@@ -492,6 +509,20 @@ struct CommandBarView: View {
                 rows.append(CommandItem(id: "todos-today", title: "To-do",
                                         subtitle: left == 1 ? "One left for today" : "\(left) left for today",
                                         kind: "", icon: .glyph(.todo), action: .todos))
+            }
+            // Pinned answers, worked out again now: the weather, days until, a rate.
+            for asked in PinnedAnswers.all {
+                let answer: CommandItem?
+                if WeatherQuery.place(in: asked) != nil {
+                    answer = pinnedWeather[asked].map { Self.weatherRow(id: "", $0, action: .search(asked)) }
+                        ?? CommandItem(id: "", title: "Weather", subtitle: asked, kind: "", icon: .glyph(.today), action: .search(asked))
+                } else {
+                    answer = CommandRanker.rank(query: asked, browser: browser, suggestions: [])
+                        .first { $0.id == "calc" || $0.id == "weather" }
+                }
+                guard let answer else { continue }
+                rows.append(CommandItem(id: "answer-\(asked)", title: answer.title, subtitle: answer.subtitle,
+                                        kind: "", icon: answer.icon, action: answer.action, mark: .pin))
             }
             var seen = Set<String>()
             for pin in pins {
@@ -847,5 +878,39 @@ nonisolated enum WeatherQuery {
         if place.hasSuffix("i") { names.append(String(place.dropLast()) + "a") }
         if place.hasSuffix("ju") { names.append(String(place.dropLast(2)) + "ja") }
         return names
+    }
+}
+
+/// Answers kept with your pins (the weather, "days until 24.12.", "100 eur
+/// in usd"), as what was typed: worked out again whenever the bar opens.
+@MainActor
+enum PinnedAnswers {
+    private static let key = "pinnedAnswers"
+
+    static var all: [String] { UserDefaults.standard.stringArray(forKey: key) ?? [] }
+
+    static func add(_ query: String) {
+        guard !query.isEmpty, !all.contains(query) else { return }
+        UserDefaults.standard.set(all + [query], forKey: key)
+    }
+
+    static func remove(_ query: String) {
+        UserDefaults.standard.set(all.filter { $0 != query }, forKey: key)
+    }
+}
+
+extension WeatherQuery {
+    /// The weather for a town asked about by name, or nil when no town is found.
+    static func weather(for query: String) async -> TodayWeather? {
+        guard let place = place(in: query) else { return nil }
+        var found: WeatherPlace?
+        for name in lookups(for: place) where found == nil {
+            // A town of that exact name first: "Zagrebu" alone may find a village, "Zagreb" the city.
+            let results = await WeatherPlace.search(name)
+            found = results.first { $0.name.lowercased() == name.lowercased() } ?? (name == place ? nil : results.first)
+        }
+        if found == nil { found = await WeatherPlace.search(place).first }
+        guard let found else { return nil }
+        return try? await TodayWeather.fetch(at: found.coordinate, place: found.name)
     }
 }
