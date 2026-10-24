@@ -6,6 +6,7 @@ import SwiftUI
 /// throw it up to close it. Pull the bottom row up to go back to your page.
 struct TabStackView: View {
     @Environment(BrowserModel.self) private var browser
+    @Query private var todos: [Todo]
     /// The card centred in the carousel; follows scrolling.
     @State private var focused: BrowserTab.ID?
     /// How far the whole switcher has been pulled up (negative), following the finger.
@@ -128,6 +129,8 @@ struct TabStackView: View {
                 browser.showCommandBar(mode: .privateTab)
             }
             Spacer(minLength: 8)
+            roundButton(.today, "Today") { browser.panel = .today }
+            Spacer(minLength: 8)
             Button { browser.showCommandBar() } label: {
                 Glyph(.plus, size: 22, weight: 2)
                     .frame(width: 104, height: 48)
@@ -137,6 +140,8 @@ struct TabStackView: View {
             }
             .buttonStyle(GlyphButtonStyle())
             .accessibilityLabel("New tab")
+            Spacer(minLength: 8)
+            todoButton
             Spacer(minLength: 8)
             roundButton(.settings, "Settings") { browser.panel = .settings }
         }
@@ -156,6 +161,22 @@ struct TabStackView: View {
         }
         .buttonStyle(GlyphButtonStyle())
         .accessibilityLabel(label)
+    }
+
+    /// To-do, with how many are left today on its corner while any are.
+    private var todoButton: some View {
+        let left = todos.filter(\.isDueNow).count
+        return Button { browser.panel = .todos } label: {
+            Group {
+                if left > 0 { TodoIcon(left: left, size: 22) } else { Glyph(.todo, size: 20) }
+            }
+            .frame(width: 48, height: 48)
+            .background(Theme.raised, in: .circle)
+            .overlay(Circle().strokeBorder(Theme.edge))
+            .contentShape(.circle)
+        }
+        .buttonStyle(GlyphButtonStyle())
+        .accessibilityLabel(left > 0 ? "To-do, \(left) left for today" : "To-do")
     }
 
     private var pullUp: some Gesture {

@@ -152,7 +152,7 @@ struct WorkingGlow: View {
                     Image(uiImage: grain)
                         .resizable(resizingMode: .tile)
                         .blendMode(.overlay)
-                        .opacity(0.28)
+                        .opacity(0.5)
                         .mask(falloff)
                 }
             }
@@ -162,16 +162,20 @@ struct WorkingGlow: View {
 /// A small tile of fine monochrome noise, made once from random bytes.
 /// (Core Image made it in 90 ms, most of it setting up a CIContext: a hitch
 /// the first time a light showed. This takes well under a millisecond.)
+/// One noise dot per screen pixel, and only a little either side of middle
+/// grey (neutral under overlay): enough to keep a gradient from banding,
+/// too fine and faint to read as static.
 nonisolated enum Grain {
     static let image: UIImage? = {
-        let side = 128
+        let side = 192
         var pixels = [UInt8](repeating: 0, count: side * side)
         arc4random_buf(&pixels, pixels.count)
+        for index in pixels.indices { pixels[index] = 112 + pixels[index] % 33 }
         guard let provider = CGDataProvider(data: Data(pixels) as CFData),
               let cgImage = CGImage(width: side, height: side, bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: side,
                                     space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGBitmapInfo(rawValue: 0),
                                     provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
         else { return nil }
-        return UIImage(cgImage: cgImage)
+        return UIImage(cgImage: cgImage, scale: 3, orientation: .up)
     }()
 }

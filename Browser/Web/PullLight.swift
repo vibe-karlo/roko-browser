@@ -1,12 +1,12 @@
 import SwiftUI
 import UIKit
 
-/// roko's light, pouring in from the top edge while a pull would summarize:
-/// nothing during the plain reload stage, then it grows past the reload point
-/// and is full once "Summarize" shows. Orange means roko's AI, as the light
-/// behind Browse for Me and Summarize does.
+/// A dusk falling from the top edge while a pull would summarize: nothing
+/// during the plain reload stage, then it deepens past the reload point and
+/// is full once "Summarize" shows. It's the summary's own dark, so a release
+/// hands straight into the summary instead of an orange wash over the page.
 ///
-/// Cheap by construction: the light is drawn once per appearance (light or
+/// Cheap by construction: the shade is drawn once per appearance (light or
 /// dark) into a small image, and a pull only moves, stretches and fades that
 /// image. No frame redraws anything.
 final class PullLight: UIImageView {
@@ -35,7 +35,7 @@ final class PullLight: UIImageView {
             transform = .identity
             let top = -container.convert(CGPoint.zero, to: window).y
             let width = container.bounds.width
-            frame = CGRect(x: -width * 0.3, y: top, width: width * 1.6, height: window.bounds.height * Self.reach)
+            frame = CGRect(x: 0, y: top, width: width, height: window.bounds.height * Self.reach)
         }
         let height = bounds.height
         let stretch = 0.3 + 0.7 * strength
@@ -82,47 +82,32 @@ final class PullLight: UIImageView {
         return image
     }
 
-    /// WorkingGlow's stops, in the orange for the page's brightness. On a light
-    /// page it warms toward amber, more than in WorkingGlow: over white, plain
-    /// orange light reads as salmon.
+    /// The summary's canvas, falling off over many stops so it eases out
+    /// rather than ending in a line. Deeper over a light page, where a faint
+    /// dark reads as grey haze rather than dusk.
     private static func colors(onLightPage: Bool) -> [CGColor] {
-        let traits = UITraitCollection(userInterfaceStyle: onLightPage ? .light : .dark)
-        let accent = UIColor(Theme.accent).resolvedColor(with: traits)
-        let amber = UIColor(red: 0.96, green: 0.65, blue: 0.14, alpha: 1)
-        return stops.map { stop in
-            let warmth = onLightPage ? min(1, stop.warmth + 0.3) : 0
-            return mix(accent, amber, warmth).withAlphaComponent(stop.alpha).cgColor
-        }
+        let traits = UITraitCollection(userInterfaceStyle: .dark)
+        let dusk = UIColor(Theme.canvas).resolvedColor(with: traits)
+        let strength: CGFloat = onLightPage ? 1 : 0.9
+        return stops.map { dusk.withAlphaComponent($0 * strength).cgColor }
     }
 
-    /// Stronger than WorkingGlow's: it only shows for the moment of a pull, over a page.
-    private static let stops: [(alpha: CGFloat, warmth: CGFloat, location: CGFloat)] = [
-        (0.95, 0, 0), (0.78, 0.25, 0.16), (0.55, 0.5, 0.34), (0.32, 0.65, 0.52), (0.13, 0.8, 0.72), (0, 0.8, 1),
-    ]
+    /// Eased: most of the shade near the edge, a long soft tail.
+    private static let stops: [CGFloat] = [0.96, 0.9, 0.78, 0.6, 0.4, 0.22, 0.09, 0.02, 0]
+    private static let locations: [CGFloat] = [0, 0.12, 0.25, 0.38, 0.52, 0.66, 0.8, 0.92, 1]
 
-    /// The lower half of an ellipse centred on the top edge, with grain
-    /// dithered into it so it can't band. Safe on any thread.
+    /// A vertical fall-off, drawn tall so stretching it never shows steps.
+    /// Safe on any thread.
     nonisolated private static func draw(_ colors: [CGColor]) -> UIImage {
-        let size = CGSize(width: 320, height: 240)
+        let size = CGSize(width: 4, height: 512)
         let format = UIGraphicsImageRendererFormat()
-        format.scale = 2
+        format.scale = 1
         format.opaque = false
-        let locations: [CGFloat] = [0, 0.16, 0.34, 0.52, 0.72, 1]
+        format.preferredRange = .extended
         return UIGraphicsImageRenderer(size: size, format: format).image { context in
-            let cg = context.cgContext
-            guard let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: colors as CFArray,
+            guard let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.extendedSRGB), colors: colors as CFArray,
                                             locations: locations) else { return }
-            cg.saveGState()
-            cg.translateBy(x: size.width / 2, y: 0)
-            cg.scaleBy(x: size.width / 2, y: size.height)
-            cg.drawRadialGradient(gradient, startCenter: .zero, startRadius: 0, endCenter: .zero, endRadius: 1, options: [])
-            cg.restoreGState()
-            // Grain only where there's light: atop keeps the light's own alpha.
-            if let grain = Grain.image?.cgImage {
-                cg.setBlendMode(.sourceAtop)
-                cg.setAlpha(0.1)
-                cg.draw(grain, in: CGRect(x: 0, y: 0, width: 64, height: 64), byTiling: true)
-            }
+            context.cgContext.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: 0, y: size.height), options: [])
         }
     }
 

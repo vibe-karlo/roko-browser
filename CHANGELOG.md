@@ -6,11 +6,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Today and To-do in the tab switcher's bottom row, either side of the new-tab button; To-do carries how many are left today.
 - To-dos can have a time: long-press, Date and Time…, switch Time on. A notification (with sound, unlike the quiet daily reminders) comes 15 minutes before; it's withdrawn if the to-do is ticked off, moved or deleted. From the bar: "todo call Petra tomorrow at 15", "… u 15h", "… at 3pm" or "… 9:30". The time shows under the to-do, in Today and in the bar.
 - Drag a to-do to reorder it, or into another section to move it there (into Tomorrow, This week, Someday…). The order holds in Today and the bar too.
 - Today → tap the weather (or Settings → Today → Weather) to pick a town instead of where you are, found by name through Open-Meteo; a town needs no location permission.
 - Today follows pages and topics, not just whole sites. Add a page by its address (glas-slavonije.hr/sport/nk-osijek) and it gets a section of its own with only its stories: from its own feed if it has one, else read from the page itself. Add a topic ("NK Osijek") and Today finds stories about it in the major Croatian news feeds and yours; for a topic of more than one word, Apple's on-device model drops the ones about something else that shares a word.
 - The address bar as a launcher for to-dos. "todo call Petra tomorrow" (or "+call Petra") adds one, for today unless it ends in tomorrow, this week, someday or their Croatian words, and Return adds it. Anything else you type can be kept too: Add to-do sits under Browse for Me. Typing "todo" brings today's to-dos up under the To-do row, to tick off there; otherwise the bar shows only the to-do icon with how many are left, beside your pins.
+- The orange light is smooth: its grain is one fine dot per screen pixel, only a little either side of neutral, instead of full-strength noise drawn three times too big.
 - Today's weather fits the screen: the day's range and rain sit under the condition instead of running off the edge, and the next twelve hours show every other hour, spread across the width rather than scrolling off it.
 - Today → Calendars (and Settings → Today → Calendars): pick which calendars Today shows, grouped by account. A calendar added later shows up until you untick it.
 - Reminders, silent and at most two a day: at 8:30 if you haven't looked at Today, and at 16:00 if today's to-dos are still open (withdrawn once they're done). Tapping one opens Today or To-do. Settings → Today → Reminders turns them off.
@@ -23,7 +25,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Settings → Appearance: Automatic, Light or Dark, for the whole app and the pages in it.
 - Settings → Answer language: Automatic, or one of about thirty languages (Hrvatski, Srpski in Latin or Cyrillic, Bosanski, Slovenščina, Deutsch...) for summaries, Browse for Me and Notify Me. A language Apple's models write badly goes to Claude, and the setting says that's slower and paid.
 - Text in Summarize and Browse for Me can be selected: long-press a word, drag the handles, then Copy, Look Up or Translate.
-- roko's orange light in more places: it pours in from the top while a long pull would summarize (warming to amber on light pages), floods the whole screen as a Browse for Me answer or a summary arrives, then dissolves so the answer is read on dark; and it rises under "Answered by roko" at the end of a shared page.
+- roko's orange light in more places: a long pull that would summarize brings a dusk down from the top edge in the summary's own dark (so a release hands straight into the summary instead of washing the page orange), the orange floods the whole screen as a Browse for Me answer or a summary arrives, then dissolves so the answer is read on dark; and it rises under "Answered by roko" at the end of a shared page.
 - Share in Browse for Me, as in Arc: the page becomes a short link anyone can open, laid out as in the app (opening on the answer, without the question above it), light or dark, signed "Answered by roko" with the Eclipse mark. Sharing again after a follow-up updates the same link. Settings → Shared pages lists them; swipe to unshare. The server is in `Server/share` (Cloudflare Worker and D1), ready to deploy once there's a domain; until then Share is hidden.
 - Full-screen Summarize: the page shrinks into a card, then the summary writes itself.
 - Structured answers for Summarize and Browse for Me: a gist, then sections with topic icons.
