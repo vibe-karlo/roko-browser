@@ -189,29 +189,25 @@ struct SummaryView: View {
         .animation(.smooth(duration: 0.5), value: model.text.isEmpty)
     }
 
-    /// Who wrote it, and the way back to the page, always in reach.
+    /// Who wrote it, then the app's bar: back to the page, and a question
+    /// about it from the middle.
     private var footer: some View {
-        HStack(spacing: 12) {
-            // Signed, so a screenshot says where it came from; who wrote it beside.
-            RokoSignature()
-            Text(model.phase == .done ? Self.credit(model.engine) + (model.note.map { " · \($0)" } ?? "") : "")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.faintInk)
-                .lineLimit(2)
-            Spacer(minLength: 8)
-            Button(action: close) {
-                Glyph(.close, size: 15, weight: 2)
-                    .frame(width: 40, height: 40)
-                    .background(Theme.raised, in: .circle)
-                    .contentShape(.circle)
+        VStack(spacing: 6) {
+            HStack(spacing: 12) {
+                // Signed, so a screenshot says where it came from; who wrote it beside.
+                RokoSignature()
+                Text(model.phase == .done ? Self.credit(model.engine) + (model.note.map { " · \($0)" } ?? "") : "")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.faintInk)
+                    .lineLimit(2)
+                Spacer(minLength: 0)
             }
-            .buttonStyle(GlyphButtonStyle())
-            .accessibilityLabel("Back to the page")
+            .padding(.horizontal, 22)
+            ContextBar(leading: .init(glyph: .close, label: "Back to the page", action: close),
+                       glyph: .browse, title: "Ask about this page",
+                       launch: { browser.showCommandBar(context: .aboutPage) }, fades: false)
         }
-        .padding(.horizontal, 22)
-        // Low: the home indicator is thin, its whole strip needn't stay empty.
         .padding(.top, 6)
-        .padding(.bottom, -10)
         // See-through while the light is up, so its brightest part shows.
         // At the light's own pace, so no dark band crosses it as it sinks or floods.
         .background(Theme.canvas.opacity(edgesClear ? 0 : 1))

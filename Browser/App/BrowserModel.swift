@@ -13,6 +13,18 @@ final class BrowserModel {
         case newTab, currentTab, privateTab
     }
 
+    /// What the launcher is for, from the screen it was opened on.
+    enum LauncherContext: Equatable {
+        /// Addresses, searches and answers: the browser's own.
+        case web
+        /// To-do: what's typed is a new to-do.
+        case todo
+        /// Browse for Me: what's typed is a follow-up.
+        case followUp
+        /// A summary: what's typed is a question about the page.
+        case aboutPage
+    }
+
     /// Live web views kept in memory; older tabs hibernate to a snapshot.
     static let liveTabLimit = 3
 
@@ -21,6 +33,9 @@ final class BrowserModel {
     var panel: Panel = .none
     var commandPrefill = ""
     var commandMode: CommandMode = .newTab
+    var launcherContext: LauncherContext = .web
+    /// The screen the launcher was opened over, shown again when it closes.
+    var launcherReturn: Panel = .none
     var isBarCollapsed = false
     var summary: SummaryModel? {
         // Closed before it's finished: stop there, as Browse for Me does.
@@ -300,9 +315,12 @@ final class BrowserModel {
         panel = .tabs
     }
 
-    func showCommandBar(prefill: String = "", mode: CommandMode = .newTab) {
+    func showCommandBar(prefill: String = "", mode: CommandMode = .newTab,
+                        context: LauncherContext = .web, over screen: Panel = .none) {
         commandPrefill = prefill
         commandMode = mode
+        launcherContext = context
+        launcherReturn = screen
         panel = .command
         // The address bar offers the copied link itself.
         copiedLinkOffer = false
@@ -315,6 +333,16 @@ final class BrowserModel {
         case .newTab: open(url, inNewTab: true)
         case .privateTab: open(url, inNewTab: true, isPrivate: true)
         }
+    }
+
+    /// A question about a summarized page: Browse for Me, with the summary as
+    /// what's already been said, so the answer builds on it.
+    func ask(_ question: String, about summary: SummaryModel) {
+        let session = BrowseSession(question: question,
+                                    context: [(question: "Summarize \(summary.title) (\(summary.host))", answer: summary.text)])
+        summaryCoversPage = false
+        self.summary = nil
+        browseForMe = session
     }
 
     /// Opens the full-screen summary: the page on screen shrinks into its card.

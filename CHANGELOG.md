@@ -6,6 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- One bar across the app, shaped for the screen it's on: the browser's tabs, launcher and page menu; in To-do, close and "New to-do"; in Today, close, Search and Refresh; in Browse for Me, close, "Ask a follow-up" and Share; in a summary, close and "Ask about this page". The middle always opens the same launcher, set up for that screen: in To-do it reads the to-do in words and stays up for the next; in an answer it asks a follow-up (or offers the suggested ones); in a summary it asks Browse for Me about the page, with the summary as context. To-do's own field at the bottom is gone.
 - What's next on your calendar in the address bar: type "calendar", "next" or "kalendar" for the next event ("In 25 min, at 14:30 · Office", "Tomorrow at 9:00"); Return opens Calendar there. Pin it like the weather to keep it under the empty field.
 - Pin answers like pages: long-press the weather ("vrijeme", "vrijeme u Zagrebu"), "days until 24.12.", "100 eur in usd" or any sum, and choose Pin. It sits with your pins under the empty address field, worked out again each time you open it; long-press to unpin.
 - Feels like: Today's weather and the bar's weather rows say what it feels like (with wind and humidity) when that's different from the temperature.

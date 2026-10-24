@@ -5,7 +5,7 @@ struct CommandItem: Identifiable {
     enum Action {
         case open(URL), switchTab(BrowserTab), openPin(Pin), search(String),
              browse(String), summarize, findOnPage, privateTab, settings, copy(String),
-             pasteLink, openCopied(URL), todos, today, openApp(URL), addTodo(String, TodoWhen, DateComponents?)
+             pasteLink, openCopied(URL), todos, today, openApp(URL), ask(String), askAboutPage(String), addTodo(String, TodoWhen, DateComponents?)
     }
 
     let id: String
@@ -97,7 +97,7 @@ struct CommandBarView: View {
             focused = true
         }
         .task {
-            guard await CopiedLink.isWaiting() else { return }
+            guard browser.launcherContext == .web, await CopiedLink.isWaiting() else { return }
             copiedURL = await CopiedLink.peek()
             // The page you're on isn't worth a row.
             if let copiedURL, browser.isCurrentPage(copiedURL) { return }
@@ -154,7 +154,7 @@ struct CommandBarView: View {
         .task(id: query) {
             // A short pause so suggestions aren't requested for every keystroke.
             let text = query.trimmingCharacters(in: .whitespaces)
-            guard UserDefaults.standard.object(forKey: "suggestions") as? Bool ?? true,
+            guard browser.launcherContext == .web, UserDefaults.standard.object(forKey: "suggestions") as? Bool ?? true,
                   text.count >= 2, Omnibox.url(from: text) == nil else {
                 suggestions = []
                 return
@@ -179,6 +179,7 @@ struct CommandBarView: View {
         ScrollView {
             LazyVStack(spacing: 2) {
                 // Best match first, right under the field.
+                if browser.launcherContext == .todo && query.isEmpty && !dueTodos.isEmpty { todoWidget }
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     Group {
                         if case .pasteLink = item.action {
@@ -343,7 +344,7 @@ struct CommandBarView: View {
                 if let shown {
                     RowIcon(icon: shown.icon)
                 } else {
-                    Glyph(showsPrivate ? .eyeClosed : .search, size: 18)
+                    Glyph(showsPrivate ? .eyeClosed : contextGlyph, size: 18)
                         .foregroundStyle(showsPrivate ? Theme.accent : Theme.secondaryInk)
                 }
             }
@@ -408,8 +409,10 @@ struct CommandBarView: View {
                 .transition(.opacity)
             } else {
                 // Same spot: the private switch while empty, the clear button once typing.
-                privateSwitch
-                    .transition(.opacity)
+                if browser.launcherContext == .web {
+                    privateSwitch
+                        .transition(.opacity)
+                }
             }
         }
         .animation(.easeOut(duration: 0.15), value: query.isEmpty)
@@ -446,9 +449,24 @@ struct CommandBarView: View {
     }
 
     private var placeholder: String {
-        switch browser.commandMode {
-        case .privateTab: "Private search or address"
-        case .currentTab, .newTab: "Search or enter address"
+        switch browser.launcherContext {
+        case .todo: return "New to-do, e.g. Call Petra on Monday at 15"
+        case .followUp: return "Ask a follow-up"
+        case .aboutPage: return "Ask about this page"
+        case .web:
+            switch browser.commandMode {
+            case .privateTab: return "Private search or address"
+            case .currentTab, .newTab: return "Search or enter address"
+            }
+        }
+    }
+
+    /// The field's mark: what typing here does.
+    private var contextGlyph: Glyph.Kind {
+        switch browser.launcherContext {
+        case .web: .search
+        case .todo: .todo
+        case .followUp, .aboutPage: .browse
         }
     }
 
@@ -470,10 +488,39 @@ struct CommandBarView: View {
 
     private func dismiss() {
         focused = false
-        browser.panel = .none
+        browser.panel = browser.launcherReturn
     }
 
     // MARK: Ranking
+
+    /// What the launcher offers on a screen other than a page: the to-do
+    /// being typed, a follow-up to ask (or the answer's suggested ones), a
+    /// question about the summarized page.
+    private func contextRows() -> [CommandItem] {
+        let text = query.trimmingCharacters(in: .whitespaces)
+        switch browser.launcherContext {
+        case .web:
+            return []
+        case .todo:
+            guard let read = TodoDraft.read(text) else { return [] }
+            let when = read.when ?? .today
+            return [CommandItem(id: "add-todo", title: read.title, subtitle: "New to-do for " + TodoDraft.phrase(when, read.time),
+                                kind: "Add", icon: .glyph(.todo), action: .addTodo(read.title, when, read.time))]
+        case .followUp:
+            if !text.isEmpty {
+                return [CommandItem(id: "ask", title: text, subtitle: "Ask a follow-up", kind: "AI",
+                                    icon: .glyph(.browse), action: .ask(text))]
+            }
+            // Nothing typed: what the answer suggests asking next.
+            return (browser.browseForMe?.latest.followUps ?? []).map {
+                CommandItem(id: "suggested-\($0)", title: $0, subtitle: "", kind: "", icon: .glyph(.browse), action: .ask($0))
+            }
+        case .aboutPage:
+            guard !text.isEmpty else { return [] }
+            return [CommandItem(id: "ask", title: text, subtitle: "Ask about this page", kind: "AI",
+                                icon: .glyph(.browse), action: .askAboutPage(text))]
+        }
+    }
 
     /// A weather answer: now, the day under it.
     static func weatherRow(id: String, _ weather: TodayWeather, action: CommandItem.Action) -> CommandItem {
@@ -482,6 +529,10 @@ struct CommandBarView: View {
     }
 
     private func rebuild() {
+        guard browser.launcherContext == .web else {
+            items = contextRows()
+            return
+        }
         items = CommandRanker.rank(query: query, browser: browser, suggestions: suggestions)
         // A town's weather, asked for by name: first, as the answer.
         if let (asked, weather) = placeWeather, asked == query, WeatherQuery.place(in: query) != nil {
@@ -574,10 +625,22 @@ struct CommandBarView: View {
             todo.order = (todos.map(\.order).max() ?? 0) + 1
             context.insert(todo)
             try? context.save()
-            browser.panel = .none
             if time != nil { TodoAlerts.askIfNeeded() }
             browser.showToast(when == .today && time == nil ? "Added to today's to-dos"
                               : "To-do added for \(TodoDraft.phrase(when, time))")
+            if browser.launcherContext == .todo {
+                // In To-do: ready for the next one, the list showing it behind.
+                query = ""
+                focused = true
+            } else {
+                browser.panel = .none
+            }
+        case .ask(let question):
+            browser.panel = .none
+            browser.browseForMe?.ask(question)
+        case .askAboutPage(let question):
+            browser.panel = .none
+            if let summary = browser.summary { browser.ask(question, about: summary) }
         case .copy(let result):
             UIPasteboard.general.string = result
             browser.panel = .none

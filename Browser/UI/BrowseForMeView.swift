@@ -116,43 +116,23 @@ struct BrowseForMeView: View {
     // MARK: Footer
 
     private var footer: some View {
-        HStack(spacing: 12) {
-            // Signed, so a screenshot says where it came from.
-            RokoSignature()
-            AnswerOrSearch(showsSearch: $session.showsSearch)
-            Spacer(minLength: 8)
-            // Once there's an answer to show for it.
-            if AnswerSharing.isAvailable, session.turns.contains(where: { $0.phase == .done }) {
-                Button(action: share) {
-                    Group {
-                        if session.isSharing {
-                            ProgressView().tint(Theme.ink)
-                        } else {
-                            Glyph(.share, size: 16, weight: 2)
-                        }
-                    }
-                    .frame(width: 40, height: 40)
-                    .background(Theme.raised, in: .circle)
-                    .contentShape(.circle)
-                }
-                .buttonStyle(GlyphButtonStyle())
-                .disabled(session.isSharing)
-                .accessibilityLabel("Share this page")
-                .transition(.opacity)
+        VStack(spacing: 6) {
+            // The page's own line: signed for screenshots, and AI or the search engine's results.
+            HStack(spacing: 12) {
+                RokoSignature()
+                Spacer(minLength: 8)
+                AnswerOrSearch(showsSearch: $session.showsSearch)
             }
-            Button(action: close) {
-                Glyph(.close, size: 15, weight: 2)
-                    .frame(width: 40, height: 40)
-                    .background(Theme.raised, in: .circle)
-                    .contentShape(.circle)
-            }
-            .buttonStyle(GlyphButtonStyle())
-            .accessibilityLabel("Close")
+            .padding(.horizontal, 22)
+            // The app's bar, for an answer: a follow-up from its middle, share beside it.
+            ContextBar(leading: .init(glyph: .close, label: "Close", action: close),
+                       glyph: .browse, title: "Ask a follow-up",
+                       launch: { browser.showCommandBar(context: .followUp) }, 
+                       trailing: AnswerSharing.isAvailable && session.turns.contains(where: { $0.phase == .done })
+                           ? .init(glyph: .share, label: "Share this page", action: share) : nil,
+                       fades: false)
         }
-        .padding(.horizontal, 22)
-        // Low: the home indicator is thin, its whole strip needn't stay empty.
         .padding(.top, 6)
-        .padding(.bottom, -10)
         // See-through while the light is up, so its brightest part shows.
         // It turns solid at the light's own pace, so no dark band crosses the light as it sinks.
         .background(Theme.canvas.opacity(edgesClear && !session.showsSearch ? 0 : 1))
@@ -167,6 +147,7 @@ struct BrowseForMeView: View {
 
     /// Uploads the page (or its follow-ups since), then offers the link.
     private func share() {
+        guard !session.isSharing else { return }
         session.isSharing = true
         Task {
             defer { session.isSharing = false }

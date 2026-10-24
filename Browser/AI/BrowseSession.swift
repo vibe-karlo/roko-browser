@@ -18,8 +18,8 @@ final class BrowseSession: Identifiable {
         didSet { if showsSearch { loadSearchIfNeeded() } }
     }
 
-    init(question: String) {
-        let first = BrowseForMeModel(query: question)
+    init(question: String, context: [(question: String, answer: String)] = []) {
+        let first = BrowseForMeModel(query: question, context: context)
         turns = [first]
         first.start()
     }

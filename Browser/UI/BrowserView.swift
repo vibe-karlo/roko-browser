@@ -78,13 +78,6 @@ struct BrowserView: View {
                 .ignoresSafeArea(.keyboard, edges: .bottom)
         }
         .overlay {
-            if browser.panel == .command {
-                CommandBarView()
-                    // Quick: it swaps places with the bar, and the keyboard brings the motion.
-                    .transition(.opacity.animation(.easeOut(duration: 0.12)))
-            }
-        }
-        .overlay {
             if browser.panel == .tabs {
                 // Arrives from below; leaves upward, continuing the pull that uncovers the page.
                 // Full screen: its own bottom row replaces the bar it would sit above.
@@ -105,13 +98,13 @@ struct BrowserView: View {
             }
         }
         .overlay {
-            if browser.panel == .today {
+            if browser.panel == .today || browser.panel == .command && browser.launcherReturn == .today {
                 TodayView()
                     .transition(.move(edge: .bottom))
             }
         }
         .overlay {
-            if browser.panel == .todos {
+            if browser.panel == .todos || browser.panel == .command && browser.launcherReturn == .todos {
                 // Full screen, rising from the bar like Browse for Me.
                 TodoView()
                     .transition(.move(edge: .bottom))
@@ -130,6 +123,14 @@ struct BrowserView: View {
                 // Full screen; it animates the page into its card itself.
                 SummaryView(model: summary)
                     .transition(.identity)
+            }
+        }
+        .overlay {
+            if browser.panel == .command {
+                // Over whatever screen it was opened from, which stays under it.
+                CommandBarView()
+                    // Quick: it swaps places with the bar, and the keyboard brings the motion.
+                    .transition(.opacity.animation(.easeOut(duration: 0.12)))
             }
         }
         .overlay(alignment: .bottom) {

@@ -5,14 +5,12 @@ import SwiftUI
 /// when each to-do is for: Overdue, Today, Tomorrow, This week, Later, Someday.
 /// Tap the circle to tick one off, tap its words to change them, long-press
 /// to move it to another day, give it a time, or delete it; drag it to put it
-/// somewhere else in its section or into another. New ones are typed at the bottom,
+/// somewhere else in its section or into another. New ones come from the bar,
 /// where the thumb is. Pull down past the top to close it.
 struct TodoView: View {
     @Environment(BrowserModel.self) private var browser
     @Environment(\.modelContext) private var context
     @Query(sort: \Todo.createdAt) private var todos: [Todo]
-    @State private var draft = ""
-    @State private var draftWhen: TodoWhen = .today
     /// Ticked a moment ago: still shown, struck through, so a slip can be undone.
     @State private var justDone: Set<PersistentIdentifier> = []
     @State private var editing: PersistentIdentifier?
@@ -73,7 +71,7 @@ struct TodoView: View {
             dropped()
             return true
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) { footer }
+        .safeAreaInset(edge: .bottom, spacing: 0) { bar }
         .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas) }
         .background(Theme.canvas.ignoresSafeArea())
         .foregroundStyle(Theme.ink)
@@ -249,73 +247,17 @@ struct TodoView: View {
         Button(role: .destructive) { delete(todo) } label: { Label("Delete", systemImage: "trash") }
     }
 
-    // MARK: Footer
+    // MARK: Bar
 
-    private var footer: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 8) {
-                // Return adds it and the keyboard stays up for the next one.
-                ReturnKeepingField(placeholder: "New to-do", text: $draft, onReturn: add)
-                    .frame(height: 44)
-                Menu {
-                    Picker("When", selection: $draftWhen) {
-                        Text("Today").tag(TodoWhen.today)
-                        Text("Tomorrow").tag(TodoWhen.tomorrow)
-                        Text("This Week").tag(TodoWhen.thisWeek)
-                        Text("Someday").tag(TodoWhen.someday)
-                    }
-                } label: {
-                    // What the words say when they say it ("… on Monday at 13"),
-                    // else the picked day.
-                    Text(whenLabel)
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(Theme.accentText)
-                        .lineLimit(1)
-                        .fixedSize()
-                        .frame(minHeight: 44)
-                        .contentShape(.rect)
-                        .animation(.snappy(duration: 0.2), value: whenLabel)
-                }
-                .accessibilityLabel("When: \(whenLabel)")
-            }
-            .padding(.leading, 18)
-            .padding(.trailing, 14)
-            .frame(height: 52)
-            .background(Theme.raised, in: .rect(cornerRadius: 18))
-            .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.edge))
-        }
-        // No close button: pulling the list down past its top closes it.
-        .padding(.horizontal, 22)
-        .padding(.vertical, 10)
-        .background(Theme.canvas)
-        .background(alignment: .top) { FadeEdge(color: Theme.canvas) }
-    }
-
-    /// The draft's own day and time, if it names any.
-    private var understood: (title: String, when: TodoWhen?, time: DateComponents?)? {
-        guard let read = TodoDraft.read(draft), read.when != nil || read.time != nil else { return nil }
-        return read
-    }
-
-    private var whenLabel: String {
-        guard let understood else { return TodoDraft.label(draftWhen) }
-        return TodoDraft.label(understood.when ?? draftWhen, understood.time)
+    /// The app's bar, for To-do: the launcher in its middle takes a new to-do
+    /// in words ("Call Petra on Monday at 15"), and stays up for the next.
+    private var bar: some View {
+        ContextBar(leading: .init(glyph: .close, label: "Close", action: close),
+                   glyph: .plus, title: "New to-do",
+                   launch: { browser.showCommandBar(context: .todo, over: .todos) })
     }
 
     // MARK: Changes
-
-    private func add() {
-        let title = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty else { return }
-        // "Call Petra on Monday at 13:00": Monday, 13:00, as in the address bar.
-        let todo = understood.map { Todo(title: $0.title, when: $0.when ?? draftWhen, at: $0.time) }
-            ?? Todo(title: title, when: draftWhen)
-        if todo.time != nil { TodoAlerts.askIfNeeded() }
-        todo.order = (todos.map(\.order).max() ?? 0) + 1
-        withAnimation(.snappy) { context.insert(todo) }
-        save()
-        draft = ""
-    }
 
     private func toggle(_ todo: Todo) {
         let id = todo.persistentModelID
@@ -506,55 +448,6 @@ private struct DayPicker: View {
             hasTime = time != nil
             // A new time starts at the next whole hour.
             clock = time ?? Calendar.current.nextDate(after: .now, matching: DateComponents(minute: 0), matchingPolicy: .nextTime) ?? .now
-        }
-    }
-}
-
-/// A one-line field whose Return doesn't put the keyboard away: SwiftUI's
-/// always gives up focus on Return, and the first letters typed after it
-/// were lost while it came back. UIKit's asks first, and here the answer is no.
-private struct ReturnKeepingField: UIViewRepresentable {
-    let placeholder: String
-    @Binding var text: String
-    let onReturn: () -> Void
-
-    func makeUIView(context: Context) -> UITextField {
-        let field = UITextField()
-        field.delegate = context.coordinator
-        field.font = .systemFont(ofSize: 17)
-        field.textColor = UIColor(Theme.ink)
-        field.tintColor = UIColor(Theme.accent)
-        field.attributedPlaceholder = NSAttributedString(string: placeholder,
-                                                         attributes: [.foregroundColor: UIColor(Theme.secondaryInk)])
-        field.returnKeyType = .done
-        field.autocapitalizationType = .sentences
-        field.addTarget(context.coordinator, action: #selector(Coordinator.changed(_:)), for: .editingChanged)
-        field.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        return field
-    }
-
-    func updateUIView(_ field: UITextField, context: Context) {
-        context.coordinator.parent = self
-        if field.text != text { field.text = text }
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
-
-    final class Coordinator: NSObject, UITextFieldDelegate {
-        var parent: ReturnKeepingField
-
-        init(parent: ReturnKeepingField) {
-            self.parent = parent
-        }
-
-        @objc func changed(_ field: UITextField) {
-            parent.text = field.text ?? ""
-        }
-
-        func textFieldShouldReturn(_ field: UITextField) -> Bool {
-            parent.onReturn()
-            return false
         }
     }
 }

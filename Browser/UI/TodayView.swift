@@ -59,6 +59,15 @@ struct TodayView: View {
             if pulled { browser.panel = .none }
         }
         .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas) }
+        // The app's bar, for Today: search from here, refresh it.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            ContextBar(leading: .init(glyph: .close, label: "Close") { browser.panel = .none },
+                       glyph: .search, title: "Search",
+                       launch: { browser.showCommandBar(over: .today) },
+                       trailing: .init(glyph: .reload, label: "Refresh") { Task { await today.refresh() } },
+                       // A dark edge would cut across the morning light.
+                       fades: false)
+        }
         .background {
             ZStack {
                 Theme.canvas
