@@ -5,7 +5,7 @@ struct CommandItem: Identifiable {
     enum Action {
         case open(URL), switchTab(BrowserTab), openPin(Pin), search(String),
              browse(String), summarize, findOnPage, privateTab, settings, copy(String),
-             pasteLink, openCopied(URL)
+             pasteLink, openCopied(URL), todos
     }
 
     let id: String
@@ -26,6 +26,7 @@ struct CommandItem: Identifiable {
 struct CommandBarView: View {
     @Environment(BrowserModel.self) private var browser
     @Query(sort: \Pin.order) private var pins: [Pin]
+    @Query private var todos: [Todo]
     @State private var query = ""
     @State private var items: [CommandItem] = []
     @State private var suggestions: [String] = []
@@ -56,7 +57,7 @@ struct CommandBarView: View {
 
             VStack(spacing: 0) {
                 results
-                if query.isEmpty && !pins.isEmpty { pinRow }
+                if query.isEmpty && (!pins.isEmpty || todos.contains(where: \.isDueNow)) { pinRow }
                 field
             }
             .foregroundStyle(Theme.ink)
@@ -162,6 +163,10 @@ struct CommandBarView: View {
     private var pinRow: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 0) {
+                // Today's to-dos first, while there are any.
+                TodoPin(size: 28) { icon in
+                    icon.frame(width: 52, height: 48).contentShape(.rect)
+                }
                 ForEach(pins) { pin in
                     let name = pin.title.isEmpty ? pin.host : pin.title
                     Button { focused = false; browser.open(pin) } label: {
@@ -313,6 +318,7 @@ struct CommandBarView: View {
             browser.selectedTab?.webView?.findInteraction?.presentFindNavigator(showingReplace: false)
         case .privateTab: browser.showCommandBar(mode: .privateTab)
         case .settings: browser.panel = .settings
+        case .todos: browser.panel = .todos
         case .copy(let result):
             UIPasteboard.general.string = result
             browser.panel = .none
@@ -477,11 +483,17 @@ enum CommandRanker {
                                                   kind: "Action", icon: .glyph(.search), action: .findOnPage)),
             (["settings", "preferences", "api key"], CommandItem(id: "action-settings", title: "Settings", subtitle: "",
                                                                  kind: "Action", icon: .glyph(.settings), action: .settings)),
+            (["to-do", "todo", "todos", "to do", "tasks"], CommandItem(id: "action-todos", title: "To-do", subtitle: "",
+                                                                       kind: "Action", icon: .glyph(.todo), action: .todos)),
         ]
         for (words, item) in actions where words.contains(where: { $0.hasPrefix(needle) }) {
             let needsPage = ["action-summarize", "action-find"].contains(item.id)
             if needsPage && browser.selectedTab == nil { continue }
-            ranked.append((needle.count >= 3 ? 880 : 500, item))
+            // Typed in full, a place in roko (Settings, To-do) is what's meant,
+            // not a web search for the word: it goes first, and Return opens it.
+            let isPlace = ["action-settings", "action-todos"].contains(item.id)
+            let exact = words.contains(needle)
+            ranked.append((isPlace && exact ? 990 : needle.count >= 3 ? 880 : 500, item))
         }
 
         // The engine often suggests exactly what was typed (give or take a

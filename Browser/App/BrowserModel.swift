@@ -6,7 +6,7 @@ import WebKit
 @Observable
 final class BrowserModel {
     enum Panel: Equatable {
-        case none, command, tabs, tools, settings, notifyMe
+        case none, command, tabs, tools, settings, notifyMe, todos
     }
 
     enum CommandMode {

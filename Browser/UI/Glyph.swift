@@ -13,7 +13,9 @@ struct Glyph: View {
              // Notify Me.
              bell,
              // Cookie pop-ups, in Site Settings.
-             cookie
+             cookie,
+             // To-do, and Today.
+             todo, today, calendar, news
     }
 
     let kind: Kind

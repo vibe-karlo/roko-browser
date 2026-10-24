@@ -6,6 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- To-do: one list, opened by searching "to-do" (or "todo"), like Settings. It sorts itself into Overdue (with Move to Today), Today, Tomorrow, This week, Later and Someday. Tap the circle to tick one off, tap its words to change them, long-press to move it (Today, Tomorrow, This Week, Choose Date…, Someday) or delete it. New ones go in at the bottom, for Today unless you pick another time, and the keyboard stays up for the next. While anything is due today, the to-do icon sits first among your pins with how many are left. To-dos join iCloud sync once it's on.
 - iCloud sync, ready but off until the paid Apple Developer Program: pins, history, settings and what you chose for each site, on every device signed in to your iCloud. Open tabs and Notify Me stay on each device. Data already moves into the new layout on first launch.
 - Handoff: the page on screen can be continued on your Mac, in its default browser. Never a private tab.
 - Copy a link on your Mac and roko offers it ("Link you copied"), through Universal Clipboard: above the bar once when you open roko, then in the address bar for five minutes. It opens with the system Paste button, so iOS never asks for permission to paste.
@@ -101,6 +102,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Pages no longer stop short of the bottom edge, leaving a blank strip above the home indicator.
 - Typing into a page, the bar stays behind the keyboard instead of covering the form, and the page reaches down to the keyboard instead of stopping short of it.
 - Typing an address for a private tab no longer offers an open normal tab, which Return would switch to.
+- Typing "settings" in full puts Settings first, so Return opens it instead of searching for the word.
 - A copied link to the page already on screen isn't offered; nor is a link copied in roko, above the bar.
 - A link copied long ago is no longer offered as new after roko restarts.
 - The copied-link and cookie offers no longer stay on top of the page menu.

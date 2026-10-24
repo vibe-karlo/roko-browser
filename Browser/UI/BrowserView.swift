@@ -100,6 +100,13 @@ struct BrowserView: View {
             }
         }
         .overlay {
+            if browser.panel == .todos {
+                // Full screen, rising from the bar like Browse for Me.
+                TodoView()
+                    .transition(.move(edge: .bottom))
+            }
+        }
+        .overlay {
             if let session = browser.browseForMe {
                 // Full screen, rising from the bar where the question was asked.
                 BrowseForMeView(session: session)
@@ -255,7 +262,7 @@ struct BrowserView: View {
     /// Text that reads on whatever is behind the status bar.
     private var statusBarStyle: UIStatusBarStyle {
         // The summary and Browse for Me sit on the app's own canvas.
-        if browser.summary != nil || browser.browseForMe != nil { return .default }
+        if browser.summary != nil || browser.browseForMe != nil || browser.panel == .todos { return .default }
         if browser.panel == .tabs { return .lightContent }  // the switcher is always dark
         guard let color = browser.selectedTab?.topColor else { return .default }
         return color.isLight ? .darkContent : .lightContent

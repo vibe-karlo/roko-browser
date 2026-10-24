@@ -6,12 +6,13 @@ import SwiftUI
 struct StartView: View {
     @Environment(BrowserModel.self) private var browser
     @Query(sort: \Pin.order) private var pins: [Pin]
+    @Query private var todos: [Todo]
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
 
     var body: some View {
         VStack {
-            if pins.isEmpty {
+            if pins.isEmpty && !todos.contains(where: \.isDueNow) {
                 Spacer()
                 Text("Pin a site from its page menu and it lives here.")
                     .font(.subheadline)
@@ -23,6 +24,9 @@ struct StartView: View {
             } else {
                 Spacer()
                 LazyVGrid(columns: columns, spacing: 14) {
+                    TodoPin(size: 34) { icon in
+                        icon.frame(maxWidth: .infinity, minHeight: 56).contentShape(.rect)
+                    }
                     ForEach(pins) { pin in
                         let name = pin.title.isEmpty ? pin.host : pin.title
                         Button { browser.open(pin) } label: { PinTile(pin: pin) }

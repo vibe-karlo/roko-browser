@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// Where roko keeps its data. Pins and history sync through iCloud, in the
+/// Where roko keeps its data. Pins, history and to-dos sync through iCloud, in the
 /// private database of the person signed in; open tabs and Notify Me stay on
 /// this device (tabs are saved after every page load, with their back and
 /// forward history, which would only churn the sync; watched pages would
@@ -22,19 +22,19 @@ enum Store {
     static func makeContainer() -> ModelContainer {
         let folder = URL.applicationSupportDirectory
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let synced = ModelConfiguration("Synced", schema: Schema([Pin.self, HistoryEntry.self]),
+        let synced = ModelConfiguration("Synced", schema: Schema([Pin.self, HistoryEntry.self, Todo.self]),
                                         url: folder.appending(path: "synced.store"),
                                         cloudKitDatabase: syncs ? .private(cloudContainer) : .none)
         let device = ModelConfiguration("Device", schema: Schema([SavedTab.self, Watch.self]),
                                         url: folder.appending(path: "device.store"), cloudKitDatabase: .none)
-        let schema = Schema([Pin.self, HistoryEntry.self, SavedTab.self, Watch.self])
+        let schema = Schema([Pin.self, HistoryEntry.self, Todo.self, SavedTab.self, Watch.self])
         let container: ModelContainer
         do {
             container = try ModelContainer(for: schema, configurations: synced, device)
         } catch {
             // Never fail to open: without sync, roko is still a browser.
             print("Synced store unavailable, using this device only: \(error)")
-            let local = ModelConfiguration("Synced", schema: Schema([Pin.self, HistoryEntry.self]),
+            let local = ModelConfiguration("Synced", schema: Schema([Pin.self, HistoryEntry.self, Todo.self]),
                                            url: folder.appending(path: "synced.store"), cloudKitDatabase: .none)
             container = try! ModelContainer(for: schema, configurations: local, device)
         }
