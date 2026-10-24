@@ -14,6 +14,8 @@ struct CommandItem: Identifiable {
     let kind: String
     let icon: Icon
     let action: Action
+    /// A mark at the row's end in place of `kind` (a pin, for pinned pages).
+    var mark: Glyph.Kind? = nil
 
     enum Icon {
         case glyph(Glyph.Kind), site(String), image(String)
@@ -35,6 +37,8 @@ struct CommandBarView: View {
     @State private var query = ""
     @State private var items: [CommandItem] = []
     @State private var suggestions: [String] = []
+    /// "weather in London": London's weather, found for what was typed.
+    @State private var placeWeather: (query: String, weather: TodayWeather)?
     @State private var selection = 0
     /// The row in the slot under the field, as the list is scrolled.
     @State private var topRow: String?
@@ -126,6 +130,16 @@ struct CommandBarView: View {
         .onChange(of: CurrencyRates.shared.date) { rebuild() }
         .onChange(of: TodayModel.shared.weather) { rebuild() }
         .task(id: query) {
+            // "weather in London", "vrijeme u Zagrebu": a town's weather, after a short pause.
+            guard let place = WeatherQuery.place(in: query) else { return }
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled, let found = await WeatherPlace.search(place).first,
+                  let weather = try? await TodayWeather.fetch(at: found.coordinate, place: found.name),
+                  !Task.isCancelled else { return }
+            placeWeather = (query, weather)
+            rebuild()
+        }
+        .task(id: query) {
             // A short pause so suggestions aren't requested for every keystroke.
             let text = query.trimmingCharacters(in: .whitespaces)
             guard UserDefaults.standard.object(forKey: "suggestions") as? Bool ?? true,
@@ -152,10 +166,6 @@ struct CommandBarView: View {
         ScrollViewReader { proxy in
         ScrollView {
             LazyVStack(spacing: 2) {
-                // Nothing typed: your pins first, a tap away.
-                if query.isEmpty && (!pins.isEmpty || todos.contains(where: \.isDueNow)) {
-                    pinRow.id("pins")
-                }
                 // Best match first, right under the field.
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     Group {
@@ -169,6 +179,14 @@ struct CommandBarView: View {
                         }
                     }
                     .id(item.id)
+                    .contextMenu {
+                        if case .openPin(let pin) = item.action {
+                            Button("Unpin", role: .destructive) {
+                                browser.unpin(pin)
+                                rebuild()
+                            }
+                        }
+                    }
                     // Typing "todo" brings today's to-dos up under the To-do row, to tick off there.
                     if item.id == "action-todos" && !dueTodos.isEmpty { todoWidget }
                 }
@@ -293,39 +311,6 @@ struct CommandBarView: View {
         }
     }
 
-    /// Your pins, one tap away, right above the field where the thumb already
-    /// is: just their icons, on the same axis as the icons in the list. A long
-    /// press says which page it is.
-    private var pinRow: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 0) {
-                // Today's to-dos first while any are left: the icon and how many.
-                TodoPin(size: 28) { icon in
-                    icon.frame(width: 52, height: 48).contentShape(.rect)
-                }
-                ForEach(pins) { pin in
-                    let name = pin.title.isEmpty ? pin.host : pin.title
-                    Button { focused = false; browser.open(pin) } label: {
-                        SiteIcon(host: pin.host, size: 28)
-                            .frame(width: 52, height: 48)
-                            .contentShape(.rect)
-                    }
-                    .buttonStyle(RowButtonStyle())
-                    .accessibilityLabel(name)
-                    .contextMenu {
-                        Section(name) {
-                            Button("Unpin", role: .destructive) { browser.unpin(pin) }
-                        }
-                    }
-                }
-            }
-            // The first icon centred where the field's and the rows' icons are.
-            .padding(.horizontal, 5)
-        }
-        .scrollIndicators(.hidden)
-        .padding(.top, items.isEmpty ? 6 : 0)
-    }
-
     private var field: some View {
         HStack(spacing: 12) {
             // While typing hides the switch, the leading mark keeps private mode visible.
@@ -448,8 +433,7 @@ struct CommandBarView: View {
     private func backToTop() {
         previewing = false
         selection = 0
-        guard let top = query.isEmpty && (!pins.isEmpty || todos.contains(where: \.isDueNow)) ? "pins" : items.first?.id,
-              topRow != top else { return }
+        guard let top = items.first?.id, topRow != top else { return }
         resetTarget = top
         scrollRequest = top
     }
@@ -470,12 +454,23 @@ struct CommandBarView: View {
 
     private func rebuild() {
         items = CommandRanker.rank(query: query, browser: browser, suggestions: suggestions)
+        // A town's weather, asked for by name: first, as the answer.
+        if let (asked, weather) = placeWeather, asked == query, WeatherQuery.place(in: query) != nil {
+            items.insert(CommandItem(id: "weather-place",
+                                     title: "\(Int(weather.temperature.rounded()))° " + weather.condition
+                                         + (weather.place.map { " in \($0)" } ?? ""),
+                                     subtitle: "\(Int(weather.low.rounded()))° to \(Int(weather.high.rounded()))°"
+                                         + (weather.rainChance >= 30 ? ", rain \(weather.rainChance)%" : ""),
+                                     kind: "Weather", icon: .image("phosphor/\(weather.glyph)"), action: .search(query)),
+                         at: 0)
+        }
         // Asked for the weather and it's half an hour old: fetch it now (one small request).
         if items.contains(where: { $0.id == "weather" }),
            Date.now.timeIntervalSince(TodayModel.shared.weather?.fetchedAt ?? .distantPast) > 1800 {
             Task { await TodayModel.shared.freshenWeather() }
         }
         // Nothing typed yet: a link copied a moment ago, here or on a Mac,
+        // today's to-dos while any are left, your pins (as Arc lists them),
         // then the last pages you were on, to scroll through and pick.
         if query.isEmpty {
             var rows: [CommandItem] = []
@@ -486,9 +481,23 @@ struct CommandBarView: View {
                 } ?? CommandItem(id: "copied-link", title: "Link you copied", subtitle: "",
                                  kind: "", icon: .glyph(.link), action: .pasteLink))
             }
+            let left = todos.filter(\.isDueNow).count
+            if left > 0 {
+                rows.append(CommandItem(id: "todos-today", title: "To-do",
+                                        subtitle: left == 1 ? "One left for today" : "\(left) left for today",
+                                        kind: "", icon: .glyph(.todo), action: .todos))
+            }
             var seen = Set<String>()
+            for pin in pins {
+                guard let url = URL(string: pin.url) else { continue }
+                seen.insert(pin.url)
+                rows.append(CommandItem(id: "pin-\(pin.url)", title: pin.title.isEmpty ? pin.host : pin.title,
+                                        subtitle: url.displayHost, kind: "", icon: .site(pin.host),
+                                        action: .openPin(pin), mark: .pin))
+            }
+            let firstRecent = rows.count
             for entry in browser.history(matching: "", limit: 30) {
-                guard rows.count < 8, let url = URL(string: entry.url), !browser.isCurrentPage(url),
+                guard rows.count - firstRecent < 8, let url = URL(string: entry.url), !browser.isCurrentPage(url),
                       seen.insert(entry.url).inserted else { continue }
                 rows.append(CommandItem(id: "recent-\(entry.url)", title: entry.title.isEmpty ? url.displayHost : entry.title,
                                         subtitle: url.displayHost, kind: "", icon: .site(url.displayHost), action: .open(url)))
@@ -586,9 +595,13 @@ private struct CommandRow: View {
                 }
             }
             Spacer(minLength: 8)
-            Text(item.kind)
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.faintInk)
+            if let mark = item.mark {
+                Glyph(mark, size: 14).foregroundStyle(Theme.faintInk)
+            } else {
+                Text(item.kind)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.faintInk)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
@@ -784,5 +797,30 @@ enum CommandRanker {
 extension Array {
     subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil
+    }
+}
+
+/// A weather question about a place: "weather in London", "london weather",
+/// "vrijeme u Zagrebu", "prognoza Split". Not one about a day ("vrijeme sutra").
+nonisolated enum WeatherQuery {
+    private static let words = ["weather", "forecast", "vrijeme", "vreme", "prognoza"]
+    private static let notPlaces: Set<String> = ["today", "tomorrow", "now", "weekend", "danas", "sutra", "sada",
+                                                 "vikend", "prekosutra", "this week", "ovaj tjedan"]
+
+    static func place(in query: String) -> String? {
+        let words = query.lowercased().split(whereSeparator: \.isWhitespace).map(String.init)
+        guard words.count >= 2 else { return nil }
+        var rest: [String]
+        if Self.words.contains(words[0]) {
+            rest = Array(words.dropFirst())
+            if let first = rest.first, ["in", "u", "za", "for", "at"].contains(first) { rest.removeFirst() }
+        } else if let last = words.last, Self.words.contains(last) {
+            rest = Array(words.dropLast())
+        } else {
+            return nil
+        }
+        let place = rest.joined(separator: " ")
+        guard place.count >= 2, !notPlaces.contains(place) else { return nil }
+        return place
     }
 }

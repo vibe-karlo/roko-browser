@@ -6,6 +6,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- A town's weather from the address bar: "weather in London", "london weather", "vrijeme u Zagrebu" answers first with its weather now (found by name through Open-Meteo); Return searches it.
+- Today: tap the weather to open the Weather app (long-press it to choose the town), tap an event to open Calendar at its time.
+- Pins are the first rows under the address field, as in Arc, marked with a pin and part of the scroll-to-pick (long-press one to unpin), after To-do with how many are left today.
 - Type "weather" or "vrijeme" (or "forecast", "prognoza") in the address bar: the weather now, where Today's is for, as the first row; Return opens Today. Half an hour old, it's fetched again as you type.
 - Summaries and Browse for Me answers are signed with roko's Eclipse mark and name in the footer, so a screenshot says where it came from. The footer is slimmer and sits lower, into the home indicator's strip.
 - Swipe down on the open address bar (on its list or the page behind) to close it.

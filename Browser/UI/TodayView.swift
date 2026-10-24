@@ -134,10 +134,11 @@ struct TodayView: View {
 
     /// Now, then the day in three short lines beside it, so nothing runs to
     /// the edge; under it the next twelve hours, every other hour, spread
-    /// across the width. Tapping it picks where the weather is for.
+    /// across the width. Tapping it opens the Weather app; a long press picks
+    /// where it's for.
     private func weatherView(_ weather: TodayWeather) -> some View {
         VStack(alignment: .leading, spacing: 18) {
-            Button { choosingPlace = true } label: {
+            Button { open("weather://") } label: {
                 HStack(alignment: .center, spacing: 14) {
                     Image("phosphor/\(weather.glyph)")
                         .resizable()
@@ -162,7 +163,10 @@ struct TodayView: View {
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
-            .accessibilityHint("Choose where the weather is for")
+            .contextMenu {
+                Button { choosingPlace = true } label: { Label("Choose Town…", systemImage: "mappin.and.ellipse") }
+            }
+            .accessibilityHint("Opens the Weather app")
             // First and last flush with the page's margins, the rest spaced evenly between.
             let hours = Array(weather.hours.enumerated().filter { $0.offset % 2 == 0 }.prefix(6).map(\.element))
             HStack(spacing: 0) {
@@ -196,29 +200,44 @@ struct TodayView: View {
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(Theme.accentText)
             } else if today.events.isEmpty {
-                Text("Nothing else on your calendar today.")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Theme.secondaryInk)
+                Button { open("calshow:\(Int(Date.now.timeIntervalSinceReferenceDate))") } label: {
+                    Text("Nothing else on your calendar today.")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Theme.secondaryInk)
+                }
+                .buttonStyle(.plain)
             } else {
                 ForEach(today.events) { event in
-                    HStack(alignment: .firstTextBaseline, spacing: 14) {
-                        Text(event.isAllDay ? "All day" : event.start.formatted(date: .omitted, time: .shortened))
-                            .font(.system(size: 15).monospacedDigit())
-                            .foregroundStyle(Theme.secondaryInk)
-                            .frame(width: 64, alignment: .leading)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(event.title).font(.system(size: 17))
-                            if let location = event.location {
-                                Text(location)
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(Theme.secondaryInk)
-                                    .lineLimit(1)
+                    // Opens the Calendar app at the event's time.
+                    Button { open("calshow:\(Int(event.start.timeIntervalSinceReferenceDate))") } label: {
+                        HStack(alignment: .firstTextBaseline, spacing: 14) {
+                            Text(event.isAllDay ? "All day" : event.start.formatted(date: .omitted, time: .shortened))
+                                .font(.system(size: 15).monospacedDigit())
+                                .foregroundStyle(Theme.secondaryInk)
+                                .frame(width: 64, alignment: .leading)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(event.title).font(.system(size: 17))
+                                if let location = event.location {
+                                    Text(location)
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(Theme.secondaryInk)
+                                        .lineLimit(1)
+                                }
                             }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(.rect)
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
+    }
+
+    /// Hands over to Apple's own app: Weather, or Calendar at a moment.
+    private func open(_ link: String) {
+        guard let url = URL(string: link) else { return }
+        UIApplication.shared.open(url)
     }
 
     // MARK: To-do
