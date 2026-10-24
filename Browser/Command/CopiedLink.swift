@@ -45,9 +45,26 @@ enum CopiedLink {
     private static var ownCounts: Set<Int> = []
     private static var observer: NSObjectProtocol?
 
+    /// When roko last went to the background.
+    private static var leftAt = defaults.object(forKey: "copiedLink.leftAt") as? Date {
+        didSet { defaults.set(leftAt, forKey: "copiedLink.leftAt") }
+    }
+
     /// roko is going to the background.
     static func left() {
         countWhenLeft = UIPasteboard.general.changeCount
+        leftAt = .now
+    }
+
+    /// iOS doesn't say when something was copied, only that the clipboard
+    /// changed. Away for longer than the window, roko can't tell a link copied
+    /// a moment ago from one copied half an hour ago: so it isn't put above the
+    /// bar then, only kept in the address bar's list for when you look.
+    private static var copyMayBeOld: Bool {
+        let count = UIPasteboard.general.changeCount
+        // Only a change first noticed now, after being away.
+        guard seen?.count != count, let leftAt else { return false }
+        return Date.now.timeIntervalSince(leftAt) > window
     }
 
     /// roko is in front (or just launched): from now on, its own copies are noted.
@@ -83,7 +100,8 @@ enum CopiedLink {
     /// Opening roko with a fresh link: offered above the bar once per copy.
     /// Not one copied in roko, which is already here.
     static func shouldOfferAboveBar() async -> Bool {
-        guard await isWaiting() else { return false }
+        let mayBeOld = copyMayBeOld
+        guard await isWaiting(), !mayBeOld else { return false }
         let count = UIPasteboard.general.changeCount
         guard count != offeredAboveBar, ownCopy?.count != count else { return false }
         offeredAboveBar = count
