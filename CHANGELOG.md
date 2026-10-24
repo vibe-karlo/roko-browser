@@ -6,7 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- The launcher's field goes to the top of the screen, as in Arc Search: it grows out of the bar's capsule and rises there, then the rows come in under it, down to the keyboard. Its place no longer depends on the keyboard, so a taller one (SwiftKey) or one that reports its size late can't make it jump.
+- The launcher's field goes to the top of the screen, as in Arc Search: it grows out of the bar's capsule and rises there in about a quarter of a second, then the rows come in under it, down to the keyboard. Its place no longer depends on the keyboard, so a taller one (SwiftKey) or one that reports its size late can't make it jump.
 - The launcher grows out of the bar for real: its field starts exactly on the capsule you tapped and widens and rises into place, with the keyboard coming up under it, then sinks back into the capsule on close. (The capsule used to fade out while a field appeared at the top: the frames it measured included its own movement, so it never moved.)
 - To-do's field: the chip says when in short ("Wed 15:00") and is a menu (Today, Tomorrow, This Week, Someday, Date and Time…) for when the words don't say. "at 3" means 15:00 (1 to 6 are the afternoon), and a day typed first ("Wednesday at 3") is read too.
 

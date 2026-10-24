@@ -73,7 +73,7 @@ struct CommandBarView: View {
     }
 
     /// How long the field takes to fly up, for what waits on it.
-    private static let flight: Double = 0.36
+    private static let flight: Double = 0.26
 
     private static var safeTop: CGFloat {
         let window = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first
@@ -528,13 +528,13 @@ struct CommandBarView: View {
     /// covers the capsule the field is growing out of.
     private func open() {
         // A frame later: drawn in the bar's place first, so there's somewhere to grow from.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
+        DispatchQueue.main.async {
             withAnimation(.launcher) {
                 opened = true
                 browser.launcherShown = true
             }
-            withAnimation(.easeOut(duration: 0.22).delay(Self.flight * 0.7)) { rowsShown = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) { focused = true }
+            withAnimation(.easeOut(duration: 0.16).delay(Self.flight * 0.6)) { rowsShown = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { focused = true }
         }
     }
 
