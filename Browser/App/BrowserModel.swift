@@ -57,10 +57,18 @@ final class BrowserModel {
             copiedLinkOffer = true
             copiedLinkTask?.cancel()
             copiedLinkTask = Task {
-                try? await Task.sleep(for: .seconds(10))
+                try? await Task.sleep(for: .seconds(8))
                 if !Task.isCancelled { copiedLinkOffer = false }
             }
         }
+    }
+
+    /// Read on without it: put away, not offered again for this copy.
+    func dismissCopiedLink() {
+        guard copiedLinkOffer else { return }
+        CopiedLink.took()
+        copiedLinkOffer = false
+        copiedLinkTask?.cancel()
     }
 
     func openCopiedLink(_ url: URL) {

@@ -35,18 +35,46 @@ enum CopiedLink {
     private static var defaults: UserDefaults { .standard }
     /// A link roko copied itself: iOS lets an app read its own copy freely.
     private static var ownCopy: (count: Int, url: URL)?
+    /// The clipboard as roko left it, going to the background; kept across
+    /// launches. A copy is offered only if it changed after that…
+    private static var countWhenLeft = defaults.object(forKey: "copiedLink.left") as? Int {
+        didSet { defaults.set(countWhenLeft, forKey: "copiedLink.left") }
+    }
+    /// …and not since roko came back: a link copied in roko (from a page's
+    /// menu, the share sheet, anywhere) is never offered back.
+    private static var countWhenArrived: Int?
+
+    /// roko is going to the background.
+    static func left() {
+        countWhenLeft = UIPasteboard.general.changeCount
+    }
+
+    /// roko is in front again (or just launched).
+    static func arrived() {
+        countWhenArrived = UIPasteboard.general.changeCount
+    }
+
+    /// Copied elsewhere (another app, a Mac) while roko was away.
+    private static var cameFromElsewhere: Bool {
+        let count = UIPasteboard.general.changeCount
+        return count == (countWhenArrived ?? count) && count != countWhenLeft
+    }
     /// What reading the clipboard found, once per copy, so iOS asks at most once.
     private static var peeked: (count: Int, url: URL?)?
 
     static func isWaiting() async -> Bool {
         let board = UIPasteboard.general
         let count = board.changeCount
-        guard count != taken else { return false }
+        if LaunchClock.isEnabled {
+            print("COPIED count=\(count) taken=\(taken) left=\(String(describing: countWhenLeft)) arrived=\(String(describing: countWhenArrived))")
+        }
+        guard count != taken, cameFromElsewhere else { return false }
         if seen?.count != count { seen = (count, .now) }
         // Recent only: an old link isn't what you came to open.
         guard let seen, Date.now.timeIntervalSince(seen.at) < window else { return false }
         // Throws when the clipboard is empty.
         let found = try? await board.detectedPatterns(for: [\.probableWebURL])
+        if LaunchClock.isEnabled { print("COPIED count=\(count) found=\(String(describing: found))") }
         return found?.contains(\.probableWebURL) ?? false
     }
 

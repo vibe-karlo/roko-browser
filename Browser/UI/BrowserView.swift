@@ -197,6 +197,7 @@ struct BrowserView: View {
             }
         }
         .animation(.snappy(duration: 0.3), value: browser.copiedLinkOffer)
+        .modifier(CopiedLinkWatch(browser: browser))
         // Handoff: continue this page on a Mac or iPad.
         .userActivity(NSUserActivityTypeBrowsingWeb, element: browser.handoffPage) { page, activity in
             activity.webpageURL = page.url
@@ -248,6 +249,7 @@ struct BrowserView: View {
                 return
             }
             // Back with a link just copied, perhaps on a Mac: offer it.
+            CopiedLink.arrived()
             browser.offerCopiedLinkIfFresh()
         }
         // So does coming back from a summary, an answer or the reader: the
@@ -363,5 +365,22 @@ private struct BottomPanel<Content: View>: View {
 
     private func close() {
         withAnimation(.easeOut(duration: 0.22)) { shown = false } completion: { dismiss() }
+    }
+}
+
+/// Notes the clipboard as roko leaves, so only a link copied elsewhere is
+/// offered on its return; and takes the offer away once you read on (scrolling
+/// folds the bar).
+private struct CopiedLinkWatch: ViewModifier {
+    let browser: BrowserModel
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: browser.isBarCollapsed) { _, collapsed in
+                if collapsed { browser.dismissCopiedLink() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+                CopiedLink.left()
+            }
     }
 }
