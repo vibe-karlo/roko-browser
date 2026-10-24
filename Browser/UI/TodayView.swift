@@ -96,16 +96,31 @@ struct TodayView: View {
                 Text(Date.now.formatted(.dateTime.day().month(.wide)))
                     .font(.system(size: 20))
                     .foregroundStyle(Theme.secondaryInk)
-                Group {
-                    if today.isRefreshing {
-                        Text("Freshening…")
-                    } else if let refreshed = today.refreshedAt {
-                        Text("Updated \(refreshed.formatted(date: .omitted, time: .shortened))")
+                // Pulling down closes Today, so freshening it is a tap here.
+                Button {
+                    Task { await today.refresh() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Glyph(.reload, size: 12, weight: 1.8)
+                            .rotationEffect(.degrees(today.isRefreshing ? 360 : 0))
+                            .animation(today.isRefreshing ? .linear(duration: 1).repeatForever(autoreverses: false) : .default,
+                                       value: today.isRefreshing)
+                        if today.isRefreshing {
+                            Text("Refreshing…")
+                        } else if let refreshed = today.refreshedAt {
+                            Text("Updated \(refreshed.formatted(date: .omitted, time: .shortened))")
+                        } else {
+                            Text("Refresh")
+                        }
                     }
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.secondaryInk)
+                    .frame(minHeight: 32)
+                    .contentShape(.rect)
                 }
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.faintInk)
-                .padding(.top, 4)
+                .buttonStyle(.plain)
+                .disabled(today.isRefreshing)
+                .accessibilityLabel("Refresh Today")
             }
             if let weather = today.weather {
                 weatherView(weather)

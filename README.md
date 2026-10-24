@@ -232,7 +232,8 @@ day, and with "today". It reads:
   from up to sixty headlines; at most two stories per site, and headlines sharing most of
   their words count as one story. Without the model, each site's newest.
 
-What it last showed is kept in `today.json`, so it opens at once. It refreshes when opened
+What it last showed is kept in `today.json`, so it opens at once. The weather and calendar
+are fetched on every opening; everything refreshes with a tap on "Updated", when opened
 more than half an hour later (there's no pull to refresh: a pull down closes it, as To-do and
 Browse for Me do), and in a background refresh iOS runs from about 5:30. A refresh that brings
 nothing (offline) leaves what was there. Measured in the simulator: weather and four sites,

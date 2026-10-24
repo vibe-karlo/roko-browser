@@ -5,7 +5,8 @@ import Foundation
 /// What Today shows, and when it's fetched. The last of it is kept on disk,
 /// so the page opens at once with what was there and freshens behind it:
 /// in the morning before you look (iOS wakes roko in the background), when
-/// you open it more than half an hour after the last time.
+/// you open it more than half an hour after the last time, or with Refresh.
+/// The weather and the calendar are fetched again every time it opens.
 /// Nothing is fetched while Today isn't being looked at or prepared.
 @MainActor
 @Observable
@@ -19,6 +20,7 @@ final class TodayModel {
     private(set) var events: [TodayEvent] = []
     private(set) var refreshedAt: Date?
     private(set) var isRefreshing = false
+    private var isFresheningWeather = false
 
     /// After this long, opening Today freshens it (there's no pull to refresh).
     private static let staleAfter: TimeInterval = 1800
@@ -31,11 +33,26 @@ final class TodayModel {
 
     // MARK: Refreshing
 
-    /// On opening: the calendar (instant, it's on the phone) always; the rest if stale.
+    /// On opening: the calendar (instant, it's on the phone) and the weather
+    /// (one small request) every time; the news when it's half an hour old.
     func appeared() {
         events = TodayCalendar.events()
         let stale = refreshedAt.map { Date.now.timeIntervalSince($0) > Self.staleAfter || !Calendar.current.isDateInToday($0) } ?? true
-        if stale { Task { await refresh() } }
+        if stale {
+            Task { await refresh() }
+        } else {
+            Task { await freshenWeather() }
+        }
+    }
+
+    /// Just the weather, keeping what's there until the new one arrives.
+    func freshenWeather() async {
+        guard !isRefreshing, !isFresheningWeather else { return }
+        isFresheningWeather = true
+        defer { isFresheningWeather = false }
+        guard let fresh = await freshWeather(inBackground: false) else { return }
+        weather = fresh
+        save()
     }
 
     func refresh(inBackground: Bool = false) async {
@@ -119,11 +136,7 @@ final class TodayModel {
     /// Only the weather: the news stays as it is.
     func weatherPlaceChanged() {
         weather = nil
-        Task {
-            guard let fresh = await freshWeather(inBackground: false) else { return }
-            weather = fresh
-            save()
-        }
+        Task { await freshenWeather() }
     }
 
     /// Sources or topics changed: show the new set's stories.
