@@ -6,6 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Done, at the bottom of To-do: folded under its count, it opens on what you ticked off in the last two weeks, the latest first, each a tap from being undone.
 - Pull to summarize is one motion with the summary: past the reload point the page itself starts becoming the summary's card under your finger (narrowing, its corners rounding, the summary's dark filling in around it, the bar fading away), and letting go carries on from that exact frame into place, with no bounce back. Ease off and the card settles back into the page.
 - To-do days and times in words work in the To-do list too, not only the bar: "Call dentist on Monday at 13" is added for Monday at 13:00, and the chip beside the field shows what it understood as you type.
 - To-do days from the bar, in English or Croatian: weekdays ("on Monday", "u petak", "next Friday" for next week's), next week, the day after tomorrow ("prekosutra"), "in 3 days" ("za 3 dana") and dates ("24.11."), in either order with a time ("call Petra on Monday at 13:00").

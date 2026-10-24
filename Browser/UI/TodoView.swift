@@ -20,6 +20,16 @@ struct TodoView: View {
     /// Being dragged (set as a long press lifts it, menu or drag): rows it
     /// passes over make room for it.
     @State private var dragging: Todo?
+    /// The Done list at the bottom is open.
+    @State private var showsDone = false
+
+    /// Ticked off in the last two weeks, the latest first: there to untick a slip.
+    private var finished: [Todo] {
+        let since = Date.now.addingTimeInterval(-14 * 86_400)
+        return todos
+            .filter { $0.done && !justDone.contains($0.persistentModelID) && ($0.doneAt ?? .distantPast) > since }
+            .sorted { ($0.doneAt ?? .distantPast) > ($1.doneAt ?? .distantPast) }
+    }
 
     private var sections: [(TodoSection, [Todo])] {
         let shown = todos.filter { !$0.done || justDone.contains($0.persistentModelID) }
@@ -50,6 +60,7 @@ struct TodoView: View {
                     sectionView(section, items)
                         .padding(.bottom, 30)
                 }
+                if !finished.isEmpty { doneSection }
             }
             .padding(.horizontal, 22)
             .padding(.top, 26)
@@ -161,6 +172,67 @@ struct TodoView: View {
         .padding(.vertical, 1)
         .contentShape(.rect)
         .contextMenu { menu(for: todo) }
+    }
+
+    /// Done, folded away under its count; opened, the latest first, each one
+    /// a tap from being undone.
+    private var doneSection: some View {
+        let done = finished
+        return VStack(alignment: .leading, spacing: 2) {
+            Button {
+                withAnimation(.snappy(duration: 0.3)) { showsDone.toggle() }
+            } label: {
+                HStack(spacing: 8) {
+                    Text("Done")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text("\(done.count)")
+                        .font(.system(size: 15).monospacedDigit())
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .rotationEffect(.degrees(showsDone ? 90 : 0))
+                    Spacer()
+                }
+                .foregroundStyle(Theme.secondaryInk)
+                .frame(minHeight: 36)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(showsDone ? "Hide done to-dos" : "Show \(done.count) done to-dos")
+            if showsDone {
+                ForEach(done.prefix(30)) { todo in
+                    HStack(alignment: .firstTextBaseline, spacing: 14) {
+                        Button { toggle(todo) } label: {
+                            TodoCircle(done: true)
+                                .frame(width: 44, height: 44)
+                                .contentShape(.rect)
+                        }
+                        .buttonStyle(.plain)
+                        .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 6 }
+                        .accessibilityLabel("Done. Tap to undo")
+                        .padding(.leading, -11)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(todo.title)
+                                .font(.system(size: 17))
+                                .foregroundStyle(Theme.secondaryInk)
+                                .strikethrough(true, color: Theme.secondaryInk)
+                            if let at = todo.doneAt {
+                                Text(Calendar.current.isDateInToday(at) ? at.formatted(date: .omitted, time: .shortened)
+                                     : at.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(Theme.faintInk)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, 1)
+                    .contextMenu {
+                        Button(role: .destructive) { delete(todo) } label: { Label("Delete", systemImage: "trash") }
+                    }
+                    .transition(.opacity.combined(with: .offset(y: -6)))
+                }
+            }
+        }
+        .padding(.bottom, 30)
     }
 
     @ViewBuilder
