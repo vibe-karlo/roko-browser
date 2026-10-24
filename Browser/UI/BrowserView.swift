@@ -167,6 +167,12 @@ struct BrowserView: View {
             }
         }
         .animation(.snappy(duration: 0.3), value: browser.cookieOffer)
+        // Handoff: continue this page on a Mac or iPad.
+        .userActivity(NSUserActivityTypeBrowsingWeb, element: browser.handoffPage) { page, activity in
+            activity.webpageURL = page.url
+            activity.title = page.title
+            activity.isEligibleForHandoff = true
+        }
         .background(StatusBarStyler(style: statusBarStyle))
         // Every toast confirms something done (copied, pinned, translating): a tick to feel it.
         .sensoryFeedback(.impact(weight: .light), trigger: browser.toast) { _, toast in toast != nil }
@@ -193,7 +199,10 @@ struct BrowserView: View {
                 browser.saveTabs()
                 WatchScheduler.schedule(in: context)
             }
-            if phase == .active { checkWatches(after: .seconds(2)) }
+            if phase == .active {
+                checkWatches(after: .seconds(2))
+                browser.mergeSyncedDuplicates()
+            }
         }
         // Launch: Notify Me catches up once the first page has had its moment.
         .task { checkWatches(after: .seconds(4)) }

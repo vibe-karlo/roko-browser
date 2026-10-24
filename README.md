@@ -81,9 +81,10 @@ developer account. Until then the app runs without them and never touches them.
 The app already meets the browser requirements (it declares http/https and opens to an
 address field). Once granted:
 
-1. Uncomment both `CODE_SIGN_ENTITLEMENTS` and `SWIFT_ACTIVE_COMPILATION_CONDITIONS`
-   in `project.yml`, then run `xcodegen`. Remove any key from `Browser/Browser.entitlements`
-   that Apple hasn't granted yet, or signing fails.
+1. In `project.yml`, swap the active `CODE_SIGN_ENTITLEMENTS` and
+   `SWIFT_ACTIVE_COMPILATION_CONDITIONS` lines for the commented ones below them, then run
+   `xcodegen`. `Browser/Browser.entitlements` carries iCloud's entitlements too. Remove any key
+   Apple hasn't granted yet, or signing fails.
 2. In the app, Settings → Passkeys → Allow passkeys.
 
 Never set `PRIVATE_CLOUD_COMPUTE` without the cloud entitlement: Apple's framework stops the
@@ -132,9 +133,37 @@ every check in a Debug build, launch with `-checkWatches`.
 
 ## Not done yet
 
-- iCloud sync (the data model is already CloudKit-compatible).
+- iCloud sync is built but off: it needs the paid Apple Developer Program (see "iCloud sync").
 - A count of blocked items: WebKit doesn't report blocks to the app.
 - Default-browser status needs Apple's browser entitlement, which is requested separately.
+
+## iCloud sync
+
+Pins and history sync through CloudKit, in the private database of the iCloud account
+(container `iCloud.com.growthstudio.roko`). `Store` keeps two SwiftData stores: `synced.store`
+for `Pin` and `HistoryEntry`, and `device.store` for `SavedTab` and `Watch`. Open tabs are saved
+after every page load with their back and forward history, which would only churn the sync, and
+Notify Me would check and notify on every device. The first launch with sync copies the old
+single `default.store` into the two and keeps it as `before-sync.store`. Settings and per-site
+choices (search engine, blocking, cookies, zoom, pinch) sync through the iCloud key-value store
+(`SettingsSync`); the app icon, the Claude key and caches stay on the device.
+
+Records can't be unique in CloudKit, so two devices can add the same page before they hear
+from each other: `Store.mergeDuplicates` folds those at launch and when roko comes back to the
+front. Deletions go one by one rather than as a batch, so they reach iCloud too.
+
+**Off until the team is in the paid Apple Developer Program**: a Personal team can't sign
+iCloud or push notifications. Then uncomment `CODE_SIGN_ENTITLEMENTS` and
+`SWIFT_ACTIVE_COMPILATION_CONDITIONS` under "iCloud sync" in `project.yml`, run `xcodegen`, and
+build with an Apple ID in Xcode (Settings, Accounts): automatic signing adds iCloud and push
+to the app ID and creates the container. Without the flag the same two stores are used, on the
+device only. Builds use the development CloudKit environment; before an App Store release,
+deploy the schema to production in the CloudKit Console.
+
+Continuing between devices: roko hands the page on screen off through Handoff (a Mac's Dock
+opens it in the Mac's default browser, private tabs never). iOS hands web pages from a Mac
+to Safari only, so the way back is Universal Clipboard: copy a link on the Mac, and roko
+offers it in the address bar for ten minutes, checking only that there is a link until you tap.
 
 ## Cookie pop-ups
 

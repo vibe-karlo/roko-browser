@@ -47,6 +47,19 @@ final class BrowserModel {
 
     var selectedTab: BrowserTab? { tabs.first { $0.id == selectedID } }
 
+    /// The page on screen, offered to your other devices through Handoff
+    /// (a Mac's Dock opens it in its default browser). Never a private tab.
+    var handoffPage: HandoffPage? {
+        guard let tab = selectedTab, !tab.isPrivate, let url = tab.url,
+              url.scheme == "https" || url.scheme == "http" else { return nil }
+        return HandoffPage(url: url, title: tab.displayTitle)
+    }
+
+    struct HandoffPage: Equatable {
+        let url: URL
+        let title: String
+    }
+
     // MARK: Launch and persistence
 
     func start(context: ModelContext) {
@@ -87,9 +100,20 @@ final class BrowserModel {
     /// and slow every address-bar search.
     private func tidyUp() async {
         await BrowserTab.pruneSnapshots(keeping: Set(tabs.map(\.id)))
+        guard let context else { return }
         let cutoff = Date.now.addingTimeInterval(-90 * 24 * 3600)
-        try? context?.delete(model: HistoryEntry.self, where: #Predicate { $0.visitedAt < cutoff })
-        try? context?.save()
+        // One by one rather than as a batch: history syncs, and the removal
+        // has to reach iCloud like any other change.
+        let old = (try? context.fetch(FetchDescriptor<HistoryEntry>(predicate: #Predicate { $0.visitedAt < cutoff }))) ?? []
+        old.forEach(context.delete)
+        try? context.save()
+        mergeSyncedDuplicates()
+    }
+
+    /// Pages and pins that two devices added before hearing from each other.
+    func mergeSyncedDuplicates() {
+        guard Store.syncs, let context else { return }
+        Store.mergeDuplicates(in: context)
     }
 
     /// iOS is short of memory: give back what can be rebuilt, before it has to
@@ -361,9 +385,11 @@ final class BrowserModel {
         return (try? context.fetch(descriptor)) ?? []
     }
 
+    /// On every device: entry by entry, so the removal syncs.
     func clearHistory() {
-        try? context?.delete(model: HistoryEntry.self)
-        try? context?.save()
+        guard let context else { return }
+        ((try? context.fetch(FetchDescriptor<HistoryEntry>())) ?? []).forEach(context.delete)
+        try? context.save()
     }
 }
 

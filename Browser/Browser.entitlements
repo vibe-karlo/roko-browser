@@ -11,5 +11,19 @@
 	<!-- Apple's cloud model for Summarize and Browse for Me. -->
 	<key>com.apple.developer.private-cloud-compute</key>
 	<true/>
+	<!-- iCloud sync, as in Sync.entitlements (which builds use until the
+	     managed entitlements above are granted). -->
+	<key>com.apple.developer.icloud-container-identifiers</key>
+	<array>
+		<string>iCloud.com.growthstudio.roko</string>
+	</array>
+	<key>com.apple.developer.icloud-services</key>
+	<array>
+		<string>CloudKit</string>
+	</array>
+	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
+	<string>$(TeamIdentifierPrefix)$(CFBundleIdentifier)</string>
+	<key>aps-environment</key>
+	<string>development</string>
 </dict>
 </plist>

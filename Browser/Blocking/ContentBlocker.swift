@@ -41,6 +41,11 @@ final class ContentBlocker {
 
     func setEnabled(_ category: Category, _ enabled: Bool) {
         defaults.set(enabled, forKey: "block.\(category.rawValue)")
+        settingsChanged()
+    }
+
+    /// Blocking settings changed, here or on another device (SettingsSync).
+    func settingsChanged() {
         controllers.allObjects.forEach { apply(to: $0, host: nil) }
     }
 

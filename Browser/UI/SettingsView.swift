@@ -1,3 +1,4 @@
+import CloudKit
 import SwiftData
 import SwiftUI
 
@@ -13,6 +14,22 @@ struct SettingsView: View {
     @State private var blocking: [ContentBlocker.Category: Bool] = [:]
     @State private var confirmClear = false
     @State private var passkeyStatus = PasskeyAccess.status
+    @State private var syncStatus = "Checking…"
+
+    /// Whether this iPhone can sync: signed in to iCloud, and iCloud allowed for roko.
+    private static func iCloudStatus() async -> String {
+        #if ICLOUD_SYNC
+        switch try? await CKContainer(identifier: Store.cloudContainer).accountStatus() {
+        case .available: return "On"
+        case .noAccount: return "Sign in to iCloud"
+        case .restricted: return "Not allowed on this iPhone"
+        case .temporarilyUnavailable: return "Paused: check iCloud in Settings"
+        default: return "Unavailable"
+        }
+        #else
+        return "Off"
+        #endif
+    }
 
     private var passkeyLabel: String {
         switch passkeyStatus {
@@ -103,6 +120,19 @@ struct SettingsView: View {
                     Text("Passkeys")
                 } footer: {
                     Text("Sites can sign you in with passkeys once Apple approves this app as a web browser. Until then their passkey prompts won't appear.")
+                }
+
+                if Store.syncs {
+                    Section {
+                        LabeledContent("Sync") {
+                            Text(syncStatus).foregroundStyle(Theme.secondaryInk)
+                        }
+                    } header: {
+                        Text("iCloud")
+                    } footer: {
+                        Text("Pins, history, settings and what you chose for each site, on every device signed in to your iCloud. Open tabs and Notify Me stay on this iPhone.")
+                    }
+                    .task { syncStatus = await Self.iCloudStatus() }
                 }
 
                 Section("Tabs") {

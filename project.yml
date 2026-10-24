@@ -41,7 +41,8 @@ targets:
           NSAllowsArbitraryLoadsInWebContent: true
         ITSAppUsesNonExemptEncryption: false
         # Notify Me: iOS wakes roko now and then to check watched pages.
-        UIBackgroundModes: [fetch]
+        # iCloud sync: silent pushes bring other devices' changes.
+        UIBackgroundModes: [fetch, remote-notification]
         BGTaskSchedulerPermittedIdentifiers: [com.growthstudio.roko.watch]
         # Required before Apple will grant the browser entitlements (default
         # browser, passkeys): the app must declare it opens http and https.
@@ -59,10 +60,18 @@ targets:
         CODE_SIGN_STYLE: Automatic
         # Your team, kept here so regenerating the project doesn't drop it.
         DEVELOPMENT_TEAM: 6ZQC2F6CF2
+        # iCloud sync (pins, history, settings) needs the paid Apple Developer
+        # Program: a Personal team can't sign iCloud or push notifications.
+        # Once the team is paid, uncomment both lines and run xcodegen.
+        # ICLOUD_SYNC turns sync on in code; never set it without these
+        # entitlements, or CloudKit traps. See README, "iCloud sync".
+        # CODE_SIGN_ENTITLEMENTS: Browser/Sync.entitlements
+        # SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) ICLOUD_SYNC
         # Once Apple grants your team the managed entitlements (browser,
-        # passkeys, Private Cloud Compute), uncomment both lines. The flag lets
-        # the app use Apple's cloud model; never set it without the entitlement,
-        # or the first AI request crashes. See README, "Apple's permissions".
+        # passkeys, Private Cloud Compute), use these two lines instead: the
+        # file has iCloud's entitlements too. The flag lets the app use Apple's
+        # cloud model; never set it without the entitlement, or the first AI
+        # request crashes. See README, "Apple's permissions".
         # CODE_SIGN_ENTITLEMENTS: Browser/Browser.entitlements
-        # SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) PRIVATE_CLOUD_COMPUTE
+        # SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) ICLOUD_SYNC PRIVATE_CLOUD_COMPUTE
         ENABLE_PREVIEWS: YES

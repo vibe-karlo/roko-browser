@@ -11,9 +11,13 @@ struct BrowserApp: App {
 
     init() {
         LaunchClock.mark("appInit")
-        container = try! ModelContainer(for: Pin.self, HistoryEntry.self, SavedTab.self, Watch.self)
+        container = Store.makeContainer()
         // Before launch finishes, so a tap on a notification that opens roko isn't missed.
         UNUserNotificationCenter.current().delegate = NotificationRouter.shared
+        SettingsSync.shared.start()
+        // iCloud tells roko about changes from other devices with silent
+        // pushes, which need no permission.
+        if Store.syncs { UIApplication.shared.registerForRemoteNotifications() }
     }
 
     var body: some Scene {

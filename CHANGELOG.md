@@ -6,6 +6,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- iCloud sync, ready but off until the paid Apple Developer Program: pins, history, settings and what you chose for each site, on every device signed in to your iCloud. Open tabs and Notify Me stay on each device. Data already moves into the new layout on first launch.
+- Handoff: the page on screen can be continued on your Mac, in its default browser. Never a private tab.
+- Copy a link on your Mac and roko offers it in the address bar ("Link you copied"), through Universal Clipboard.
 - Full-screen Summarize: the page shrinks into a card, live with a pinch, then the summary writes itself.
 - Structured answers for Summarize and Browse for Me: a gist, then sections with topic icons.
 - Browse for Me shows each site as it's read, with source cards, pictures and real site icons.

@@ -4,7 +4,7 @@ import SwiftUI
 struct CommandItem: Identifiable {
     enum Action {
         case open(URL), switchTab(BrowserTab), openPin(Pin), search(String),
-             browse(String), summarize, findOnPage, privateTab, settings, copy(String)
+             browse(String), summarize, findOnPage, privateTab, settings, copy(String), pasteLink
     }
 
     let id: String
@@ -30,6 +30,7 @@ struct CommandBarView: View {
     @State private var suggestions: [String] = []
     @State private var selection = 0
     @State private var resultsHeight: CGFloat = 0
+    @State private var hasCopiedLink = false
     /// Mid-blink of the private switch's eye.
     @State private var blink = false
     @FocusState private var focused: Bool
@@ -68,6 +69,10 @@ struct CommandBarView: View {
             query = browser.commandPrefill
             rebuild()
             focused = true
+        }
+        .task {
+            hasCopiedLink = await CopiedLink.isWaiting()
+            if hasCopiedLink { rebuild() }
         }
         .onChange(of: query) {
             selection = 0
@@ -239,6 +244,11 @@ struct CommandBarView: View {
 
     private func rebuild() {
         items = CommandRanker.rank(query: query, browser: browser, suggestions: suggestions)
+        // Nothing typed yet: a link copied a moment ago, here or on a Mac.
+        if query.isEmpty, hasCopiedLink {
+            items = [CommandItem(id: "copied-link", title: "Link you copied", subtitle: "Open it here",
+                                 kind: "Paste", icon: .glyph(.link), action: .pasteLink)]
+        }
         // Resolve where Return would go before it's pressed.
         switch items.first?.action {
         case .open(let url): DNSPrefetcher.warm(url.host())
@@ -266,7 +276,40 @@ struct CommandBarView: View {
             UIPasteboard.general.string = result
             browser.panel = .none
             browser.showToast("Copied \(result)")
+        case .pasteLink:
+            // Reading it is what asks permission to paste, so only on a tap.
+            if let url = CopiedLink.take() { browser.openFromCommandBar(url) } else { browser.panel = .none }
         }
+    }
+}
+
+/// A link copied a moment ago: on this iPhone, or on a Mac through Universal
+/// Clipboard, the way to carry a page from Chrome on the Mac to roko (iOS
+/// hands web pages from a Mac to Safari only). Only whether there is one is
+/// checked, which needs no permission; the link itself is read on a tap.
+@MainActor
+enum CopiedLink {
+    /// When the clipboard last changed, as far as roko has seen.
+    private static var seen: (count: Int, at: Date)?
+    private static var taken = -1
+
+    static func isWaiting() async -> Bool {
+        let board = UIPasteboard.general
+        let count = board.changeCount
+        guard count != taken else { return false }
+        if seen?.count != count { seen = (count, .now) }
+        // Recent only: an old link isn't what you came to open.
+        guard let seen, Date.now.timeIntervalSince(seen.at) < 600 else { return false }
+        // Throws when the clipboard is empty.
+        let found = try? await board.detectedPatterns(for: [\.probableWebURL])
+        return found?.contains(\.probableWebURL) ?? false
+    }
+
+    static func take() -> URL? {
+        let board = UIPasteboard.general
+        taken = board.changeCount
+        if let url = board.url, url.scheme?.hasPrefix("http") == true { return url }
+        return board.string.flatMap { Omnibox.url(from: $0.trimmingCharacters(in: .whitespacesAndNewlines)) }
     }
 }
 
