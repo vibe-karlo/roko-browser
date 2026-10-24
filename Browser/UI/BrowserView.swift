@@ -54,7 +54,10 @@ struct BrowserView: View {
                     // Last, so the clip above is the full height too: applied
                     // before it, the clip still ended at the home indicator
                     // and cut a blank strip off the bottom of every page.
-                    .ignoresSafeArea(.container, edges: .bottom)
+                    // The keyboard too: WebKit makes room for it on its own,
+                    // and shrunk by SwiftUI as well, the page stopped short
+                    // of the keyboard while typing into a form.
+                    .ignoresSafeArea(edges: .bottom)
                     // Once the card has taken over, the hidden page returns to
                     // full size, ready for the card to grow back into it.
                     .onChange(of: browser.summaryCoversPage) { _, covered in
@@ -90,6 +93,9 @@ struct BrowserView: View {
             BottomBar()
                 .opacity(browser.panel == .command || browser.panel == .tabs ? 0 : 1)
                 .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { barTop = $0 }
+                // Typing into a page, the keyboard covers the bar, as in Safari;
+                // risen above it, the bar sat on top of the form being filled in.
+                .ignoresSafeArea(.keyboard, edges: .bottom)
         }
         .overlay {
             if browser.panel == .command {

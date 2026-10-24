@@ -70,12 +70,13 @@ launch timings and each hiding request.
 
 ## Apple's permissions
 
-Three features need managed entitlements that Apple grants on request to a paid
+These features need managed entitlements that Apple grants on request to a paid
 developer account. Until then the app runs without them and never touches them.
 
 | Feature | Entitlement | Request |
 | --- | --- | --- |
 | Passkeys on websites | `com.apple.developer.web-browser`, `com.apple.developer.web-browser.public-key-credential` | Default-browser entitlement request (developer account) |
+| Saved passwords suggested for the site you're on (without it, iOS offers only the Passwords key and a full list) | `com.apple.developer.web-browser` | Default-browser entitlement request (developer account) |
 | Apple's cloud model for Summarize and Browse for Me | `com.apple.developer.private-cloud-compute` | developer.apple.com/contact/request/private-cloud-compute/ |
 
 The app already meets the browser requirements (it declares http/https and opens to an

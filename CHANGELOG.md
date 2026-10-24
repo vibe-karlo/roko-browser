@@ -89,6 +89,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - A picture that won't load is removed instead of staying an empty tile, and the same picture no longer shows twice.
 - Bold terms no longer show their asterisks while an answer is streaming in.
 - Pages no longer stop short of the bottom edge, leaving a blank strip above the home indicator.
+- Typing into a page, the bar stays behind the keyboard instead of covering the form, and the page reaches down to the keyboard instead of stopping short of it.
 - Typing an address for a private tab no longer offers an open normal tab, which Return would switch to.
 
 ## [0.1.0] - 2026-10-23
