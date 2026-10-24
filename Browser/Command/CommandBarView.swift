@@ -58,19 +58,26 @@ struct CommandBarView: View {
     /// Mid-blink of the private switch's eye.
     @State private var blink = false
     @FocusState private var focused: Bool
-    /// Where the keyboard's top will be: the launcher is laid out there from
-    /// its first frame, so its field rises out of the bar in one move while
-    /// the keyboard slides up under it, rather than riding up behind it.
-    @State private var keyboardHeight = KeyboardHeight.last
+    /// How tall the list is, between the field and the keyboard.
+    @State private var listHeight: CGFloat = 300
     /// Grown out of the bar (true) or still sitting in it (false): see LauncherMorph.
     @State private var opened = false
-    /// Where the field ends up on screen, from the layout's own numbers: above
-    /// the keyboard, the list (a fixed height) and the gap between them. Worked
-    /// out rather than measured, so it's right on the very first frame.
+    /// The rows: in once the field has landed, so it never flies up through them.
+    @State private var rowsShown = false
+    /// Where the field ends up: at the top, under the status bar, as in Arc
+    /// Search. Fixed, so it's known before anything is laid out and no keyboard
+    /// (the system's, SwiftKey, one that says its size late) can move it.
     private var fieldTarget: CGRect {
         let screen = UIScreen.main.bounds
-        let top = screen.height - keyboardHeight - 4 - Self.listHeight - 6 - 56
-        return CGRect(x: 8, y: top, width: screen.width - 16, height: 56)
+        return CGRect(x: 8, y: Self.safeTop + 8, width: screen.width - 16, height: 56)
+    }
+
+    /// How long the field takes to fly up, for what waits on it.
+    private static let flight: Double = 0.36
+
+    private static var safeTop: CGFloat {
+        let window = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first
+        return window?.safeAreaInsets.top ?? 59
     }
 
     /// Panel corner, and the row inset inside it. Rows round by the difference,
@@ -79,7 +86,7 @@ struct CommandBarView: View {
     static let inset: CGFloat = 8
 
     var body: some View {
-        ZStack(alignment: .bottom) {
+        ZStack(alignment: .top) {
             // The page stays in view, frosted and dimmed in its own colours:
             // what's typed is about it. A tap on it closes the bar.
             Rectangle()
@@ -98,28 +105,19 @@ struct CommandBarView: View {
             VStack(spacing: 6) {
                 field
                     .modifier(LauncherMorph(from: browser.launcherOrigin, to: fieldTarget, opened: opened))
+                    .zIndex(1)
                     .gesture(DragGesture(minimumDistance: 30).onEnded { value in
                         if value.translation.height > 60 { dismiss() }
                     })
+                // Down to the keyboard, whatever its size, settling as it arrives.
                 results
-                    .opacity(opened ? 1 : 0)
-                    .offset(y: opened ? 0 : 24)
+                    .opacity(rowsShown ? 1 : 0)
+                    .offset(y: rowsShown ? 0 : -10)
             }
             .foregroundStyle(Theme.ink)
             .padding(.horizontal, 8)
-            .padding(.bottom, keyboardHeight + 4)
-        }
-        .ignoresSafeArea(.keyboard)
-        .ignoresSafeArea(.container, edges: .bottom)
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
-            // Only a keyboard coming up (or changing height) moves it; one going
-            // away is the launcher closing, which sinks into the bar on its own.
-            guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
-                  let screen = UIScreen.main.bounds.height as CGFloat?, frame.minY < screen else { return }
-            let height = screen - frame.minY
-            guard abs(height - keyboardHeight) > 1 else { return }
-            KeyboardHeight.last = height
-            withAnimation(.smooth(duration: 0.25)) { keyboardHeight = height }
+            .padding(.top, 8)
+            .padding(.bottom, 4)
         }
         .onAppear {
             query = browser.commandPrefill
@@ -204,10 +202,6 @@ struct CommandBarView: View {
 
     // MARK: Layout
 
-    /// How tall the list is: always the same, so the field never moves as
-    /// rows come and go; about five rows.
-    private static let listHeight: CGFloat = 300
-
     private var results: some View {
         ScrollViewReader { proxy in
         ScrollView {
@@ -255,7 +249,8 @@ struct CommandBarView: View {
         // Row by row, like a picker; any row can be brought up to the slot.
         .scrollTargetBehavior(.viewAligned)
         .scrollPosition(id: $topRow, anchor: .top)
-        .contentMargins(.bottom, Self.listHeight - 64, for: .scrollContent)
+        // Room below the last row, so any row can come up to the slot under the field.
+        .contentMargins(.bottom, max(0, listHeight - 64), for: .scrollContent)
         .scrollIndicators(.hidden)
         // Rows leaving at either edge fade rather than being sliced off.
         .mask {
@@ -265,7 +260,8 @@ struct CommandBarView: View {
                 LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: 28)
             }
         }
-        .frame(height: Self.listHeight)
+        .frame(maxHeight: .infinity)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
         // Pulled down past its top, the list closes the bar, as a sheet would.
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y < -geometry.contentInsets.top - 60
@@ -537,6 +533,7 @@ struct CommandBarView: View {
                 opened = true
                 browser.launcherShown = true
             }
+            withAnimation(.easeOut(duration: 0.22).delay(Self.flight * 0.7)) { rowsShown = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) { focused = true }
         }
     }
@@ -545,6 +542,7 @@ struct CommandBarView: View {
     /// then the launcher is gone and the capsule is there in its place.
     private func dismiss() {
         focused = false
+        withAnimation(.easeIn(duration: 0.1)) { rowsShown = false }
         withAnimation(.launcher) {
             opened = false
             browser.launcherShown = false
@@ -1071,16 +1069,5 @@ extension WeatherQuery {
         if found == nil { found = await WeatherPlace.search(place).first }
         guard let found else { return nil }
         return try? await TodayWeather.fetch(at: found.coordinate, place: found.name)
-    }
-}
-
-/// The keyboard's height, as last seen: a fair guess at where it will be
-/// before it says so (the system's own, with the bar of suggestions).
-@MainActor
-enum KeyboardHeight {
-    private static let key = "keyboardHeight"
-    static var last: CGFloat {
-        get { UserDefaults.standard.object(forKey: key) as? CGFloat ?? 336 }
-        set { UserDefaults.standard.set(newValue, forKey: key) }
     }
 }
