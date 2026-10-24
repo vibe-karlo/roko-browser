@@ -48,6 +48,8 @@ final class TodayModel {
     /// Just the weather, keeping what's there until the new one arrives.
     func freshenWeather() async {
         guard !isRefreshing, !isFresheningWeather else { return }
+        // Fetched in the last ten minutes: it hasn't changed enough to ask again.
+        if let weather, Date.now.timeIntervalSince(weather.fetchedAt) < 600 { return }
         isFresheningWeather = true
         defer { isFresheningWeather = false }
         guard let fresh = await freshWeather(inBackground: false) else { return }

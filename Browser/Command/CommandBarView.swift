@@ -171,7 +171,9 @@ struct CommandBarView: View {
         .task {
             // Pinned town weather: all at once, as the bar opens.
             await withTaskGroup(of: (String, TodayWeather?).self) { group in
-                for asked in PinnedAnswers.all where WeatherQuery.place(in: asked) != nil {
+                // Half an hour old or less: what's there stands (two requests a town saved).
+                for asked in PinnedAnswers.all where WeatherQuery.place(in: asked) != nil
+                    && Date.now.timeIntervalSince(pinnedWeather[asked]?.fetchedAt ?? .distantPast) > 1800 {
                     group.addTask { (asked, await WeatherQuery.weather(for: asked)) }
                 }
                 for await (asked, weather) in group {
@@ -591,6 +593,12 @@ struct CommandBarView: View {
     }
 
     private func rebuild() {
+        let started = CFAbsoluteTimeGetCurrent()
+        defer {
+            if LaunchClock.isEnabled {
+                print(String(format: "PERF rank \"%@\" %.1fms, %d rows", query, (CFAbsoluteTimeGetCurrent() - started) * 1000, items.count))
+            }
+        }
         guard browser.launcherContext == .web else {
             items = contextRows()
             return
@@ -629,9 +637,16 @@ struct CommandBarView: View {
                 if WeatherQuery.place(in: asked) != nil {
                     answer = pinnedWeather[asked].map { Self.weatherRow(id: "", $0, action: .search(asked)) }
                         ?? CommandItem(id: "", title: "Weather", subtitle: asked, kind: "", icon: .glyph(.today), action: .search(asked))
+                } else if ["calendar", "kalendar", "next", "next meeting", "agenda", "raspored"].contains(asked.lowercased()) {
+                    answer = CommandRanker.calendarItem()
+                } else if ["weather", "forecast", "vrijeme", "vreme", "prognoza"].contains(asked.lowercased()),
+                          let weather = TodayModel.shared.weather {
+                    answer = Self.weatherRow(id: "", weather, action: .today)
                 } else {
-                    answer = CommandRanker.rank(query: asked, browser: browser, suggestions: [])
-                        .first { ["calc", "weather", "calendar"].contains($0.id) }
+                    // A sum, a conversion, days until: the calculator alone, not the whole ranking.
+                    answer = Calculator.answer(asked).map {
+                        CommandItem(id: "", title: $0.result, subtitle: $0.question, kind: "", icon: .glyph(.equals), action: .copy($0.result))
+                    }
                 }
                 guard let answer else { continue }
                 rows.append(CommandItem(id: "answer-\(asked)", title: answer.title, subtitle: answer.subtitle,
@@ -778,6 +793,25 @@ private struct CommandRow: View {
 }
 
 enum CommandRanker {
+    /// What's next on your calendar, as a row; Return opens Calendar there.
+    static func calendarItem() -> CommandItem {
+        let item: CommandItem
+        if !TodayCalendar.isAllowed {
+            item = CommandItem(id: "calendar", title: "Calendar", subtitle: "Allow it in Today", kind: "Today",
+                               icon: .glyph(.calendar), action: .today)
+        } else if let event = TodayCalendar.next() {
+            let place = event.location.map { " · \($0)" } ?? ""
+            item = CommandItem(id: "calendar", title: event.title, subtitle: TodayCalendar.when(event) + place,
+                               kind: "Calendar", icon: .glyph(.calendar),
+                               action: .openApp(URL(string: "calshow:\(Int(event.start.timeIntervalSinceReferenceDate))")!))
+        } else {
+            item = CommandItem(id: "calendar", title: "Nothing on your calendar", subtitle: "For the next seven days",
+                               kind: "Calendar", icon: .glyph(.calendar),
+                               action: .openApp(URL(string: "calshow:\(Int(Date.now.timeIntervalSinceReferenceDate))")!))
+        }
+        return item
+    }
+
     static func rank(query rawQuery: String, browser: BrowserModel, suggestions: [String]) -> [CommandItem] {
         let query = rawQuery.trimmingCharacters(in: .whitespaces)
         let needle = query.lowercased()
@@ -944,20 +978,7 @@ enum CommandRanker {
         // "calendar", "next": what's next on your calendar; Return opens Calendar there.
         let calendarWords = ["calendar", "kalendar", "next meeting", "agenda", "sljedeće", "sljedece", "raspored"]
         if needle.count >= 3, calendarWords.contains(where: { $0.hasPrefix(needle) }) || needle == "next" {
-            let item: CommandItem
-            if !TodayCalendar.isAllowed {
-                item = CommandItem(id: "calendar", title: "Calendar", subtitle: "Allow it in Today", kind: "Today",
-                                   icon: .glyph(.calendar), action: .today)
-            } else if let event = TodayCalendar.next() {
-                let place = event.location.map { " · \($0)" } ?? ""
-                item = CommandItem(id: "calendar", title: event.title, subtitle: TodayCalendar.when(event) + place,
-                                   kind: "Calendar", icon: .glyph(.calendar),
-                                   action: .openApp(URL(string: "calshow:\(Int(event.start.timeIntervalSinceReferenceDate))")!))
-            } else {
-                item = CommandItem(id: "calendar", title: "Nothing on your calendar", subtitle: "For the next seven days",
-                                   kind: "Calendar", icon: .glyph(.calendar),
-                                   action: .openApp(URL(string: "calshow:\(Int(Date.now.timeIntervalSinceReferenceDate))")!))
-            }
+            let item = calendarItem()
             ranked.append((calendarWords.contains(needle) || needle == "next" ? 1012 : 890, item))
         }
 

@@ -302,3 +302,17 @@ HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTIO
 CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
+
+## Speed and battery, measured
+
+On the iPhone 17 Pro, Release build (24 October 2026): first screen 160 ms after launch warm, 460 ms
+cold; the content blocker ready 0.4 to 1.2 s. In the simulator: every screen (a page, the address
+bar, Today, To-do, an answer) at 0% CPU when nothing is happening, about 80 MB; ranking the
+address bar 1 to 2.5 ms a keystroke, 3.5 ms to open. Nothing polls: waits are one-off pauses or
+debounces, the light's breathing and the reading shimmer run only while something is being worked
+on, and the network and location are touched only when what they'd bring is stale (weather ten
+minutes in Today, half an hour pinned; a location fix fifteen minutes). In the background: one
+morning refresh for Today, Notify Me's checks, and local notifications.
+
+With -perf: `PERF` lines for launch, `PERF rank` for each keystroke, `HITCH` for frames over 40 ms
+while a summary opens, `SUMMARY` for its first words.

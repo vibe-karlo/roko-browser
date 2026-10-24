@@ -12,6 +12,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - To-do's field: the chip says when in short ("Wed 15:00") and is a menu (Today, Tomorrow, This Week, Someday, Date and Time…) for when the words don't say. "at 3" means 15:00 (1 to 6 are the afternoon), and a day typed first ("Wednesday at 3") is read too.
 
 ### Fixed
+- Less network and location for the weather: pinned towns' weather is fetched again only when it's half an hour old (it was on every opening of the address bar, two requests a town); Today's weather when it's ten minutes old; a location fix from the last quarter of an hour is reused instead of waking GPS, and the town isn't looked up again within a kilometre of the last one.
+- The address bar opens in 3.5 ms (was 7 to 24 ms, enough to drop a frame as the field starts to rise): a pinned answer is worked out by itself instead of by running the whole ranking for each one.
 - A link copied on a Mac while roko is open is offered again: only copies made in roko itself are left out now.
 - The bar is one capsule with one edge: its buttons and launcher capsule are plain fills inside it, their curves parallel to its own, instead of each drawing an outline at a different roundness. In To-do the field fills the bar.
 - The launcher opens out of the bar: the bar's capsule is the launcher's field, so it widens and rises with the keyboard, and closing it sinks back into the bar, instead of one fading out while another fades in at the top.

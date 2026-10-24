@@ -160,6 +160,8 @@ final class TodayLocation: NSObject, CLLocationManagerDelegate {
     /// The latest place, asking for permission the first time.
     func current() async -> CLLocation? {
         if isDenied { return nil }
+        // A fix from the last quarter of an hour will do: no GPS woken for the weather.
+        if let last = manager.location, Date.now.timeIntervalSince(last.timestamp) < 900 { return last }
         return await withCheckedContinuation { continuation in
             waiting.append(continuation)
             guard waiting.count == 1 else { return }
@@ -178,10 +180,15 @@ final class TodayLocation: NSObject, CLLocationManagerDelegate {
 
     /// The town's name, for the weather line.
     static func placeName(for location: CLLocation) async -> String? {
+        // Within a kilometre of the last place named: the same town, no request.
+        if let (named, name) = lastNamed, named.distance(from: location) < 1000 { return name }
         guard let request = MKReverseGeocodingRequest(location: location) else { return nil }
         let items = try? await request.mapItems
-        return items?.first?.addressRepresentations?.cityName
+        let name = items?.first?.addressRepresentations?.cityName
+        if let name { lastNamed = (location, name) }
+        return name
     }
+    private static var lastNamed: (CLLocation, String)?
 
     private func finish(_ location: CLLocation?) {
         let continuations = waiting
