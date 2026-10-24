@@ -129,8 +129,8 @@ struct BrowserView: View {
             if browser.panel == .command {
                 // Over whatever screen it was opened from, which stays under it.
                 CommandBarView()
-                    // Quick: it swaps places with the bar, and the keyboard brings the motion.
-                    .transition(.opacity.animation(.easeOut(duration: 0.12)))
+                    // Its field grows out of the bar's capsule; the rest fades in around it.
+                    .transition(.opacity)
             }
         }
         .overlay(alignment: .bottom) {

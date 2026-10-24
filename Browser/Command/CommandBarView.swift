@@ -30,6 +30,7 @@ struct CommandItem: Identifiable {
 struct CommandBarView: View {
     @Environment(BrowserModel.self) private var browser
     @Environment(\.modelContext) private var context
+    @Environment(\.launcherSpace) private var launcherSpace
     @Query(sort: \Pin.order) private var pins: [Pin]
     @Query(sort: \Todo.createdAt) private var todos: [Todo]
     /// Ticked in the bar a moment ago: still shown, struck through.
@@ -420,8 +421,13 @@ struct CommandBarView: View {
         // Icons share one axis with the rows' icons below.
         .padding(.horizontal, 16)
         .frame(height: 56)
-        .background(Theme.panel, in: .rect(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.edge))
+        // Opened out of the bar's capsule, and closed back into it.
+        .background {
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Theme.panel)
+                .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.edge))
+                .launcherMorph(launcherSpace)
+        }
     }
 
     /// Arc-style private switch: an open eye, which blinks shut (in the accent)
@@ -488,7 +494,7 @@ struct CommandBarView: View {
 
     private func dismiss() {
         focused = false
-        browser.panel = browser.launcherReturn
+        withAnimation(.launcher) { browser.panel = browser.launcherReturn }
     }
 
     // MARK: Ranking

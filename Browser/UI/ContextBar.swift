@@ -19,6 +19,12 @@ struct ContextBar: View {
     var trailing: Slot? = nil
     /// Off where the screen draws its own edge above the bar.
     var fades = true
+    /// The launcher opens out of this bar's capsule (not To-do's, which types in place).
+    var morphs = true
+    /// Where the capsule widens into a field of the screen's own (To-do's), if any.
+    var fieldSpace: Namespace.ID? = nil
+    @Environment(BrowserModel.self) private var browser
+    @Environment(\.launcherSpace) private var launcherSpace
 
     var body: some View {
         HStack(spacing: 0) {
@@ -32,8 +38,13 @@ struct ContextBar: View {
                 .padding(.horizontal, 20)
                 .frame(minWidth: 104)
                 .frame(height: 38)
-                .background(Theme.raised, in: .capsule)
-                .overlay(Capsule().strokeBorder(Theme.edge))
+                .background {
+                    if !(morphs && browser.panel == .command) {
+                        Capsule().fill(Theme.raised)
+                            .overlay(Capsule().strokeBorder(Theme.edge))
+                            .launcherMorph(fieldSpace ?? (morphs ? launcherSpace : nil), id: fieldSpace == nil ? "launcher" : "field")
+                    }
+                }
                 .contentShape(.capsule)
             }
             .buttonStyle(GlyphButtonStyle())

@@ -5,6 +5,7 @@ import SwiftUI
 /// back as soon as you scroll up.
 struct BottomBar: View {
     @Environment(BrowserModel.self) private var browser
+    @Environment(\.launcherSpace) private var launcherSpace
     /// Tabs switched by swiping the bar; each one ticks.
     @State private var switches = 0
 
@@ -37,8 +38,15 @@ struct BottomBar: View {
             Button { browser.showCommandBar() } label: {
                 Glyph(.plus, size: 22, weight: 2)
                     .frame(width: 104, height: 38)
-                    .background(Theme.raised, in: .capsule)
-                    .overlay(Capsule().strokeBorder(Theme.edge))
+                    .background {
+                        // Becomes the launcher's field: there only while the launcher isn't,
+                        // and only on a page (a screen over it has its own bar).
+                        if browser.panel != .command, onPage {
+                            Capsule().fill(Theme.raised)
+                                .overlay(Capsule().strokeBorder(Theme.edge))
+                                .launcherMorph(launcherSpace)
+                        }
+                    }
                     .contentShape(.capsule)
             }
             .buttonStyle(GlyphButtonStyle())
@@ -63,6 +71,10 @@ struct BottomBar: View {
         .barSurface(cornerRadius: 24)
         .highPriorityGesture(swipes)
         .sensoryFeedback(.selection, trigger: switches)
+    }
+
+    private var onPage: Bool {
+        ![.today, .todos].contains(browser.panel) && browser.browseForMe == nil && browser.summary == nil
     }
 
     private var recentTabs: [BrowserTab] {

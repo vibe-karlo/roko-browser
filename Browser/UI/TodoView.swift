@@ -18,6 +18,10 @@ struct TodoView: View {
     /// Being dragged (set as a long press lifts it, menu or drag): rows it
     /// passes over make room for it.
     @State private var dragging: Todo?
+    /// Typing a new one: the bar's capsule has widened into a field, in place.
+    @State private var adding = false
+    @State private var draft = ""
+    @Namespace private var barSpace
     /// The Done list at the bottom is open.
     @State private var showsDone = false
 
@@ -249,12 +253,79 @@ struct TodoView: View {
 
     // MARK: Bar
 
-    /// The app's bar, for To-do: the launcher in its middle takes a new to-do
-    /// in words ("Call Petra on Monday at 15"), and stays up for the next.
+    /// The app's bar, for To-do. Its capsule widens into a field right where
+    /// it is: the list stays in view above, and each to-do lands in it as
+    /// Return adds it, ready for the next. Words say when ("Call Petra on
+    /// Monday at 15"); the chip says what was understood.
+    @ViewBuilder
     private var bar: some View {
-        ContextBar(leading: .init(glyph: .close, label: "Close", action: close),
-                   glyph: .plus, title: "New to-do",
-                   launch: { browser.showCommandBar(context: .todo, over: .todos) })
+        if adding {
+            HStack(spacing: 10) {
+                ReturnKeepingField(placeholder: "Call Petra on Monday at 15", text: $draft, onReturn: add)
+                    .frame(height: 44)
+                Text(whenLabel)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.accentText)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .animation(.snappy(duration: 0.2), value: whenLabel)
+                Button { finishAdding() } label: {
+                    Glyph(.close, size: 13, weight: 2.2)
+                        .frame(width: 30, height: 30)
+                        .background(Theme.canvas.opacity(0.6), in: .circle)
+                        .frame(width: 44, height: 44)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(GlyphButtonStyle())
+                .accessibilityLabel("Done adding")
+            }
+            .padding(.leading, 18)
+            .padding(.trailing, 4)
+            .frame(height: 50)
+            .background {
+                Capsule().fill(Theme.raised)
+                    .overlay(Capsule().strokeBorder(Theme.edge))
+                    .matchedGeometryEffect(id: "field", in: barSpace)
+            }
+            .padding(.horizontal, 7)
+            .frame(height: Theme.barHeight + 8)
+            .barSurface(cornerRadius: 24)
+            .padding(.horizontal, Theme.gutter)
+            .padding(.bottom, 4)
+            .background(alignment: .top) { FadeEdge(color: Theme.canvas, height: 40).offset(y: 12) }
+            .transition(.opacity)
+        } else {
+            ContextBar(leading: .init(glyph: .close, label: "Close", action: close),
+                       glyph: .plus, title: "New to-do",
+                       launch: { withAnimation(.launcher) { adding = true } },
+                       morphs: false, fieldSpace: barSpace)
+                .transition(.opacity)
+        }
+    }
+
+    private func finishAdding() {
+        withAnimation(.launcher) { adding = false }
+        draft = ""
+    }
+
+    /// The draft's own day and time, if it names any.
+    private var understood: (title: String, when: TodoWhen?, time: DateComponents?)? {
+        TodoDraft.read(draft)
+    }
+
+    private var whenLabel: String {
+        let read = understood
+        return TodoDraft.label(read?.when ?? .today, read?.time)
+    }
+
+    private func add() {
+        guard let read = understood else { return }
+        let todo = Todo(title: read.title, when: read.when ?? .today, at: read.time)
+        if todo.time != nil { TodoAlerts.askIfNeeded() }
+        todo.order = (todos.map(\.order).max() ?? 0) + 1
+        withAnimation(.snappy) { context.insert(todo) }
+        save()
+        draft = ""
     }
 
     // MARK: Changes
@@ -448,6 +519,57 @@ private struct DayPicker: View {
             hasTime = time != nil
             // A new time starts at the next whole hour.
             clock = time ?? Calendar.current.nextDate(after: .now, matching: DateComponents(minute: 0), matchingPolicy: .nextTime) ?? .now
+        }
+    }
+}
+
+/// A one-line field whose Return doesn't put the keyboard away: SwiftUI's
+/// always gives up focus on Return, and the first letters typed after it
+/// were lost while it came back. UIKit's asks first, and here the answer is no.
+/// It takes the keyboard as it appears.
+private struct ReturnKeepingField: UIViewRepresentable {
+    let placeholder: String
+    @Binding var text: String
+    let onReturn: () -> Void
+
+    func makeUIView(context: Context) -> UITextField {
+        let field = UITextField()
+        field.delegate = context.coordinator
+        field.font = .systemFont(ofSize: 17)
+        field.textColor = UIColor(Theme.ink)
+        field.tintColor = UIColor(Theme.accent)
+        field.attributedPlaceholder = NSAttributedString(string: placeholder,
+                                                         attributes: [.foregroundColor: UIColor(Theme.secondaryInk)])
+        field.returnKeyType = .done
+        field.autocapitalizationType = .sentences
+        field.addTarget(context.coordinator, action: #selector(Coordinator.changed(_:)), for: .editingChanged)
+        field.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        DispatchQueue.main.async { field.becomeFirstResponder() }
+        return field
+    }
+
+    func updateUIView(_ field: UITextField, context: Context) {
+        context.coordinator.parent = self
+        if field.text != text { field.text = text }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
+
+    final class Coordinator: NSObject, UITextFieldDelegate {
+        var parent: ReturnKeepingField
+
+        init(parent: ReturnKeepingField) {
+            self.parent = parent
+        }
+
+        @objc func changed(_ field: UITextField) {
+            parent.text = field.text ?? ""
+        }
+
+        func textFieldShouldReturn(_ field: UITextField) -> Bool {
+            parent.onReturn()
+            return false
         }
     }
 }

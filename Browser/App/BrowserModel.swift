@@ -321,7 +321,8 @@ final class BrowserModel {
         commandMode = mode
         launcherContext = context
         launcherReturn = screen
-        panel = .command
+        // The bar's capsule opens into the field (LauncherMorph).
+        withAnimation(.launcher) { panel = .command }
         // The address bar offers the copied link itself.
         copiedLinkOffer = false
     }
