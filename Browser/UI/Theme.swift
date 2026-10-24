@@ -27,6 +27,36 @@ enum Theme {
     static let gutter: CGFloat = 16
 }
 
+/// Settings → Appearance: follow iOS, or stay light or dark.
+enum Appearance: String, CaseIterable, Identifiable {
+    case system, light, dark
+
+    static let key = "appearance"
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .system: "Automatic"
+        case .light: "Light"
+        case .dark: "Dark"
+        }
+    }
+
+    /// Set on the windows rather than in SwiftUI, so everything follows:
+    /// sheets, the system Paste button, and pages that have a dark mode.
+    static func apply() {
+        let chosen = UserDefaults.standard.string(forKey: key).flatMap(Appearance.init) ?? .system
+        let style: UIUserInterfaceStyle = switch chosen {
+        case .system: .unspecified
+        case .light: .light
+        case .dark: .dark
+        }
+        for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+            scene.windows.forEach { $0.overrideUserInterfaceStyle = style }
+        }
+    }
+}
+
 // SwiftUI resolves dynamic colours on its render thread during animations, so
 // this must not inherit the project's default main-actor isolation.
 extension View {

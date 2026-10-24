@@ -166,7 +166,9 @@ opens it in the Mac's default browser, private tabs never). iOS hands web pages 
 to Safari only, so the way back is Universal Clipboard: copy a link on the Mac, and roko
 offers it above the bar once when you open roko, then in the address bar for five minutes. It
 only checks that there is a link; the system Paste button hands the link over, which needs no
-permission prompt.
+permission prompt. To see the link itself first, turn on Settings → Show the link you copied
+and set roko's Paste from Other Apps to Allow in iOS Settings; otherwise iOS asks for each
+link. A link to the page already on screen isn't offered.
 
 ## Cookie pop-ups
 

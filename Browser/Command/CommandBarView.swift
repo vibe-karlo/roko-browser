@@ -4,7 +4,8 @@ import SwiftUI
 struct CommandItem: Identifiable {
     enum Action {
         case open(URL), switchTab(BrowserTab), openPin(Pin), search(String),
-             browse(String), summarize, findOnPage, privateTab, settings, copy(String), pasteLink
+             browse(String), summarize, findOnPage, privateTab, settings, copy(String),
+             pasteLink, openCopied(URL)
     }
 
     let id: String
@@ -31,6 +32,8 @@ struct CommandBarView: View {
     @State private var selection = 0
     @State private var resultsHeight: CGFloat = 0
     @State private var hasCopiedLink = false
+    /// The copied link itself, when roko may read it (see CopiedLink.peek).
+    @State private var copiedURL: URL?
     /// Mid-blink of the private switch's eye.
     @State private var blink = false
     @FocusState private var focused: Bool
@@ -71,8 +74,12 @@ struct CommandBarView: View {
             focused = true
         }
         .task {
-            hasCopiedLink = await CopiedLink.isWaiting()
-            if hasCopiedLink { rebuild() }
+            guard await CopiedLink.isWaiting() else { return }
+            copiedURL = await CopiedLink.peek()
+            // The page you're on isn't worth a row.
+            if let copiedURL, browser.isCurrentPage(copiedURL) { return }
+            hasCopiedLink = true
+            rebuild()
         }
         .onChange(of: query) {
             selection = 0
@@ -123,52 +130,59 @@ struct CommandBarView: View {
         .frame(height: items.isEmpty ? 0 : min(resultsHeight, 380))
     }
 
-    /// A link copied a moment ago, here or on a Mac: the system Paste button
-    /// opens it without asking for permission.
+    /// A link copied a moment ago that roko can't read without iOS asking: a
+    /// row like the others, with the system Paste button where the kind goes.
     private var copiedLinkRow: some View {
         HStack(spacing: 12) {
             Glyph(.link, size: 18).foregroundStyle(Theme.secondaryInk).frame(width: 22)
-            Text("Link you copied")
-                .font(.system(size: 16))
-                .foregroundStyle(Theme.ink)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Link you copied")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.ink)
+                Text("From your clipboard")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.secondaryInk)
+            }
+            .lineLimit(1)
             Spacer(minLength: 8)
-            CopiedLinkButton { url in
+            PasteControl { url in
                 focused = false
                 browser.openFromCommandBar(url)
             }
         }
-        .padding(.horizontal, 12)
-        .frame(minHeight: 52)
+        // "Paste" ends where the other rows' kind labels do.
+        .padding(.leading, 12)
+        .padding(.trailing, 12 - PasteControl.inset)
+        .padding(.vertical, 4)
     }
 
-    /// Your pins, one tap away, right above the field where the thumb already is.
+    /// Your pins, one tap away, right above the field where the thumb already
+    /// is: just their icons, on the same axis as the icons in the list. A long
+    /// press says which page it is.
     private var pinRow: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 0) {
                 ForEach(pins) { pin in
+                    let name = pin.title.isEmpty ? pin.host : pin.title
                     Button { focused = false; browser.open(pin) } label: {
-                        VStack(spacing: 6) {
-                            SiteIcon(host: pin.host, size: 30)
-                            Text(pin.title.isEmpty ? pin.host : pin.title)
-                                .font(.system(size: 11))
-                                .foregroundStyle(Theme.secondaryInk)
-                                .lineLimit(1)
-                        }
-                        .frame(width: 66)
-                        .padding(.vertical, 6)
-                        .contentShape(.rect)
+                        SiteIcon(host: pin.host, size: 28)
+                            .frame(width: 52, height: 48)
+                            .contentShape(.rect)
                     }
                     .buttonStyle(RowButtonStyle())
-                    .accessibilityLabel(pin.title.isEmpty ? pin.host : pin.title)
+                    .accessibilityLabel(name)
                     .contextMenu {
-                        Button("Unpin", role: .destructive) { browser.unpin(pin) }
+                        Section(name) {
+                            Button("Unpin", role: .destructive) { browser.unpin(pin) }
+                        }
                     }
                 }
             }
-            .padding(.horizontal, 10)
+            // The first icon centred where the field's and the rows' icons are.
+            .padding(.horizontal, 5)
         }
         .scrollIndicators(.hidden)
-        .padding(.top, items.isEmpty ? 10 : 2)
+        .padding(.top, items.isEmpty ? 6 : 0)
     }
 
     private var field: some View {
@@ -216,7 +230,8 @@ struct CommandBarView: View {
             }
         }
         .animation(.easeOut(duration: 0.15), value: query.isEmpty)
-        .padding(.horizontal, 18)
+        // The rows' inset plus their padding: icons share one axis down the panel.
+        .padding(.horizontal, Self.inset + 12)
         .frame(height: 56)
     }
 
@@ -267,9 +282,13 @@ struct CommandBarView: View {
     private func rebuild() {
         items = CommandRanker.rank(query: query, browser: browser, suggestions: suggestions)
         // Nothing typed yet: a link copied a moment ago, here or on a Mac.
+        // Above the pins, so they keep one place right over the field.
         if query.isEmpty, hasCopiedLink {
-            items = [CommandItem(id: "copied-link", title: "Link you copied", subtitle: "Open it here",
-                                 kind: "Paste", icon: .glyph(.link), action: .pasteLink)]
+            items = [copiedURL.map {
+                CommandItem(id: "copied-link", title: $0.shortDisplay, subtitle: "Link you copied",
+                            kind: "", icon: .site($0.displayHost), action: .openCopied($0))
+            } ?? CommandItem(id: "copied-link", title: "Link you copied", subtitle: "",
+                             kind: "", icon: .glyph(.link), action: .pasteLink)]
         }
         // Resolve where Return would go before it's pressed.
         switch items.first?.action {
@@ -300,6 +319,9 @@ struct CommandBarView: View {
             browser.showToast("Copied \(result)")
         case .pasteLink:
             break  // its row has the system Paste button instead
+        case .openCopied(let url):
+            CopiedLink.took()
+            browser.openFromCommandBar(url)
         }
     }
 }

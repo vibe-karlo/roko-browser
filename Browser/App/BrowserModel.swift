@@ -38,6 +38,8 @@ final class BrowserModel {
     @ObservationIgnored private var cookieOffersMade = Set<String>()
     /// A link copied a moment ago, offered above the bar on opening roko.
     private(set) var copiedLinkOffer = false
+    /// The link itself, when roko may read it; otherwise the offer pastes it.
+    private(set) var copiedLinkURL: URL?
     @ObservationIgnored private var copiedLinkTask: Task<Void, Never>?
 
     /// Opening roko (or coming back to it) with a link just copied, here or
@@ -48,6 +50,10 @@ final class BrowserModel {
         guard panel == .none, summary == nil, browseForMe == nil else { return }
         Task {
             guard await CopiedLink.shouldOfferAboveBar() else { return }
+            let url = await CopiedLink.peek()
+            // Already on screen: nothing to offer.
+            if let url, isCurrentPage(url) { return }
+            copiedLinkURL = url
             copiedLinkOffer = true
             copiedLinkTask?.cancel()
             copiedLinkTask = Task {
@@ -58,6 +64,7 @@ final class BrowserModel {
     }
 
     func openCopiedLink(_ url: URL) {
+        CopiedLink.took()
         copiedLinkOffer = false
         copiedLinkTask?.cancel()
         open(url, inNewTab: true)
@@ -390,6 +397,11 @@ final class BrowserModel {
 
     /// The page an address points at, ignoring "www.", http vs https, a
     /// trailing slash and the #section within it.
+    /// The page on screen: a copied link to it isn't worth offering.
+    func isCurrentPage(_ url: URL) -> Bool {
+        selectedTab?.url.map(Self.samePage) == Self.samePage(url)
+    }
+
     private static func samePage(_ url: URL) -> String {
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         components?.fragment = nil

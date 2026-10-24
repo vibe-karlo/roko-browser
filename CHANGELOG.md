@@ -9,6 +9,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - iCloud sync, ready but off until the paid Apple Developer Program: pins, history, settings and what you chose for each site, on every device signed in to your iCloud. Open tabs and Notify Me stay on each device. Data already moves into the new layout on first launch.
 - Handoff: the page on screen can be continued on your Mac, in its default browser. Never a private tab.
 - Copy a link on your Mac and roko offers it ("Link you copied"), through Universal Clipboard: above the bar once when you open roko, then in the address bar for five minutes. It opens with the system Paste button, so iOS never asks for permission to paste.
+- Settings → Show the link you copied: the offer and the address bar show the link itself, with its site's icon, before you open it. Set Paste from Other Apps to Allow in iOS Settings and iOS doesn't ask; links copied in roko always show.
+- Settings → Appearance: Automatic, Light or Dark, for the whole app and the pages in it.
 - Full-screen Summarize: the page shrinks into a card, live with a pinch, then the summary writes itself.
 - Structured answers for Summarize and Browse for Me: a gist, then sections with topic icons.
 - Browse for Me shows each site as it's read, with source cards, pictures and real site icons.
@@ -57,6 +59,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - A pin always opens the page that was pinned, not whatever page of that site is open; two pages of one site can both be pinned.
 - A pinch summarizes pages wider than the screen too, from their own size; a page you've zoomed into still zooms out.
 - Apple's models write in English when they summarize a Croatian page or answer a Croatian question, and say why; Claude still writes Croatian.
+- The copied-link offer reads like the cookie one: what it is, then "Paste" or "Open" in orange, instead of a filled orange capsule. In the address bar it's a row like the others.
+- Pins are just their sites' icons, above the field and on the start screen, on the same line as the icons in the list; a long press names the page.
+- The address field's icons line up with the rows above it.
 
 ### Performance
 - The first page after launch starts about 0.16 s sooner: it waits only for the request rules; the hiding indexes now decode in parallel.
@@ -91,6 +96,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Pages no longer stop short of the bottom edge, leaving a blank strip above the home indicator.
 - Typing into a page, the bar stays behind the keyboard instead of covering the form, and the page reaches down to the keyboard instead of stopping short of it.
 - Typing an address for a private tab no longer offers an open normal tab, which Return would switch to.
+- A copied link to the page already on screen isn't offered; nor is a link copied in roko, above the bar.
+- A link copied long ago is no longer offered as new after roko restarts.
+- The copied-link and cookie offers no longer stay on top of the page menu.
 
 ## [0.1.0] - 2026-10-23
 

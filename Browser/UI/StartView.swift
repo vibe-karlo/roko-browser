@@ -7,7 +7,7 @@ struct StartView: View {
     @Environment(BrowserModel.self) private var browser
     @Query(sort: \Pin.order) private var pins: [Pin]
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
 
     var body: some View {
         VStack {
@@ -22,12 +22,16 @@ struct StartView: View {
                 Spacer()
             } else {
                 Spacer()
-                LazyVGrid(columns: columns, spacing: 22) {
+                LazyVGrid(columns: columns, spacing: 14) {
                     ForEach(pins) { pin in
+                        let name = pin.title.isEmpty ? pin.host : pin.title
                         Button { browser.open(pin) } label: { PinTile(pin: pin) }
-                            .buttonStyle(.plain)
+                            .buttonStyle(RowButtonStyle())
+                            .accessibilityLabel(name)
                             .contextMenu {
-                                Button("Unpin", role: .destructive) { browser.unpin(pin) }
+                                Section(name) {
+                                    Button("Unpin", role: .destructive) { browser.unpin(pin) }
+                                }
                             }
                     }
                 }
@@ -39,19 +43,15 @@ struct StartView: View {
     }
 }
 
+/// A pin is its site's icon, bare: names cut short to fit under it were noise.
+/// A long press says which page it is.
 struct PinTile: View {
     let pin: Pin
 
     var body: some View {
-        VStack(spacing: 8) {
-            SiteIcon(host: pin.host, size: 30)
-            Text(pin.title.isEmpty ? pin.host : pin.title)
-                .font(.caption)
-                .foregroundStyle(Theme.ink)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity)
-        .contentShape(.rect)
+        SiteIcon(host: pin.host, size: 34)
+            .frame(maxWidth: .infinity, minHeight: 56)
+            .contentShape(.rect)
     }
 }
 

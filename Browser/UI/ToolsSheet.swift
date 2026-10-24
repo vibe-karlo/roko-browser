@@ -79,6 +79,7 @@ struct ToolsSheet: View {
 
             iconButton(.link, "Copy link") {
                 UIPasteboard.general.url = tab.url
+                if let url = tab.url { CopiedLink.copiedHere(url) }
                 browser.panel = .none
                 browser.showToast("Link copied")
             }

@@ -153,7 +153,7 @@ struct BrowserView: View {
             }
         }
         .overlay(alignment: .bottom) {
-            if browser.cookieOffer != nil {
+            if browser.cookieOffer != nil, browser.panel == .none {
                 // After a few reloads: the page may be broken by its cookie pop-up's answer.
                 HStack(spacing: 14) {
                     Text("Page not working?")
@@ -174,18 +174,36 @@ struct BrowserView: View {
         }
         .animation(.snappy(duration: 0.3), value: browser.cookieOffer)
         .overlay(alignment: .bottom) {
-            if browser.copiedLinkOffer, browser.cookieOffer == nil {
-                // Opening roko with a link just copied, here or on a Mac.
+            // Never over the page menu or another panel opened while it showed.
+            if browser.copiedLinkOffer, browser.cookieOffer == nil, browser.panel == .none {
+                // Opening roko with a link just copied, here or on a Mac. Built
+                // like the cookie offer: what it is, then one word to act.
                 HStack(spacing: 14) {
-                    Text("Link you copied")
-                        .font(.system(size: 15, weight: .medium))
-                    CopiedLinkButton { browser.openCopiedLink($0) }
+                    if let url = browser.copiedLinkURL {
+                        HStack(spacing: 10) {
+                            SiteIcon(host: url.displayHost, size: 18)
+                            Text(url.shortDisplay)
+                                .font(.system(size: 15, weight: .medium))
+                        }
+                        Button("Open") { browser.openCopiedLink(url) }
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Theme.accentText)
+                            .frame(minHeight: 44)
+                            .contentShape(.rect)
+                    } else {
+                        // Spaced so "Paste" sits as "Allow cookies" does.
+                        HStack(spacing: 14 - PasteControl.inset) {
+                            Text("Link you copied")
+                                .font(.system(size: 15, weight: .medium))
+                            PasteControl { browser.openCopiedLink($0) }
+                        }
+                    }
                 }
                 .lineLimit(1)
-                .padding(.leading, 18)
-                .padding(.trailing, 8)
-                .padding(.vertical, 6)
+                .padding(.leading, browser.copiedLinkURL == nil ? 18 : 14)
+                .padding(.trailing, browser.copiedLinkURL == nil ? 16 - PasteControl.inset : 16)
                 .barSurface(cornerRadius: 14)
+                .padding(.horizontal, Theme.gutter)
                 .padding(.bottom, Theme.barHeight + 20)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }

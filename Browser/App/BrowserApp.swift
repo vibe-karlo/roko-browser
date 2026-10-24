@@ -25,6 +25,7 @@ struct BrowserApp: App {
             BrowserView()
                 .environment(browser)
                 .tint(Theme.accent)
+                .task { Appearance.apply() }
         }
         .modelContainer(container)
         // Notify Me while roko isn't open: iOS wakes it for a few seconds.

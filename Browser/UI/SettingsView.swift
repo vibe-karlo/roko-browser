@@ -8,6 +8,8 @@ struct SettingsView: View {
     @Query(sort: \Watch.createdAt) private var watches: [Watch]
     @AppStorage("searchEngine") private var engine: SearchEngine = .google
     @AppStorage("suggestions") private var suggestions = true
+    @AppStorage(CopiedLink.showKey) private var showsCopiedLink = false
+    @AppStorage(Appearance.key) private var appearance: Appearance = .system
     @AppStorage("archivePolicy") private var archive: ArchivePolicy = .day
     @AppStorage(ClaudeClient.enabledKey) private var claudeEnabled = true
     @State private var apiKey = Keychain.claudeAPIKey ?? ""
@@ -42,6 +44,15 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("Appearance") {
+                    Picker("Appearance", selection: $appearance) {
+                        ForEach(Appearance.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .onChange(of: appearance) { Appearance.apply() }
+                }
+
                 Section("App icon") {
                     AppIconPicker()
                 }
@@ -51,6 +62,23 @@ struct SettingsView: View {
                         ForEach(SearchEngine.allCases) { Text($0.name).tag($0) }
                     }
                     Toggle("Suggestions while typing", isOn: $suggestions)
+                }
+
+                Section {
+                    Toggle("Show the link you copied", isOn: $showsCopiedLink)
+                    if showsCopiedLink {
+                        Button("Open iOS Settings") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Copied links")
+                } footer: {
+                    Text(showsCopiedLink
+                         ? "roko reads the link to show it. In iOS Settings, set Paste from Other Apps to Allow, or iOS asks for each link."
+                         : "Off, the address bar offers a Paste button, which opens the link without iOS asking.")
                 }
 
                 Section {
