@@ -25,8 +25,11 @@ struct CommandItem: Identifiable {
 /// where the thumb is, and Return runs it.
 struct CommandBarView: View {
     @Environment(BrowserModel.self) private var browser
+    @Environment(\.modelContext) private var context
     @Query(sort: \Pin.order) private var pins: [Pin]
-    @Query private var todos: [Todo]
+    @Query(sort: \Todo.createdAt) private var todos: [Todo]
+    /// Ticked in the bar a moment ago: still shown, struck through.
+    @State private var justDone: Set<PersistentIdentifier> = []
     @State private var query = ""
     @State private var items: [CommandItem] = []
     @State private var suggestions: [String] = []
@@ -57,7 +60,9 @@ struct CommandBarView: View {
 
             VStack(spacing: 0) {
                 results
-                if query.isEmpty && (!pins.isEmpty || todos.contains(where: \.isDueNow)) { pinRow }
+                // Nothing typed and to-dos due: they take the place of suggestions.
+                if query.isEmpty && !dueTodos.isEmpty { todoWidget }
+                if query.isEmpty && !pins.isEmpty { pinRow }
                 field
             }
             .foregroundStyle(Theme.ink)
@@ -157,16 +162,85 @@ struct CommandBarView: View {
         .padding(.vertical, 4)
     }
 
+    private var dueTodos: [Todo] {
+        todos.filter { $0.isDueNow || justDone.contains($0.persistentModelID) }
+    }
+
+    /// Today's to-dos, right in the bar: tick them off without opening the
+    /// list. The heading opens it. Four at most; the rest are counted.
+    private var todoWidget: some View {
+        let due = dueTodos
+        let shown = due.prefix(4)
+        return VStack(alignment: .leading, spacing: 0) {
+            Button { focused = false; browser.panel = .todos } label: {
+                HStack(spacing: 12) {
+                    Glyph(.todo, size: 18).foregroundStyle(Theme.secondaryInk).frame(width: 22)
+                    Text("To-do").font(.system(size: 16, weight: .semibold))
+                    Spacer(minLength: 8)
+                    let left = due.filter { !$0.done }.count
+                    Text(left == 0 ? "All done" : "\(left) left today")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.faintInk)
+                }
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+                .contentShape(.rect)
+            }
+            .buttonStyle(RowButtonStyle())
+            ForEach(Array(shown)) { todo in
+                HStack(spacing: 12) {
+                    Button { toggle(todo) } label: {
+                        TodoCircle(done: todo.done)
+                            .frame(width: 44, height: 40)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(width: 22)
+                    .accessibilityLabel(todo.done ? "Done" : "Not done")
+                    Text(todo.title)
+                        .font(.system(size: 16))
+                        .foregroundStyle(todo.done ? Theme.secondaryInk : Theme.ink)
+                        .strikethrough(todo.done, color: Theme.secondaryInk)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 12)
+                .transition(.opacity)
+            }
+            if due.count > shown.count {
+                Text("\(due.count - shown.count) more")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.secondaryInk)
+                    .padding(.leading, 46)
+                    .padding(.vertical, 6)
+            }
+        }
+        .padding(.horizontal, Self.inset)
+        .padding(.top, items.isEmpty ? Self.inset : 2)
+        .animation(.snappy(duration: 0.3), value: due.map(\.persistentModelID))
+    }
+
+    private func toggle(_ todo: Todo) {
+        let id = todo.persistentModelID
+        withAnimation(.snappy(duration: 0.25)) {
+            todo.done.toggle()
+            todo.doneAt = todo.done ? .now : nil
+            if todo.done { justDone.insert(id) } else { justDone.remove(id) }
+        }
+        try? context.save()
+        guard todo.done else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+            guard todo.done else { return }
+            _ = withAnimation(.snappy(duration: 0.35)) { justDone.remove(id) }
+        }
+    }
+
     /// Your pins, one tap away, right above the field where the thumb already
     /// is: just their icons, on the same axis as the icons in the list. A long
     /// press says which page it is.
     private var pinRow: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 0) {
-                // Today's to-dos first, while there are any.
-                TodoPin(size: 28) { icon in
-                    icon.frame(width: 52, height: 48).contentShape(.rect)
-                }
                 ForEach(pins) { pin in
                     let name = pin.title.isEmpty ? pin.host : pin.title
                     Button { focused = false; browser.open(pin) } label: {

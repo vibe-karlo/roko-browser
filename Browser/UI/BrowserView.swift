@@ -229,6 +229,7 @@ struct BrowserView: View {
                 browser.saveTabs()
                 WatchScheduler.schedule(in: context)
                 TodayModel.scheduleMorningRefresh()
+                DailyReminders.update(in: context)
             }
             if phase == .active {
                 checkWatches(after: .seconds(2))

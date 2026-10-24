@@ -5,7 +5,7 @@ import SwiftUI
 /// when each to-do is for: Overdue, Today, Tomorrow, This week, Later, Someday.
 /// Tap the circle to tick one off, tap its words to change them, long-press
 /// to move it to another day or delete it. New ones are typed at the bottom,
-/// where the thumb is.
+/// where the thumb is. Pull down past the top to close it.
 struct TodoView: View {
     @Environment(BrowserModel.self) private var browser
     @Environment(\.modelContext) private var context
@@ -56,6 +56,7 @@ struct TodoView: View {
         .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas) }
         .background(Theme.canvas.ignoresSafeArea())
         .foregroundStyle(Theme.ink)
+        .onAppear { DailyReminders.askIfNeeded() }
         .sheet(item: $choosingDate) { todo in
             DayPicker(initial: todo.day ?? .now) { date in
                 withAnimation(.snappy) { todo.schedule(.date(date)) }
@@ -175,16 +176,8 @@ struct TodoView: View {
             .frame(height: 52)
             .background(Theme.raised, in: .rect(cornerRadius: 18))
             .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.edge))
-
-            Button(action: close) {
-                Glyph(.close, size: 16, weight: 2)
-                    .frame(width: 44, height: 44)
-                    .background(Theme.raised, in: .circle)
-                    .contentShape(.circle)
-            }
-            .buttonStyle(GlyphButtonStyle())
-            .accessibilityLabel("Close")
         }
+        // No close button: pulling the list down past its top closes it.
         .padding(.horizontal, 22)
         .padding(.vertical, 10)
         .background(Theme.canvas)

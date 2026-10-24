@@ -26,6 +26,12 @@ struct TodayView: View {
                 if calendarAllowed || !TodayCalendar.wasAsked { calendar }
                 if !dueTodos.isEmpty { toDos }
                 news
+                ForEach(today.followed) { section in followedView(section) }
+                if !today.newsSites.isEmpty || !NewsTopics.chosen.isEmpty {
+                    Button("News sites and topics") { choosingSites = true }
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.secondaryInk)
+                }
                 Text("Weather by Open-Meteo.com")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.faintInk)
@@ -62,6 +68,9 @@ struct TodayView: View {
         .onAppear {
             today.appeared()
             TodayModel.markShown()
+            DailyReminders.askIfNeeded()
+            // Seen this morning: no nudge to look.
+            DailyReminders.update(in: context)
         }
         .sheet(isPresented: $choosingSites) {
             NewsSitesSheet { today.sitesChanged() }
@@ -219,48 +228,79 @@ struct TodayView: View {
 
     // MARK: News
 
+    @ViewBuilder
     private var news: some View {
-        section("Top stories") {
-            if today.newsSites.isEmpty {
-                Text("Choose the news sites you read, and their most important stories show up here each morning.")
+        let sites = today.newsSites.filter { !$0.isSection }
+        if today.newsSites.isEmpty && NewsTopics.chosen.isEmpty {
+            section("Top stories") {
+                Text("Choose the news sites you read, sections of them, or topics to follow, and they show up here each morning.")
                     .font(.system(size: 16))
                     .foregroundStyle(Theme.secondaryInk)
-                Button("Choose news sites") { choosingSites = true }
+                Button("Choose news") { choosingSites = true }
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(Theme.accentText)
-            } else {
+            }
+        } else if !sites.isEmpty {
+            section("Top stories") {
                 if today.top.isEmpty {
                     Text(today.isRefreshing ? "Reading your news sites…" : "No stories yet. Pull down to try again.")
                         .font(.system(size: 16))
                         .foregroundStyle(Theme.secondaryInk)
                 }
-                ForEach(today.top) { story in
-                    Button { open(story.link) } label: {
-                        HStack(alignment: .top, spacing: 12) {
-                            SiteIcon(host: story.host, size: 18, remote: true)
-                                .padding(.top, 2)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(story.title)
-                                    .font(.system(size: 17))
-                                    .foregroundStyle(Theme.ink)
-                                    .multilineTextAlignment(.leading)
-                                    .lineLimit(3)
-                                Text(story.host + (story.published.map { " · " + $0.formatted(.relative(presentation: .named)) } ?? ""))
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(Theme.secondaryInk)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .contentShape(.rect)
-                    }
-                    .buttonStyle(RowButtonStyle())
-                    .padding(.bottom, 6)
-                }
-                Button("News sites") { choosingSites = true }
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Theme.secondaryInk)
+                ForEach(today.top) { story in storyRow(story) }
             }
         }
+    }
+
+    /// A followed page ("NK Osijek" on glas-slavonije.hr) or a topic.
+    private func followedView(_ followed: FollowedSection) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                if let host = followed.host { SiteIcon(host: host, size: 16, remote: true) }
+                Text(followed.title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.secondaryInk)
+            }
+            if followed.stories.isEmpty {
+                Text(today.isRefreshing ? "Looking…" : "Nothing new in the last two days.")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.secondaryInk)
+            }
+            ForEach(followed.stories) { story in storyRow(story) }
+        }
+    }
+
+    private func storyRow(_ story: NewsStory) -> some View {
+        Button { open(story.link) } label: {
+            HStack(alignment: .top, spacing: 12) {
+                SiteIcon(host: story.host, size: 18, remote: true)
+                    .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(story.title)
+                        .font(.system(size: 17))
+                        .foregroundStyle(Theme.ink)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(3)
+                    Text(story.host + (story.published.map { " · " + Self.when($0) } ?? ""))
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.secondaryInk)
+                }
+                Spacer(minLength: 0)
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(RowButtonStyle())
+        .padding(.bottom, 6)
+    }
+
+    /// "10 minutes ago", or for a page that only dates its stories by day, "today" / "yesterday".
+    private static func when(_ date: Date) -> String {
+        let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+        if parts.hour == 12, parts.minute == 0 {
+            return Calendar.current.isDateInToday(date) ? "today"
+                : Calendar.current.isDateInYesterday(date) ? "yesterday" : date.formatted(.dateTime.day().month(.abbreviated))
+        }
+        return date.formatted(.relative(presentation: .named))
     }
 
     private func open(_ url: URL) {
@@ -305,12 +345,15 @@ struct TodayView: View {
     }
 }
 
-/// Today's news sites: well-known ones to tick, and any other by its address.
+/// Today's news: well-known sites to tick, any other site or one section of
+/// it by its address ("glas-slavonije.hr/sport/nk-osijek"), and topics.
 struct NewsSitesSheet: View {
     let changed: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var chosen = NewsSite.chosen
+    @State private var topics = NewsTopics.chosen
     @State private var address = ""
+    @State private var topic = ""
     @State private var finding = false
     @State private var notFound = false
 
@@ -318,30 +361,25 @@ struct NewsSitesSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    ForEach(NewsSite.suggestions + chosen.filter { site in !NewsSite.suggestions.contains { $0.host == site.host } }) { site in
-                        Button {
-                            if let index = chosen.firstIndex(where: { $0.host == site.host }) {
-                                chosen.remove(at: index)
-                            } else {
-                                chosen.append(site)
-                            }
-                        } label: {
+                    ForEach(NewsSite.suggestions + chosen.filter { site in !NewsSite.suggestions.contains { $0.id == site.id } }) { site in
+                        Button { toggle(site) } label: {
                             HStack(spacing: 12) {
                                 SiteIcon(host: site.host, size: 20, remote: true)
-                                Text(site.host).foregroundStyle(Theme.ink)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(site.title).foregroundStyle(Theme.ink)
+                                    if site.isSection {
+                                        Text(site.host + (site.path ?? "")).font(.footnote).foregroundStyle(Theme.secondaryInk).lineLimit(1)
+                                    }
+                                }
                                 Spacer()
-                                if chosen.contains(where: { $0.host == site.host }) {
+                                if chosen.contains(where: { $0.id == site.id }) {
                                     Image(systemName: "checkmark").foregroundStyle(Theme.accent)
                                 }
                             }
                         }
                     }
-                } footer: {
-                    Text("Today reads their newest stories and picks the most important on this iPhone.")
-                }
-                Section {
                     HStack {
-                        TextField("Another site, e.g. telegram.hr", text: $address)
+                        TextField("A site or page, e.g. glas-slavonije.hr/sport/nk-osijek", text: $address)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .keyboardType(.URL)
@@ -350,19 +388,39 @@ struct NewsSitesSheet: View {
                             Button("Add", action: add).disabled(address.trimmingCharacters(in: .whitespaces).isEmpty)
                         }
                     }
+                } header: {
+                    Text("Sites and pages")
                 } footer: {
-                    if notFound { Text("Couldn't find news on that site.") }
+                    Text(notFound ? "Couldn't find news at that address."
+                         : "A whole site's stories go into Top stories. A page of a site, like one club's news, gets a section of its own with only its stories.")
+                }
+
+                Section {
+                    ForEach(topics, id: \.self) { topic in Text(topic) }
+                        .onDelete { topics.remove(atOffsets: $0) }
+                    HStack {
+                        // Names: autocorrect made "Hajduk" into "Handful".
+                        TextField("A topic, e.g. NK Osijek", text: $topic)
+                            .autocorrectionDisabled()
+                            .onSubmit(addTopic)
+                        Button("Add", action: addTopic).disabled(topic.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                } header: {
+                    Text("Topics")
+                } footer: {
+                    Text("Stories about each topic from the major Croatian news sites and yours, picked on this iPhone. Swipe to remove one.")
                 }
             }
             .scrollContentBackground(.hidden)
             .background(Theme.panel)
-            .navigationTitle("News sites")
+            .navigationTitle("News")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
-                        if chosen != NewsSite.chosen {
+                        if chosen != NewsSite.chosen || topics != NewsTopics.chosen {
                             NewsSite.chosen = chosen
+                            NewsTopics.chosen = topics
                             changed()
                         }
                         dismiss()
@@ -373,17 +431,28 @@ struct NewsSitesSheet: View {
         .tint(Theme.accent)
     }
 
+    private func toggle(_ site: NewsSite) {
+        if let index = chosen.firstIndex(where: { $0.id == site.id }) { chosen.remove(at: index) } else { chosen.append(site) }
+    }
+
     private func add() {
         let typed = address
         guard !typed.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         finding = true
         notFound = false
         Task {
-            let site = await TodayNews.findFeed(for: typed)
+            let site = await TodayNews.find(typed)
             finding = false
             guard let site else { notFound = true; return }
-            if !chosen.contains(where: { $0.host == site.host }) { chosen.append(site) }
+            if !chosen.contains(where: { $0.id == site.id }) { chosen.append(site) }
             address = ""
         }
+    }
+
+    private func addTopic() {
+        let name = topic.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, !topics.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) else { return }
+        topics.append(name)
+        topic = ""
     }
 }

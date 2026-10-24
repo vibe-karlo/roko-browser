@@ -215,7 +215,12 @@ day, and with "today". It reads:
   the page), at a reduced-accuracy location; the town name comes from MapKit.
 - **Calendar** with EventKit's full access, asked for from the page; events stay on the phone.
 - **News** from the RSS or Atom feeds of the sites chosen in Settings → Today (thirteen
-  suggested, any other found by its address). Apple's on-device model picks the front page
+  suggested, any other found by its address). A page of a site (a club's news) is followed
+  on its own: its section's feed if there is one, else its headlines read from the page
+  (`PageHeadlines`: links into the section, the element named for the headline, dates from
+  the address). Topics are matched in the major Croatian feeds and your own: a stem of the
+  topic's longest word, then, for multi-word topics, the on-device model keeps only those
+  really about it. Google News has no Croatian edition, so it isn't used. Apple's on-device model picks the front page
   from up to sixty headlines; at most two stories per site, and headlines sharing most of
   their words count as one story. Without the model, each site's newest.
 
@@ -225,6 +230,10 @@ own task), and in a background refresh iOS runs from about 5:30. A refresh that 
 nothing (offline) leaves what was there. Measured in the simulator: weather and four sites,
 sixty stories and the pick, 4.6 to 5.6 s; nothing runs while Today isn't open or being
 prepared.
+
+Reminders (`Today/DailyReminders.swift`) are local and passive (no sound): 8:30 if Today hasn't
+been opened that day, 16:00 if today's to-dos are open. They're worked out again whenever roko
+goes to the background or Today opens, so one never reports something already done.
 
 ## Sharing answers
 

@@ -107,7 +107,14 @@ final class BrowserModel {
         WebViewFactory.prewarm()
         restoreTabs()
         // A Notify Me notification opens its page.
-        NotificationRouter.shared.open = { [weak self] url in self?.open(url, inNewTab: true) }
+        NotificationRouter.shared.open = { [weak self] url in
+            // roko's own reminders open Today or To-do; Notify Me's open their page.
+            switch url.absoluteString {
+            case "roko://today": self?.panel = .today
+            case "roko://todo": self?.panel = .todos
+            default: self?.open(url, inNewTab: true)
+            }
+        }
         // Cookies accepted because a site needs them: say so, once per site.
         ConsentHandler.shared.onAccepted = { [weak self] host, _ in
             self?.showToast("Accepted cookies: \(URL(string: "https://\(host)")?.displayHost ?? host) needs them")

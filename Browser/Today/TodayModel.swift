@@ -14,6 +14,8 @@ final class TodayModel {
 
     private(set) var weather: TodayWeather?
     private(set) var top: [NewsStory] = []
+    /// A section per followed page, then per topic.
+    private(set) var followed: [FollowedSection] = []
     private(set) var events: [TodayEvent] = []
     private(set) var refreshedAt: Date?
     private(set) var isRefreshing = false
@@ -48,18 +50,41 @@ final class TodayModel {
         defer { isRefreshing = false }
         let started = CFAbsoluteTimeGetCurrent()
 
+        let sources = NewsSite.chosen
+        let topics = NewsTopics.chosen
+        // Topics are looked for in the major Croatian feeds too, not only your own.
+        let pool = topics.isEmpty ? [] : TodayNews.topicPool.filter { extra in !sources.contains { $0.id == extra.id } }
         async let weather = freshWeather(inBackground: inBackground)
-        async let stories = TodayNews.latest(from: NewsSite.chosen)
-        let (newWeather, newStories) = await (weather, stories)
+        async let read = TodayNews.stories(of: sources + pool)
+        let (newWeather, byID) = await (weather, read)
         if let newWeather { self.weather = newWeather }
+
+        // Whole sites compete for Top stories; each followed page keeps its own section.
+        let siteStories = TodayNews.recent(sources.filter { !$0.isSection }.flatMap { byID[$0.id] ?? [] })
         var picked: [NewsStory] = []
         // Nothing came back (offline, say): what was there stays.
-        if !newStories.isEmpty {
+        if !siteStories.isEmpty {
             // The newest first while the model picks the front page.
-            if top.isEmpty { top = Array(newStories.sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }.prefix(6)) }
-            picked = await TodayNews.top(newStories)
+            if top.isEmpty { top = Array(siteStories.prefix(6)) }
+            picked = await TodayNews.top(siteStories)
             top = picked
+        } else if sources.allSatisfy(\.isSection) {
+            top = []
         }
+        var sections: [FollowedSection] = sources.filter(\.isSection).compactMap { source in
+            let stories = byID[source.id] ?? []
+            if stories.isEmpty { return followed.first { $0.id == source.id } }  // keep the last when a read fails
+            return FollowedSection(id: source.id, title: source.title, host: source.host,
+                                   stories: TodayNews.varied(TodayNews.recent(stories, hours: 72), count: 4, perSite: 4))
+        }
+        let everything = byID.values.flatMap { $0 }
+        for topic in topics {
+            let stories = await TodayNews.about(topic, in: everything)
+            sections.append(FollowedSection(id: "topic:" + topic, title: topic, host: nil, stories: stories))
+        }
+        followed = sections
+        let newStories = everything
+
         if !inBackground { events = TodayCalendar.events() }
         // Only a refresh that brought something counts as one.
         if newWeather != nil || !newStories.isEmpty {
@@ -92,9 +117,10 @@ final class TodayModel {
         return CLLocationCoordinate2D(latitude: pair[0], longitude: pair[1])
     }
 
-    /// News sites changed: show the new set's stories.
+    /// Sources or topics changed: show the new set's stories.
     func sitesChanged() {
         top = []
+        followed = []
         Task { await refresh() }
     }
 
@@ -135,6 +161,7 @@ final class TodayModel {
     private struct Saved: Codable {
         var weather: TodayWeather?
         var top: [NewsStory]
+        var followed: [FollowedSection]?
         var refreshedAt: Date?
     }
 
@@ -144,11 +171,12 @@ final class TodayModel {
         guard let data = try? Data(contentsOf: Self.file), let saved = try? JSONDecoder().decode(Saved.self, from: data) else { return }
         weather = saved.weather
         top = saved.top
+        followed = saved.followed ?? []
         refreshedAt = saved.refreshedAt
     }
 
     private func save() {
-        let saved = Saved(weather: weather, top: top, refreshedAt: refreshedAt)
+        let saved = Saved(weather: weather, top: top, followed: followed, refreshedAt: refreshedAt)
         guard let data = try? JSONEncoder().encode(saved) else { return }
         try? data.write(to: Self.file, options: .atomic)
     }

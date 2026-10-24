@@ -1,12 +1,24 @@
 import Foundation
 import FoundationModels
 
-/// A news site you chose for Today, with its feed once found.
+/// A news source for Today: a whole site (its stories compete for Top
+/// stories), or one section of a site, "glas-slavonije.hr/sport/nk-osijek",
+/// which gets a section of its own. Read from its feed, or, for sites
+/// without one, from the page itself.
 nonisolated struct NewsSite: Codable, Equatable, Hashable, Identifiable, Sendable {
-    /// What it's called on the page: its host, "index.hr".
+    /// Its host, "index.hr", for the icon and the line under each story.
     var host: String
     var feed: URL?
-    var id: String { host }
+    /// A section's path, "/sport/nk-osijek"; nil for a whole site.
+    var path: String? = nil
+    /// A page read for its headlines, when the site has no feed for it.
+    var page: URL? = nil
+    /// What the section is called, "NK Osijek".
+    var name: String? = nil
+
+    var id: String { host + (path ?? "") }
+    var isSection: Bool { path != nil }
+    var title: String { name ?? host }
 
     /// Well-known sites with their feeds, to pick from without typing.
     static let suggestions: [NewsSite] = [
@@ -25,7 +37,7 @@ nonisolated struct NewsSite: Codable, Equatable, Hashable, Identifiable, Sendabl
         ("news.ycombinator.com", "https://hnrss.org/frontpage"),
     ].map { NewsSite(host: $0.0, feed: URL(string: $0.1)) }
 
-    // MARK: Chosen sites
+    // MARK: Chosen sources
 
     static let key = "today.newsSites"
 
@@ -35,57 +47,136 @@ nonisolated struct NewsSite: Codable, Equatable, Hashable, Identifiable, Sendabl
     }
 }
 
-/// One story from a site's feed.
+/// A subject to follow in Today, "NK Osijek": stories about it from all the
+/// sources roko reads, whichever site they're on.
+nonisolated enum NewsTopics {
+    static let key = "today.topics"
+
+    static var chosen: [String] {
+        get { UserDefaults.standard.stringArray(forKey: key) ?? [] }
+        set { UserDefaults.standard.set(newValue, forKey: key) }
+    }
+}
+
+/// One story from a feed or a page.
 nonisolated struct NewsStory: Codable, Equatable, Hashable, Identifiable, Sendable {
     let title: String
     let link: URL
     let host: String
     let published: Date?
+    /// The feed's short description, when it has one: topics are matched on it too.
+    var summary: String? = nil
     var id: URL { link }
 }
 
-/// Reads the chosen sites' feeds (RSS or Atom), and has Apple's on-device
-/// model pick the day's most important stories from them. It only picks: the
-/// headlines stay in the sites' own words, so nothing is lost in translation
-/// and nothing is paid for.
+/// A section of Today besides Top stories: one followed page, or one topic.
+nonisolated struct FollowedSection: Codable, Equatable, Identifiable, Sendable {
+    let id: String
+    let title: String
+    /// The site, for a page's section; nil for a topic, which spans sites.
+    let host: String?
+    let stories: [NewsStory]
+}
+
+/// Reads the chosen sources and has Apple's on-device model pick from them.
+/// It only picks: headlines stay in the sites' own words, so nothing is lost
+/// in translation and nothing is paid for.
 enum TodayNews {
-    /// Finds a site's feed from its address: the one its homepage names, or
-    /// the usual places a feed lives.
-    static func findFeed(for address: String) async -> NewsSite? {
-        let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard let home = URL(string: trimmed.contains("://") ? trimmed : "https://\(trimmed)"), let host = home.host() else { return nil }
-        let name = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
-        if let known = NewsSite.suggestions.first(where: { $0.host == name }) { return known }
-        var candidates: [URL] = []
-        if let html = await text(at: home) {
-            candidates += feedLinks(in: html, base: home)
+    // MARK: Adding a source
+
+    /// Finds how to read an address: a whole site's feed, or for a section
+    /// ("…/sport/nk-osijek/"), a feed of just that section, or else the
+    /// section page itself. Never the whole site's feed for a section: only
+    /// that section was asked for.
+    static func find(_ address: String) async -> NewsSite? {
+        let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed.contains("://") ? trimmed : "https://\(trimmed)"), let rawHost = url.host() else { return nil }
+        let host = rawHost.lowercased().hasPrefix("www.") ? String(rawHost.lowercased().dropFirst(4)) : rawHost.lowercased()
+        let path = url.path(percentEncoded: false).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let isSection = !path.isEmpty
+        if !isSection, let known = NewsSite.suggestions.first(where: { $0.host == host }) { return known }
+
+        let html = await text(at: url)
+        let declared = html.map { feedLinks(in: $0, base: url) } ?? []
+        var candidates: [URL]
+        if isSection {
+            // A feed the page names for itself, then the usual feed beside it.
+            let base = url.absoluteString.hasSuffix("/") ? url : url.appending(path: "")
+            candidates = declared.filter { $0.path(percentEncoded: false).contains("/" + path) }
+                + ["feed", "rss", "feed.xml", "rss.xml"].compactMap { URL(string: $0, relativeTo: base)?.absoluteURL }
+        } else {
+            candidates = declared + ["feed", "rss", "rss.xml", "feed.xml", "index.xml", "feeds/posts/default"]
+                .compactMap { URL(string: "/" + $0, relativeTo: url)?.absoluteURL }
         }
-        // The ones the homepage names first, then the usual places.
-        candidates += ["feed", "rss", "rss.xml", "feed.xml", "index.xml", "feeds/posts/default"]
-            .compactMap { URL(string: "/" + $0, relativeTo: home)?.absoluteURL }
+        let name = isSection ? sectionName(path: path, pageTitle: html.flatMap(pageTitle)) : nil
         for candidate in candidates {
-            if let stories = await stories(from: candidate, host: name), !stories.isEmpty {
-                return NewsSite(host: name, feed: candidate)
+            if let stories = await stories(from: candidate, host: host), stories.count >= 3 {
+                return NewsSite(host: host, feed: candidate, path: isSection ? "/" + path : nil, name: name)
             }
+        }
+        // No feed: the page itself, if it lists enough stories to follow.
+        if let html, PageHeadlines.parse(html, page: url, host: host).count >= 3 {
+            return NewsSite(host: host, feed: nil, path: isSection ? "/" + path : nil, page: url, name: name)
         }
         return nil
     }
 
-    /// The newest stories of every chosen site, from the last day and a half.
-    static func latest(from sites: [NewsSite]) async -> [NewsStory] {
-        await withTaskGroup(of: [NewsStory].self) { group in
-            for site in sites {
-                guard let feed = site.feed else { continue }
-                group.addTask { await stories(from: feed, host: site.host) ?? [] }
+    /// "Sportske novosti - HNL" for …/nogomet/hnl gives "HNL"; a page with no
+    /// title gives its address: "nk-osijek" → "NK Osijek".
+    private static func sectionName(path: String, pageTitle: String?) -> String {
+        let slug = path.split(separator: "/").last.map(String.init) ?? path
+        let words = slug.split(separator: "-").map { word -> String in
+            let lower = word.lowercased()
+            let hasVowel = lower.contains { "aeiou".contains($0) }
+            return lower.count <= 2 || !hasVowel ? lower.uppercased() : lower.prefix(1).uppercased() + lower.dropFirst()
+        }
+        let fromSlug = words.joined(separator: " ")
+        if let pageTitle {
+            let parts = pageTitle.components(separatedBy: CharacterSet(charactersIn: "|–-")).map { $0.trimmingCharacters(in: .whitespaces) }
+            let folded = fromSlug.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+            if let match = parts.first(where: { $0.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil) == folded }) {
+                return match
             }
-            var all: [NewsStory] = []
-            for await stories in group {
-                let recent = stories.filter { ($0.published ?? .now) > .now.addingTimeInterval(-36 * 3600) }
-                all += Array((recent.isEmpty ? stories : recent).prefix(15))
+        }
+        return fromSlug
+    }
+
+    private static func pageTitle(_ html: String) -> String? {
+        let title = html.firstMatch(of: /<title[^>]*>([^<]*)<\/title>/)?.1 ?? ""
+        let trimmed = String(title).trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : PageHeadlines.decode(trimmed)
+    }
+
+    // MARK: Reading
+
+    /// A source's newest stories.
+    static func stories(of source: NewsSite) async -> [NewsStory] {
+        if let feed = source.feed { return await stories(from: feed, host: source.host) ?? [] }
+        if let page = source.page, let html = await text(at: page) {
+            return await Task.detached(priority: .utility) { PageHeadlines.parse(html, page: page, host: source.host) }.value
+        }
+        return []
+    }
+
+    /// The stories of several sources, read at once, each source's newest first.
+    static func stories(of sources: [NewsSite]) async -> [String: [NewsStory]] {
+        await withTaskGroup(of: (String, [NewsStory]).self) { group in
+            for source in sources {
+                group.addTask { (source.id, await stories(of: source)) }
             }
+            var all: [String: [NewsStory]] = [:]
+            for await (id, stories) in group { all[id] = stories }
             return all
         }
     }
+
+    /// From the last day and a half, newest first (all of them if none are dated that recently).
+    static func recent(_ stories: [NewsStory], hours: Double = 36) -> [NewsStory] {
+        let recent = stories.filter { ($0.published ?? .now) > .now.addingTimeInterval(-hours * 3600) }
+        return (recent.isEmpty ? stories : recent).sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
+    }
+
+    // MARK: Top stories
 
     /// The day's most important stories, picked by Apple's on-device model.
     /// Without the model (or if it fails), each site's newest. Either way, at
@@ -111,11 +202,11 @@ enum TodayNews {
     }
 
     /// In order, skipping a third story from one site and any story already told.
-    private static func varied(_ stories: [NewsStory], count: Int) -> [NewsStory] {
+    static func varied(_ stories: [NewsStory], count: Int, perSite limit: Int = 2) -> [NewsStory] {
         var result: [NewsStory] = []
         var perSite: [String: Int] = [:]
         for story in stories where result.count < count {
-            guard perSite[story.host, default: 0] < 2,
+            guard perSite[story.host, default: 0] < limit,
                   !result.contains(where: { $0.link == story.link || sameStory($0.title, story.title) }) else { continue }
             result.append(story)
             perSite[story.host, default: 0] += 1
@@ -124,24 +215,69 @@ enum TodayNews {
     }
 
     /// Two headlines about one event share most of their words that matter.
-    private static func sameStory(_ a: String, _ b: String) -> Bool {
-        func words(_ text: String) -> Set<String> {
-            Set(text.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init).filter { $0.count >= 4 }
-                .map { String($0.prefix(6)) })  // a rough stem: "poginula", "poginuo"
-        }
-        let left = words(a), right = words(b)
+    static func sameStory(_ a: String, _ b: String) -> Bool {
+        let left = stems(a), right = stems(b)
         guard !left.isEmpty, !right.isEmpty else { return false }
         return Double(left.intersection(right).count) / Double(min(left.count, right.count)) >= 0.5
     }
 
-    // MARK: Feeds
+    /// Words that matter, cut to a rough stem: "poginula" and "poginuo" meet as "poginu".
+    private static func stems(_ text: String) -> Set<String> {
+        Set(folded(text).split { !$0.isLetter && !$0.isNumber }.filter { $0.count >= 4 }.map { String($0.prefix(6)) })
+    }
 
-    private static func text(at url: URL) async -> String? {
+    private static func folded(_ text: String) -> String {
+        text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+    }
+
+    // MARK: Topics
+
+    /// Croatian news feeds topics are looked for in, besides your own
+    /// sources: the national sites and the sports pages, where most of what
+    /// a Croatian reader follows turns up.
+    static let topicPool: [NewsSite] = NewsSite.suggestions.filter { $0.host.hasSuffix(".hr") } + [
+        NewsSite(host: "jutarnji.hr", feed: URL(string: "https://www.jutarnji.hr/sportske/feed"), path: "/sportske", name: "Sportske novosti"),
+        NewsSite(host: "index.hr", feed: URL(string: "https://www.index.hr/rss/sport"), path: "/sport", name: "Index Sport"),
+        NewsSite(host: "glas-slavonije.hr", feed: nil, path: "/sport", page: URL(string: "https://glas-slavonije.hr/sport/"), name: "Glas Slavonije Sport"),
+    ]
+
+    /// Stories about a topic among `stories`: headlines that name it, then
+    /// Apple's on-device model drops those about something else that shares
+    /// the name ("Osijek" the city when it's NK Osijek you follow).
+    static func about(_ topic: String, in stories: [NewsStory], count: Int = 4) async -> [NewsStory] {
+        // The topic's most telling word, cut to a stem: "Osijek" finds "Osijeka" and "Osijeku" too.
+        let words = folded(topic).split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        guard let key = words.max(by: { $0.count < $1.count }) else { return [] }
+        let stem = key.count > 5 ? String(key.dropLast()) : key
+        let matching = varied(recent(stories, hours: 48).filter { story in
+            let text = folded(story.title + " " + (story.summary ?? ""))
+            return text.split { !$0.isLetter && !$0.isNumber }.contains { $0.hasPrefix(stem) }
+        }, count: 20, perSite: 20)
+        guard words.count > 1 || key.count < 6, AppleModels.onDeviceAvailable, !matching.isEmpty else {
+            return Array(matching.prefix(count))
+        }
+        let numbered = matching.enumerated().map { "\($0.offset + 1). \($0.element.title)" }
+        let session = LanguageModelSession(model: AppleModels.summarizing, instructions: """
+            You sort news headlines for someone who follows one subject. Keep only the headlines that are \
+            about that subject itself, not about something else that shares a word with it.
+            """)
+        let prompt = "Subject: \(topic)\n\nHeadlines:\n" + numbered.joined(separator: "\n") + "\n\nWhich are about \(topic)?"
+        guard let picks = try? await session.respond(to: prompt, generating: TopicMatch.self).content.numbers else {
+            return Array(matching.prefix(count))
+        }
+        let kept = Set(picks)
+        return Array(matching.enumerated().filter { kept.contains($0.offset + 1) }.map(\.element).prefix(count))
+    }
+
+    // MARK: Fetching
+
+    static func text(at url: URL) async -> String? {
         var request = URLRequest(url: url, timeoutInterval: 10)
-        request.setValue("Mozilla/5.0 (iPhone) roko", forHTTPHeaderField: "User-Agent")
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 roko",
+                         forHTTPHeaderField: "User-Agent")
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
-        return String(data: data.prefix(800_000), encoding: .utf8) ?? String(decoding: data.prefix(800_000), as: UTF8.self)
+        return String(data: data.prefix(1_200_000), encoding: .utf8) ?? String(decoding: data.prefix(1_200_000), as: UTF8.self)
     }
 
     private static func feedLinks(in html: String, base: URL) -> [URL] {
@@ -170,13 +306,85 @@ nonisolated struct FrontPage {
     var numbers: [Int]
 }
 
+@Generable
+nonisolated struct TopicMatch {
+    @Guide(description: "The numbers of the headlines about the subject; none if no headline is")
+    var numbers: [Int]
+}
+
+/// Headlines from a page with no feed: the links into the page's own section
+/// that read like headlines. A news card usually holds a kicker ("DOLAZI
+/// RUDEŠ"), the headline and a subhead; the headline is the element named
+/// for it, else an h1 to h4, else the longest piece of text in the link.
+nonisolated enum PageHeadlines {
+    static func parse(_ html: String, page: URL, host: String) -> [NewsStory] {
+        let section = page.path(percentEncoded: false).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        var stories: [NewsStory] = []
+        var seen = Set<String>()
+        for match in html.matches(of: /<a\s[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/) {
+            guard let url = URL(string: decode(String(match.1)), relativeTo: page)?.absoluteURL,
+                  url.host()?.hasSuffix(host) == true else { continue }
+            let path = url.path(percentEncoded: false).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            // Into the section, and deeper than it: an article, not the section's own menu.
+            guard section.isEmpty || path.hasPrefix(section + "/"), path.count > section.count + 8,
+                  seen.insert(url.absoluteString).inserted else { continue }
+            guard let title = headline(in: String(match.2)), title.count >= 20, title.count <= 220 else { continue }
+            stories.append(NewsStory(title: title, link: url, host: host, published: date(in: path)))
+            if stories.count >= 30 { break }
+        }
+        return stories
+    }
+
+    private static func headline(in inner: String) -> String? {
+        // An element named for the headline: …title, …head, …headline, …heading (not over- or subhead).
+        for element in inner.matches(of: /<(\w+)[^>]*class=["']([^"']*)["'][^>]*>([\s\S]*?)<\/\1>/) {
+            let names = String(element.2).split(separator: " ").map { $0.split(whereSeparator: { "_-".contains($0) }).last.map(String.init) ?? "" }
+            if names.contains(where: { ["title", "head", "headline", "heading"].contains($0.lowercased()) }) {
+                let text = plain(String(element.3))
+                if text.count >= 20 { return text }
+            }
+        }
+        if let heading = inner.firstMatch(of: /<h[1-4][^>]*>([\s\S]*?)<\/h[1-4]>/) {
+            let text = plain(String(heading.1))
+            if text.count >= 20 { return text }
+        }
+        // The longest run of text between tags.
+        let pieces = inner.split(separator: "<").compactMap { $0.split(separator: ">", maxSplits: 1).last.map { plain(String($0)) } }
+        return pieces.max { $0.count < $1.count }
+    }
+
+    /// A date written into the address: /2026/10/23/ or 2026-10-23.
+    private static func date(in path: String) -> Date? {
+        guard let match = path.firstMatch(of: /(20\d\d)[\/-](\d\d)[\/-](\d\d)/) else { return nil }
+        var parts = DateComponents()
+        parts.year = Int(match.1)
+        parts.month = Int(match.2)
+        parts.day = Int(match.3)
+        parts.hour = 12
+        return Calendar.current.date(from: parts)
+    }
+
+    static func plain(_ html: String) -> String {
+        decode(html.replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression))
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func decode(_ text: String) -> String {
+        text.replacingOccurrences(of: "&amp;", with: "&").replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&#39;", with: "'").replacingOccurrences(of: "&#039;", with: "'")
+            .replacingOccurrences(of: "&nbsp;", with: " ").replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+    }
+}
+
 /// RSS 2.0 and Atom, the two feed formats news sites use.
 nonisolated final class FeedParser: NSObject, XMLParserDelegate {
     private let host: String
     private var stories: [NewsStory] = []
     private var inItem = false
     private var element = ""
-    private var title = "", link = "", date = ""
+    private var title = "", link = "", date = "", summary = ""
 
     private init(host: String) {
         self.host = host
@@ -194,7 +402,7 @@ nonisolated final class FeedParser: NSObject, XMLParserDelegate {
                 attributes: [String: String] = [:]) {
         if name == "item" || name == "entry" {
             inItem = true
-            title = ""; link = ""; date = ""
+            title = ""; link = ""; date = ""; summary = ""
         } else if inItem, name == "link", let href = attributes["href"],
                   attributes["rel"] == nil || attributes["rel"] == "alternate" {
             link = href  // Atom
@@ -204,36 +412,36 @@ nonisolated final class FeedParser: NSObject, XMLParserDelegate {
 
     func parser(_ parser: XMLParser, foundCharacters string: String) {
         guard inItem else { return }
-        switch element {
-        case "title": title += string
-        case "link": link += string
-        case "pubDate", "published", "updated", "dc:date": if date.isEmpty || element != "updated" { date += string }
-        default: break
-        }
+        append(string)
     }
 
     func parser(_ parser: XMLParser, foundCDATA block: Data) {
-        guard inItem, element == "title" || element == "link", let text = String(data: block, encoding: .utf8) else { return }
-        if element == "title" { title += text } else { link += text }
+        guard inItem, let text = String(data: block, encoding: .utf8) else { return }
+        append(text)
+    }
+
+    private func append(_ text: String) {
+        switch element {
+        case "title": title += text
+        case "link": link += text
+        case "pubDate", "published", "dc:date": date += text
+        case "updated": if date.isEmpty { date += text }
+        case "description", "summary": if summary.count < 600 { summary += text }
+        default: break
+        }
     }
 
     func parser(_ parser: XMLParser, didEndElement name: String, namespaceURI: String?, qualifiedName: String?) {
         if name == "item" || name == "entry" {
             inItem = false
-            let title = Self.clean(title)
+            let title = PageHeadlines.plain(title)
             if !title.isEmpty, let url = URL(string: link.trimmingCharacters(in: .whitespacesAndNewlines)), url.scheme?.hasPrefix("http") == true {
-                stories.append(NewsStory(title: title, link: url, host: host, published: Self.date(date)))
+                let summary = PageHeadlines.plain(summary)
+                stories.append(NewsStory(title: title, link: url, host: host, published: Self.date(date),
+                                         summary: summary.isEmpty ? nil : String(summary.prefix(300))))
             }
         }
         element = ""
-    }
-
-    private static func clean(_ text: String) -> String {
-        text.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
-            .replacingOccurrences(of: "&amp;", with: "&").replacingOccurrences(of: "&quot;", with: "\"")
-            .replacingOccurrences(of: "&#39;", with: "'").replacingOccurrences(of: "&#039;", with: "'")
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static let rfc822: [DateFormatter] = ["EEE, dd MMM yyyy HH:mm:ss Z", "EEE, dd MMM yyyy HH:mm:ss zzz", "dd MMM yyyy HH:mm:ss Z"]

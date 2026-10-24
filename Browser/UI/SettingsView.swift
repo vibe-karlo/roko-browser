@@ -13,6 +13,7 @@ struct SettingsView: View {
     @AppStorage(AnswerLanguage.key) private var answerLanguage = ""
     @State private var shared = AnswerSharing.all
     @AppStorage(TodayModel.openKey) private var opensToday = true
+    @AppStorage(DailyReminders.key) private var reminders = true
     @State private var choosingNewsSites = false
     @AppStorage("archivePolicy") private var archive: ArchivePolicy = .day
     @AppStorage(ClaudeClient.enabledKey) private var claudeEnabled = true
@@ -90,12 +91,14 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("Open Today each morning", isOn: $opensToday)
-                    Button("News sites") { choosingNewsSites = true }
+                    Toggle("Reminders", isOn: $reminders)
+                        .onChange(of: reminders) { DailyReminders.update(in: context) }
+                    Button("News sites and topics") { choosingNewsSites = true }
                         .foregroundStyle(Theme.ink)
                 } header: {
                     Text("Today")
                 } footer: {
-                    Text("The first time you open roko each day: the weather, your calendar, today's to-dos and the top stories from your news sites. Search \u{201C}today\u{201D} to see it any time.")
+                    Text("The first time you open roko each day: the weather, your calendar, today's to-dos and the news you follow. Search \u{201C}today\u{201D} to see it any time. Reminders, silent and at most two a day: at 8:30 if you haven't looked at Today, and at 16:00 if today's to-dos are still open.")
                 }
                 .sheet(isPresented: $choosingNewsSites) {
                     NewsSitesSheet { TodayModel.shared.sitesChanged() }
