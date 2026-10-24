@@ -12,6 +12,9 @@ struct SummaryView: View {
     @State private var settle: CGFloat
     /// Where a pull had the card, easing up to its place.
     @State private var lift: CGFloat
+    /// 0 to 1 over the card's flight: it tips back on its way into place and
+    /// comes upright as it lands. 0 and 1 are flat, so a pull hands over untilted.
+    @State private var flight: CGFloat = 0
     /// The title and summary show only once the card has come to rest.
     @State private var textShown = false
     /// No canvas under the footer or the status bar while the light is up and
@@ -27,6 +30,8 @@ struct SummaryView: View {
     }
 
     private var settled: Bool { settle >= 1 }
+    /// On screen: the light comes with the card, not after it.
+    @State private var appeared = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -36,9 +41,9 @@ struct SummaryView: View {
                     .opacity(model.handoff != nil && !model.isClosing ? 1 : settle)
                     .ignoresSafeArea()
 
-                // roko's light while it works: rising as the page is read, flooding
-                // the screen as the summary starts. Not while the card is still moving.
-                if textShown {
+                // roko's light while it works: there as the card flies in, rising as
+                // the page is read, flooding the screen as the summary starts.
+                if appeared {
                     WorkingGlow(progress: model.progress, isActive: showsLight,
                                 finished: !model.isWorking && !model.isClosing && !model.phase.isFailure)
                         .ignoresSafeArea()
@@ -48,6 +53,7 @@ struct SummaryView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
                             card(width: proxy.size.width)
+                                .modifier(CardFlight(flight: flight))
                                 .offset(y: lift)
                                 .id("card")
                             content
@@ -90,8 +96,11 @@ struct SummaryView: View {
             HitchWatch.note("summary appeared")
             // The card now sits exactly where the page was: hide the page.
             browser.summaryCoversPage = true
-            // From a pull, the rest of the way, from where the finger let go.
-            withAnimation(.spring(duration: model.handoff == nil ? 0.5 : 0.55, bounce: 0.1)) {
+            appeared = true
+            // The rest of the way (from a pull, from where the finger let go),
+            // tipping back and coming upright as it goes.
+            withAnimation(.easeInOut(duration: 0.8)) { flight = 1 }
+            withAnimation(.smooth(duration: 0.8)) {
                 settle = 1
                 lift = 0
             } completion: {
@@ -101,7 +110,7 @@ struct SummaryView: View {
     }
 
     private var showsLight: Bool {
-        textShown && model.isWorking && !model.isClosing
+        appeared && model.isWorking && !model.isClosing
     }
 
     // MARK: The page, becoming a card
@@ -167,10 +176,10 @@ struct SummaryView: View {
                                                 removal: .opacity.animation(.easeOut(duration: 0.12))))
                 } else {
                     MarkdownText(markdown: model.text, isStreaming: model.phase == .writing)
-                        // Then the summary eases up into its place, as Browse for Me's answer does.
+                        // Then the summary comes into focus: blurred at first, sharpening as it settles.
                         .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .offset(y: 16))
-                                .animation(.smooth(duration: 0.6).delay(0.14)),
+                            insertion: AnyTransition(.blurReplace(.downUp)).combined(with: .offset(y: 10))
+                                .animation(.smooth(duration: 0.75).delay(0.1)),
                             removal: .opacity))
                 }
             }
@@ -226,6 +235,26 @@ struct SummaryView: View {
         case "Apple Intelligence": "Summarized by Apple Intelligence, privately in Apple's cloud"
         default: "Summarized on this iPhone"
         }
+    }
+}
+
+/// The card tipped back mid-flight, top away, as a card laid down and picked
+/// up again: flat at the start and the end, most tipped halfway. Animatable,
+/// so SwiftUI works the angle out for every frame rather than easing between
+/// the two ends, which are both flat.
+private struct CardFlight: ViewModifier, Animatable {
+    var flight: CGFloat
+
+    var animatableData: CGFloat {
+        get { flight }
+        set { flight = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        let lift = sin(CGFloat.pi * flight)
+        content
+            .rotation3DEffect(.degrees(56 * lift), axis: (x: 1, y: 0, z: 0), anchor: .center, perspective: 0.7)
+            .scaleEffect(1 - 0.12 * lift)
     }
 }
 

@@ -79,12 +79,13 @@ struct WebViewHost: UIViewRepresentable {
         private var loadObservations: [NSKeyValueObservation] = []
         private let haptic = UIImpactFeedbackGenerator(style: .light)
         private let firmHaptic = UIImpactFeedbackGenerator(style: .medium)
-        /// How far past the top a pull has to go: long and deliberate, not a bounce.
-        private let pullDistance: CGFloat = 120
+        /// How far past the top a pull has to go: deliberate, not a bounce.
+        private let pullDistance: CGFloat = 100
         /// Further still, and letting go summarizes instead of reloading. The
-        /// page resists more the further it goes: this is about 370 points of
-        /// finger travel, 115 past the reload point's 255.
-        private let summarizeDistance: CGFloat = 165
+        /// page resists more the further it goes: this is about 300 points of
+        /// finger travel, 90 past the reload point's 210. Shorter and it came
+        /// by accident; longer (it was 370) and it felt like a chore.
+        private let summarizeDistance: CGFloat = 140
         /// Pulled far enough, waiting for the finger to lift before reloading.
         private var refreshArmed = false
         /// Pulled as far as summarizing, waiting for the finger to lift.
@@ -130,12 +131,13 @@ struct WebViewHost: UIViewRepresentable {
             indicator.setProgress(pull <= pullDistance
                                   ? pull / pullDistance
                                   : 1 + (pull - pullDistance) / (summarizeDistance - pullDistance))
-            // Past the reload point the page starts becoming the summary's card.
-            if pull > pullDistance, preview.snapshot != nil {
+            // The page follows the finger as its own picture over the summary's
+            // dark, and past the reload point starts becoming the summary's card.
+            if pull > 1, preview.snapshot != nil {
                 if !preview.isShowing { parent.onPreview(true) }  // the bar makes way
                 preview.update(progress: (pull - pullDistance) / (summarizeDistance - pullDistance), pull: pull)
             } else if preview.isShowing {
-                preview.hide()  // back short of it: card and page are the same picture here
+                preview.hide()  // back at the top: card and page are the same picture
                 parent.onPreview(false)
             }
             if pull >= pullDistance, !refreshArmed {

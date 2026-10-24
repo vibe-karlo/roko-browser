@@ -11,9 +11,12 @@ struct PullHandoff {
     let offset: CGFloat
 }
 
-/// The first part of the summary's opening, played by the finger. Past the
-/// reload point the page itself starts becoming the summary's card: it
-/// narrows, its corners round, and the summary's dark fills in around it.
+/// The first part of the summary's opening, played by the finger. From the
+/// first point of the pull the page is this picture of itself, over the
+/// summary's dark: no grey strip above it, no fixed header left behind (WebKit
+/// keeps a site's fixed header in place while the page under it moves down).
+/// Past the reload point it starts becoming the summary's card: it narrows and
+/// its corners round.
 /// Let go there and the summary carries on from exactly this frame; ease
 /// back and the page settles back to what it was.
 ///
@@ -66,8 +69,7 @@ final class PullPreview: UIView {
             // The dark reaches the very top of the screen, over the status bar strip.
             canvas.frame = window.convert(window.bounds, to: self)
         }
-        // The dark arrives over the first stretch past the reload point.
-        canvas.alpha = min(1, progress * 3)
+        canvas.alpha = 1
         settle = Self.reach * progress
         offset = pull
         layoutCard(snapshot)
