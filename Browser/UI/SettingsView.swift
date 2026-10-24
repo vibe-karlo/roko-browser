@@ -12,6 +12,8 @@ struct SettingsView: View {
     @AppStorage(Appearance.key) private var appearance: Appearance = .system
     @AppStorage(AnswerLanguage.key) private var answerLanguage = ""
     @State private var shared = AnswerSharing.all
+    @AppStorage(TodayModel.openKey) private var opensToday = true
+    @State private var choosingNewsSites = false
     @AppStorage("archivePolicy") private var archive: ArchivePolicy = .day
     @AppStorage(ClaudeClient.enabledKey) private var claudeEnabled = true
     @State private var apiKey = Keychain.claudeAPIKey ?? ""
@@ -84,6 +86,19 @@ struct SettingsView: View {
                         ForEach(SearchEngine.allCases) { Text($0.name).tag($0) }
                     }
                     Toggle("Suggestions while typing", isOn: $suggestions)
+                }
+
+                Section {
+                    Toggle("Open Today each morning", isOn: $opensToday)
+                    Button("News sites") { choosingNewsSites = true }
+                        .foregroundStyle(Theme.ink)
+                } header: {
+                    Text("Today")
+                } footer: {
+                    Text("The first time you open roko each day: the weather, your calendar, today's to-dos and the top stories from your news sites. Search \u{201C}today\u{201D} to see it any time.")
+                }
+                .sheet(isPresented: $choosingNewsSites) {
+                    NewsSitesSheet { TodayModel.shared.sitesChanged() }
                 }
 
                 Section {

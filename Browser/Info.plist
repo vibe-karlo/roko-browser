@@ -5,6 +5,7 @@
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>com.growthstudio.roko.watch</string>
+		<string>com.growthstudio.roko.today</string>
 	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
@@ -45,6 +46,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Today shows what's left on your calendar for the day. It stays on this iPhone.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Today shows the weather where you are. Only a rough location is used, and only for the weather.</string>
 	<key>RokoShareServer</key>
 	<string>$(SHARE_SERVER)</string>
 	<key>UIApplicationSceneManifest</key>

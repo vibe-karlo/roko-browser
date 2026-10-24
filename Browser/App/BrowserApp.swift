@@ -32,5 +32,10 @@ struct BrowserApp: App {
         .backgroundTask(.appRefresh(WatchScheduler.taskID)) { [container] in
             await Watcher.runDue(in: container, inBackground: true)
         }
+        // Today, ready before the morning: news and weather, fetched while you sleep.
+        .backgroundTask(.appRefresh(TodayModel.taskID)) {
+            await TodayModel.shared.refresh(inBackground: true)
+            await TodayModel.scheduleMorningRefresh()
+        }
     }
 }

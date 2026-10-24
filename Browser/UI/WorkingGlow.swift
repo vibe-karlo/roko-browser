@@ -22,6 +22,9 @@ struct WorkingGlow: View {
     var isActive = true
     /// The work it stood for is done: it leaves by flooding, not sinking.
     var finished = false
+    /// Off for a light that stands for nothing being worked on (Today's
+    /// morning light): it holds still, and costs no frames.
+    var breathes = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     /// The progress actually drawn, easing after `progress`.
@@ -120,7 +123,7 @@ struct WorkingGlow: View {
     static let floodDuration: TimeInterval = 1.2
 
     private func breathe() {
-        guard !reduceMotion, !breathing else { return }
+        guard breathes, !reduceMotion, !breathing else { return }
         withAnimation(.easeInOut(duration: 3.2).repeatForever(autoreverses: true)) { breathing = true }
     }
 

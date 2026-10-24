@@ -5,7 +5,7 @@ struct CommandItem: Identifiable {
     enum Action {
         case open(URL), switchTab(BrowserTab), openPin(Pin), search(String),
              browse(String), summarize, findOnPage, privateTab, settings, copy(String),
-             pasteLink, openCopied(URL), todos
+             pasteLink, openCopied(URL), todos, today
     }
 
     let id: String
@@ -319,6 +319,7 @@ struct CommandBarView: View {
         case .privateTab: browser.showCommandBar(mode: .privateTab)
         case .settings: browser.panel = .settings
         case .todos: browser.panel = .todos
+        case .today: browser.panel = .today
         case .copy(let result):
             UIPasteboard.general.string = result
             browser.panel = .none
@@ -485,15 +486,18 @@ enum CommandRanker {
                                                                  kind: "Action", icon: .glyph(.settings), action: .settings)),
             (["to-do", "todo", "todos", "to do", "tasks"], CommandItem(id: "action-todos", title: "To-do", subtitle: "",
                                                                        kind: "Action", icon: .glyph(.todo), action: .todos)),
+            (["today", "danas"], CommandItem(id: "action-today", title: "Today", subtitle: "Weather, calendar, to-dos, news",
+                                             kind: "Action", icon: .glyph(.today), action: .today)),
         ]
         for (words, item) in actions where words.contains(where: { $0.hasPrefix(needle) }) {
             let needsPage = ["action-summarize", "action-find"].contains(item.id)
             if needsPage && browser.selectedTab == nil { continue }
             // Typed in full, a place in roko (Settings, To-do) is what's meant,
             // not a web search for the word: it goes first, and Return opens it.
-            let isPlace = ["action-settings", "action-todos"].contains(item.id)
+            let isPlace = ["action-settings", "action-todos", "action-today"].contains(item.id)
             let exact = words.contains(needle)
-            ranked.append((isPlace && exact ? 990 : needle.count >= 3 ? 880 : 500, item))
+            // Above the calculator too: "today" opens Today rather than showing the date.
+            ranked.append((isPlace && exact ? 1010 : needle.count >= 3 ? 880 : 500, item))
         }
 
         // The engine often suggests exactly what was typed (give or take a

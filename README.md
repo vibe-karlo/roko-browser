@@ -200,6 +200,32 @@ Cookie banners the cosmetic list hides are faded (opacity) for ten seconds befor
 removed, so Autoconsent can still find and answer them. Measured on an iPhone 17 Pro with the
 `-benchmark -benchConsent` harness, the scripts made no measurable difference to page loads.
 
+## To-do and Today
+
+To-do (`Models/Todo.swift`, `UI/TodoView.swift`) is one list of SwiftData models in the synced
+store. Each to-do keeps only the day it's for (or none, for Someday, or a week's last day for
+This week), and its section is worked out from that and today's date, so nothing needs moving
+as days pass. "to-do" or "todo" typed in full opens it; while anything is due today, the to-do
+icon leads the pins with a count.
+
+Today (`Today/`, `UI/TodayView.swift`) opens the first time roko comes up after 4 a.m. each
+day, and with "today". It reads:
+
+- **Weather** from [Open-Meteo](https://open-meteo.com) (free, no key, CC BY 4.0, credited on
+  the page), at a reduced-accuracy location; the town name comes from MapKit.
+- **Calendar** with EventKit's full access, asked for from the page; events stay on the phone.
+- **News** from the RSS or Atom feeds of the sites chosen in Settings → Today (thirteen
+  suggested, any other found by its address). Apple's on-device model picks the front page
+  from up to sixty headlines; at most two stories per site, and headlines sharing most of
+  their words count as one story. Without the model, each site's newest.
+
+What it last showed is kept in `today.json`, so it opens at once. It refreshes when opened
+more than an hour later, with a pull (in a task of its own: the gesture ending cancels its
+own task), and in a background refresh iOS runs from about 5:30. A refresh that brings
+nothing (offline) leaves what was there. Measured in the simulator: weather and four sites,
+sixty stories and the pick, 4.6 to 5.6 s; nothing runs while Today isn't open or being
+prepared.
+
 ## Sharing answers
 
 Share in Browse for Me turns the page into a short link anyone can open, as Arc does. The

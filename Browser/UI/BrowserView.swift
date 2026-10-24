@@ -100,6 +100,12 @@ struct BrowserView: View {
             }
         }
         .overlay {
+            if browser.panel == .today {
+                TodayView()
+                    .transition(.move(edge: .bottom))
+            }
+        }
+        .overlay {
             if browser.panel == .todos {
                 // Full screen, rising from the bar like Browse for Me.
                 TodoView()
@@ -222,6 +228,7 @@ struct BrowserView: View {
             if phase == .background {
                 browser.saveTabs()
                 WatchScheduler.schedule(in: context)
+                TodayModel.scheduleMorningRefresh()
             }
             if phase == .active {
                 checkWatches(after: .seconds(2))
@@ -234,6 +241,11 @@ struct BrowserView: View {
         // UIKit's own signal: it arrives whatever wraps the SwiftUI scene.
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             if browser.isBarCollapsed { browser.isBarCollapsed = false }
+            // The first time on a new day: Today first.
+            if TodayModel.shouldOpenNow(), browser.panel == .none, browser.summary == nil, browser.browseForMe == nil {
+                browser.panel = .today
+                return
+            }
             // Back with a link just copied, perhaps on a Mac: offer it.
             browser.offerCopiedLinkIfFresh()
         }
@@ -262,7 +274,9 @@ struct BrowserView: View {
     /// Text that reads on whatever is behind the status bar.
     private var statusBarStyle: UIStatusBarStyle {
         // The summary and Browse for Me sit on the app's own canvas.
-        if browser.summary != nil || browser.browseForMe != nil || browser.panel == .todos { return .default }
+        if browser.summary != nil || browser.browseForMe != nil || browser.panel == .todos || browser.panel == .today {
+            return .default
+        }
         if browser.panel == .tabs { return .lightContent }  // the switcher is always dark
         guard let color = browser.selectedTab?.topColor else { return .default }
         return color.isLight ? .darkContent : .lightContent
