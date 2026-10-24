@@ -272,24 +272,22 @@ struct TodoView: View {
                 Button { finishAdding() } label: {
                     Glyph(.close, size: 13, weight: 2.2)
                         .frame(width: 30, height: 30)
-                        .background(Theme.canvas.opacity(0.6), in: .circle)
+                        .background(Theme.panel, in: .circle)
                         .frame(width: 44, height: 44)
                         .contentShape(.rect)
                 }
                 .buttonStyle(GlyphButtonStyle())
                 .accessibilityLabel("Done adding")
             }
-            .padding(.leading, 18)
-            .padding(.trailing, 4)
-            .frame(height: 50)
+            .padding(.leading, 22)
+            .padding(.trailing, 8)
+            .frame(height: Theme.barHeight + 8)
+            // The capsule has grown to be the whole bar: one shape, one edge.
             .background {
                 Capsule().fill(Theme.raised)
-                    .overlay(Capsule().strokeBorder(Theme.edge))
                     .matchedGeometryEffect(id: "field", in: barSpace)
             }
-            .padding(.horizontal, 7)
-            .frame(height: Theme.barHeight + 8)
-            .barSurface(cornerRadius: 24)
+            .barSurface(cornerRadius: Theme.barRadius)
             .padding(.horizontal, Theme.gutter)
             .padding(.bottom, 4)
             .background(alignment: .top) { FadeEdge(color: Theme.canvas, height: 40).offset(y: 12) }

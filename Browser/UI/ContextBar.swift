@@ -41,7 +41,6 @@ struct ContextBar: View {
                 .background {
                     if !(morphs && browser.panel == .command) {
                         Capsule().fill(Theme.raised)
-                            .overlay(Capsule().strokeBorder(Theme.edge))
                             .launcherMorph(fieldSpace ?? (morphs ? launcherSpace : nil), id: fieldSpace == nil ? "launcher" : "field")
                     }
                 }
@@ -52,7 +51,7 @@ struct ContextBar: View {
             place(trailing)
         }
         .frame(height: Theme.barHeight + 8)
-        .barSurface(cornerRadius: 24)
+        .barSurface(cornerRadius: Theme.barRadius)
         .padding(.horizontal, Theme.gutter)
         .padding(.bottom, 4)
         // What scrolls under the bar dissolves above it rather than being sliced by its edge.
@@ -68,7 +67,6 @@ struct ContextBar: View {
                 Glyph(slot.glyph, size: 16, weight: 2)
                     .frame(width: 38, height: 38)
                     .background(Theme.raised, in: .circle)
-                    .overlay(Circle().strokeBorder(Theme.edge))
                     .frame(width: 64, height: Theme.barHeight)
                     .contentShape(.rect)
             }

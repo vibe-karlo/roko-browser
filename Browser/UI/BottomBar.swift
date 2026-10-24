@@ -43,7 +43,6 @@ struct BottomBar: View {
                         // and only on a page (a screen over it has its own bar).
                         if browser.panel != .command, onPage {
                             Capsule().fill(Theme.raised)
-                                .overlay(Capsule().strokeBorder(Theme.edge))
                                 .launcherMorph(launcherSpace)
                         }
                     }
@@ -58,7 +57,6 @@ struct BottomBar: View {
                 Glyph(.chevronUp, size: 18, weight: 2)
                     .frame(width: 38, height: 38)
                     .background(Theme.raised, in: .circle)
-                    .overlay(Circle().strokeBorder(Theme.edge))
                     .frame(width: 64, height: Theme.barHeight)
                     .contentShape(.rect)
             }
@@ -68,7 +66,7 @@ struct BottomBar: View {
         }
         .frame(height: Theme.barHeight + 8)
         .overlay(alignment: .bottom) { progressLine }
-        .barSurface(cornerRadius: 24)
+        .barSurface(cornerRadius: Theme.barRadius)
         .highPriorityGesture(swipes)
         .sensoryFeedback(.selection, trigger: switches)
     }

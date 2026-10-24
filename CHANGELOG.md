@@ -6,6 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- The bar is one capsule with one edge: its buttons and launcher capsule are plain fills inside it, their curves parallel to its own, instead of each drawing an outline at a different roundness. In To-do the field fills the bar.
 - The launcher opens out of the bar: the bar's capsule is the launcher's field, so it widens and rises with the keyboard, and closing it sinks back into the bar, instead of one fading out while another fades in at the top.
 - To-do types in place: "New to-do" widens into a field right in the bar, the list stays in view above, the chip says when ("Fri, 30 Oct"), and Return adds it into the list with the keyboard still up for the next. ✕ finishes.
 - One bar across the app, shaped for the screen it's on: the browser's tabs, launcher and page menu; in To-do, close and "New to-do"; in Today, close, Search and Refresh; in Browse for Me, close, "Ask a follow-up" and Share; in a summary, close and "Ask about this page". The middle always opens the same launcher, set up for that screen: in an answer it asks a follow-up (or offers the suggested ones); in a summary it asks Browse for Me about the page, with the summary as context. To-do's own field at the bottom is gone.

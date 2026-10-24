@@ -24,6 +24,9 @@ enum Theme {
     static let edge = Color(light: 0x0E0E0F, dark: 0xE7E7E4).opacity(0.08)
 
     static let barHeight: CGFloat = 52
+    /// The bar is a capsule: its 38-point controls sit 11 points in, so their
+    /// curves run parallel to its own (19 + 11 = 30, half its height).
+    static let barRadius: CGFloat = (barHeight + 8) / 2
     static let gutter: CGFloat = 16
 }
 
