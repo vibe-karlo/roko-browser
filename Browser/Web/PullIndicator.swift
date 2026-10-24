@@ -1,26 +1,33 @@
 import SwiftUI
 import UIKit
 
-/// The pull-to-refresh mark: a ring that fills as you pull, spins while the
-/// page reloads, then fades. It floats above the page, so a site's fixed header
-/// can't hide it, and it never pushes the page content down, which is what
-/// makes the system control feel jerky on a web view.
+/// The pull mark: a ring that fills as you pull, spins while the page
+/// reloads, then fades. Pulled on past the reload point, the ring closes and
+/// the mark opens into "Summarize": letting go there summarizes instead. It
+/// floats above the page, so a site's fixed header can't hide it, and it never
+/// pushes the page content down, which is what makes the system control feel
+/// jerky on a web view.
 final class PullIndicator: UIView {
     static let size: CGFloat = 34
     private let ring = CAShapeLayer()
+    private let glyph = UIImageView(image: UIImage(named: "phosphor/summarize")?.withRenderingMode(.alwaysTemplate))
+    private let label = UILabel()
+    /// Showing "Summarize": a release now summarizes the page.
+    private(set) var showsSummarize = false
 
     init() {
         super.init(frame: CGRect(x: 0, y: 0, width: Self.size, height: Self.size))
         isUserInteractionEnabled = false
         alpha = 0
         backgroundColor = UIColor(Theme.panel)
+        // Half the height at any width: a circle, opening into a capsule.
         layer.cornerRadius = Self.size / 2
-        // The bar's tight, downward shadow, so it reads on any page.
+        // The bar's tight, downward shadow, so it reads on any page. No fixed
+        // path: the shadow follows the shape as it widens.
         layer.shadowColor = UIColor.black.cgColor
         layer.shadowOpacity = 0.14
         layer.shadowRadius = 5
         layer.shadowOffset = CGSize(width: 0, height: 2)
-        layer.shadowPath = UIBezierPath(ovalIn: bounds).cgPath
 
         let inset: CGFloat = 9
         ring.frame = bounds
@@ -32,27 +39,85 @@ final class PullIndicator: UIView {
         ring.lineCap = .round
         ring.strokeEnd = 0
         layer.addSublayer(ring)
+
+        glyph.contentMode = .scaleAspectFit
+        glyph.alpha = 0
+        addSubview(glyph)
+        label.text = "Summarize"
+        label.font = .systemFont(ofSize: 15, weight: .medium)
+        label.alpha = 0
+        addSubview(label)
+
         registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (view: PullIndicator, _) in view.updateColors() }
         updateColors()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    private func updateColors() {
-        ring.strokeColor = UIColor(Theme.ink).resolvedColor(with: traitCollection).cgColor
+    private enum Layout {
+        static let leading: CGFloat = 12, glyph: CGFloat = 18, gap: CGFloat = 7, trailing: CGFloat = 15
     }
 
-    /// 0 to 1 while pulling; full at the point a release would reload.
-    func setProgress(_ progress: CGFloat) {
-        guard ring.animation(forKey: "spin") == nil else { return }
-        let progress = min(max(progress, 0), 1)
+    override var intrinsicContentSize: CGSize {
+        guard showsSummarize else { return CGSize(width: Self.size, height: Self.size) }
+        let width = Layout.leading + Layout.glyph + Layout.gap + label.intrinsicContentSize.width + Layout.trailing
+        return CGSize(width: width.rounded(.up), height: Self.size)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // The ring stays centred in the circle; the glyph and word sit at the
+        // leading edge, so they're revealed as the capsule opens around them.
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        ring.strokeEnd = progress * 0.85
+        ring.position = CGPoint(x: bounds.midX, y: bounds.midY)
+        CATransaction.commit()
+        glyph.frame = CGRect(x: Layout.leading, y: (bounds.height - Layout.glyph) / 2,
+                             width: Layout.glyph, height: Layout.glyph)
+        let text = label.intrinsicContentSize
+        label.frame = CGRect(x: glyph.frame.maxX + Layout.gap, y: (bounds.height - text.height) / 2,
+                             width: text.width, height: text.height)
+    }
+
+    private func updateColors() {
+        backgroundColor = UIColor(Theme.panel)
+        let ink = UIColor(Theme.ink).resolvedColor(with: traitCollection)
+        ring.strokeColor = ink.cgColor
+        glyph.tintColor = ink
+        label.textColor = ink
+    }
+
+    /// 0 to 1 while pulling to the reload point; on to 2 at the summarize point,
+    /// closing the ring.
+    func setProgress(_ progress: CGFloat) {
+        guard ring.animation(forKey: "spin") == nil else { return }
+        let progress = min(max(progress, 0), 2)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        ring.strokeEnd = progress <= 1 ? progress * 0.85 : 0.85 + (progress - 1) * 0.15
         ring.setAffineTransform(CGAffineTransform(rotationAngle: progress * .pi))
         CATransaction.commit()
-        alpha = min(progress * 2.5, 1)
-        transform = CGAffineTransform(scaleX: 0.7 + 0.3 * progress, y: 0.7 + 0.3 * progress)
+        let reached = min(progress, 1)
+        alpha = min(reached * 2.5, 1)
+        transform = CGAffineTransform(scaleX: 0.7 + 0.3 * reached, y: 0.7 + 0.3 * reached)
+    }
+
+    /// Opens into "Summarize", or closes back into the ring.
+    func setSummarize(_ on: Bool) {
+        guard on != showsSummarize else { return }
+        showsSummarize = on
+        invalidateIntrinsicContentSize()
+        UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.82, initialSpringVelocity: 0,
+                       options: [.beginFromCurrentState]) {
+            self.superview?.layoutIfNeeded()
+            self.glyph.alpha = on ? 1 : 0
+            self.label.alpha = on ? 1 : 0
+        }
+        // The ring goes at once rather than sliding under the word.
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(on ? 0.12 : 0.25)
+        ring.opacity = on ? 0 : 1
+        CATransaction.commit()
     }
 
     func spin() {
@@ -69,8 +134,18 @@ final class PullIndicator: UIView {
 
     func hide(animated: Bool = true) {
         let finish = { [weak self] in
-            self?.ring.removeAnimation(forKey: "spin")
-            self?.ring.strokeEnd = 0
+            guard let self else { return }
+            ring.removeAnimation(forKey: "spin")
+            ring.strokeEnd = 0
+            // Back to a plain circle, unseen, for the next pull.
+            if showsSummarize {
+                showsSummarize = false
+                invalidateIntrinsicContentSize()
+                superview?.layoutIfNeeded()
+                glyph.alpha = 0
+                label.alpha = 0
+                ring.opacity = 1
+            }
         }
         guard animated else {
             alpha = 0

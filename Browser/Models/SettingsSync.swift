@@ -2,7 +2,7 @@ import Foundation
 
 /// Settings and per-site choices, kept the same on every device through
 /// iCloud's key-value store: the search engine, what's blocked, and what you
-/// chose for a site (blocking off, cookies accepted, zoom, pinch). Things that
+/// chose for a site (blocking off, cookies accepted, zoom). Things that
 /// belong to one device stay there: the app icon, the Claude key (in the
 /// Keychain), caches.
 @MainActor
@@ -20,7 +20,7 @@ final class SettingsSync {
     private static let exact: Set<String> = [
         "searchEngine", "suggestions", "archivePolicy", ClaudeClient.enabledKey, "consent.acceptedHosts",
     ]
-    private static let prefixes = ["block.", "zoom.", "pinchOff."]
+    private static let prefixes = ["block.", "zoom."]
 
     static func syncs(_ key: String) -> Bool {
         exact.contains(key) || prefixes.contains { key.hasPrefix($0) }

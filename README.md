@@ -146,7 +146,7 @@ for `Pin` and `HistoryEntry`, and `device.store` for `SavedTab` and `Watch`. Ope
 after every page load with their back and forward history, which would only churn the sync, and
 Notify Me would check and notify on every device. The first launch with sync copies the old
 single `default.store` into the two and keeps it as `before-sync.store`. Settings and per-site
-choices (search engine, blocking, cookies, zoom, pinch) sync through the iCloud key-value store
+choices (search engine, blocking, cookies, zoom) sync through the iCloud key-value store
 (`SettingsSync`); the app icon, the Claude key and caches stay on the device.
 
 Records can't be unique in CloudKit, so two devices can add the same page before they hear

@@ -2,22 +2,18 @@ import SwiftUI
 import WebKit
 
 /// Shows the selected tab's web view. Also listens for the two page gestures:
-/// pinching the page smaller to summarize, and scrolling to fold the bar away.
+/// pulling down past the top to reload or, further, to summarize, and
+/// scrolling to fold the bar away.
 struct WebViewHost: UIViewRepresentable {
     let tab: BrowserTab
     /// Where the floating bar's top edge is, in screen coordinates.
     var barTop: CGFloat
-    var onPinchIn: () -> Void
-    /// While a summarizing pinch is under way: how small the page should be (nil: back to full).
-    var onPinchChange: (CGFloat?) -> Void = { _ in }
+    var onSummarize: () -> Void
     var onScrollDirection: (_ down: Bool) -> Void
 
     func makeUIView(context: Context) -> UIView {
         let container = UIView()
         container.backgroundColor = .clear
-        let pinch = UIPinchGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pinched(_:)))
-        pinch.delegate = context.coordinator
-        container.addGestureRecognizer(pinch)
         return container
     }
 
@@ -54,7 +50,7 @@ struct WebViewHost: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
 
-    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+    final class Coordinator: NSObject {
         var parent: WebViewHost
         private var offsetObservation: NSKeyValueObservation?
         private var lastOffset: CGFloat = 0
@@ -78,10 +74,19 @@ struct WebViewHost: UIViewRepresentable {
         private let indicator = PullIndicator()
         private var loadObservations: [NSKeyValueObservation] = []
         private let haptic = UIImpactFeedbackGenerator(style: .light)
+        private let firmHaptic = UIImpactFeedbackGenerator(style: .medium)
         /// How far past the top a pull has to go: long and deliberate, not a bounce.
         private let pullDistance: CGFloat = 120
+        /// Further still, and letting go summarizes instead of reloading. The
+        /// page resists more the further it goes: this is about 370 points of
+        /// finger travel, 115 past the reload point's 255.
+        private let summarizeDistance: CGFloat = 165
         /// Pulled far enough, waiting for the finger to lift before reloading.
         private var refreshArmed = false
+        /// Pulled as far as summarizing, waiting for the finger to lift.
+        private var summarizeArmed = false
+        /// Let go to summarize: waiting for the page to spring back to its top.
+        private var summarizePending = false
         /// Reloading for a pull; `sawLoading` once WebKit has actually started.
         private var refreshing = false, sawLoading = false
 
@@ -95,10 +100,10 @@ struct WebViewHost: UIViewRepresentable {
             indicator.hide(animated: false)
             container.addSubview(indicator)
             indicator.translatesAutoresizingMaskIntoConstraints = false
+            // Its own width: a circle, or a capsule once it says "Summarize".
             NSLayoutConstraint.activate([
                 indicator.centerXAnchor.constraint(equalTo: container.centerXAnchor),
                 indicator.topAnchor.constraint(equalTo: container.safeAreaLayoutGuide.topAnchor, constant: 14),
-                indicator.widthAnchor.constraint(equalToConstant: PullIndicator.size),
                 indicator.heightAnchor.constraint(equalToConstant: PullIndicator.size),
             ])
             webView.scrollView.panGestureRecognizer.addTarget(self, action: #selector(panChanged(_:)))
@@ -114,10 +119,12 @@ struct WebViewHost: UIViewRepresentable {
 
         /// Follows the finger past the top of the page.
         private func pulled(_ scrollView: UIScrollView) {
-            guard !refreshing, scrollView.isTracking else { return }
+            guard !refreshing, !summarizePending, scrollView.isTracking else { return }
             let pull = -(scrollView.contentOffset.y + scrollView.adjustedContentInset.top)
             guard pull > 0 || indicator.alpha > 0 else { return }
-            indicator.setProgress(pull / pullDistance)
+            indicator.setProgress(pull <= pullDistance
+                                  ? pull / pullDistance
+                                  : 1 + (pull - pullDistance) / (summarizeDistance - pullDistance))
             if pull >= pullDistance, !refreshArmed {
                 refreshArmed = true
                 haptic.impactOccurred()
@@ -125,15 +132,51 @@ struct WebViewHost: UIViewRepresentable {
                 // Pushed back up: changed their mind.
                 refreshArmed = false
             }
+            // A firmer tap as it turns into "Summarize"; easing back off a
+            // little takes it back to a reload.
+            if pull >= summarizeDistance, !summarizeArmed {
+                summarizeArmed = true
+                indicator.setSummarize(true)
+                firmHaptic.impactOccurred()
+            } else if pull < summarizeDistance - 20, summarizeArmed {
+                summarizeArmed = false
+                indicator.setSummarize(false)
+            }
         }
 
         @objc private func panChanged(_ pan: UIPanGestureRecognizer) {
             switch pan.state {
-            case .began: haptic.prepare()
+            case .began:
+                haptic.prepare()
+                firmHaptic.prepare()
             case .ended, .cancelled, .failed:
-                if refreshArmed { startReload() } else if !refreshing { indicator.hide() }
+                if summarizeArmed {
+                    startSummarize()
+                } else if refreshArmed {
+                    startReload()
+                } else if !refreshing {
+                    indicator.hide()
+                }
             default: break
             }
+        }
+
+        /// The page springs back to its top first, so the summary opens from
+        /// the page as it reads, not from the gap above it. "Summarize" stays
+        /// up meanwhile.
+        private func startSummarize() {
+            summarizeArmed = false
+            refreshArmed = false
+            summarizePending = true
+            // Never wait on a page that doesn't spring back.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.finishSummarize() }
+        }
+
+        private func finishSummarize() {
+            guard summarizePending else { return }
+            summarizePending = false
+            indicator.hide()
+            parent.onSummarize()
         }
 
         private func startReload() {
@@ -191,6 +234,9 @@ struct WebViewHost: UIViewRepresentable {
         }
 
         private func scrolled(_ scrollView: UIScrollView) {
+            if summarizePending, scrollView.contentOffset.y >= -scrollView.adjustedContentInset.top - 0.5 {
+                finishSummarize()
+            }
             pulled(scrollView)
             // Within a screen and a half of the end, the strip past the page
             // takes the footer's colour. A comparison per frame; the colour
@@ -217,48 +263,5 @@ struct WebViewHost: UIViewRepresentable {
             }
         }
 
-        /// A pinch that began with the page at its own size: it summarizes.
-        private var pinchSummarizes = false
-        private var pinchStartZoom: CGFloat = 1
-
-        @objc func pinched(_ recognizer: UIPinchGestureRecognizer) {
-            guard let scrollView = parent.tab.webView?.scrollView else { return }
-            switch recognizer.state {
-            case .began:
-                // Only a pinch that starts on an un-zoomed page means "summarize";
-                // on a page you've zoomed into, it's an ordinary zoom out. Un-zoomed
-                // is as small as it goes, or a mobile page at its own scale of 1:
-                // one wider than the screen (a wide table, say) could zoom out
-                // further, but it's still at its own size.
-                // Turned off for this site in Site Settings, it's always a zoom.
-                pinchStartZoom = scrollView.zoomScale
-                pinchSummarizes = PinchToSummarize.isOn(for: parent.tab.url?.host())
-                    && (pinchStartZoom <= scrollView.minimumZoomScale + 0.01 || abs(pinchStartZoom - 1) < 0.01)
-            case .changed where pinchSummarizes:
-                let scale = recognizer.scale
-                // A pinch inward from the page's own size is ours: stop WebKit
-                // zooming the page out as well (cancelling its recognizer), or
-                // the two shrink the page together. Whatever it zoomed out
-                // already goes back, so the page returns at the size it was.
-                if scale < 0.97, let zoom = scrollView.pinchGestureRecognizer, zoom.isEnabled {
-                    zoom.isEnabled = false
-                    zoom.isEnabled = true
-                    scrollView.setZoomScale(pinchStartZoom, animated: false)
-                }
-                // The page follows the fingers, with resistance as it gets small.
-                parent.onPinchChange(scale < 1 ? max(0.55, 1 - (1 - scale) * 0.7) : nil)
-            case .ended where pinchSummarizes && recognizer.scale < 0.75:
-                parent.onPinchIn()
-            case .ended, .cancelled, .failed:
-                if pinchSummarizes { parent.onPinchChange(nil) }
-            default:
-                break
-            }
-        }
-
-        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
-                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
-            true
-        }
     }
 }

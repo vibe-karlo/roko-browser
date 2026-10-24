@@ -11,7 +11,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Copy a link on your Mac and roko offers it ("Link you copied"), through Universal Clipboard: above the bar once when you open roko, then in the address bar for five minutes. It opens with the system Paste button, so iOS never asks for permission to paste.
 - Settings → Show the link you copied: the offer and the address bar show the link itself, with its site's icon, before you open it. Set Paste from Other Apps to Allow in iOS Settings and iOS doesn't ask; links copied in roko always show.
 - Settings → Appearance: Automatic, Light or Dark, for the whole app and the pages in it.
-- Full-screen Summarize: the page shrinks into a card, live with a pinch, then the summary writes itself.
+- Full-screen Summarize: the page shrinks into a card, then the summary writes itself.
 - Structured answers for Summarize and Browse for Me: a gist, then sections with topic icons.
 - Browse for Me shows each site as it's read, with source cards, pictures and real site icons.
 - Settings → App icon: thirteen alternates from the logo designs, including three Eclipse marks (cream, on orange, orange).
@@ -27,7 +27,6 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Browse for Me matches the question: a quick fact gets a short answer from three sources; a comparison, a "best" or a plan reads more sites and writes more.
 - Answers written by Claude show pictures too, from the pages its searches found, fetched alongside while it works.
 - A weather topic, with a sun, for answer sections about weather and seasons.
-- Site Settings → Pinch to summarize: turn it off for a site where you need the pinch to zoom.
 - Cookie pop-ups are answered, not just hidden: DuckDuckGo's Autoconsent (with Consent-O-Matic's rules) rejects them on about 1,200 consent platforms and sites, and finds the rest by their buttons.
 - Cookies are accepted only where a site needs them: a cookie wall, or a video or embed held back until you accept. roko remembers the site and says so ("Accepted cookies: … needs them").
 - Site Settings → Reject cookies: see and change what roko does with a site's cookie pop-ups.
@@ -57,7 +56,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Rewording a question wraps over lines instead of scrolling sideways.
 - The bar floats over the page, as in Safari: pages run to the bottom edge with the bar showing or folded away.
 - A pin always opens the page that was pinned, not whatever page of that site is open; two pages of one site can both be pinned.
-- A pinch summarizes pages wider than the screen too, from their own size; a page you've zoomed into still zooms out.
+- Summarize with a long pull from the top of a page instead of a pinch: past the reload point the ring closes and opens into "Summarize", with a firmer tap, and letting go there summarizes. Easing back off reloads instead. A pinch always zooms again.
 - Apple's models write in English when they summarize a Croatian page or answer a Croatian question, and say why; Claude still writes Croatian.
 - The copied-link offer reads like the cookie one: what it is, then "Paste" or "Open" in orange, instead of a filled orange capsule. In the address bar it's a row like the others.
 - Pins are just their sites' icons, above the field and on the start screen, on the same line as the icons in the list; a long press names the page.
@@ -75,7 +74,6 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Low memory: background tabs hibernate and tab pictures are released before iOS has to close roko.
 - Old tab pictures and history older than 90 days are cleaned up after launch.
 - Translation no longer loses its hook when a page in a translated tab navigates.
-- The page no longer zooms out under the summary card while pinching.
 - Summarize opens and closes seamlessly: the card and the page swap only where they match exactly.
 - A site's header colour no longer shows at the bottom of the screen.
 - The status bar stays readable over the address bar in light mode.

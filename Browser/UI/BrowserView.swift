@@ -6,8 +6,6 @@ struct BrowserView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
     @State private var barTop: CGFloat = 0
-    /// How far a pinch on the page has shrunk it toward a summary (1 = not at all).
-    @State private var pinchScale: CGFloat = 1
 
     var body: some View {
         @Bindable var browser = browser
@@ -18,9 +16,9 @@ struct BrowserView: View {
             // colour ever shows at the bottom of the screen.
             GeometryReader { proxy in
                 VStack(spacing: 0) {
-                    (pinchScale < 1 || browser.summaryCoversPage && browser.summary?.isClosing != true ? Theme.canvas : browser.selectedTab?.topColor.map(Color.init) ?? Theme.canvas)
+                    (browser.summaryCoversPage && browser.summary?.isClosing != true ? Theme.canvas : browser.selectedTab?.topColor.map(Color.init) ?? Theme.canvas)
                         .frame(height: proxy.safeAreaInsets.top)
-                    (pinchScale < 1 || browser.summaryCoversPage && browser.summary?.isClosing != true ? Theme.canvas : browser.selectedTab?.bottomColor.map(Color.init) ?? Theme.canvas)
+                    (browser.summaryCoversPage && browser.summary?.isClosing != true ? Theme.canvas : browser.selectedTab?.bottomColor.map(Color.init) ?? Theme.canvas)
                 }
                 .ignoresSafeArea()
             }
@@ -30,39 +28,16 @@ struct BrowserView: View {
                 WebViewHost(
                     tab: tab,
                     barTop: barTop,
-                    onPinchIn: {
-                        // Hand over at the size the fingers left the page; the
-                        // summary's card carries on from there.
-                        browser.summarize(fromScale: pinchScale)
-                    },
-                    onPinchChange: { scale in
-                        if let scale {
-                            browser.preparePinchSnapshot()
-                            pinchScale = scale
-                        } else if browser.summary == nil {
-                            browser.cancelPinchSnapshot()
-                            withAnimation(.spring(duration: 0.35, bounce: 0.25)) { pinchScale = 1 }
-                        }
-                    },
+                    onSummarize: { browser.summarize() },
                     onScrollDirection: { down in
                         if browser.isBarCollapsed != down { browser.isBarCollapsed = down }
                     })
-                    // The page itself follows a pinch, shrinking into a card.
-                    .clipShape(.rect(cornerRadius: 40 * (1 - pinchScale)))
-                    .scaleEffect(pinchScale)
                     .opacity(browser.summaryCoversPage ? 0 : 1)
-                    // Last, so the clip above is the full height too: applied
-                    // before it, the clip still ended at the home indicator
-                    // and cut a blank strip off the bottom of every page.
-                    // The keyboard too: WebKit makes room for it on its own,
-                    // and shrunk by SwiftUI as well, the page stopped short
-                    // of the keyboard while typing into a form.
+                    // Down to the bottom edge, under the floating bar. The
+                    // keyboard too: WebKit makes room for it on its own, and
+                    // shrunk by SwiftUI as well, the page stopped short of the
+                    // keyboard while typing into a form.
                     .ignoresSafeArea(edges: .bottom)
-                    // Once the card has taken over, the hidden page returns to
-                    // full size, ready for the card to grow back into it.
-                    .onChange(of: browser.summaryCoversPage) { _, covered in
-                        if covered { pinchScale = 1 }
-                    }
 
                 // A restored tab shows its last snapshot until its page is live.
                 if !tab.isLive, let snapshot = tab.snapshot {
@@ -256,7 +231,7 @@ struct BrowserView: View {
             browser.offerCopiedLinkIfFresh()
         }
         // So does coming back from a summary, an answer or the reader: the
-        // pinch or scroll that led there may have folded it away.
+        // pull or scroll that led there may have folded it away.
         .onChange(of: browser.summary == nil && browser.browseForMe == nil && browser.reader == nil) { _, backOnPage in
             if backOnPage, browser.isBarCollapsed { browser.isBarCollapsed = false }
         }

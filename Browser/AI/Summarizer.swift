@@ -56,8 +56,6 @@ final class SummaryModel: Identifiable {
     let title: String
     let host: String
     var snapshot: UIImage?
-    /// The page's size when the summary opened (below 1 after a pinch).
-    var startScale: CGFloat = 1
     /// Growing back into the page: the status bar takes the site's colour again.
     var isClosing = false
     private(set) var text = ""

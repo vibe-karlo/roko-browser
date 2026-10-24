@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Full-screen summary. It opens on the page itself, which shrinks into a card
-/// at the top (from wherever a pinch left it); a light passes down the card
+/// at the top; a light passes down the card
 /// while it's read, then the summary writes itself below. Closing plays it
 /// backwards: the card grows into the page again.
 struct SummaryView: View {
@@ -74,7 +74,6 @@ struct SummaryView: View {
     private func card(width: CGFloat) -> some View {
         let image = model.snapshot
         let fullHeight = image.map { width * $0.size.height / max($0.size.width, 1) } ?? cardHeight
-        let scale = settled ? 1 : model.startScale
         let inset: CGFloat = settled ? 22 : 0
         return VStack(alignment: .leading, spacing: 12) {
             ZStack(alignment: .top) {
@@ -91,11 +90,10 @@ struct SummaryView: View {
                     ScanLight()
                 }
             }
-            .clipShape(.rect(cornerRadius: settled ? 24 : 40 * (1 - scale)))
+            .clipShape(.rect(cornerRadius: settled ? 24 : 0))
             .overlay {
                 RoundedRectangle(cornerRadius: settled ? 24 : 0).strokeBorder(Theme.edge.opacity(settled ? 1 : 0))
             }
-            .scaleEffect(scale, anchor: .center)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(model.title)
@@ -176,7 +174,6 @@ struct SummaryView: View {
     /// The card grows back to exactly the page's size and place; only then is
     /// it swapped for the live page, in one frame, so the hand-over can't be seen.
     private func close() {
-        model.startScale = 1
         textShown = false  // at once: only the card moves on the way out
         withAnimation(.easeOut(duration: 0.3)) { model.isClosing = true }
         withAnimation(.spring(duration: 0.45, bounce: 0)) { settled = false } completion: {

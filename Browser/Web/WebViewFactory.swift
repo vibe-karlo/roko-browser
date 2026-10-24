@@ -52,9 +52,6 @@ enum WebViewFactory {
         webView.allowsBackForwardNavigationGestures = true
         webView.isFindInteractionEnabled = true
         webView.scrollView.contentInsetAdjustmentBehavior = .always
-        // No rubber-band zoom below the page's size: pinching in shrinks the
-        // whole page toward a summary instead (see WebViewHost).
-        webView.scrollView.bouncesZoom = false
         // Opaque, so WebKit paints the page's own default canvas: white for
         // sites without dark mode, dark for sites that ask for it. A clear web
         // view let the app's dark backdrop show behind black text.
