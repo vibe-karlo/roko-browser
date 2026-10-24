@@ -16,6 +16,8 @@ struct SettingsView: View {
     @AppStorage(DailyReminders.key) private var reminders = true
     @State private var choosingNewsSites = false
     @State private var choosingCalendars = false
+    @State private var choosingWeatherPlace = false
+    @State private var weatherPlace = WeatherPlace.fixed?.name ?? "My location"
     @AppStorage("archivePolicy") private var archive: ArchivePolicy = .day
     @AppStorage(ClaudeClient.enabledKey) private var claudeEnabled = true
     @State private var apiKey = Keychain.claudeAPIKey ?? ""
@@ -100,6 +102,10 @@ struct SettingsView: View {
                         Button("Calendars") { choosingCalendars = true }
                             .foregroundStyle(Theme.ink)
                     }
+                    Button { choosingWeatherPlace = true } label: {
+                        LabeledContent("Weather", value: weatherPlace)
+                    }
+                    .foregroundStyle(Theme.ink)
                 } header: {
                     Text("Today")
                 } footer: {
@@ -110,6 +116,12 @@ struct SettingsView: View {
                 }
                 .sheet(isPresented: $choosingCalendars) {
                     CalendarsSheet { TodayModel.shared.appeared() }
+                }
+                .sheet(isPresented: $choosingWeatherPlace) {
+                    WeatherPlaceSheet {
+                        TodayModel.shared.weatherPlaceChanged()
+                        weatherPlace = WeatherPlace.fixed?.name ?? "My location"
+                    }
                 }
 
                 Section {

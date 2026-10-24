@@ -94,6 +94,10 @@ final class TodayModel {
     /// The weather where you are. In the background there's no asking where
     /// that is: the last place found stands in.
     private func freshWeather(inBackground: Bool) async -> TodayWeather? {
+        // A town chosen in Settings: no asking where you are.
+        if let fixed = WeatherPlace.fixed {
+            return try? await TodayWeather.fetch(at: fixed.coordinate, place: fixed.name)
+        }
         var coordinate = Self.lastCoordinate
         var place = UserDefaults.standard.string(forKey: "today.place")
         if !inBackground, let location = await TodayLocation.shared.current() {
@@ -109,6 +113,17 @@ final class TodayModel {
     private static var lastCoordinate: CLLocationCoordinate2D? {
         guard let pair = UserDefaults.standard.array(forKey: "today.coordinate") as? [Double], pair.count == 2 else { return nil }
         return CLLocationCoordinate2D(latitude: pair[0], longitude: pair[1])
+    }
+
+    /// Weather for another place: fetched again at once.
+    /// Only the weather: the news stays as it is.
+    func weatherPlaceChanged() {
+        weather = nil
+        Task {
+            guard let fresh = await freshWeather(inBackground: false) else { return }
+            weather = fresh
+            save()
+        }
     }
 
     /// Sources or topics changed: show the new set's stories.

@@ -14,6 +14,7 @@ struct BrowserApp: App {
         container = Store.makeContainer()
         // Before launch finishes, so a tap on a notification that opens roko isn't missed.
         UNUserNotificationCenter.current().delegate = NotificationRouter.shared
+        TodoAlerts.watch(container)
         SettingsSync.shared.start()
         // iCloud tells roko about changes from other devices with silent
         // pushes, which need no permission.

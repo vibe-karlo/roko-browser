@@ -207,14 +207,19 @@ store. Each to-do keeps only the day it's for (or none, for Someday, or a week's
 This week), and its section is worked out from that and today's date, so nothing needs moving
 as days pass. "to-do" or "todo" typed in full opens it, with today's to-dos listed under the row
 to tick off; "todo" and a task (`TodoDraft`) adds one, a trailing day word picking the day, and
-any other query offers Add to-do under Browse for Me. While anything is due today, the to-do
-icon leads the bar's pins with a count.
+any other query offers Add to-do under Browse for Me; a trailing time ("at 15", "u 15h",
+"9:30") gives it one. A to-do with a time (`time`, an absolute date) gets a notification 15
+minutes before (`Today/TodoAlerts.swift`): they're laid out again after every save that touches a
+to-do (`ModelContext.didSave`, filtered to Todo so page visits don't trigger it), at most 40.
+Dragging sets `order` across the section it lands in, and moves it to that section's day. While
+anything is due today, the to-do icon leads the bar's pins with a count.
 
 Today (`Today/`, `UI/TodayView.swift`) opens the first time roko comes up after 4 a.m. each
 day, and with "today". It reads:
 
 - **Weather** from [Open-Meteo](https://open-meteo.com) (free, no key, CC BY 4.0, credited on
-  the page), at a reduced-accuracy location; the town name comes from MapKit.
+  the page), at a reduced-accuracy location (the town name from MapKit), or at a town picked by
+  name with Open-Meteo's geocoding, which needs no location permission.
 - **Calendar** with EventKit's full access, asked for from the page; events stay on the phone.
   Calendars can be left out (Today → Calendars); the ones left out are stored, so new ones show.
 - **News** from the RSS or Atom feeds of the sites chosen in Settings → Today (thirteen

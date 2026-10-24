@@ -5,7 +5,7 @@ struct CommandItem: Identifiable {
     enum Action {
         case open(URL), switchTab(BrowserTab), openPin(Pin), search(String),
              browse(String), summarize, findOnPage, privateTab, settings, copy(String),
-             pasteLink, openCopied(URL), todos, today, addTodo(String, TodoWhen)
+             pasteLink, openCopied(URL), todos, today, addTodo(String, TodoWhen, DateComponents?)
     }
 
     let id: String
@@ -166,7 +166,7 @@ struct CommandBarView: View {
     }
 
     private var dueTodos: [Todo] {
-        todos.filter { $0.isDueNow || justDone.contains($0.persistentModelID) }
+        todos.filter { $0.isDueNow || justDone.contains($0.persistentModelID) }.sorted(by: Todo.listOrder)
     }
 
     /// Today's to-dos, under the To-do row: tick them off without opening the
@@ -190,7 +190,12 @@ struct CommandBarView: View {
                         .foregroundStyle(todo.done ? Theme.secondaryInk : Theme.ink)
                         .strikethrough(todo.done, color: Theme.secondaryInk)
                         .lineLimit(1)
-                    Spacer(minLength: 0)
+                    Spacer(minLength: 8)
+                    if let time = todo.timeLabel {
+                        Text(time)
+                            .font(.system(size: 12).monospacedDigit())
+                            .foregroundStyle(Theme.faintInk)
+                    }
                 }
                 .padding(.horizontal, 12)
                 .transition(.opacity)
@@ -386,11 +391,15 @@ struct CommandBarView: View {
         case .settings: browser.panel = .settings
         case .todos: browser.panel = .todos
         case .today: browser.panel = .today
-        case .addTodo(let title, let when):
-            context.insert(Todo(title: title, when: when))
+        case .addTodo(let title, let when, let time):
+            let todo = Todo(title: title, when: when, at: time)
+            todo.order = (todos.map(\.order).max() ?? 0) + 1
+            context.insert(todo)
             try? context.save()
             browser.panel = .none
-            browser.showToast(when == .today ? "Added to today's to-dos" : "To-do added for \(TodoDraft.label(when).lowercased())")
+            if time != nil { TodoAlerts.askIfNeeded() }
+            browser.showToast(when == .today && time == nil ? "Added to today's to-dos"
+                              : "To-do added for \(TodoDraft.label(when, time).lowercased())")
         case .copy(let result):
             UIPasteboard.general.string = result
             browser.panel = .none
@@ -466,8 +475,8 @@ enum CommandRanker {
         // "todo call Petra tomorrow": a new to-do, on top, so Return adds it.
         if let draft = TodoDraft.parse(query) {
             ranked.append((1020, CommandItem(id: "add-todo", title: draft.title, subtitle: "New to-do",
-                                             kind: TodoDraft.label(draft.when), icon: .glyph(.todo),
-                                             action: .addTodo(draft.title, draft.when))))
+                                             kind: TodoDraft.label(draft.when, draft.time), icon: .glyph(.todo),
+                                             action: .addTodo(draft.title, draft.when, draft.time))))
         }
 
         // A sum, conversion or time question gets answered on top, Raycast-style.
@@ -498,8 +507,8 @@ enum CommandRanker {
                 // Or keep it: what was typed becomes a to-do ("call Petra tomorrow" for tomorrow).
                 if TodoDraft.parse(query) == nil, let draft = TodoDraft.parse("todo " + query) {
                     ranked.append((845, CommandItem(id: "keep-todo", title: "Add to-do",
-                                                    subtitle: draft.when == .someday ? "Someday" : "For \(TodoDraft.label(draft.when).lowercased())",
-                                                    kind: "To-do", icon: .glyph(.todo), action: .addTodo(draft.title, draft.when))))
+                                                    subtitle: draft.when == .someday ? "Someday" : "For \(TodoDraft.label(draft.when, draft.time).lowercased())",
+                                                    kind: "To-do", icon: .glyph(.todo), action: .addTodo(draft.title, draft.when, draft.time))))
                 }
             }
         }

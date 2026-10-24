@@ -13,12 +13,13 @@ struct TodayView: View {
     @State private var today = TodayModel.shared
     @State private var choosingSites = false
     @State private var choosingCalendars = false
+    @State private var choosingPlace = false
     @State private var calendarAllowed = TodayCalendar.isAllowed
     /// Ticked a moment ago: still shown, struck through.
     @State private var justDone: Set<PersistentIdentifier> = []
 
     private var dueTodos: [Todo] {
-        todos.filter { $0.isDueNow || justDone.contains($0.persistentModelID) }
+        todos.filter { $0.isDueNow || justDone.contains($0.persistentModelID) }.sorted(by: Todo.listOrder)
     }
 
     var body: some View {
@@ -80,6 +81,9 @@ struct TodayView: View {
         .sheet(isPresented: $choosingCalendars) {
             CalendarsSheet { today.appeared() }
         }
+        .sheet(isPresented: $choosingPlace) {
+            WeatherPlaceSheet { today.weatherPlaceChanged() }
+        }
     }
 
     // MARK: Header and weather
@@ -105,54 +109,64 @@ struct TodayView: View {
             }
             if let weather = today.weather {
                 weatherView(weather)
-            } else if TodayLocation.shared.isDenied {
-                Text("Allow location for roko in iOS Settings to see the weather here.")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.secondaryInk)
+            } else if TodayLocation.shared.isDenied && WeatherPlace.fixed == nil {
+                Button("Choose a town for the weather") { choosingPlace = true }
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Theme.accentText)
             }
         }
     }
 
+    /// Now, then the day in three short lines beside it, so nothing runs to
+    /// the edge; under it the next twelve hours, every other hour, spread
+    /// across the width. Tapping it picks where the weather is for.
     private func weatherView(_ weather: TodayWeather) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 14) {
-                Image("phosphor/\(weather.glyph)")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 40, height: 40)
-                Text("\(Int(weather.temperature.rounded()))°")
-                    .font(.system(size: 44, weight: .semibold).monospacedDigit())
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(weather.condition + (weather.place.map { " in \($0)" } ?? ""))
-                        .font(.system(size: 16, weight: .medium))
-                        .lineLimit(1)
-                    Text("Up to \(Int(weather.high.rounded()))°, down to \(Int(weather.low.rounded()))°"
-                         + (weather.rainChance >= 30 ? " · rain \(weather.rainChance)%" : ""))
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.secondaryInk)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                }
-            }
-            ScrollView(.horizontal) {
-                HStack(spacing: 22) {
-                    ForEach(weather.hours) { hour in
-                        VStack(spacing: 8) {
-                            Text(hour.time.formatted(.dateTime.hour(.twoDigits(amPM: .omitted))))
-                                .font(.system(size: 13).monospacedDigit())
-                                .foregroundStyle(Theme.secondaryInk)
-                            Image("phosphor/\(TodayWeather.glyph(hour.code, isDay: hour.isDay))")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 22, height: 22)
-                            Text("\(Int(hour.temperature.rounded()))°")
-                                .font(.system(size: 15, weight: .medium).monospacedDigit())
-                        }
+        VStack(alignment: .leading, spacing: 18) {
+            Button { choosingPlace = true } label: {
+                HStack(alignment: .center, spacing: 14) {
+                    Image("phosphor/\(weather.glyph)")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 40, height: 40)
+                    Text("\(Int(weather.temperature.rounded()))°")
+                        .font(.system(size: 44, weight: .semibold).monospacedDigit())
+                        .fixedSize()
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(weather.condition + (weather.place.map { " in \($0)" } ?? ""))
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(Theme.ink)
+                        Text("\(Int(weather.low.rounded()))° to \(Int(weather.high.rounded()))°"
+                             + (weather.rainChance >= 30 ? ", rain \(weather.rainChance)%" : ""))
+                            .font(.system(size: 14))
+                            .foregroundStyle(Theme.secondaryInk)
                     }
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Choose where the weather is for")
+            // First and last flush with the page's margins, the rest spaced evenly between.
+            let hours = Array(weather.hours.enumerated().filter { $0.offset % 2 == 0 }.prefix(6).map(\.element))
+            HStack(spacing: 0) {
+                ForEach(Array(hours.enumerated()), id: \.element.id) { index, hour in
+                    VStack(spacing: 8) {
+                        Text(hour.time.formatted(.dateTime.hour(.twoDigits(amPM: .omitted))))
+                            .font(.system(size: 13).monospacedDigit())
+                            .foregroundStyle(Theme.secondaryInk)
+                        Image("phosphor/\(TodayWeather.glyph(hour.code, isDay: hour.isDay))")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 22, height: 22)
+                        Text("\(Int(hour.temperature.rounded()))°")
+                            .font(.system(size: 15, weight: .medium).monospacedDigit())
+                    }
+                    .fixedSize()
+                    if index < hours.count - 1 { Spacer(minLength: 0) }
                 }
             }
-            .scrollIndicators(.hidden)
-            .scrollClipDisabled()
         }
     }
 
@@ -211,7 +225,11 @@ struct TodayView: View {
                         .foregroundStyle(todo.done ? Theme.secondaryInk : Theme.ink)
                         .strikethrough(todo.done, color: Theme.secondaryInk)
                     Spacer(minLength: 0)
-                    if TodoSection.of(todo) == .overdue {
+                    if let time = todo.timeLabel, TodoSection.of(todo) == .today {
+                        Text(time)
+                            .font(.system(size: 15).monospacedDigit())
+                            .foregroundStyle(Theme.secondaryInk)
+                    } else if TodoSection.of(todo) == .overdue {
                         Text("Overdue")
                             .font(.system(size: 13))
                             .foregroundStyle(Theme.accentText)
@@ -334,6 +352,70 @@ struct TodayView: View {
         }
     }
 
+}
+
+/// Where the weather is for: where you are, or a town you pick.
+struct WeatherPlaceSheet: View {
+    let changed: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var chosen = WeatherPlace.fixed
+    @State private var query = ""
+    @State private var found: [WeatherPlace] = []
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    row(title: "My location", detail: "Roughly where you are", selected: chosen == nil) { chosen = nil }
+                    if let chosen, !found.contains(chosen) {
+                        row(title: chosen.name, detail: chosen.detail, selected: true) {}
+                    }
+                    TextField("A town, e.g. Osijek", text: $query)
+                        .autocorrectionDisabled()
+                    ForEach(found) { place in
+                        row(title: place.name, detail: place.detail, selected: chosen == place) { chosen = place }
+                    }
+                } footer: {
+                    Text("A town you pick needs no location permission.")
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(Theme.panel)
+            .navigationTitle("Weather")
+            .navigationBarTitleDisplayMode(.inline)
+            .task(id: query) {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled else { return }
+                found = await WeatherPlace.search(query)
+            }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        if chosen != WeatherPlace.fixed {
+                            WeatherPlace.fixed = chosen
+                            changed()
+                        }
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    private func row(title: String, detail: String, selected: Bool, pick: @escaping () -> Void) -> some View {
+        Button(action: pick) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).foregroundStyle(Theme.ink)
+                    if !detail.isEmpty {
+                        Text(detail).font(.footnote).foregroundStyle(Theme.secondaryInk).lineLimit(1)
+                    }
+                }
+                Spacer()
+                if selected { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
+            }
+        }
+    }
 }
 
 /// Which calendars Today shows, by account, the way the Calendar app lists them.

@@ -4,7 +4,8 @@ import SwiftUI
 /// roko's one to-do list, opened by searching "to-do". It sorts itself by
 /// when each to-do is for: Overdue, Today, Tomorrow, This week, Later, Someday.
 /// Tap the circle to tick one off, tap its words to change them, long-press
-/// to move it to another day or delete it. New ones are typed at the bottom,
+/// to move it to another day, give it a time, or delete it; drag it to put it
+/// somewhere else in its section or into another. New ones are typed at the bottom,
 /// where the thumb is. Pull down past the top to close it.
 struct TodoView: View {
     @Environment(BrowserModel.self) private var browser
@@ -16,14 +17,18 @@ struct TodoView: View {
     @State private var justDone: Set<PersistentIdentifier> = []
     @State private var editing: PersistentIdentifier?
     @State private var choosingDate: Todo?
+    /// Being dragged (set as a long press lifts it, menu or drag): rows it
+    /// passes over make room for it.
+    @State private var dragging: Todo?
 
     private var sections: [(TodoSection, [Todo])] {
         let shown = todos.filter { !$0.done || justDone.contains($0.persistentModelID) }
         let grouped = Dictionary(grouping: shown) { TodoSection.of($0) }
         return TodoSection.allCases.compactMap { section in
             guard let items = grouped[section], !items.isEmpty else { return nil }
-            // Later is in date order; the rest in the order they were added.
-            return (section, section == .later ? items.sorted { ($0.day ?? .distantFuture) < ($1.day ?? .distantFuture) } : items)
+            // Later is in date order; the rest in the order they were put in.
+            let ordered = items.sorted(by: Todo.listOrder)
+            return (section, section == .later ? ordered.sorted { ($0.day ?? .distantFuture) < ($1.day ?? .distantFuture) } : ordered)
         }
     }
 
@@ -52,15 +57,24 @@ struct TodoView: View {
             .animation(.snappy(duration: 0.3), value: justDone)
         }
         .scrollDismissesKeyboard(.interactively)
+        // Let go between rows: it stays where it was last put.
+        .onDrop(of: [.text], isTargeted: nil) { _ in
+            dropped()
+            return true
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) { footer }
         .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas) }
         .background(Theme.canvas.ignoresSafeArea())
         .foregroundStyle(Theme.ink)
         .onAppear { DailyReminders.askIfNeeded() }
         .sheet(item: $choosingDate) { todo in
-            DayPicker(initial: todo.day ?? .now) { date in
-                withAnimation(.snappy) { todo.schedule(.date(date)) }
+            DayPicker(initial: todo.day ?? .now, time: todo.time) { date, clock in
+                withAnimation(.snappy) {
+                    todo.schedule(.date(date))
+                    todo.setTime(clock)
+                }
                 save()
+                if clock != nil { TodoAlerts.askIfNeeded() }
             }
         }
         // Pull down past the top to close, as Browse for Me does.
@@ -90,9 +104,17 @@ struct TodoView: View {
                 }
             }
             .padding(.bottom, 8)
+            // Dropped on the heading: first in the section.
+            .contentShape(.rect)
+            .onDrop(of: [.text], delegate: TodoDrop(view: self, target: nil, section: section))
             ForEach(items) { todo in
                 row(todo, section: section)
                     .transition(.opacity.combined(with: .offset(y: -6)))
+                    .onDrag {
+                        dragging = todo
+                        return NSItemProvider(object: todo.title as NSString)
+                    }
+                    .onDrop(of: [.text], delegate: TodoDrop(view: self, target: todo, section: section))
             }
         }
     }
@@ -125,9 +147,14 @@ struct TodoView: View {
                         .onTapGesture { if !todo.done { editing = todo.persistentModelID } }
                 }
                 if section == .later, let day = todo.day {
-                    Text(day.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
+                    Text(day.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
+                         + (todo.timeLabel.map { ", " + $0 } ?? ""))
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.secondaryInk)
+                } else if let time = todo.timeLabel {
+                    Text(time)
+                        .font(.system(size: 13).monospacedDigit())
+                        .foregroundStyle(section == .overdue ? Theme.accentText : Theme.secondaryInk)
                 }
             }
         }
@@ -141,7 +168,10 @@ struct TodoView: View {
         Button { move(todo, .today) } label: { Label("Today", systemImage: "sun.max") }
         Button { move(todo, .tomorrow) } label: { Label("Tomorrow", systemImage: "sunrise") }
         Button { move(todo, .thisWeek) } label: { Label("This Week", systemImage: "calendar") }
-        Button { choosingDate = todo } label: { Label("Choose Date…", systemImage: "calendar.badge.clock") }
+        Button { choosingDate = todo } label: { Label("Date and Time…", systemImage: "calendar.badge.clock") }
+        if todo.time != nil {
+            Button { withAnimation(.snappy) { todo.setTime(nil) }; save() } label: { Label("No Time", systemImage: "clock.badge.xmark") }
+        }
         Button { move(todo, .someday) } label: { Label("Someday", systemImage: "archivebox") }
         Divider()
         Button(role: .destructive) { delete(todo) } label: { Label("Delete", systemImage: "trash") }
@@ -199,7 +229,9 @@ struct TodoView: View {
     private func add() {
         let title = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return }
-        withAnimation(.snappy) { context.insert(Todo(title: title, when: draftWhen)) }
+        let todo = Todo(title: title, when: draftWhen)
+        todo.order = (todos.map(\.order).max() ?? 0) + 1
+        withAnimation(.snappy) { context.insert(todo) }
         save()
         draft = ""
     }
@@ -236,6 +268,68 @@ struct TodoView: View {
 
     private func close() {
         browser.panel = .none
+    }
+
+    // MARK: Dragging
+
+    /// The dragged to-do takes `target`'s place (or the top of `section`),
+    /// joining that section's day if it came from another. Nothing is dropped
+    /// into Overdue from elsewhere: that's a day already gone.
+    fileprivate func place(at target: Todo?, in section: TodoSection) {
+        guard let moving = dragging, moving.persistentModelID != target?.persistentModelID else { return }
+        let from = TodoSection.of(moving)
+        if section == .overdue, from != .overdue { return }
+        withAnimation(.snappy(duration: 0.25)) {
+            if from != section {
+                switch section {
+                case .today: moving.schedule(.today)
+                case .tomorrow: moving.schedule(.tomorrow)
+                case .thisWeek: moving.schedule(.thisWeek)
+                case .someday: moving.schedule(.someday)
+                case .later, .overdue: if let day = target?.day ?? sections.first(where: { $0.0 == section })?.1.first?.day {
+                    moving.schedule(.date(day))
+                }
+                }
+            }
+            var items = (sections.first { $0.0 == section }?.1 ?? []).filter { $0.persistentModelID != moving.persistentModelID }
+            let index = target.flatMap { target in items.firstIndex { $0.persistentModelID == target.persistentModelID } } ?? 0
+            // Passing a row on the way down puts it after that row.
+            let wasAbove = from == section && (sections.first { $0.0 == section }?.1
+                .firstIndex { $0.persistentModelID == moving.persistentModelID } ?? 0) <= index
+            items.insert(moving, at: target == nil ? 0 : min(wasAbove ? index + 1 : index, items.count))
+            for (place, todo) in items.enumerated() { todo.order = Double(place + 1) }
+        }
+    }
+
+    fileprivate func dropped() {
+        dragging = nil
+        save()
+    }
+}
+
+private struct TodoDrop: DropDelegate {
+    let view: TodoView
+    let target: Todo?
+    let section: TodoSection
+
+    func dropEntered(info: DropInfo) {
+        view.place(at: target, in: section)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        view.dropped()
+        return true
+    }
+}
+
+extension Todo {
+    /// The order a section lists them in: where they were dragged, else as added.
+    static func listOrder(_ a: Todo, _ b: Todo) -> Bool {
+        (a.order, a.createdAt) < (b.order, b.createdAt)
     }
 }
 
@@ -284,33 +378,54 @@ private struct TitleEditor: View {
     }
 }
 
-/// Choose Date…: a calendar, from today on.
+/// Date and Time…: a calendar, from today on, and a time if it has one.
 private struct DayPicker: View {
     let initial: Date
-    let pick: (Date) -> Void
+    let time: Date?
+    let pick: (Date, DateComponents?) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var date = Date.now
+    @State private var hasTime = false
+    @State private var clock = Date.now
 
     var body: some View {
         NavigationStack {
-            DatePicker("Day", selection: $date, in: Calendar.current.startOfDay(for: .now)..., displayedComponents: .date)
-                .datePickerStyle(.graphical)
-                .tint(Theme.accent)
-                .padding(.horizontal)
-                .navigationTitle("Choose Date")
+            Form {
+                Section {
+                    DatePicker("Day", selection: $date, in: Calendar.current.startOfDay(for: .now)..., displayedComponents: .date)
+                        .datePickerStyle(.graphical)
+                }
+                Section {
+                    Toggle("Time", isOn: $hasTime.animation(.snappy))
+                    if hasTime {
+                        DatePicker("At", selection: $clock, displayedComponents: .hourAndMinute)
+                    }
+                } footer: {
+                    if hasTime { Text("A notification comes 15 minutes before.") }
+                }
+            }
+            .tint(Theme.accent)
+            .scrollContentBackground(.hidden)
+            .background(Theme.panel)
+                .navigationTitle("Date and Time")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Done") {
-                            pick(date)
+                            pick(date, hasTime ? Calendar.current.dateComponents([.hour, .minute], from: clock) : nil)
                             dismiss()
                         }
                     }
                 }
         }
-        .presentationDetents([.medium])
-        .onAppear { date = max(initial, Calendar.current.startOfDay(for: .now)) }
+        .presentationDetents([.large])
+        .onAppear {
+            date = max(initial, Calendar.current.startOfDay(for: .now))
+            hasTime = time != nil
+            // A new time starts at the next whole hour.
+            clock = time ?? Calendar.current.nextDate(after: .now, matching: DateComponents(minute: 0), matchingPolicy: .nextTime) ?? .now
+        }
     }
 }
 

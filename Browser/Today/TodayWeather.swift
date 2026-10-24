@@ -192,3 +192,54 @@ final class TodayLocation: NSObject, CLLocationManagerDelegate {
         MainActor.assumeIsolated { finish(nil) }
     }
 }
+
+/// A town chosen for the weather in place of where you are, found by name
+/// with Open-Meteo's geocoding (free, no key, like the forecast).
+nonisolated struct WeatherPlace: Codable, Equatable, Hashable, Sendable, Identifiable {
+    let name: String
+    /// Region and country, to tell two Springfields apart.
+    let detail: String
+    let latitude: Double
+    let longitude: Double
+    var id: String { "\(latitude),\(longitude)" }
+
+    var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: latitude, longitude: longitude) }
+
+    private static let key = "today.weatherPlace"
+
+    /// The chosen town, or nil for where you are.
+    static var fixed: WeatherPlace? {
+        get { UserDefaults.standard.data(forKey: key).flatMap { try? JSONDecoder().decode(WeatherPlace.self, from: $0) } }
+        set { UserDefaults.standard.set(newValue.flatMap { try? JSONEncoder().encode($0) }, forKey: key) }
+    }
+
+    static func search(_ text: String) async -> [WeatherPlace] {
+        let name = text.trimmingCharacters(in: .whitespaces)
+        guard name.count >= 2 else { return [] }
+        var parts = URLComponents(string: "https://geocoding-api.open-meteo.com/v1/search")!
+        parts.queryItems = [.init(name: "name", value: name), .init(name: "count", value: "8"),
+                            .init(name: "language", value: Locale.current.language.languageCode?.identifier ?? "en")]
+        guard let (data, _) = try? await URLSession.shared.data(from: parts.url!),
+              let found = try? JSONDecoder().decode(Found.self, from: data) else { return [] }
+        // Villages share their town's name and region: the biggest (listed first) stands for them.
+        var seen = Set<String>()
+        return (found.results ?? []).compactMap { result in
+            let place = WeatherPlace(name: result.name, detail: [result.admin1, result.country].compactMap { $0 }.joined(separator: ", "),
+                                     latitude: result.latitude, longitude: result.longitude)
+            return seen.insert(place.name + "|" + place.detail).inserted ? place : nil
+        }
+        .prefix(5)
+        .map { $0 }
+    }
+
+    private struct Found: Decodable {
+        struct Result: Decodable {
+            let name: String
+            let latitude: Double
+            let longitude: Double
+            let country: String?
+            let admin1: String?
+        }
+        let results: [Result]?
+    }
+}
