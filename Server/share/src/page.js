@@ -53,12 +53,13 @@ a{color:inherit}
 strong{font-weight:600;color:var(--ink)}
 code{font-size:.9em}
 .answer a{color:var(--accent);text-decoration:none}
-.signature{position:relative;overflow:hidden;margin-top:72px;padding:0 22px 230px;font-size:14px;color:var(--ink2)}
+.signature{position:relative;overflow:hidden;margin-top:24px;padding:64px 22px 60px;font-size:14px;color:var(--ink2)}
 .signature .inner{position:relative;z-index:1;max-width:596px;margin:0 auto}
-/* roko's light, rising from the bottom edge as it does behind Browse for Me:
-   the top of an ellipse centred on the edge, falling off over many stops,
-   with grain so it can't band. Faded out well below the text's top. */
-.signature::before,.signature::after{content:"";position:absolute;left:-60%;right:-60%;bottom:-320px;height:640px;pointer-events:none}
+/* roko's light, rising from the bottom edge as it does behind Browse for Me,
+   up behind the signature: the top of an ellipse centred on the edge, falling
+   off over many stops, with grain so it can't band. Its reach is the footer's
+   height, so it has faded out by the footer's top: no edge where it's cut. */
+.signature::before,.signature::after{content:"";position:absolute;left:-60%;right:-60%;bottom:-100%;height:200%;pointer-events:none}
 .signature::before{background:radial-gradient(closest-side,var(--l0) 0%,var(--l1) 16%,var(--l2) 34%,var(--l3) 52%,var(--l4) 72%,transparent 100%)}
 .signature::after{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");mix-blend-mode:overlay;opacity:.35;-webkit-mask-image:radial-gradient(closest-side,#000 0%,transparent 100%);mask-image:radial-gradient(closest-side,#000 0%,transparent 100%)}
 .signature .brand{display:inline-flex;align-items:center;gap:10px;font-size:17px;color:var(--ink);text-decoration:none}
