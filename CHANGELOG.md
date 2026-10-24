@@ -6,6 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- What's next on your calendar in the address bar: type "calendar", "next" or "kalendar" for the next event ("In 25 min, at 14:30 · Office", "Tomorrow at 9:00"); Return opens Calendar there. Pin it like the weather to keep it under the empty field.
 - Pin answers like pages: long-press the weather ("vrijeme", "vrijeme u Zagrebu"), "days until 24.12.", "100 eur in usd" or any sum, and choose Pin. It sits with your pins under the empty address field, worked out again each time you open it; long-press to unpin.
 - Feels like: Today's weather and the bar's weather rows say what it feels like (with wind and humidity) when that's different from the temperature.
 - Town weather in Croatian forms and short: "vrijeme u Zagrebu", "u Rijeci", "u Zadru", and the plate codes "vrijeme zg", "os", "st", "ri"…; "vrijme" works too.

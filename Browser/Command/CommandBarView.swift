@@ -5,7 +5,7 @@ struct CommandItem: Identifiable {
     enum Action {
         case open(URL), switchTab(BrowserTab), openPin(Pin), search(String),
              browse(String), summarize, findOnPage, privateTab, settings, copy(String),
-             pasteLink, openCopied(URL), todos, today, addTodo(String, TodoWhen, DateComponents?)
+             pasteLink, openCopied(URL), todos, today, openApp(URL), addTodo(String, TodoWhen, DateComponents?)
     }
 
     let id: String
@@ -202,7 +202,7 @@ struct CommandBarView: View {
                                 PinnedAnswers.remove(String(item.id.dropFirst("answer-".count)))
                                 rebuild()
                             }
-                        } else if ["calc", "weather", "weather-place"].contains(item.id) {
+                        } else if ["calc", "weather", "weather-place", "calendar"].contains(item.id) {
                             // An answer kept with your pins, worked out again each time.
                             Button {
                                 PinnedAnswers.add(query.trimmingCharacters(in: .whitespaces))
@@ -518,7 +518,7 @@ struct CommandBarView: View {
                         ?? CommandItem(id: "", title: "Weather", subtitle: asked, kind: "", icon: .glyph(.today), action: .search(asked))
                 } else {
                     answer = CommandRanker.rank(query: asked, browser: browser, suggestions: [])
-                        .first { $0.id == "calc" || $0.id == "weather" }
+                        .first { ["calc", "weather", "calendar"].contains($0.id) }
                 }
                 guard let answer else { continue }
                 rows.append(CommandItem(id: "answer-\(asked)", title: answer.title, subtitle: answer.subtitle,
@@ -566,6 +566,9 @@ struct CommandBarView: View {
         case .settings: browser.panel = .settings
         case .todos: browser.panel = .todos
         case .today: browser.panel = .today
+        case .openApp(let url):
+            browser.panel = .none
+            UIApplication.shared.open(url)
         case .addTodo(let title, let when, let time):
             let todo = Todo(title: title, when: when, at: time)
             todo.order = (todos.map(\.order).max() ?? 0) + 1
@@ -772,6 +775,26 @@ enum CommandRanker {
                                    icon: .glyph(.today), action: .today)
             }
             ranked.append((weatherWords.contains(needle) ? 1012 : 890, item))
+        }
+
+        // "calendar", "next": what's next on your calendar; Return opens Calendar there.
+        let calendarWords = ["calendar", "kalendar", "next meeting", "agenda", "sljedeće", "sljedece", "raspored"]
+        if needle.count >= 3, calendarWords.contains(where: { $0.hasPrefix(needle) }) || needle == "next" {
+            let item: CommandItem
+            if !TodayCalendar.isAllowed {
+                item = CommandItem(id: "calendar", title: "Calendar", subtitle: "Allow it in Today", kind: "Today",
+                                   icon: .glyph(.calendar), action: .today)
+            } else if let event = TodayCalendar.next() {
+                let place = event.location.map { " · \($0)" } ?? ""
+                item = CommandItem(id: "calendar", title: event.title, subtitle: TodayCalendar.when(event) + place,
+                                   kind: "Calendar", icon: .glyph(.calendar),
+                                   action: .openApp(URL(string: "calshow:\(Int(event.start.timeIntervalSinceReferenceDate))")!))
+            } else {
+                item = CommandItem(id: "calendar", title: "Nothing on your calendar", subtitle: "For the next seven days",
+                                   kind: "Calendar", icon: .glyph(.calendar),
+                                   action: .openApp(URL(string: "calshow:\(Int(Date.now.timeIntervalSinceReferenceDate))")!))
+            }
+            ranked.append((calendarWords.contains(needle) || needle == "next" ? 1012 : 890, item))
         }
 
         let actions: [(words: [String], item: CommandItem)] = [
