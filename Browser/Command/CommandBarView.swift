@@ -21,8 +21,10 @@ struct CommandItem: Identifiable {
 }
 
 /// One field, one ranked list: addresses, searches, pins, open tabs, history,
-/// suggestions and page actions. The best match sits right above the field,
-/// where the thumb is, and Return runs it.
+/// suggestions and page actions. The field sits on top and the rows below it,
+/// nearer the thumb, over the page frosted behind them (as Arc Search does).
+/// The list snaps row by row like a picker: the row under the field is the
+/// one Return runs, so a flick of the thumb chooses.
 struct CommandBarView: View {
     @Environment(BrowserModel.self) private var browser
     @Environment(\.modelContext) private var context
@@ -34,7 +36,8 @@ struct CommandBarView: View {
     @State private var items: [CommandItem] = []
     @State private var suggestions: [String] = []
     @State private var selection = 0
-    @State private var resultsHeight: CGFloat = 0
+    /// The row in the slot under the field, as the list is scrolled.
+    @State private var topRow: String?
     @State private var hasCopiedLink = false
     /// The copied link itself, when roko may read it (see CopiedLink.peek).
     @State private var copiedURL: URL?
@@ -49,31 +52,26 @@ struct CommandBarView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Nothing laid over the page: the panel is the only thing that
-            // opens, riding up with the keyboard in one move. A full-screen
-            // veil fading in on top made opening feel like two steps.
-            // A tap anywhere above the panel closes it.
-            Color.clear
-                .contentShape(.rect)
+            // The page stays in view, frosted and dimmed in its own colours:
+            // what's typed is about it. A tap on it closes the bar.
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                // Deep enough that a white page reads as dusk, not grey.
+                .overlay(Theme.canvas.opacity(0.66))
                 .ignoresSafeArea()
+                .contentShape(.rect)
                 .onTapGesture { dismiss() }
 
-            VStack(spacing: 0) {
-                results
-                // Typing "todo" brings today's to-dos up under the To-do row,
-                // to tick off there; otherwise the bar stays for searching.
-                if items.first?.id == "action-todos" && !dueTodos.isEmpty { todoWidget }
-                if query.isEmpty && (!pins.isEmpty || todos.contains(where: \.isDueNow)) { pinRow }
+            VStack(spacing: 6) {
                 field
+                    .gesture(DragGesture(minimumDistance: 30).onEnded { value in
+                        if value.translation.height > 60 { dismiss() }
+                    })
+                results
             }
             .foregroundStyle(Theme.ink)
-            .background(Theme.panel, in: .rect(cornerRadius: CommandBarView.corner))
-            .overlay(RoundedRectangle(cornerRadius: CommandBarView.corner).strokeBorder(Theme.edge))
             .padding(.horizontal, 8)
-            .padding(.bottom, 8)
-            .gesture(DragGesture(minimumDistance: 30).onEnded { value in
-                if value.translation.height > 60 { dismiss() }
-            })
+            .padding(.bottom, 4)
         }
         .onAppear {
             query = browser.commandPrefill
@@ -93,7 +91,16 @@ struct CommandBarView: View {
         .onChange(of: query) {
             selection = 0
             rebuild()
+            // Typing starts the list over at its best match.
+            var reset = Transaction()
+            reset.disablesAnimations = true
+            withTransaction(reset) { topRow = items.first?.id }
         }
+        .onChange(of: topRow) { _, row in
+            // Scrolled: the row now in the slot is the one Return runs.
+            if let row, let index = items.firstIndex(where: { $0.id == row }) { selection = index }
+        }
+        .sensoryFeedback(.selection, trigger: selection)
         .onChange(of: CurrencyRates.shared.date) { rebuild() }
         .task(id: query) {
             // A short pause so suggestions aren't requested for every keystroke.
@@ -114,29 +121,51 @@ struct CommandBarView: View {
 
     // MARK: Layout
 
+    /// How tall the list is: always the same, so the field never moves as
+    /// rows come and go; about five rows.
+    private static let listHeight: CGFloat = 300
+
     private var results: some View {
         ScrollView {
             LazyVStack(spacing: 2) {
-                // Best match last, so it lands next to the field.
-                ForEach(Array(items.enumerated()).reversed(), id: \.element.id) { index, item in
-                    if case .pasteLink = item.action {
-                        copiedLinkRow
-                    } else {
-                        Button { perform(item) } label: {
-                            CommandRow(item: item, isSelected: index == selection && !query.isEmpty)
+                // Nothing typed: your pins first, a tap away.
+                if query.isEmpty && (!pins.isEmpty || todos.contains(where: \.isDueNow)) {
+                    pinRow.id("pins")
+                }
+                // Best match first, right under the field.
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    Group {
+                        if case .pasteLink = item.action {
+                            copiedLinkRow
+                        } else {
+                            Button { perform(item) } label: {
+                                CommandRow(item: item, isSelected: index == selection && !query.isEmpty)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
+                    .id(item.id)
+                    // Typing "todo" brings today's to-dos up under the To-do row, to tick off there.
+                    if item.id == "action-todos" && !dueTodos.isEmpty { todoWidget }
                 }
             }
-            .padding(.horizontal, Self.inset)
-            .padding(.top, Self.inset)
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { resultsHeight = $0 }
+            .scrollTargetLayout()
+            .padding(.horizontal, Self.inset - 4)
         }
-        .defaultScrollAnchor(.bottom)
-        .scrollBounceBehavior(.basedOnSize)
-        // Hug the rows; scroll only past a comfortable height.
-        .frame(height: items.isEmpty ? 0 : min(resultsHeight, 380))
+        // Row by row, like a picker; any row can be brought up to the slot.
+        .scrollTargetBehavior(.viewAligned)
+        .scrollPosition(id: $topRow, anchor: .top)
+        .contentMargins(.bottom, Self.listHeight - 64, for: .scrollContent)
+        .scrollIndicators(.hidden)
+        // Rows leaving at either edge fade rather than being sliced off.
+        .mask {
+            VStack(spacing: 0) {
+                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: 6)
+                Color.black
+                LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: 28)
+            }
+        }
+        .frame(height: Self.listHeight)
     }
 
     /// A link copied a moment ago that roko can't read without iOS asking: a
@@ -282,8 +311,8 @@ struct CommandBarView: View {
                           let item = items[safe: selection] else { return }
                     perform(item)
                 }
-                .onKeyPress(.upArrow) { move(1) }
-                .onKeyPress(.downArrow) { move(-1) }
+                .onKeyPress(.upArrow) { move(-1) }
+                .onKeyPress(.downArrow) { move(1) }
                 .onKeyPress(.escape) { dismiss(); return .handled }
             if !query.isEmpty {
                 Button { query = "" } label: {
@@ -306,9 +335,11 @@ struct CommandBarView: View {
             }
         }
         .animation(.easeOut(duration: 0.15), value: query.isEmpty)
-        // The rows' inset plus their padding: icons share one axis down the panel.
-        .padding(.horizontal, Self.inset + 12)
+        // Icons share one axis with the rows' icons below.
+        .padding(.horizontal, 16)
         .frame(height: 56)
+        .background(Theme.panel, in: .rect(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.edge))
     }
 
     /// Arc-style private switch: an open eye, which blinks shut (in the accent)
@@ -345,6 +376,7 @@ struct CommandBarView: View {
     private func move(_ step: Int) -> KeyPress.Result {
         guard !items.isEmpty else { return .ignored }
         selection = min(max(selection + step, 0), items.count - 1)
+        withAnimation(.snappy(duration: 0.2)) { topRow = items[selection].id }
         return .handled
     }
 
@@ -357,14 +389,25 @@ struct CommandBarView: View {
 
     private func rebuild() {
         items = CommandRanker.rank(query: query, browser: browser, suggestions: suggestions)
-        // Nothing typed yet: a link copied a moment ago, here or on a Mac.
-        // Above the pins, so they keep one place right over the field.
-        if query.isEmpty, hasCopiedLink {
-            items = [copiedURL.map {
-                CommandItem(id: "copied-link", title: $0.shortDisplay, subtitle: "Link you copied",
-                            kind: "", icon: .site($0.displayHost), action: .openCopied($0))
-            } ?? CommandItem(id: "copied-link", title: "Link you copied", subtitle: "",
-                             kind: "", icon: .glyph(.link), action: .pasteLink)]
+        // Nothing typed yet: a link copied a moment ago, here or on a Mac,
+        // then the last pages you were on, to scroll through and pick.
+        if query.isEmpty {
+            var rows: [CommandItem] = []
+            if hasCopiedLink {
+                rows.append(copiedURL.map {
+                    CommandItem(id: "copied-link", title: $0.shortDisplay, subtitle: "Link you copied",
+                                kind: "", icon: .site($0.displayHost), action: .openCopied($0))
+                } ?? CommandItem(id: "copied-link", title: "Link you copied", subtitle: "",
+                                 kind: "", icon: .glyph(.link), action: .pasteLink))
+            }
+            var seen = Set<String>()
+            for entry in browser.history(matching: "", limit: 30) {
+                guard rows.count < 8, let url = URL(string: entry.url), !browser.isCurrentPage(url),
+                      seen.insert(entry.url).inserted else { continue }
+                rows.append(CommandItem(id: "recent-\(entry.url)", title: entry.title.isEmpty ? url.displayHost : entry.title,
+                                        subtitle: url.displayHost, kind: "", icon: .site(url.displayHost), action: .open(url)))
+            }
+            items = rows
         }
         // Resolve where Return would go before it's pressed.
         switch items.first?.action {
