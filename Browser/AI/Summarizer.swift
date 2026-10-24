@@ -51,6 +51,8 @@ final class SummaryModel: Identifiable {
     let title: String
     let host: String
     var snapshot: UIImage?
+    /// Opened by a pull that had already started the card: it carries on from there.
+    var handoff: PullHandoff?
     /// Growing back into the page: the status bar takes the site's colour again.
     var isClosing = false
     private(set) var text = ""
@@ -89,6 +91,7 @@ final class SummaryModel: Identifiable {
         let page: ReadablePage
         do {
             page = try await PageReader.read(webView)
+            HitchWatch.note("page read")
         } catch {
             if !Task.isCancelled { phase = .failed(error.localizedDescription) }
             return
@@ -101,8 +104,14 @@ final class SummaryModel: Identifiable {
         // when Apple's models write it anyway (no key, Claude off or failing),
         // it's in English. Everything else stays on Apple's models, free and
         // private, with Claude as the fallback.
-        let language = AnswerLanguage.target(for: page.text, host: host, declared: page.declaredLanguage)
+        // Off the main thread: telling the language took over 100 ms there, in
+        // the middle of the card's move into place.
+        let (pageText, host, declared) = (page.text, host, page.declaredLanguage)
+        let language = await Task.detached(priority: .userInitiated) {
+            AnswerLanguage.target(for: pageText, host: host, declared: declared)
+        }.value
         let appleWritesIt = language?.appleWritesWell ?? true
+        HitchWatch.note("language")
         var engines: [Engine] = [.appleCloud, .onDevice]
         if ClaudeClient.configured != nil { appleWritesIt ? engines.append(.claude) : engines.insert(.claude, at: 0) }
 

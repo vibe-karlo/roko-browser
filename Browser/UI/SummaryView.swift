@@ -1,15 +1,17 @@
 import SwiftUI
 
 /// Full-screen summary. It opens on the page itself, which shrinks into a card
-/// at the top; a light passes down the card
+/// at the top (from a pull, it picks up where the finger left the card); a light passes down the card
 /// while it's read, then the summary writes itself below. Closing plays it
 /// backwards: the card grows into the page again.
 struct SummaryView: View {
     @Environment(BrowserModel.self) private var browser
     let model: SummaryModel
 
-    /// False: the card fills the screen as the page did. True: it's the card.
-    @State private var settled = false
+    /// 0: the card fills the screen as the page did. 1: it's the card.
+    @State private var settle: CGFloat
+    /// Where a pull had the card, easing up to its place.
+    @State private var lift: CGFloat
     /// The title and summary show only once the card has come to rest.
     @State private var textShown = false
     /// No canvas under the footer or the status bar while the light is up and
@@ -18,11 +20,20 @@ struct SummaryView: View {
     @State private var edgesClear = false
     private let cardHeight: CGFloat = 210
 
+    init(model: SummaryModel) {
+        self.model = model
+        _settle = State(initialValue: model.handoff?.settle ?? 0)
+        _lift = State(initialValue: model.handoff?.offset ?? 0)
+    }
+
+    private var settled: Bool { settle >= 1 }
+
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .top) {
+                // From a pull the dark is already all there.
                 Theme.canvas
-                    .opacity(settled ? 1 : 0)
+                    .opacity(model.handoff != nil && !model.isClosing ? 1 : settle)
                     .ignoresSafeArea()
 
                 // roko's light while it works: rising as the page is read, flooding
@@ -37,6 +48,7 @@ struct SummaryView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
                             card(width: proxy.size.width)
+                                .offset(y: lift)
                                 .id("card")
                             content
                                 .opacity(textShown ? 1 : 0)
@@ -46,9 +58,9 @@ struct SummaryView: View {
                     }
                     .scrollDisabled(!settled)
                     .scrollIndicators(.hidden)
-                    .onChange(of: settled) { _, isSettled in
+                    .onChange(of: model.isClosing) { _, closing in
                         // Closing from further down: the card returns to the top as it grows.
-                        if !isSettled { scroller.scrollTo("card", anchor: .top) }
+                        if closing { scroller.scrollTo("card", anchor: .top) }
                     }
                 }
             }
@@ -75,9 +87,14 @@ struct SummaryView: View {
             }
         }
         .onAppear {
+            HitchWatch.note("summary appeared")
             // The card now sits exactly where the page was: hide the page.
             browser.summaryCoversPage = true
-            withAnimation(.spring(duration: 0.5, bounce: 0.1)) { settled = true } completion: {
+            // From a pull, the rest of the way, from where the finger let go.
+            withAnimation(.spring(duration: model.handoff == nil ? 0.5 : 0.55, bounce: 0.1)) {
+                settle = 1
+                lift = 0
+            } completion: {
                 withAnimation(.easeOut(duration: 0.28)) { textShown = true }
             }
         }
@@ -92,14 +109,14 @@ struct SummaryView: View {
     private func card(width: CGFloat) -> some View {
         let image = model.snapshot
         let fullHeight = image.map { width * $0.size.height / max($0.size.width, 1) } ?? cardHeight
-        let inset: CGFloat = settled ? 22 : 0
+        let inset: CGFloat = 22 * settle
         return VStack(alignment: .leading, spacing: 12) {
             ZStack(alignment: .top) {
                 if let image {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
-                        .frame(width: width - inset * 2, height: settled ? cardHeight : fullHeight, alignment: .top)
+                        .frame(width: width - inset * 2, height: fullHeight + (cardHeight - fullHeight) * settle, alignment: .top)
                         .clipped()
                 } else {
                     Theme.raised.frame(height: cardHeight)
@@ -108,9 +125,9 @@ struct SummaryView: View {
                     ScanLight()
                 }
             }
-            .clipShape(.rect(cornerRadius: settled ? 24 : 0))
+            .clipShape(.rect(cornerRadius: 24 * settle, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: settled ? 24 : 0).strokeBorder(Theme.edge.opacity(settled ? 1 : 0))
+                RoundedRectangle(cornerRadius: 24 * settle, style: .continuous).strokeBorder(Theme.edge.opacity(settle))
             }
 
             VStack(alignment: .leading, spacing: 3) {
@@ -127,7 +144,7 @@ struct SummaryView: View {
             .offset(y: textShown || model.isClosing ? 0 : 8)
         }
         .padding(.horizontal, inset)
-        .padding(.top, settled ? 12 : 0)
+        .padding(.top, 12 * settle)
     }
 
     // MARK: The summary
@@ -193,7 +210,7 @@ struct SummaryView: View {
     private func close() {
         textShown = false  // at once: only the card moves on the way out
         withAnimation(.easeOut(duration: 0.3)) { model.isClosing = true }
-        withAnimation(.spring(duration: 0.45, bounce: 0)) { settled = false } completion: {
+        withAnimation(.spring(duration: 0.45, bounce: 0)) { settle = 0 } completion: {
             var swap = Transaction()
             swap.disablesAnimations = true
             withTransaction(swap) {

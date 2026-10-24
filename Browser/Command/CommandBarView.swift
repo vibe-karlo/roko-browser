@@ -399,7 +399,7 @@ struct CommandBarView: View {
             browser.panel = .none
             if time != nil { TodoAlerts.askIfNeeded() }
             browser.showToast(when == .today && time == nil ? "Added to today's to-dos"
-                              : "To-do added for \(TodoDraft.label(when, time).lowercased())")
+                              : "To-do added for \(TodoDraft.phrase(when, time))")
         case .copy(let result):
             UIPasteboard.general.string = result
             browser.panel = .none
@@ -507,7 +507,7 @@ enum CommandRanker {
                 // Or keep it: what was typed becomes a to-do ("call Petra tomorrow" for tomorrow).
                 if TodoDraft.parse(query) == nil, let draft = TodoDraft.parse("todo " + query) {
                     ranked.append((845, CommandItem(id: "keep-todo", title: "Add to-do",
-                                                    subtitle: draft.when == .someday ? "Someday" : "For \(TodoDraft.label(draft.when, draft.time).lowercased())",
+                                                    subtitle: draft.when == .someday ? "Someday" : "For \(TodoDraft.phrase(draft.when, draft.time))",
                                                     kind: "To-do", icon: .glyph(.todo), action: .addTodo(draft.title, draft.when, draft.time))))
                 }
             }

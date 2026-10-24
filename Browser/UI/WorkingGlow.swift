@@ -170,7 +170,7 @@ nonisolated enum Grain {
         let side = 192
         var pixels = [UInt8](repeating: 0, count: side * side)
         arc4random_buf(&pixels, pixels.count)
-        for index in pixels.indices { pixels[index] = 112 + pixels[index] % 33 }
+        for index in pixels.indices { pixels[index] = 104 + pixels[index] % 49 }
         guard let provider = CGDataProvider(data: Data(pixels) as CFData),
               let cgImage = CGImage(width: side, height: side, bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: side,
                                     space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGBitmapInfo(rawValue: 0),

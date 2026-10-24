@@ -28,7 +28,10 @@ struct BrowserView: View {
                 WebViewHost(
                     tab: tab,
                     barTop: barTop,
-                    onSummarize: { browser.summarize() },
+                    onSummarize: { browser.summarize(from: $0) },
+                    onPreview: { showing in
+                        if browser.pageBecomingSummary != showing { browser.pageBecomingSummary = showing }
+                    },
                     onScrollDirection: { down in
                         if browser.isBarCollapsed != down { browser.isBarCollapsed = down }
                     })
@@ -66,7 +69,9 @@ struct BrowserView: View {
         .overlay(alignment: .bottom) {
             // The command bar takes the bar's place rather than stacking on top of it.
             BottomBar()
-                .opacity(browser.panel == .command || browser.panel == .tabs ? 0 : 1)
+                .opacity(browser.panel == .command || browser.panel == .tabs || browser.pageBecomingSummary ? 0 : 1)
+                // Faded, not folded: folding changes the page's insets, which stops a pull dead.
+                .animation(.easeOut(duration: 0.2), value: browser.pageBecomingSummary)
                 .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { barTop = $0 }
                 // Typing into a page, the keyboard covers the bar, as in Safari;
                 // risen above it, the bar sat on top of the form being filled in.

@@ -29,6 +29,8 @@ final class BrowserModel {
     /// True while the summary's card stands in for the page, which hides
     /// underneath so the two never show at once.
     var summaryCoversPage = false
+    /// A pull has the page turning into the summary's card: the bar steps aside.
+    var pageBecomingSummary = false
     private(set) var toast: String?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
     /// The site roko is offering to allow cookies on (see tabKeepsReloading).
@@ -316,9 +318,18 @@ final class BrowserModel {
     }
 
     /// Opens the full-screen summary: the page on screen shrinks into its card.
-    func summarize() {
+    func summarize(from handoff: PullHandoff? = nil) {
         guard let tab = selectedTab, let webView = tab.webView, tab.url != nil else { return }
         let model = SummaryModel(title: tab.displayTitle, host: tab.url?.displayHost ?? "", snapshot: nil)
+        if let handoff {
+            HitchWatch.start("summarize")
+            // From a pull: no waiting, the card is already on its way.
+            model.snapshot = handoff.snapshot
+            model.handoff = handoff
+            summary = model
+            model.start(webView: webView)
+            return
+        }
         Task {
             // The page as it is on screen, so it can shrink into the card.
             model.snapshot = await tab.viewportSnapshot() ?? tab.snapshot

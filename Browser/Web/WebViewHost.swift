@@ -8,7 +8,9 @@ struct WebViewHost: UIViewRepresentable {
     let tab: BrowserTab
     /// Where the floating bar's top edge is, in screen coordinates.
     var barTop: CGFloat
-    var onSummarize: () -> Void
+    var onSummarize: (PullHandoff?) -> Void
+    /// The page is (or stops) turning into the summary's card.
+    var onPreview: (Bool) -> Void = { _ in }
     var onScrollDirection: (_ down: Bool) -> Void
 
     func makeUIView(context: Context) -> UIView {
@@ -72,8 +74,8 @@ struct WebViewHost: UIViewRepresentable {
 
         private weak var webView: WKWebView?
         private let indicator = PullIndicator()
-        /// roko's orange light from the top edge, past the reload point.
-        private let light = PullLight()
+        /// Past the reload point, the page starting to become the summary's card.
+        private let preview = PullPreview()
         private var loadObservations: [NSKeyValueObservation] = []
         private let haptic = UIImpactFeedbackGenerator(style: .light)
         private let firmHaptic = UIImpactFeedbackGenerator(style: .medium)
@@ -89,8 +91,6 @@ struct WebViewHost: UIViewRepresentable {
         private var summarizeArmed = false
         /// Let go to summarize: waiting for the page to spring back to its top.
         private var summarizePending = false
-        /// The page behind the pull is light (white, mostly): the light's colours follow it.
-        private var pageIsLight = true
         /// Reloading for a pull; `sawLoading` once WebKit has actually started.
         private var refreshing = false, sawLoading = false
 
@@ -103,9 +103,7 @@ struct WebViewHost: UIViewRepresentable {
             webView.scrollView.refreshControl = nil
             indicator.hide(animated: false)
             container.addSubview(indicator)
-            light.alpha = 0
-            container.insertSubview(light, belowSubview: indicator)
-            PullLight.prepare()
+            container.insertSubview(preview, belowSubview: indicator)
             indicator.translatesAutoresizingMaskIntoConstraints = false
             // Its own width: a circle, or a capsule once it says "Summarize".
             NSLayoutConstraint.activate([
@@ -132,8 +130,14 @@ struct WebViewHost: UIViewRepresentable {
             indicator.setProgress(pull <= pullDistance
                                   ? pull / pullDistance
                                   : 1 + (pull - pullDistance) / (summarizeDistance - pullDistance))
-            // Past the reload point the light pours in, full once a release summarizes.
-            light.setStrength((pull - pullDistance) / (summarizeDistance - pullDistance), onLightPage: pageIsLight)
+            // Past the reload point the page starts becoming the summary's card.
+            if pull > pullDistance, preview.snapshot != nil {
+                if !preview.isShowing { parent.onPreview(true) }  // the bar makes way
+                preview.update(progress: (pull - pullDistance) / (summarizeDistance - pullDistance), pull: pull)
+            } else if preview.isShowing {
+                preview.hide()  // back short of it: card and page are the same picture here
+                parent.onPreview(false)
+            }
             if pull >= pullDistance, !refreshArmed {
                 refreshArmed = true
                 haptic.impactOccurred()
@@ -158,23 +162,42 @@ struct WebViewHost: UIViewRepresentable {
             case .began:
                 haptic.prepare()
                 firmHaptic.prepare()
-                // A pull from the top may reach the light: draw it now (once
-                // per appearance, a millisecond or two), not mid-pull.
+                // A pull from the top may become the summary: the page as it is
+                // now, for the card. Only for a pull (finger moving down), not
+                // for every scroll that starts at the top.
                 if let scrollView = pan.view as? UIScrollView,
-                   scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 1 {
-                    let start = CACurrentMediaTime()
-                    pageIsLight = Self.isLight(webView?.underPageBackgroundColor)
-                    _ = PullLight.image(onLightPage: pageIsLight)
-                    if LaunchClock.isEnabled { print(String(format: "PERF pullLight %.2fms", (CACurrentMediaTime() - start) * 1000)) }
+                   scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 1,
+                   pan.velocity(in: scrollView).y > 0 {
+                    let tab = parent.tab
+                    Task { [weak self] in
+                        let start = CACurrentMediaTime()
+                        guard let taken = await tab.viewportSnapshot() else { return }
+                        // Decoded now, mid-pull, so the summary's first frame doesn't have to.
+                        let snapshot = await taken.byPreparingForDisplay() ?? taken
+                        self?.preview.prepare(snapshot)
+                        if LaunchClock.isEnabled { print(String(format: "PERF pullSnapshot %.1fms", (CACurrentMediaTime() - start) * 1000)) }
+                    }
                 }
             case .ended, .cancelled, .failed:
-                if summarizeArmed {
-                    // The light goes as the page springs back; the summary
-                    // brings its own.
-                    light.fadeOut(duration: 0.45)
+                if summarizeArmed, let handoff = preview.handoff() {
+                    // The summary carries on from this very frame; the page
+                    // springs back unseen under it.
+                    summarizeArmed = false
+                    refreshArmed = false
+                    indicator.hide()
+                    parent.onSummarize(handoff)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                        self?.preview.hide()
+                        self?.parent.onPreview(false)
+                    }
+                } else if summarizeArmed {
+                    // No picture of the page yet (a very quick pull): the old way.
+                    preview.hide()
+                    parent.onPreview(false)
                     startSummarize()
                 } else {
-                    light.fadeOut(duration: 0.2)
+                    if preview.isShowing { parent.onPreview(false) }
+                    preview.settleBack()
                     if refreshArmed {
                         startReload()
                     } else if !refreshing {
@@ -200,13 +223,7 @@ struct WebViewHost: UIViewRepresentable {
             guard summarizePending else { return }
             summarizePending = false
             indicator.hide()
-            parent.onSummarize()
-        }
-
-        private static func isLight(_ color: UIColor?) -> Bool {
-            var white: CGFloat = 1, alpha: CGFloat = 1
-            guard let color, color.getWhite(&white, alpha: &alpha) else { return true }
-            return white > 0.5
+            parent.onSummarize(nil)
         }
 
         private func startReload() {
@@ -285,7 +302,8 @@ struct WebViewHost: UIViewRepresentable {
             let delta = offset - lastOffset
             let atTop = offset <= -scrollView.adjustedContentInset.top + 4
             if atTop {
-                parent.onScrollDirection(false)
+                // Not while the page is becoming the summary's card: the bar stays away.
+                if !preview.isShowing { parent.onScrollDirection(false) }
                 lastOffset = offset
             } else if abs(delta) > 24 {
                 parent.onScrollDirection(delta > 0)
