@@ -1,3 +1,4 @@
+import Synchronization
 import Foundation
 import SwiftData
 
@@ -177,10 +178,17 @@ nonisolated enum TodoDraft {
 
     /// "… at 15", "… at 3pm", "… u 15h", "… 15:30": the time, and what's before it.
     /// A bare number ("buy 2") isn't a time.
+    /// Compiled once: the bar reads the to-do on every key.
+    private static let timePattern = try? NSRegularExpression(
+        pattern: #"\s+(?:(?:at|u|@)\s*(\d{1,2})(?:[:.](\d{2}))?\s*(h|am|pm)?|(\d{1,2})[:.](\d{2})\s*(am|pm)?)$"#,
+        options: .caseInsensitive)
+    private static let datePattern = try? NSRegularExpression(
+        pattern: #"\s+(?:on\s+|na\s+)?(\d{1,2})[./](\d{1,2})\.?(?:[./]?(\d{4})\.?)?$"#)
+    /// The day phrases, longest first, made once a day.
+    private static let phraseCache = Mutex<(day: Date, phrases: [(String, TodoWhen)])?>(nil)
+
     private static func trailingTime(_ text: String) -> (DateComponents, String)? {
-        let pattern = #"\s+(?:(?:at|u|@)\s*(\d{1,2})(?:[:.](\d{2}))?\s*(h|am|pm)?|(\d{1,2})[:.](\d{2})\s*(am|pm)?)$"#
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
-              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else { return nil }
+        guard let regex = timePattern, let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else { return nil }
         func group(_ index: Int) -> String? {
             Range(match.range(at: index), in: text).map { String(text[$0]) }
         }
@@ -206,6 +214,42 @@ nonisolated enum TodoDraft {
         ("petak", 6), ("subota", 7), ("subotu", 7), ("nedjelja", 1), ("nedjelju", 1),
     ]
 
+    /// Every way of saying a day roko reads, longest first so "day after
+    /// tomorrow" wins over "tomorrow". Made once a day, not on every key.
+    private static func dayPhrases(from today: Date) -> [(String, TodoWhen)] {
+        if let cache = phraseCache.withLock({ $0 }), cache.day == today { return cache.phrases }
+        let calendar = Calendar.current
+        func day(_ offset: Int) -> Date { calendar.date(byAdding: .day, value: offset, to: today)! }
+        var phrases: [(String, TodoWhen)] = [
+            ("the day after tomorrow", .date(day(2))), ("day after tomorrow", .date(day(2))), ("prekosutra", .date(day(2))),
+            ("tomorrow", .tomorrow), ("sutra", .tomorrow), ("today", .today), ("danas", .today),
+            ("this week", .thisWeek), ("ovaj tjedan", .thisWeek), ("ovog tjedna", .thisWeek),
+            ("someday", .someday),
+        ]
+        // Next week: its first day. "Next friday": the Friday of next week.
+        if let thisWeek = calendar.dateInterval(of: .weekOfYear, for: today) {
+            let nextWeekStart = calendar.startOfDay(for: thisWeek.end)
+            for phrase in ["next week", "sljedeći tjedan", "sljedeci tjedan", "idući tjedan", "iduci tjedan", "sljedećeg tjedna"] {
+                phrases.append((phrase, .date(nextWeekStart)))
+            }
+            // A weekday on its own: the next one from today (today itself if it's that day).
+            let todayNumber = calendar.component(.weekday, from: today)
+            for (name, number) in weekdays {
+                let ahead = (number - todayNumber + 7) % 7
+                let coming: TodoWhen = ahead == 0 ? .today : ahead == 1 ? .tomorrow : .date(day(ahead))
+                let intoNextWeek = (number - calendar.firstWeekday + 7) % 7
+                let nextWeeks = TodoWhen.date(calendar.date(byAdding: .day, value: intoNextWeek, to: nextWeekStart)!)
+                for prefix in ["", "on ", "this ", "u ", "ovaj ", "ovu ", "na "] { phrases.append((prefix + name, coming)) }
+                for prefix in ["next ", "sljedeći ", "sljedeću ", "sljedeci ", "sljedecu ", "idući ", "iduću ", "iduci ", "iducu "] {
+                    phrases.append((prefix + name, nextWeeks))
+                }
+            }
+        }
+        let sorted = phrases.sorted { $0.0.count > $1.0.count }
+        phraseCache.withLock { $0 = (today, sorted) }
+        return sorted
+    }
+
     /// The day at the end of `text`, and what's before it.
     private static func trailingDay(_ text: String, now: Date) -> (TodoWhen, String)? {
         let calendar = Calendar.current
@@ -216,32 +260,7 @@ nonisolated enum TodoDraft {
         }
         func day(_ offset: Int) -> Date { calendar.date(byAdding: .day, value: offset, to: today)! }
 
-        // Words and phrases, longest first so "day after tomorrow" wins over "tomorrow".
-        var phrases: [(String, TodoWhen)] = [
-            ("the day after tomorrow", .date(day(2))), ("day after tomorrow", .date(day(2))), ("prekosutra", .date(day(2))),
-            ("tomorrow", .tomorrow), ("sutra", .tomorrow), ("today", .today), ("danas", .today),
-            ("this week", .thisWeek), ("ovaj tjedan", .thisWeek), ("ovog tjedna", .thisWeek),
-            ("someday", .someday),
-        ]
-        // Next week: its first day. "Next friday": the Friday of next week.
-        guard let thisWeek = calendar.dateInterval(of: .weekOfYear, for: today) else { return nil }
-        let nextWeekStart = calendar.startOfDay(for: thisWeek.end)
-        for phrase in ["next week", "sljedeći tjedan", "sljedeci tjedan", "idući tjedan", "iduci tjedan", "sljedećeg tjedna"] {
-            phrases.append((phrase, .date(nextWeekStart)))
-        }
-        // A weekday on its own: the next one from today (today itself if it's that day).
-        let todayNumber = calendar.component(.weekday, from: today)
-        for (name, number) in weekdays {
-            let ahead = (number - todayNumber + 7) % 7
-            let coming: TodoWhen = ahead == 0 ? .today : ahead == 1 ? .tomorrow : .date(day(ahead))
-            let intoNextWeek = (number - calendar.firstWeekday + 7) % 7
-            let nextWeeks = TodoWhen.date(calendar.date(byAdding: .day, value: intoNextWeek, to: nextWeekStart)!)
-            for prefix in ["", "on ", "this ", "u ", "ovaj ", "ovu ", "na "] { phrases.append((prefix + name, coming)) }
-            for prefix in ["next ", "sljedeći ", "sljedeću ", "sljedeci ", "sljedecu ", "idući ", "iduću ", "iduci ", "iducu "] {
-                phrases.append((prefix + name, nextWeeks))
-            }
-        }
-        for (phrase, when) in phrases.sorted(by: { $0.0.count > $1.0.count }) {
+        for (phrase, when) in dayPhrases(from: today) {
             if lower.hasSuffix(" " + phrase), let kept = rest(dropping: " " + phrase) { return (when, kept) }
             if lower == phrase { return (when, "") }
         }
@@ -254,8 +273,7 @@ nonisolated enum TodoDraft {
         }
 
         // A date: "24.11.", "24.11.2026", "24/11", optionally after "on" or "na".
-        let datePattern = #"\s+(?:on\s+|na\s+)?(\d{1,2})[./](\d{1,2})\.?(?:[./]?(\d{4})\.?)?$"#
-        guard let regex = try? NSRegularExpression(pattern: datePattern),
+        guard let regex = datePattern,
               let match = regex.firstMatch(in: lower, range: NSRange(lower.startIndex..., in: lower)),
               let dayRange = Range(match.range(at: 1), in: lower), let monthRange = Range(match.range(at: 2), in: lower),
               let whole = Range(match.range, in: lower) else { return nil }

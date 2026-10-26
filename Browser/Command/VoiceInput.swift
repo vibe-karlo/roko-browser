@@ -34,6 +34,10 @@ final class VoiceInput {
     }
     private var ears: [Ear] = []
     private var finish: CheckedContinuation<String?, Never>?
+    /// Between letting go and the last words: no new session may start.
+    private var isStopping = false
+    /// The wait for the last words; cancelled once they're in, so it can't cut a later one short.
+    private var timeout: Task<Void, Never>?
 
     /// Sites you go to, said the way they'd be said ("sib točka hr"), for the
     /// recognizers to expect. Set by the browser from history and pins.
@@ -41,9 +45,11 @@ final class VoiceInput {
 
     /// The languages heard, the phone's own first.
     private static var locales: [Locale] {
-        let all = [Locale(identifier: "hr-HR"), Locale(identifier: "en-US")]
+        let all = Preferences.voiceLanguages.codes.map(Locale.init(identifier:))
         let phone = Locale.current.language.languageCode?.identifier
-        return all.sorted { a, _ in a.language.languageCode?.identifier == phone }
+        return all.sorted { a, b in
+            (a.language.languageCode?.identifier == phone ? 0 : 1) < (b.language.languageCode?.identifier == phone ? 0 : 1)
+        }
     }
 
     /// Microphone and speech recognition, asked for the first time + is held.
@@ -66,7 +72,8 @@ final class VoiceInput {
     }
 
     func start() throws {
-        guard !isListening else { return }
+        // Still finishing the last one: starting now would be stopped by it.
+        guard !isListening, !isStopping else { return }
         partial = ""
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.record, mode: .measurement, options: .duckOthers)
@@ -101,9 +108,20 @@ final class VoiceInput {
         // The microphone's and the recognizers' callbacks come on their own
         // queues: made outside the main actor (Self.tap, Self.listener), so
         // Swift doesn't stop the app when they arrive there.
+        input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 1024, format: format, block: Self.tap(ears.map(\.request), into: self))
         engine.prepare()
-        try engine.start()
+        do {
+            try engine.start()
+        } catch {
+            // A call holding the microphone, say: leave nothing behind, so the
+            // next hold starts clean and other audio comes back up.
+            input.removeTap(onBus: 0)
+            engine.stop()
+            ears = []
+            try? session.setActive(false, options: .notifyOthersOnDeactivation)
+            throw error
+        }
         isListening = true
 
         for index in ears.indices {
@@ -141,6 +159,8 @@ final class VoiceInput {
     func stop() async -> String? {
         guard isListening else { return nil }
         isListening = false
+        isStopping = true
+        defer { isStopping = false }
         level = 0
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
@@ -148,11 +168,13 @@ final class VoiceInput {
         let text = await withCheckedContinuation { continuation in
             finish = continuation
             if ears.allSatisfy(\.finished) { conclude() }
-            Task {
+            timeout = Task {
                 try? await Task.sleep(for: .seconds(1.5))
+                guard !Task.isCancelled else { return }
                 self.conclude()
             }
         }
+        timeout?.cancel()
         for ear in ears { ear.task?.cancel() }
         ears = []
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)

@@ -85,7 +85,7 @@ nonisolated struct TodayWeather: Codable, Equatable, Sendable {
             .init(name: "timezone", value: "auto"),
             .init(name: "forecast_days", value: "2"),
         ]
-        let (data, response) = try await URLSession.shared.data(from: parts.url!)
+        let (data, response) = try await URLSession.quick.data(from: parts.url!)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
         let raw = try JSONDecoder().decode(Raw.self, from: data)
 
@@ -166,17 +166,26 @@ final class TodayLocation: NSObject, CLLocationManagerDelegate {
             waiting.append(continuation)
             guard waiting.count == 1 else { return }
             if manager.authorizationStatus == .notDetermined {
+                // The clock starts once it's allowed: time spent reading the
+                // question isn't time waiting for a fix.
                 manager.requestWhenInUseAuthorization()
             } else {
-                manager.requestLocation()
-            }
-            // Never hang a refresh on a fix that doesn't come.
-            Task {
-                try? await Task.sleep(for: .seconds(8))
-                self.finish(nil)
+                locate()
             }
         }
     }
+
+    /// Asks for a fix, and never hangs a refresh on one that doesn't come.
+    private func locate() {
+        manager.requestLocation()
+        timeout?.cancel()
+        timeout = Task {
+            try? await Task.sleep(for: .seconds(8))
+            guard !Task.isCancelled else { return }
+            self.finish(nil)
+        }
+    }
+    private var timeout: Task<Void, Never>?
 
     /// The town's name, for the weather line.
     static func placeName(for location: CLLocation) async -> String? {
@@ -191,6 +200,8 @@ final class TodayLocation: NSObject, CLLocationManagerDelegate {
     private static var lastNamed: (CLLocation, String)?
 
     private func finish(_ location: CLLocation?) {
+        timeout?.cancel()
+        timeout = nil
         let continuations = waiting
         waiting = []
         continuations.forEach { $0.resume(returning: location) }
@@ -201,7 +212,7 @@ final class TodayLocation: NSObject, CLLocationManagerDelegate {
         MainActor.assumeIsolated {
             switch status {
             case .authorizedWhenInUse, .authorizedAlways:
-                if !waiting.isEmpty { self.manager.requestLocation() }
+                if !waiting.isEmpty { locate() }
             case .denied, .restricted:
                 finish(nil)
             default:
@@ -245,7 +256,7 @@ nonisolated struct WeatherPlace: Codable, Equatable, Hashable, Sendable, Identif
         var parts = URLComponents(string: "https://geocoding-api.open-meteo.com/v1/search")!
         parts.queryItems = [.init(name: "name", value: name), .init(name: "count", value: "8"),
                             .init(name: "language", value: Locale.current.language.languageCode?.identifier ?? "en")]
-        guard let (data, _) = try? await URLSession.shared.data(from: parts.url!),
+        guard let (data, _) = try? await URLSession.quick.data(from: parts.url!),
               let found = try? JSONDecoder().decode(Found.self, from: data) else { return [] }
         // Villages share their town's name and region: the biggest (listed first) stands for them.
         var seen = Set<String>()

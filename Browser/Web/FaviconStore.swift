@@ -66,7 +66,7 @@ final class FaviconStore {
         """
         guard let href = try? await webView.callAsyncJavaScript(script, contentWorld: .defaultClient) as? String,
               let url = URL(string: href),
-              let (data, _) = try? await URLSession.shared.data(from: url),
+              let (data, _) = try? await URLSession.quick.data(from: url),
               let image = UIImage(data: data) else { return }
 
         memory.setObject(image, forKey: host as NSString)

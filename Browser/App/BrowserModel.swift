@@ -186,10 +186,14 @@ final class BrowserModel {
     }
 
     /// Pages and pins that two devices added before hearing from each other.
+    /// At most once an hour: it reads all of history.
     func mergeSyncedDuplicates() {
         guard Store.syncs, let context else { return }
+        if let last = lastMerge, Date.now.timeIntervalSince(last) < 3600 { return }
+        lastMerge = .now
         Store.mergeDuplicates(in: context)
     }
+    @ObservationIgnored private var lastMerge: Date?
 
     /// iOS is short of memory: give back what can be rebuilt, before it has to
     /// close roko. The tab on screen is never touched.
@@ -282,6 +286,7 @@ final class BrowserModel {
             tab.discardSnapshot()
         }
         tabs.remove(at: index)
+        if tab.isPrivate, !tabs.contains(where: \.isPrivate) { WebViewFactory.endPrivateSession() }
         defer { scheduleSave() }
         if selectedID == tab.id {
             if let next = tabs.max(by: { $0.lastActive < $1.lastActive }) {
@@ -349,6 +354,7 @@ final class BrowserModel {
     /// + held: the launcher opens out of it, listening. Asked for the
     /// microphone the first time (then hold again).
     func startVoice() {
+        guard !voiceListening else { return }
         guard VoiceInput.isAuthorized else {
             Task {
                 if !(await VoiceInput.authorize()) { showToast("Allow the microphone and speech in Settings") }
@@ -397,6 +403,16 @@ final class BrowserModel {
         }
     }
     private var voiceHandsFree: Task<Void, Never>?
+
+    /// The launcher closed while listening: stop, and forget what was heard.
+    func cancelVoice() {
+        voiceHandsFree?.cancel()
+        voiceHandsFree = nil
+        guard voiceListening else { return }
+        voiceListening = false
+        voiceResult = nil
+        VoiceInput.shared.cancel()
+    }
 
     /// Stop now: what was said is opened when it's a site roko knows, and
     /// otherwise goes into the launcher as if typed, its best row ready.
@@ -462,14 +478,15 @@ final class BrowserModel {
             model.snapshot = handoff.snapshot
             model.handoff = handoff
             summary = model
-            model.start(webView: webView, url: tab.url)
+            // A private page's summary isn't kept: the cache is on disk.
+            model.start(webView: webView, url: tab.isPrivate ? nil : tab.url)
             return
         }
         Task {
             // The page as it is on screen, so it can shrink into the card.
             model.snapshot = await tab.viewportSnapshot() ?? tab.snapshot
             presentAfterPanelCloses { self.summary = model }
-            model.start(webView: webView, url: tab.url)
+            model.start(webView: webView, url: tab.isPrivate ? nil : tab.url)
         }
     }
 
@@ -590,10 +607,12 @@ final class BrowserModel {
 
 extension BrowserModel: BrowserTabDelegate {
     func tab(_ tab: BrowserTab, didFinishLoading url: URL, title: String) {
+        // Private pages leave nothing on disk, icons included.
+        guard !tab.isPrivate else { return }
         if let webView = tab.webView {
             Task { await FaviconStore.shared.refresh(from: webView) }
         }
-        guard !tab.isPrivate, let context, url.scheme?.hasPrefix("http") == true else { return }
+        guard let context, url.scheme?.hasPrefix("http") == true else { return }
         // Save open tabs as pages finish, so a force-quit or crash loses nothing.
         scheduleSave()
 

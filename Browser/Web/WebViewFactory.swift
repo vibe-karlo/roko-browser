@@ -4,7 +4,13 @@ import WebKit
 enum WebViewFactory {
     /// One web view built ahead of time, so the first page skips WebKit's setup cost.
     private static var prewarmed: WKWebView?
-    private static let privateStore = WKWebsiteDataStore.nonPersistent()
+    private static var privateStore = WKWebsiteDataStore.nonPersistent()
+
+    /// The last private tab closed: its cookies and storage go with it, so the
+    /// next private tab starts signed out of everything.
+    static func endPrivateSession() {
+        privateStore = .nonPersistent()
+    }
 
     static func prewarm() {
         guard prewarmed == nil else { return }

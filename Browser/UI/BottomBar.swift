@@ -73,7 +73,7 @@ struct BottomBar: View {
             .gesture(holdToTalk)
             .accessibilityElement()
             .accessibilityLabel("New tab")
-            .accessibilityHint("Hold to speak")
+            .accessibilityHint(Preferences.holdToTalk ? "Hold to speak" : "")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { browser.showCommandBar() }
 
@@ -119,6 +119,7 @@ struct BottomBar: View {
                 }
                 guard pressedAt == nil else { return }
                 pressedAt = .now
+                guard Preferences.holdToTalk else { return }
                 withAnimation(.linear(duration: 0.3)) { holdFill = 1 }
                 holdTask = Task {
                     // Taps that grow as the hold counts, so it's felt filling up.

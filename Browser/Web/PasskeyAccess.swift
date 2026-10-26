@@ -17,11 +17,17 @@ enum PasskeyAccess {
     }
 
     static func request() async -> Status {
-        await withCheckedContinuation { continuation in
-            ASAuthorizationWebBrowserPublicKeyCredentialManager().requestAuthorizationForPublicKeyCredentials { _ in
+        await ask()
+        return status
+    }
+
+    /// Off the main actor: iOS answers on a queue of its own, and a reply
+    /// handler made on the main actor stops the app when it's called there.
+    nonisolated private static func ask() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            ASAuthorizationWebBrowserPublicKeyCredentialManager().requestAuthorizationForPublicKeyCredentials { @Sendable _ in
                 continuation.resume()
             }
         }
-        return status
     }
 }

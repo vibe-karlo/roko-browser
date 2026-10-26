@@ -19,6 +19,7 @@ final class SettingsSync {
 
     private static let exact: Set<String> = [
         "searchEngine", "suggestions", "archivePolicy", ClaudeClient.enabledKey, "consent.acceptedHosts", AnswerLanguage.key,
+        Preferences.voiceLanguagesKey, Preferences.pullToSummarizeKey,
     ]
     private static let prefixes = ["block.", "zoom."]
 

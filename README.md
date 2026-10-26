@@ -86,7 +86,7 @@ address field). Once granted:
    `SWIFT_ACTIVE_COMPILATION_CONDITIONS` lines for the commented ones below them, then run
    `xcodegen`. `Browser/Browser.entitlements` carries iCloud's entitlements too. Remove any key
    Apple hasn't granted yet, or signing fails.
-2. In the app, Settings → Passkeys → Allow passkeys.
+2. In the app, Settings → Privacy and sync → Allow passkeys.
 
 Never set `PRIVATE_CLOUD_COMPUTE` without the cloud entitlement: Apple's framework stops the
 app rather than reporting an error.
@@ -223,7 +223,7 @@ day, and with "today". It reads:
   name with Open-Meteo's geocoding, which needs no location permission.
 - **Calendar** with EventKit's full access, asked for from the page; events stay on the phone.
   Calendars can be left out (Today → Calendars); the ones left out are stored, so new ones show.
-- **News** from the RSS or Atom feeds of the sites chosen in Settings → Today (thirteen
+- **News** from the RSS or Atom feeds of the sites chosen in Settings → Today and to-dos (thirteen
   suggested, any other found by its address). A page of a site (a club's news) is followed
   on its own: its section's feed if there is one, else its headlines read from the page
   (`PageHeadlines`: links into the section, the element named for the headline, dates from
@@ -326,3 +326,22 @@ scored by its mean segment confidence (Croatian letters tip a close call to Croa
 kept. `VoiceCommand.interpret` turns spoken addresses ("dot", "točka", "slash", "w w w") and
 "open"/"otvori" plus a name into a known host (history first, then `PopularSites`, hyphens ignored)
 and opens it; everything else goes to the bar's own ranking, where `TodoIntent` puts a to-do first.
+
+## Settings
+
+One screen, grouped by what you do, with long lists on pages of their own:
+
+- **Appearance**, and the app icon (its own page).
+- **Address bar**: search engine, suggestions, the copied link, ticks as rows go by.
+- **Voice**: hold + to speak, and which languages it listens for (Croatian and English
+  together, or one of them).
+- **Pages**: pull further to summarize (off, a pull only reloads), closing unused tabs, and
+  what's blocked (its own page).
+- **Today and to-dos**: opening Today each morning, the two daily nudges, alerts before a
+  to-do's time, news, calendars, weather place.
+- **Summaries and answers**: answer language, Claude and its key, Notify Me (its own page).
+- **Privacy and sync**: iCloud status, passkeys, shared pages (their own page), clear history.
+
+Feature switches live in `Preferences` and are read where each feature runs, so turning one off
+takes effect at once. Voice languages and pull to summarize sync with the other settings; the
+haptics and alerts belong to the device.

@@ -132,7 +132,7 @@ enum RemoteIcons {
                         "https://www.google.com/s2/favicons?domain=\(host)&sz=64"]
         for service in services {
             guard let url = URL(string: service),
-                  let (data, response) = try? await URLSession.shared.data(from: url),
+                  let (data, response) = try? await URLSession.quick.data(from: url),
                   (response as? HTTPURLResponse)?.statusCode == 200,
                   let image = UIImage(data: data) else { continue }
             cache.setObject(image, forKey: host as NSString)

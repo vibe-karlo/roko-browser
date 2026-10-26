@@ -275,7 +275,7 @@ enum TodayNews {
         var request = URLRequest(url: url, timeoutInterval: 10)
         request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 roko",
                          forHTTPHeaderField: "User-Agent")
-        guard let (data, response) = try? await URLSession.shared.data(for: request),
+        guard let (data, response) = try? await URLSession.quick.data(for: request),
               (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
         return String(data: data.prefix(1_200_000), encoding: .utf8) ?? String(decoding: data.prefix(1_200_000), as: UTF8.self)
     }
@@ -294,7 +294,7 @@ enum TodayNews {
     static func stories(from feed: URL, host: String) async -> [NewsStory]? {
         var request = URLRequest(url: feed, timeoutInterval: 10)
         request.setValue("Mozilla/5.0 (iPhone) roko", forHTTPHeaderField: "User-Agent")
-        guard let (data, response) = try? await URLSession.shared.data(for: request),
+        guard let (data, response) = try? await URLSession.quick.data(for: request),
               (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
         return await Task.detached(priority: .utility) { FeedParser.parse(data, host: host) }.value
     }

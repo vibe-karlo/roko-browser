@@ -21,7 +21,11 @@ struct SettingsView: View {
     @AppStorage("archivePolicy") private var archive: ArchivePolicy = .day
     @AppStorage(ClaudeClient.enabledKey) private var claudeEnabled = true
     @State private var apiKey = Keychain.claudeAPIKey ?? ""
-    @State private var blocking: [ContentBlocker.Category: Bool] = [:]
+    @AppStorage(Preferences.holdToTalkKey) private var holdToTalk = true
+    @AppStorage(Preferences.voiceLanguagesKey) private var voiceLanguages: Preferences.VoiceLanguages = .both
+    @AppStorage(Preferences.launcherTicksKey) private var launcherTicks = true
+    @AppStorage(Preferences.pullToSummarizeKey) private var pullToSummarize = true
+    @AppStorage(Preferences.todoAlertsKey) private var todoAlerts = true
     @State private var confirmClear = false
     @State private var passkeyStatus = PasskeyAccess.status
     @State private var syncStatus = "Checking…"
@@ -72,30 +76,84 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Appearance") {
+                Section {
                     Picker("Appearance", selection: $appearance) {
                         ForEach(Appearance.allCases) { Text($0.title).tag($0) }
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
                     .onChange(of: appearance) { Appearance.apply() }
+                    NavigationLink {
+                        Form { AppIconPicker() }
+                            .scrollContentBackground(.hidden)
+                            .background(Theme.panel)
+                            .navigationTitle("App icon")
+                    } label: {
+                        Text("App icon")
+                    }
                 }
 
-                Section("App icon") {
-                    AppIconPicker()
-                }
-
-                Section("Search") {
+                Section {
                     Picker("Search engine", selection: $engine) {
                         ForEach(SearchEngine.allCases) { Text($0.name).tag($0) }
                     }
                     Toggle("Suggestions while typing", isOn: $suggestions)
+                    Toggle("Show the link you copied", isOn: $showsCopiedLink)
+                    if showsCopiedLink {
+                        Button("Allow pasting in iOS Settings") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                    }
+                    Toggle("Tick as rows go by", isOn: $launcherTicks)
+                } header: {
+                    Text("Address bar")
+                } footer: {
+                    Text(showsCopiedLink
+                         ? "To show a copied link without iOS asking each time, set Paste from Other Apps to Allow."
+                         : "Off, the bar offers a Paste button instead, which iOS never asks about.")
+                }
+
+                Section {
+                    Toggle("Hold + to speak", isOn: $holdToTalk)
+                    if holdToTalk {
+                        Picker("Listen for", selection: $voiceLanguages) {
+                            ForEach(Preferences.VoiceLanguages.allCases) { Text($0.title).tag($0) }
+                        }
+                    }
+                } header: {
+                    Text("Voice")
+                } footer: {
+                    Text(holdToTalk
+                         ? "Questions go to Browse for Me, site names open the site, the rest is searched."
+                         : "Off, + only opens the address bar.")
+                }
+
+                Section {
+                    Toggle("Pull further to summarize", isOn: $pullToSummarize)
+                    Picker("Close unused tabs", selection: $archive) {
+                        ForEach(ArchivePolicy.allCases) { Text($0.title).tag($0) }
+                    }
+                    NavigationLink {
+                        BlockingSettings()
+                    } label: {
+                        LabeledContent("Block", value: blockingSummary)
+                    }
+                } header: {
+                    Text("Pages")
+                } footer: {
+                    Text(pullToSummarize
+                         ? "Pull a page down to reload it; keep pulling and let go to summarize it."
+                         : "Pulling a page down only reloads it.")
                 }
 
                 Section {
                     Toggle("Open Today each morning", isOn: $opensToday)
-                    Toggle("Reminders", isOn: $reminders)
+                    Toggle("Morning and afternoon nudges", isOn: $reminders)
                         .onChange(of: reminders) { DailyReminders.update(in: context) }
+                    Toggle("Alert before a to-do's time", isOn: $todoAlerts)
+                        .onChange(of: todoAlerts) { TodoAlerts.update() }
                     Button("News sites and topics") { choosingNewsSites = true }
                         .foregroundStyle(Theme.ink)
                     if TodayCalendar.isAllowed {
@@ -107,9 +165,9 @@ struct SettingsView: View {
                     }
                     .foregroundStyle(Theme.ink)
                 } header: {
-                    Text("Today")
+                    Text("Today and to-dos")
                 } footer: {
-                    Text("The first time you open roko each day: the weather, your calendar, today's to-dos and the news you follow. Search \u{201C}today\u{201D} to see it any time. Reminders, silent and at most two a day: at 8:30 if you haven't looked at Today, and at 16:00 if today's to-dos are still open.")
+                    Text("Nudges are silent, at most two a day: at 8:30 if you haven't looked at Today, at 16:00 if to-dos are still open. To-do alerts come 15 minutes before, with sound.")
                 }
                 .sheet(isPresented: $choosingNewsSites) {
                     NewsSitesSheet { TodayModel.shared.sitesChanged() }
@@ -130,85 +188,34 @@ struct SettingsView: View {
                         ForEach(WritingLanguage.all) { Text($0.name).tag($0.code) }
                     }
                     .pickerStyle(.navigationLink)
+                    Toggle("Use Claude", isOn: $claudeEnabled)
+                    if claudeEnabled {
+                        SecureField("Claude API key", text: $apiKey)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .onSubmit { Keychain.claudeAPIKey = apiKey }
+                    }
+                    NavigationLink {
+                        WatchesSettings()
+                    } label: {
+                        LabeledContent("Notify Me", value: watches.isEmpty ? "None" : "\(watches.count)")
+                    }
                 } header: {
                     Text("Summaries and answers")
                 } footer: {
-                    Text(answerLanguageFooter)
+                    Text(answerLanguageFooter + (claudeEnabled
+                         ? " Claude powers Browse for Me; the key stays in this iPhone's Keychain."
+                         : " Claude off: nothing is sent to it, and your key stays saved."))
                 }
 
                 Section {
-                    Toggle("Show the link you copied", isOn: $showsCopiedLink)
-                    if showsCopiedLink {
-                        Button("Open iOS Settings") {
-                            if let url = URL(string: UIApplication.openSettingsURLString) {
-                                UIApplication.shared.open(url)
-                            }
+                    if Store.syncs {
+                        LabeledContent("iCloud sync") {
+                            Text(syncStatus).foregroundStyle(Theme.secondaryInk)
                         }
+                        .task { syncStatus = await Self.iCloudStatus() }
                     }
-                } header: {
-                    Text("Copied links")
-                } footer: {
-                    Text(showsCopiedLink
-                         ? "roko reads the link to show it. In iOS Settings, set Paste from Other Apps to Allow, or iOS asks for each link."
-                         : "Off, the address bar offers a Paste button, which opens the link without iOS asking.")
-                }
-
-                Section {
-                    if watches.isEmpty {
-                        Text("None yet. In a page's menu, choose Notify Me.")
-                            .foregroundStyle(Theme.secondaryInk)
-                    }
-                    ForEach(watches) { watch in
-                        Button {
-                            if let url = URL(string: watch.url) { browser.open(url, inNewTab: true) }
-                        } label: {
-                            WatchRow(watch: watch)
-                        }
-                    }
-                    .onDelete { offsets in
-                        offsets.map { watches[$0] }.forEach(context.delete)
-                        try? context.save()
-                        WatchScheduler.schedule(in: context)
-                    }
-                } header: {
-                    Text("Notify Me")
-                } footer: {
-                    Text("roko checks these pages and notifies you when it finds what you asked for. iOS picks the exact times; pages that need their scripts run are checked while roko is open.")
-                }
-
-                Section {
-                    ForEach(ContentBlocker.Category.allCases) { category in
-                        Toggle(category.title, isOn: Binding(
-                            get: { blocking[category] ?? ContentBlocker.shared.isEnabled(category) },
-                            set: {
-                                blocking[category] = $0
-                                ContentBlocker.shared.setEnabled(category, $0)
-                            }))
-                    }
-                } header: {
-                    Text("Block")
-                } footer: {
-                    Text("Applies from the next page you load.")
-                }
-
-                Section {
-                    Toggle("Use Claude", isOn: $claudeEnabled)
-                    SecureField("sk-ant-…", text: $apiKey)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .onSubmit { Keychain.claudeAPIKey = apiKey }
-                        // Still editable while off: the key is kept, just not used.
-                        .foregroundStyle(claudeEnabled ? Theme.ink : Theme.secondaryInk)
-                } header: {
-                    Text("Claude API key")
-                } footer: {
-                    Text(claudeEnabled
-                         ? "Powers Browse for Me and summaries of Croatian pages. Stored only in this iPhone's Keychain."
-                         : "Off: nothing is sent to Claude, and Apple's models write every summary and answer. Your key stays saved.")
-                }
-
-                Section {
-                    LabeledContent("Access") {
+                    LabeledContent("Passkeys") {
                         Text(passkeyLabel).foregroundStyle(Theme.secondaryInk)
                     }
                     if passkeyStatus == .notAsked {
@@ -216,58 +223,22 @@ struct SettingsView: View {
                             Task { passkeyStatus = await PasskeyAccess.request() }
                         }
                     }
-                } header: {
-                    Text("Passkeys")
-                } footer: {
-                    Text("Sites can sign you in with passkeys once Apple approves this app as a web browser. Until then their passkey prompts won't appear.")
-                }
-
-                if Store.syncs {
-                    Section {
-                        LabeledContent("Sync") {
-                            Text(syncStatus).foregroundStyle(Theme.secondaryInk)
+                    if !shared.isEmpty {
+                        NavigationLink {
+                            SharedPagesSettings(shared: $shared, unshare: unshare)
+                        } label: {
+                            LabeledContent("Shared pages", value: "\(shared.count)")
                         }
-                    } header: {
-                        Text("iCloud")
-                    } footer: {
-                        Text("Pins, history, settings and what you chose for each site, on every device signed in to your iCloud. Open tabs and Notify Me stay on this iPhone.")
-                    }
-                    .task { syncStatus = await Self.iCloudStatus() }
-                }
-
-                if !shared.isEmpty {
-                    Section {
-                        ForEach(shared) { page in
-                            Button {
-                                browser.open(page.url, inNewTab: true)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(page.title).foregroundStyle(Theme.ink).lineLimit(1)
-                                    Text("\(page.url.displayHost)\(page.url.path()) · \(page.date.formatted(.relative(presentation: .named)))")
-                                        .font(.footnote)
-                                        .foregroundStyle(Theme.secondaryInk)
-                                        .lineLimit(1)
-                                }
-                            }
-                            .swipeActions {
-                                Button("Unshare", role: .destructive) { unshare(page) }
-                            }
-                        }
-                    } header: {
-                        Text("Shared pages")
-                    } footer: {
-                        Text("Browse for Me pages you shared. Swipe one to unshare it: its link stops working.")
-                    }
-                }
-
-                Section("Tabs") {
-                    Picker("Close unused tabs", selection: $archive) {
-                        ForEach(ArchivePolicy.allCases) { Text($0.title).tag($0) }
                     }
                     Button("Clear history", role: .destructive) { confirmClear = true }
                         .confirmationDialog("Clear all browsing history?", isPresented: $confirmClear) {
                             Button("Clear history", role: .destructive) { browser.clearHistory() }
                         }
+                } header: {
+                    Text("Privacy and sync")
+                } footer: {
+                    Text((Store.syncs ? "Pins, history and settings sync through your iCloud; open tabs and Notify Me stay here. " : "")
+                         + "Passkeys work once Apple approves roko as a web browser.")
                 }
 
                 Section {
@@ -291,6 +262,107 @@ struct SettingsView: View {
         }
         .presentationBackground(Theme.panel)
         .onDisappear { Keychain.claudeAPIKey = apiKey }
+    }
+
+    /// How many kinds of things are blocked, for the row.
+    private var blockingSummary: String {
+        let on = ContentBlocker.Category.allCases.filter(ContentBlocker.shared.isEnabled).count
+        return on == ContentBlocker.Category.allCases.count ? "All" : on == 0 ? "Off" : "\(on) of \(ContentBlocker.Category.allCases.count)"
+    }
+}
+
+/// What roko keeps off pages, each kind on its own.
+private struct BlockingSettings: View {
+    @State private var blocking: [ContentBlocker.Category: Bool] = [:]
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(ContentBlocker.Category.allCases) { category in
+                    Toggle(category.title, isOn: Binding(
+                        get: { blocking[category] ?? ContentBlocker.shared.isEnabled(category) },
+                        set: {
+                            blocking[category] = $0
+                            ContentBlocker.shared.setEnabled(category, $0)
+                        }))
+                }
+            } footer: {
+                Text("Applies from the next page you load.")
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(Theme.panel)
+        .navigationTitle("Block")
+    }
+}
+
+/// Pages roko checks for you.
+private struct WatchesSettings: View {
+    @Environment(BrowserModel.self) private var browser
+    @Environment(\.modelContext) private var context
+    @Query(sort: \Watch.createdAt) private var watches: [Watch]
+
+    var body: some View {
+        Form {
+            Section {
+                if watches.isEmpty {
+                    Text("None yet. In a page's menu, choose Notify Me.")
+                        .foregroundStyle(Theme.secondaryInk)
+                }
+                ForEach(watches) { watch in
+                    Button {
+                        if let url = URL(string: watch.url) { browser.open(url, inNewTab: true) }
+                    } label: {
+                        WatchRow(watch: watch)
+                    }
+                }
+                .onDelete { offsets in
+                    offsets.map { watches[$0] }.forEach(context.delete)
+                    try? context.save()
+                    WatchScheduler.schedule(in: context)
+                }
+            } footer: {
+                Text("roko checks these pages and notifies you when it finds what you asked for. iOS picks the exact times; pages that need their scripts run are checked while roko is open. Swipe one to stop.")
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(Theme.panel)
+        .navigationTitle("Notify Me")
+    }
+}
+
+/// Browse for Me pages you shared.
+private struct SharedPagesSettings: View {
+    @Environment(BrowserModel.self) private var browser
+    @Binding var shared: [AnswerSharing.Shared]
+    let unshare: (AnswerSharing.Shared) -> Void
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(shared) { page in
+                    Button {
+                        browser.open(page.url, inNewTab: true)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(page.title).foregroundStyle(Theme.ink).lineLimit(1)
+                            Text("\(page.url.displayHost)\(page.url.path()) · \(page.date.formatted(.relative(presentation: .named)))")
+                                .font(.footnote)
+                                .foregroundStyle(Theme.secondaryInk)
+                                .lineLimit(1)
+                        }
+                    }
+                    .swipeActions {
+                        Button("Unshare", role: .destructive) { unshare(page) }
+                    }
+                }
+            } footer: {
+                Text("Swipe one to unshare it: its link stops working.")
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(Theme.panel)
+        .navigationTitle("Shared pages")
     }
 }
 

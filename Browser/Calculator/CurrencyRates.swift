@@ -83,7 +83,7 @@ final class CurrencyRates {
         ]
         for source in sources {
             guard let url = URL(string: source),
-                  let (data, response) = try? await URLSession.shared.data(from: url),
+                  let (data, response) = try? await URLSession.quick.data(from: url),
                   (response as? HTTPURLResponse)?.statusCode == 200,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let table = (json["eur"] ?? json["rates"]) as? [String: Any] else { continue }

@@ -41,7 +41,7 @@ enum TodoAlerts {
         let now = Date.now
         let due = ((try? context.fetch(FetchDescriptor<Todo>())) ?? [])
             .compactMap { todo -> (String, Date, String)? in
-                guard !todo.done, let time = todo.time, time.addingTimeInterval(-lead) > now else { return nil }
+                guard Preferences.todoAlerts, !todo.done, let time = todo.time, time.addingTimeInterval(-lead) > now else { return nil }
                 return (todo.title, time, prefix + String(Int(time.timeIntervalSinceReferenceDate)) + "." + todo.title)
             }
             .sorted { $0.1 < $1.1 }
@@ -49,8 +49,9 @@ enum TodoAlerts {
             .prefix(40)
         let center = UNUserNotificationCenter.current()
         let prefix = prefix
-        center.getPendingNotificationRequests { requests in
-            let old = requests.map(\.identifier).filter { $0.hasPrefix(prefix) }
+        // Awaited rather than a reply handler: iOS answers on a queue of its own.
+        Task {
+            let old = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(prefix) }
             center.removePendingNotificationRequests(withIdentifiers: old)
             for (title, time, id) in due {
                 let content = UNMutableNotificationContent()
@@ -60,8 +61,8 @@ enum TodoAlerts {
                 content.userInfo = ["url": "roko://todo"]
                 let moment = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute],
                                                              from: time.addingTimeInterval(-lead))
-                center.add(UNNotificationRequest(identifier: id, content: content,
-                                                 trigger: UNCalendarNotificationTrigger(dateMatching: moment, repeats: false)))
+                try? await center.add(UNNotificationRequest(identifier: id, content: content,
+                                                            trigger: UNCalendarNotificationTrigger(dateMatching: moment, repeats: false)))
             }
         }
     }

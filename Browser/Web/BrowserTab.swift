@@ -22,6 +22,8 @@ final class BrowserTab: NSObject, Identifiable {
     var canGoBack = false
     var canGoForward = false
     var loadError: String?
+    /// When the page was last reloaded after WebKit gave up on it.
+    @ObservationIgnored private var lastCrashReload: Date?
     /// Asks sites for their desktop layout; set from the page menu.
     private(set) var wantsDesktopSite = false
     /// The language this tab's pages are translated into, if any. Stays on for
@@ -444,7 +446,14 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        // iOS reclaimed the page's memory; reloading brings it back.
+        // iOS reclaimed the page's memory; reloading brings it back. Once a
+        // minute at most: a page that brings WebKit down every time would
+        // otherwise reload forever and drain the battery.
+        if let last = lastCrashReload, Date.now.timeIntervalSince(last) < 60 {
+            loadError = "This page stopped working."
+            return
+        }
+        lastCrashReload = .now
         webView.reload()
     }
 

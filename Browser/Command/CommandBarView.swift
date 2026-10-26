@@ -314,7 +314,7 @@ struct CommandBarView: View {
         .onScrollGeometryChange(for: Int.self) { geometry in
             Int(((geometry.contentOffset.y + geometry.contentInsets.top) / 62).rounded())
         } action: { old, new in
-            if listMoving, new != old, new >= 0 { ticker.selectionChanged() }
+            if listMoving, new != old, new >= 0, Preferences.launcherTicks { ticker.selectionChanged() }
         }
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y < -geometry.contentInsets.top - 60
@@ -616,10 +616,13 @@ struct CommandBarView: View {
     /// Back into the bar: the field shrinks into the capsule it came from,
     /// then the launcher is gone and the capsule is there in its place.
     private func dismiss() {
-        VoiceInput.shared.cancel()
+        browser.cancelVoice()
         focused = false
         withAnimation(.easeIn(duration: 0.1)) { browser.launcherRows = false }
         withAnimation(.launcher) { browser.launcherShown = false } completion: {
+            // Something else opened meanwhile (a notification, Today in the
+            // morning, a summary): that stays.
+            guard browser.panel == .command else { return }
             var still = Transaction()
             still.disablesAnimations = true
             withTransaction(still) { browser.panel = browser.launcherReturn }

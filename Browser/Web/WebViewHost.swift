@@ -128,12 +128,13 @@ struct WebViewHost: UIViewRepresentable {
             guard !refreshing, !summarizePending, scrollView.isTracking else { return }
             let pull = -(scrollView.contentOffset.y + scrollView.adjustedContentInset.top)
             guard pull > 0 || indicator.alpha > 0 else { return }
-            indicator.setProgress(pull <= pullDistance
-                                  ? pull / pullDistance
+            let summarizes = Preferences.pullToSummarize
+            indicator.setProgress(pull <= pullDistance || !summarizes
+                                  ? min(pull / pullDistance, 1)
                                   : 1 + (pull - pullDistance) / (summarizeDistance - pullDistance))
             // The page follows the finger as its own picture over the summary's
             // dark, and past the reload point starts becoming the summary's card.
-            if pull > 1, preview.snapshot != nil {
+            if pull > 1, summarizes, preview.snapshot != nil {
                 if !preview.isShowing { parent.onPreview(true) }  // the bar makes way
                 preview.update(progress: (pull - pullDistance) / (summarizeDistance - pullDistance), pull: pull)
             } else if preview.isShowing {
@@ -149,7 +150,7 @@ struct WebViewHost: UIViewRepresentable {
             }
             // A firmer tap as it turns into "Summarize"; easing back off a
             // little takes it back to a reload.
-            if pull >= summarizeDistance, !summarizeArmed {
+            if summarizes, pull >= summarizeDistance, !summarizeArmed {
                 summarizeArmed = true
                 indicator.setSummarize(true)
                 firmHaptic.impactOccurred()
@@ -167,7 +168,7 @@ struct WebViewHost: UIViewRepresentable {
                 // A pull from the top may become the summary: the page as it is
                 // now, for the card. Only for a pull (finger moving down), not
                 // for every scroll that starts at the top.
-                if let scrollView = pan.view as? UIScrollView,
+                if Preferences.pullToSummarize, let scrollView = pan.view as? UIScrollView,
                    scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 1,
                    pan.velocity(in: scrollView).y > 0 {
                     let tab = parent.tab

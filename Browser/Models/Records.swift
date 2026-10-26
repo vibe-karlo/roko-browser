@@ -22,6 +22,8 @@ final class Pin {
 
 @Model
 final class HistoryEntry {
+    // The bar looks history up by address and lists it newest first.
+    #Index<HistoryEntry>([\.url], [\.visitedAt])
     var url: String = ""
     var title: String = ""
     var visitedAt: Date = Date.now

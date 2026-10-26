@@ -6,6 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Settings, rethought: grouped by what you do (Address bar, Voice, Pages, Today and to-dos, Summaries and answers, Privacy and sync), with Block, Notify Me, Shared pages and the app icon on pages of their own so the main screen stays short. New switches for features added lately: Hold + to speak, which languages dictation listens for (Croatian and English, or one), ticks as the bar's rows go by, pull further to summarize, and alerts before a to-do's time.
 - A question said while holding + ("koji su rezultati izbora u srbiji", "what's the best time to visit Rovinj") goes straight to Browse for Me; a site's name opens it; anything else lands in the bar.
 - Remove pages from history right in the address bar: swipe a page from your history to the left (a trash mark comes in behind it; past a third of the way, let go), or long-press it for Remove from History. On a site's row (index.hr itself) it's Remove Site from History, every page of it.
 - Hold + to speak. The address bar opens out of it, listening, with the words coming into the field as they're heard and the rows following; let go and it's done. English and Croatian are heard at once, each by its own recognizer on the same sound, and the clearer hearing wins, so there's no language to pick. Said as an address ("index točka hr", "theverge dot com slash tech", "w w w dot bbc dot com") or as "open"/"otvori" and a site ("otvori index", "open youtube"), a site roko knows opens at once, matched to your history and well-known sites ("glas slavonije točka hr" is glas-slavonije.hr). Anything else goes into the bar as typed, its best row ready: a to-do ("sutra nazvati mamu u 5", "remind me to pay rent on friday"), a question for Browse for Me, a search. A day said first is read too ("sutra nazvati mamu"). The microphone is on only while + is held.
@@ -17,6 +18,14 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - To-do's field: the chip says when in short ("Wed 15:00") and is a menu (Today, Tomorrow, This Week, Someday, Date and Time…) for when the words don't say. "at 3" means 15:00 (1 to 6 are the afternoon), and a day typed first ("Wednesday at 3") is read too.
 
 ### Fixed
+- Closing the last private tab now also clears its cookies and storage; a private page's summary is no longer kept in the summary cache, and its icon is no longer saved.
+- Dictation can't get stuck on: a hold right after letting go no longer starts a second session that the first one then half-stopped (leaving the microphone on), closing the bar while listening stops it properly, and a microphone held by a call no longer leaves the next hold failing.
+- Allowing passkeys, and to-do alerts being laid out, no longer risk stopping the app: iOS answers those on a queue of its own, now handled off the main actor.
+- Something opened while the bar was closing (a notification, Today in the morning, a summary) stays open instead of being replaced by the screen the bar was opened from.
+- Today's weather on first run: the wait for a location no longer counts the time spent reading the permission question, so the weather comes once it's allowed.
+- A page that keeps bringing WebKit down is reloaded at most once a minute, not in a loop.
+- Weather, exchange rates, icons, suggestions and news give up after ten seconds offline instead of a minute.
+- Faster typing in the bar: history is indexed by address and date, the to-do reader's patterns and day phrases are made once instead of on every key, and the iCloud duplicate check runs at most once an hour.
 - Dictation hears short site names: "sib točka hr" came out as si.hr. The recognizers are now told which names to expect (your own sites first, then well-known ones, each as its name and as its address said aloud), and an address heard with its last letter lost ("si.hr") opens the known site it nearly is (sib.hr).
 - Dictation opens what you name: a site's name said ("Sportske novosti") opens that site from your tabs, pins or history, instead of only putting it first in the bar; an address heard a letter or two off ("indeks točka hr") opens the site you know (index.hr), matched against your history and well-known sites with the same ending, and one roko doesn't know at all goes into the bar rather than being opened blind.
 - Holding + is felt filling up: four taps growing stronger over the hold, then a firm one as it starts listening.

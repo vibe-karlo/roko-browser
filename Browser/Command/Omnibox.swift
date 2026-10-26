@@ -56,7 +56,7 @@ enum SearchEngine: String, CaseIterable, Identifiable {
               var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else { return [] }
         components.queryItems = (components.queryItems ?? []) + [URLQueryItem(name: "q", value: query)]
         guard let url = components.url,
-              let (data, _) = try? await URLSession.shared.data(from: url) else { return [] }
+              let (data, _) = try? await URLSession.quick.data(from: url) else { return [] }
         return parse(data)
     }
 }
