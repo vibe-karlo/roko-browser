@@ -348,7 +348,12 @@ private struct LoadErrorView: View {
     let retry: () -> Void
     let search: (String) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var online = Connection()
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(BrowserModel.self) private var browser
+    /// One monitor for the app, not one per redraw of this view.
+    private var online: Connection { .shared }
+    /// The connection came back while this showed: say so, and load.
+    @State private var cameBack = false
 
     private var site: String { error.host ?? "This site" }
 
@@ -366,7 +371,7 @@ private struct LoadErrorView: View {
 
     private var line: String {
         switch error.kind {
-        case .offline: online.isUp ? "Back online. Loading it again." : "It loads by itself once you're back online."
+        case .offline: cameBack ? "Back online. Loading it again." : "It loads by itself once you're back online."
         case .notFound: "Check the address, or search for it."
         case .notAnswering: "It may be down for a moment."
         case .slow: "Its server is slow right now."
@@ -379,7 +384,9 @@ private struct LoadErrorView: View {
     var body: some View {
         VStack(spacing: 0) {
             Spacer()
-            TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
+            // A 9-second drift needs few frames; none while covered or away.
+            TimelineView(.animation(minimumInterval: 1 / 12,
+                                    paused: reduceMotion || browser.panel != .none || scenePhase != .active)) { context in
                 // The inner disc drifts across and back, once every 9 seconds.
                 let phase = reduceMotion ? 0.5 : (sin(context.date.timeIntervalSinceReferenceDate * 2 * .pi / 9) + 1) / 2
                 Eclipse(shift: phase)
@@ -422,9 +429,18 @@ private struct LoadErrorView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.canvas)
-        .animation(.easeOut(duration: 0.25), value: online.isUp)
-        .onChange(of: online.isUp) { _, up in
-            if up, error.kind == .offline { retry() }
+        .animation(.easeOut(duration: 0.25), value: cameBack)
+        .onChange(of: online.isUp) { was, up in
+            // Only a real return, from down to up: a dropped connection that
+            // never left the network (most Wi-Fi blips) has nothing to wait for.
+            if was == false, up == true, error.kind == .offline {
+                cameBack = true
+                retry()
+            }
+        }
+        .task {
+            // Already up when the error came (a blip): no point waiting.
+            if error.kind == .offline, online.isUp == true { cameBack = true; retry() }
         }
     }
 }
@@ -455,10 +471,12 @@ nonisolated private struct Eclipse: Shape {
 /// Whether the iPhone has a connection, as it changes.
 @Observable
 private final class Connection {
-    private(set) var isUp = true
+    static let shared = Connection()
+    /// Nil until the first reading.
+    private(set) var isUp: Bool?
     @ObservationIgnored private let monitor = NWPathMonitor()
 
-    init() {
+    private init() {
         monitor.pathUpdateHandler = { [weak self] path in
             let up = path.status == .satisfied
             Task { @MainActor in self?.isUp = up }

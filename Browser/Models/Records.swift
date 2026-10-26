@@ -69,6 +69,10 @@ final class Watch {
     /// Its text only appears once its scripts run, so it's read in a hidden
     /// web view, which only works while roko is open.
     var needsRendering: Bool = false
+    /// How the snapshot was read (`PageLines.version`): read another way, it's
+    /// read afresh rather than compared, which would announce the difference
+    /// in reading as news.
+    var readingVersion: Int = 0
     /// The last thing it noticed, for the list in Settings.
     var lastNews: String?
     var lastNewsAt: Date?

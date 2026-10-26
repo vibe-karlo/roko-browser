@@ -124,6 +124,7 @@ struct ShoppingView: View {
         .background(Theme.canvas.ignoresSafeArea())
         .foregroundStyle(Theme.ink)
         .onAppear { Shopping.tidy(in: context) }
+        .onDisappear { stopListening() }
         // Ready before the first letter: read off the main thread.
         .task { await Task.detached(priority: .utility) { _ = ShoppingCatalogue.shared }.value }
         // Pull down past the top to close, as To-do does.
@@ -144,6 +145,7 @@ struct ShoppingView: View {
                 let left = items.filter { !$0.done && $0.shop == each }.count
                 Button {
                     swipedForward = (Shop.allCases.firstIndex(of: each) ?? 0) > (Shop.allCases.firstIndex(of: shop) ?? 0)
+                    elsewhere = []
                     withAnimation(.snappy(duration: 0.25)) { shopName = each.rawValue }
                 } label: {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -418,7 +420,7 @@ struct ShoppingView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(completions) { completion in
                             Button {
-                                add(Shopping.finishing(draft, with: completion.title))
+                                add(titles: Shopping.finishing(draft, with: completion.title))
                                 draft = ""
                             } label: {
                                 HStack(spacing: 12) {
@@ -521,13 +523,20 @@ struct ShoppingView: View {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         let voice = VoiceInput.shared
         listenTask = Task {
-            // A list takes a breath between things: done after 2 seconds of quiet.
+            // A list takes a breath between things: done once the words have
+            // stopped changing for 2 seconds. Loudness alone (a busy shop)
+            // doesn't keep it going, and it never runs past 45 seconds.
+            var changedAt = Date.now
             while !Task.isCancelled, listening {
                 try? await Task.sleep(for: .milliseconds(200))
-                heard = voice.partial
                 let now = Date.now
-                if let last = voice.lastVoiceAt, !voice.partial.isEmpty, now.timeIntervalSince(last) > 2 { break }
-                if voice.lastVoiceAt == nil, now.timeIntervalSince(voice.startedAt) > 8 { break }
+                if voice.partial != heard {
+                    heard = voice.partial
+                    changedAt = now
+                }
+                if !heard.isEmpty, now.timeIntervalSince(changedAt) > 2 { break }
+                if heard.isEmpty, now.timeIntervalSince(voice.startedAt) > 8 { break }
+                if now.timeIntervalSince(voice.startedAt) > 45 { break }
             }
             if !Task.isCancelled { finishListening() }
         }
@@ -535,18 +544,29 @@ struct ShoppingView: View {
 
     private func finishListening() {
         guard listening else { return }
+        // At once, so Done tapped as it stops by itself can't add the list twice.
+        withAnimation(.snappy(duration: 0.25)) { listening = false }
         listenTask?.cancel()
+        let partial = heard
         Task {
-            let said = await VoiceInput.shared.stop() ?? heard
+            let said = await VoiceInput.shared.stop() ?? partial
             VoiceInput.expectedWords = nil
-            withAnimation(.snappy(duration: 0.25)) { listening = false }
             let things = Shopping.spokenItems(said, known: known)
             guard !things.isEmpty else {
                 browser.showToast(ListLanguage.say("Didn't catch that", "Nisam čuo"))
                 return
             }
-            add(things.joined(separator: ", "))
+            add(titles: things)
         }
+    }
+
+    /// Gone from the screen mid-listen (another panel opened): stop, and keep nothing.
+    private func stopListening() {
+        guard listening else { return }
+        listening = false
+        listenTask?.cancel()
+        VoiceInput.shared.cancel()
+        VoiceInput.expectedWords = nil
     }
 
     private func finishAdding() {
@@ -559,9 +579,20 @@ struct ShoppingView: View {
     /// Onto the list showing. On Trgovina, what's usually bought at the
     /// drugstore or pharmacy is offered a move there.
     private func add(_ typed: String) {
+        add(titles: Shopping.items(in: typed))
+    }
+
+    private func add(titles: [String]) {
         var result: (added: [ShoppingItem], already: [String]) = ([], [])
-        withAnimation(.snappy) { result = Shopping.add(typed, in: context, to: shop) }
-        if result.added.isEmpty, !result.already.isEmpty { browser.showToast(Shopping.said(result)) }
+        withAnimation(.snappy) { result = Shopping.add(titles: titles, in: context, to: shop) }
+        if result.added.isEmpty, let title = result.already.first {
+            // On another shop's list: say which, as this one doesn't show it.
+            let key = Aisle.key(title)
+            let there = items.first { !$0.done && $0.key == key }?.shop
+            browser.showToast(there.map { $0 != shop } == true && result.already.count == 1
+                              ? ListLanguage.say("\(title) is on \(there!.title)", "\(title) je na popisu: \(there!.title)")
+                              : Shopping.said(result))
+        }
         guard shop == .grocery else { return }
         let offers = result.added.compactMap { item -> (item: ShoppingItem, shop: Shop)? in
             let usual = Shopping.usualShop(of: item, in: context)
@@ -601,7 +632,11 @@ struct ShoppingView: View {
                 Spacer(minLength: 0)
                 Button(ListLanguage.say("Move", "Premjesti")) {
                     withAnimation(.snappy) {
-                        for offer in elsewhere { Shopping.move(offer.item, to: offer.shop, in: context) }
+                        // Not ones deleted, ticked or moved by hand meanwhile.
+                        for offer in elsewhere where !offer.item.isDeleted && offer.item.modelContext != nil
+                            && !offer.item.done && offer.item.shop == .grocery {
+                            Shopping.move(offer.item, to: offer.shop, in: context)
+                        }
                         elsewhere = []
                     }
                     elsewhereTask?.cancel()
@@ -633,12 +668,17 @@ struct ShoppingView: View {
         guard item.done else { return }
         // Struck through for a moment, then into Bought.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
-            guard item.done else { return }
+            // Deleted meanwhile (long-press, Delete): nothing to read.
+            guard !item.isDeleted, item.modelContext != nil, item.done else {
+                justDone.remove(id)
+                return
+            }
             _ = withAnimation(.snappy(duration: 0.35)) { justDone.remove(id) }
         }
     }
 
     private func delete(_ item: ShoppingItem) {
+        elsewhere.removeAll { $0.item.persistentModelID == item.persistentModelID }
         withAnimation(.snappy) { context.delete(item) }
         save()
     }

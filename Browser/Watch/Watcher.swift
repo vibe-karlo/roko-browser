@@ -36,6 +36,7 @@ enum Watcher {
         }
         watch.snapshot = (lines ?? []).joined(separator: "\n")
         watch.lastChecked = .now
+        watch.readingVersion = PageLines.version
         try? context.save()
     }
 
@@ -73,7 +74,14 @@ enum Watcher {
                 var lines = read[index]
                 if watch.needsRendering, let url = URL(string: watch.url) {
                     if let plain = lines, !PageLines.isThin(plain) {
-                        watch.needsRendering = false  // back to being checked in the background too
+                        // Readable plainly now: back to background checks, its
+                        // reading taken afresh (rendered and plain text differ).
+                        watch.needsRendering = false
+                        watch.snapshot = plain.joined(separator: "\n")
+                        watch.readingVersion = PageLines.version
+                        watch.lastChecked = .now
+                        try? context.save()
+                        continue
                     } else {
                         lines = await RenderedPage.lines(of: url)
                     }
@@ -93,6 +101,12 @@ enum Watcher {
     private static func compare(_ watch: Watch, with lines: [String]) async {
         let old = watch.snapshot.split(separator: "\n").map(String.init)
         watch.lastChecked = .now
+        // Read by an older version of PageLines: taken afresh, not compared.
+        guard watch.readingVersion == PageLines.version else {
+            watch.snapshot = lines.joined(separator: "\n")
+            watch.readingVersion = PageLines.version
+            return
+        }
         if LaunchClock.isEnabled { print("WATCH \(watch.host): \(lines.count) lines, was \(old.count)") }
         // Far shorter than before: an error page or a wall, not the page. Keep the old reading.
         guard lines.joined().count * 3 >= old.joined().count else { return }
@@ -147,6 +161,10 @@ nonisolated enum PageLines {
         ]
         return URLSession(configuration: configuration)
     }()
+
+    /// Bumped when the way pages are read changes (2: link text on pages of
+    /// boxes), so a watch re-reads instead of announcing the change as news.
+    static let version = 2
 
     @concurrent static func fetch(_ url: URL) async -> [String]? {
         guard let (data, response) = try? await session.data(from: url),

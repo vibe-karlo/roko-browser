@@ -88,9 +88,6 @@ struct CommandBarView: View {
         return CGRect(x: 8, y: Self.safeTop + 8, width: screen.width - 16, height: 56)
     }
 
-    /// How long the field takes to fly up, for what waits on it.
-    private static let flight: Double = 0.11
-
     private static var safeTop: CGFloat {
         let window = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first
         return window?.safeAreaInsets.top ?? 59
@@ -128,7 +125,7 @@ struct CommandBarView: View {
                 // Down to the keyboard, whatever its size, settling as it arrives.
                 results
                     .opacity(rowsShown ? 1 : 0)
-                    .offset(y: rowsShown ? 0 : -10)
+                    .offset(y: rowsShown ? 0 : -4)
             }
             .foregroundStyle(Theme.ink)
             .padding(.horizontal, 8)
@@ -136,8 +133,10 @@ struct CommandBarView: View {
             .padding(.bottom, 4)
         }
         .onAppear {
+            HitchWatch.note("appeared")
             query = browser.commandPrefill
-            rebuild()
+            // The field starts growing first; its rows, hidden until halfway
+            // through, are built on the next turn (7 to 17 ms saved before anything moves).
             open()
         }
         .onDisappear {
@@ -540,10 +539,9 @@ struct CommandBarView: View {
         // (LauncherMorph). Hidden until it landed, the field flew up as an
         // empty dark pill.
         .background {
-            // Scaled from the capsule, the corners start at the capsule's roundness.
-            RoundedRectangle(cornerRadius: opened ? 18 : 28)
-                .fill(opened ? Theme.panel : Theme.raised)
-                .overlay(RoundedRectangle(cornerRadius: opened ? 18 : 28).strokeBorder(Theme.edge.opacity(opened ? 1 : 0)))
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Theme.panel)
+                .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.edge))
         }
     }
 
@@ -625,19 +623,24 @@ struct CommandBarView: View {
         }
         // Opened with no capsule to grow from (on launch, with nothing open): just there.
         guard browser.launcherOrigin != .zero else {
+            rebuild()
             browser.launcherShown = true
             browser.launcherRows = true
             focused = !browser.voiceListening
             return
         }
-        // A frame later: drawn in the bar's place first, so there's somewhere to grow from.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
-            withAnimation(.launcher) { browser.launcherShown = true }
-            withAnimation(.easeOut(duration: 0.08).delay(Self.flight * 0.5)) { browser.launcherRows = true }
-            // Listening, there's no keyboard: the rows have the room.
-            if !browser.voiceListening {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { focused = true }
-            }
+        // At once: the field fades in where it lives and the keyboard rises
+        // with it; the rows follow a beat later, built once things are moving.
+        HitchWatch.note("opening")
+        withAnimation(.launcher) { browser.launcherShown = true }
+        if !browser.voiceListening {
+            focused = true
+            HitchWatch.note("field focused")
+        }
+        DispatchQueue.main.async {
+            rebuild()
+            HitchWatch.note("rows built")
+            withAnimation(.easeOut(duration: 0.14)) { browser.launcherRows = true }
         }
     }
 
@@ -651,7 +654,7 @@ struct CommandBarView: View {
         }
         browser.cancelVoice()
         focused = false
-        withAnimation(.easeIn(duration: 0.06)) { browser.launcherRows = false }
+        withAnimation(.easeIn(duration: 0.1)) { browser.launcherRows = false }
         withAnimation(.launcher) { browser.launcherShown = false } completion: {
             // Something else opened meanwhile (a notification, Today in the
             // morning, a summary): that stays.
@@ -814,8 +817,8 @@ struct CommandBarView: View {
                                         kind: "", icon: .glyph(.todo), action: .todos))
             }
             if !toBuy.isEmpty {
-                rows.append(CommandItem(id: "shopping-left", title: "Shopping",
-                                        subtitle: toBuy.count == 1 ? "One thing to buy" : "\(toBuy.count) things to buy",
+                rows.append(CommandItem(id: "shopping-left", title: ListLanguage.say("Shopping", "Kupovina"),
+                                        subtitle: ShoppingView.toBuy(toBuy.count),
                                         kind: "", icon: .glyph(.basket), action: .shopping))
             }
             // Pinned answers, worked out again now: the weather, days until, a rate.

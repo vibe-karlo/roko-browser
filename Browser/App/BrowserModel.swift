@@ -257,6 +257,7 @@ final class BrowserModel {
     // MARK: Tabs
 
     func select(_ tab: BrowserTab) {
+        HitchWatch.start("select tab")
         let previous = selectedTab
         selectedID = tab.id
         tab.lastActive = .now
@@ -281,6 +282,7 @@ final class BrowserModel {
     }
 
     func close(_ tab: BrowserTab) {
+        HitchWatch.start("close tab")
         guard let index = tabs.firstIndex(where: { $0.id == tab.id }) else { return }
         tab.close()
         tabs.remove(at: index)
@@ -339,6 +341,7 @@ final class BrowserModel {
     }
 
     func showTabs() {
+        HitchWatch.start("tabs")
         // Refresh the current tab's card while its page is still on screen.
         Task { await selectedTab?.captureSnapshot() }
         panel = .tabs
@@ -346,6 +349,7 @@ final class BrowserModel {
 
     func showCommandBar(prefill: String = "", mode: CommandMode = .newTab,
                         context: LauncherContext = .web, over screen: Panel = .none) {
+        HitchWatch.start("launcher")
         dismissOffers()
         commandPrefill = prefill
         commandMode = mode
@@ -692,7 +696,12 @@ extension BrowserModel: BrowserTabDelegate {
             cookieOffer = nil
             cookieOfferTask?.cancel()
         }
-        dismissCopiedLink()
+        // Hidden, not taken: opening the bar is how the link gets used, and
+        // the bar lists it. (Taken here, it was gone from both places.)
+        if copiedLinkOffer {
+            copiedLinkOffer = false
+            copiedLinkTask?.cancel()
+        }
     }
 
     func allowCookies() {

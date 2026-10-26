@@ -138,9 +138,15 @@ final class BrowserTab: NSObject, Identifiable {
         isLive = true
         observe(webView)
 
+        let wanted = url
         if let restoreState {
             webView.interactionState = restoreState
             self.restoreState = nil
+            // A page that failed to load isn't in WebKit's history: restored,
+            // the tab came back blank, loading nothing and failing nothing.
+            if let wanted, webView.backForwardList.currentItem?.url != wanted {
+                webView.load(URLRequest(url: wanted))
+            }
         } else if let url {
             webView.load(URLRequest(url: url))
         }
@@ -540,7 +546,7 @@ struct LoadError: Equatable {
         case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed: .notFound
         case NSURLErrorCannotConnectToHost, NSURLErrorBadServerResponse: .notAnswering
         case NSURLErrorTimedOut: .slow
-        case NSURLErrorSecureConnectionFailed, NSURLErrorServerCertificateHasBadDate,
+        case NSURLErrorServerCertificateHasBadDate,
              NSURLErrorServerCertificateUntrusted, NSURLErrorServerCertificateHasUnknownRoot,
              NSURLErrorServerCertificateNotYetValid, NSURLErrorClientCertificateRejected: .unsafe
         default: .other

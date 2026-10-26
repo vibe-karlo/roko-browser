@@ -71,10 +71,10 @@ enum Shopping {
     /// splits only where every part is something to buy on its own ("kruh i
     /// jaja"), not inside one thing ("sok od naranče i jabuke").
     nonisolated static func items(in typed: String) -> [String] {
-        let pieces = typed.split(whereSeparator: { ",;\n".contains($0) })
+        let parts = pieces(typed)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-        return pieces.flatMap { piece -> [String] in
+        return parts.flatMap { piece -> [String] in
             let parts = piece.components(separatedBy: " i ").flatMap { $0.components(separatedBy: " and ") }
                 .flatMap { $0.components(separatedBy: " & ") }
                 .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -85,6 +85,25 @@ enum Shopping {
             return splits ? parts : [piece]
         }
         .map(capitalized)
+    }
+
+    /// Split on commas and semicolons, but not a decimal comma: "Dukat mlijeko
+    /// 2,8%" and "Coca cola 1,5 l" are one thing each.
+    nonisolated static func pieces(_ typed: String) -> [String] {
+        var pieces: [String] = [], current = ""
+        let characters = Array(typed)
+        for (index, character) in characters.enumerated() {
+            let decimal = character == "," && index > 0 && index + 1 < characters.count
+                && characters[index - 1].isNumber && characters[index + 1].isNumber
+            if (",;\n".contains(character)) && !decimal {
+                pieces.append(current)
+                current = ""
+            } else {
+                current.append(character)
+            }
+        }
+        pieces.append(current)
+        return pieces
     }
 
     /// "mlijeko" as "Mlijeko"; the rest as written ("iPhone", "NK Osijek" stay).
@@ -102,11 +121,17 @@ enum Shopping {
     /// `shop`: the list it goes on, when one is showing; nil (from the bar)
     /// sends each thing to where it's usually bought.
     static func add(_ typed: String, in context: ModelContext, to shop: Shop? = nil) -> (added: [ShoppingItem], already: [String]) {
+        add(titles: items(in: typed), in: context, to: shop)
+    }
+
+    /// Things already named one by one (a picked suggestion, a catalogue name
+    /// with "i" in it): not split again ("Ahmad Čaj menta i limun" is one).
+    static func add(titles: [String], in context: ModelContext, to shop: Shop? = nil) -> (added: [ShoppingItem], already: [String]) {
         let listed = (try? context.fetch(FetchDescriptor<ShoppingItem>(predicate: #Predicate { !$0.done }))) ?? []
         var keys = Set(listed.map(\.key))
         var order = (listed.map(\.order).max() ?? 0) + 1
         var added: [ShoppingItem] = [], already: [String] = []
-        for title in items(in: typed) {
+        for title in titles {
             let key = Aisle.key(title)
             guard !key.isEmpty else { continue }
             guard keys.insert(key).inserted else {
@@ -193,6 +218,7 @@ enum Shopping {
                 with brands. Pick the aisle where a shop keeps the item.
                 """)
             guard let answer = try? await session.respond(to: "Item: \(title)", generating: AisleGuess.self).content.aisle.aisle,
+                  !item.isDeleted, item.modelContext != nil,
                   item.aisle == .other, item.title == title, answer != .other else { return }
             item.aisle = answer
             try? context.save()
@@ -247,7 +273,7 @@ enum Shopping {
     /// "mli" is Mlijeko; "jog" is Jogurt, then Dukat jogurt.
     static func completions(for typed: String, in habits: [ShoppingHabit], excluding listed: Set<String>,
                             limit: Int = 4) -> [Completion] {
-        let key = Aisle.key(typed.split(separator: ",").last.map(String.init) ?? "")
+        let key = Aisle.key(pieces(typed).last ?? "")
         guard key.count >= 2 else { return [] }
         let starts = { (other: String) in other.hasPrefix(key) || other.contains(" " + key) }
         var seen = listed.union([key])
@@ -263,8 +289,8 @@ enum Shopping {
     }
 
     /// What was typed with its last piece finished: "mlijeko, jaja, kr" and Kruh.
-    nonisolated static func finishing(_ typed: String, with title: String) -> String {
-        (typed.split(separator: ",").dropLast().map(String.init) + [title]).joined(separator: ", ")
+    nonisolated static func finishing(_ typed: String, with title: String) -> [String] {
+        items(in: pieces(typed).dropLast().joined(separator: ",")) + [title]
     }
 
     static func habit(_ key: String, in context: ModelContext) -> ShoppingHabit? {
@@ -406,6 +432,8 @@ nonisolated final class ShoppingCatalogue: Sendable {
     struct Entry: Sendable {
         let title: String
         let key: String
+        /// " " + key, made once: matched against on every letter typed.
+        let spaced: String
     }
 
     /// Everyday things first: they're what a list mostly says.
@@ -420,7 +448,10 @@ nonisolated final class ShoppingCatalogue: Sendable {
         }
         let everyday = read("everyday")
         everydayCount = everyday.count
-        entries = (everyday + read("products")).map { Entry(title: $0, key: Aisle.key($0)) }
+        entries = (everyday + read("products")).map { title in
+            let key = Aisle.key(title)
+            return Entry(title: title, key: key, spaced: " " + key)
+        }
     }
 
     /// The everyday things, for expecting them by ear and for splitting a spoken list.
@@ -429,12 +460,13 @@ nonisolated final class ShoppingCatalogue: Sendable {
     /// Those whose words start with what's typed: names starting with it
     /// first ("Jogurt"), then ones with it inside ("Dukat jogurt").
     func matching(_ key: String, limit: Int) -> [Entry] {
+        let spacedKey = " " + key
         var first: [Entry] = [], inside: [Entry] = []
         for entry in entries {
             if entry.key.hasPrefix(key) {
                 first.append(entry)
                 if first.count >= limit { break }
-            } else if inside.count < limit, entry.key.contains(" " + key) {
+            } else if inside.count < limit, entry.spaced.contains(spacedKey) {
                 inside.append(entry)
             }
         }

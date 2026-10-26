@@ -35,6 +35,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Five app icons: the blue, green, yellow and grey stars, and the orange chevrons.
 
 ### Fixed
+- The address bar opens in place: the field fades in at the top and settles a few points, the keyboard rising with it, instead of flying up from the bottom bar. On a warm open it starts appearing 38 ms after the tap (was 70) and has the keyboard at 39 ms (was 125); its rows are built once it's showing.
+- Opening the address bar with a copied link offered above the bar threw the link away instead of listing it in the bar.
+- A tab whose page had failed to load came back blank after a relaunch, loading nothing and showing no error: it's loaded again.
+- Shopping: picking a suggestion with "i" in its name ("Ahmad Čaj menta i limun") no longer adds two things; a decimal comma ("Dukat mlijeko 2,8%") no longer splits one; Done tapped as a spoken list finishes can't add it twice; listening stops on its own after the words stop changing, by 45 seconds at most, and when Shopping closes; ticking, deleting and moving can't touch an item already deleted; a thing already on another shop's list says which; tapping another shop's name clears the move offer; aisles are remembered rather than worked out on every redraw, and the catalogue is matched without allocating on every letter.
+- Notify Me: a watch that becomes readable without scripts, or was read by an older version, is read afresh instead of compared, which could stop it for good or send a false alert.
+- The offline error screen no longer says "Back online" before the connection has come back, and loads at once after a blip; one connection monitor for the app instead of one per redraw; its eclipse draws at 12 frames a second and stops while covered.
+- A secure-connection failure (often a captive portal) offers Try again instead of calling the site unsafe. Resetting a site in Settings → Sites applies to open tabs, and the Sites count is read when Settings opens, not on every redraw.
 - The launcher opens and closes about twice as fast (0.11 s instead of 0.2), so it reads as the bar becoming the launcher rather than a flight.
 - The launcher's field flew up from the bar as an empty dark pill, its contents shown only once it landed: they now ride along at their own size, uncovered as the field widens. And an offer above the bar (cookies, a copied link) no longer lingers as a blank box when the bar opens; it's put away first.
 - The link you copied is offered above the bar only when roko can show which link it is; the bare Paste button stays in the address bar's list. "Page not working? Allow cookies" now takes three reloads within 45 seconds, not two in two minutes (following a live blog set it off).

@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Where a shopping item is found, in the order a shop is walked: fresh food
 /// first, then the shelves, then the house. Croatian or English, singular or
@@ -51,8 +52,17 @@ nonisolated enum Aisle: String, CaseIterable, Codable, Identifiable, Sendable {
 
     /// The aisle an item belongs in, from its words; `.other` when none say.
     static func of(_ item: String) -> Aisle {
-        best(in: item)?.aisle ?? .other
+        if let known = memo.withLock({ $0[item] }) { return known }
+        let aisle = best(in: item)?.aisle ?? .other
+        memo.withLock { cache in
+            // Every render asks again about the same few things: answer from memory.
+            if cache.count > 2_000 { cache.removeAll() }
+            cache[item] = aisle
+        }
+        return aisle
     }
+
+    private static let memo = Mutex<[String: Aisle]>([:])
 
     /// How an item is known, whatever way it was written: lower case, no
     /// accents, no amounts or sizes. "2x Mlijeko 1L" and "mlijeko" are one.

@@ -19,7 +19,7 @@ struct SettingsView: View {
     @State private var apiKey = Keychain.claudeAPIKey ?? ""
     @State private var plates = Parking.shared.plates
     @State private var notifications = "On"
-    @State private var changedSites = SitesSettings.sites().count
+    @State private var changedSites = 0
 
     var body: some View {
         NavigationStack {
@@ -473,7 +473,7 @@ struct SitesSettings: View {
         var id: String { host }
     }
 
-    @State private var sites = SitesSettings.sites()
+    @State private var sites: [Site] = []
 
     static func sites() -> [Site] {
         var changes: [String: [String]] = [:]
@@ -513,11 +513,15 @@ struct SitesSettings: View {
             }
         }
         .settingsPage("Sites")
+        // Read when shown, not when built: Settings builds every page up front.
+        .onAppear { sites = Self.sites() }
     }
 
     private func reset(_ site: Site) {
         ConsentHandler.shared.setAccepted(nil, for: site.host)
         ContentBlocker.shared.forgetAllowances(for: site.host)
+        // Open tabs on it, too: their next page loads with everything blocked.
+        ContentBlocker.shared.settingsChanged()
         PageZoom.forget(site.host)
         withAnimation(.snappy) { sites = Self.sites() }
     }
