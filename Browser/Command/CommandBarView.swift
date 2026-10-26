@@ -61,9 +61,13 @@ struct CommandBarView: View {
     /// How tall the list is, between the field and the keyboard.
     @State private var listHeight: CGFloat = 300
     /// Grown out of the bar (true) or still sitting in it (false): see LauncherMorph.
-    @State private var opened = false
+    /// Kept by the app, not this view: a view rebuilt while the app starts up
+    /// would otherwise come back half-drawn.
+    private var opened: Bool { browser.launcherShown }
     /// The rows: in once the field has landed, so it never flies up through them.
-    @State private var rowsShown = false
+    private var rowsShown: Bool { browser.launcherRows }
+    /// A finger is on the list.
+    @State private var listDragged = false
     /// Where the field ends up: at the top, under the status bar, as in Arc
     /// Search. Fixed, so it's known before anything is laid out and no keyboard
     /// (the system's, SwiftKey, one that says its size late) can move it.
@@ -124,7 +128,10 @@ struct CommandBarView: View {
             rebuild()
             open()
         }
-        .onDisappear { browser.launcherShown = false }
+        .onDisappear {
+            browser.launcherShown = false
+            browser.launcherRows = false
+        }
         .task {
             guard browser.launcherContext == .web, await CopiedLink.isWaiting() else { return }
             copiedURL = await CopiedLink.peek()
@@ -264,11 +271,14 @@ struct CommandBarView: View {
         }
         .frame(maxHeight: .infinity)
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
-        // Pulled down past its top, the list closes the bar, as a sheet would.
+        // Pulled down past its top by a finger, the list closes the bar, as a sheet
+        // would. Only by a finger: while the list lays itself out it can pass
+        // that point on its own, which closed the bar the moment it opened.
+        .onScrollPhaseChange { _, phase in listDragged = phase == .interacting }
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y < -geometry.contentInsets.top - 60
         } action: { _, pulled in
-            if pulled { dismiss() }
+            if pulled, listDragged { dismiss() }
         }
         .onChange(of: scrollRequest) { _, target in
             guard let target else { return }
@@ -529,13 +539,17 @@ struct CommandBarView: View {
     /// only then does the keyboard come, rising under it, so the keyboard never
     /// covers the capsule the field is growing out of.
     private func open() {
+        // Opened with no capsule to grow from (on launch, with nothing open): just there.
+        guard browser.launcherOrigin != .zero else {
+            browser.launcherShown = true
+            browser.launcherRows = true
+            focused = true
+            return
+        }
         // A frame later: drawn in the bar's place first, so there's somewhere to grow from.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
-            withAnimation(.launcher) {
-                opened = true
-                browser.launcherShown = true
-            }
-            withAnimation(.easeOut(duration: 0.12).delay(Self.flight * 0.55)) { rowsShown = true }
+            withAnimation(.launcher) { browser.launcherShown = true }
+            withAnimation(.easeOut(duration: 0.12).delay(Self.flight * 0.55)) { browser.launcherRows = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { focused = true }
         }
     }
@@ -544,11 +558,8 @@ struct CommandBarView: View {
     /// then the launcher is gone and the capsule is there in its place.
     private func dismiss() {
         focused = false
-        withAnimation(.easeIn(duration: 0.1)) { rowsShown = false }
-        withAnimation(.launcher) {
-            opened = false
-            browser.launcherShown = false
-        } completion: {
+        withAnimation(.easeIn(duration: 0.1)) { browser.launcherRows = false }
+        withAnimation(.launcher) { browser.launcherShown = false } completion: {
             var still = Transaction()
             still.disablesAnimations = true
             withTransaction(still) { browser.panel = browser.launcherReturn }

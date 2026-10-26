@@ -40,6 +40,8 @@ final class BrowserModel {
     var launcherOrigin: CGRect = .zero
     /// The launcher is open or opening (the bar steps back meanwhile).
     var launcherShown = false
+    /// Its rows are in (after the field has landed).
+    var launcherRows = false
     var isBarCollapsed = false
     var summary: SummaryModel? {
         // Closed before it's finished: stop there, as Browse for Me does.

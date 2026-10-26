@@ -56,6 +56,12 @@ enum CopiedLink {
         leftAt = .now
     }
 
+    /// Copied on a Mac or iPad nearby: Universal Clipboard marks what it brings.
+    /// (Reading the clipboard's types asks no permission; its contents would.)
+    private static var isFromAnotherDevice: Bool {
+        UIPasteboard.general.types.contains("com.apple.is-remote-clipboard")
+    }
+
     /// iOS doesn't say when something was copied, only that the clipboard
     /// changed. Away for longer than the window, roko can't tell a link copied
     /// a moment ago from one copied half an hour ago: so it isn't put above the
@@ -89,7 +95,17 @@ enum CopiedLink {
         let board = UIPasteboard.general
         let count = board.changeCount
         guard count != taken, cameFromElsewhere else { return false }
-        if seen?.count != count { seen = (count, .now) }
+        if seen?.count != count {
+            // First noticed now. A copy from a Mac (Universal Clipboard) is
+            // always fresh: iOS keeps it only a couple of minutes. A copy made
+            // on this iPhone while roko was away long could be a day old, and
+            // nothing says when it was made: so it isn't offered at all.
+            if copyMayBeOld, !isFromAnotherDevice {
+                taken = count
+                return false
+            }
+            seen = (count, .now)
+        }
         // Recent only: an old link isn't what you came to open.
         guard let seen, Date.now.timeIntervalSince(seen.at) < window else { return false }
         // Throws when the clipboard is empty.
@@ -100,8 +116,7 @@ enum CopiedLink {
     /// Opening roko with a fresh link: offered above the bar once per copy.
     /// Not one copied in roko, which is already here.
     static func shouldOfferAboveBar() async -> Bool {
-        let mayBeOld = copyMayBeOld
-        guard await isWaiting(), !mayBeOld else { return false }
+        guard await isWaiting() else { return false }
         let count = UIPasteboard.general.changeCount
         guard count != offeredAboveBar, ownCopy?.count != count else { return false }
         offeredAboveBar = count

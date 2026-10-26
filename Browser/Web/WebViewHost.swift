@@ -80,12 +80,12 @@ struct WebViewHost: UIViewRepresentable {
         private let haptic = UIImpactFeedbackGenerator(style: .light)
         private let firmHaptic = UIImpactFeedbackGenerator(style: .medium)
         /// How far past the top a pull has to go: deliberate, not a bounce.
-        private let pullDistance: CGFloat = 100
+        private let pullDistance: CGFloat = 80
         /// Further still, and letting go summarizes instead of reloading. The
-        /// page resists more the further it goes: this is about 300 points of
-        /// finger travel, 90 past the reload point's 210. Shorter and it came
-        /// by accident; longer (it was 370) and it felt like a chore.
-        private let summarizeDistance: CGFloat = 140
+        /// page resists more the further it goes: a reload comes early, and
+        /// summarizing takes a deliberate pull well past it, so one isn't
+        /// mistaken for the other.
+        private let summarizeDistance: CGFloat = 150
         /// Pulled far enough, waiting for the finger to lift before reloading.
         private var refreshArmed = false
         /// Pulled as far as summarizing, waiting for the finger to lift.
