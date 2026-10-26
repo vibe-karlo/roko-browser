@@ -356,6 +356,16 @@ final class BrowserModel {
             return
         }
         do {
+            // Your own sites, for the recognizers to expect by name.
+            VoiceInput.expectedSites = Array(pins().compactMap { URL(string: $0.url)?.displayHost }
+                + history(matching: "", limit: 60).compactMap { URL(string: $0.url)?.displayHost })
+                .reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+                .prefix(20)
+                .flatMap { host -> [String] in
+                    let parts = host.split(separator: ".")
+                    guard parts.count >= 2 else { return [host] }
+                    return ["\(parts[parts.count - 2]) točka \(parts.last!)", String(parts[parts.count - 2])]
+                }
             let tick = UIImpactFeedbackGenerator(style: .heavy)
             tick.prepare()
             try VoiceInput.shared.start()

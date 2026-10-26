@@ -24,6 +24,16 @@ enum PopularSites {
     /// Every host, for matching a spoken name that's close but not exact.
     static var allHosts: [String] { ordered.map(\.host) }
 
+    /// What a speech recognizer should expect to hear: each site's name and
+    /// its address said aloud ("SiB", "sib točka hr", "index dot hr").
+    static var spokenNames: [String] {
+        ordered.flatMap { site -> [String] in
+            let parts = site.host.split(separator: ".")
+            guard let name = parts.first, let ending = parts.last, parts.count == 2 else { return [site.name] }
+            return [site.name, "\(name) točka \(ending)", "\(name) dot \(ending)"]
+        }
+    }
+
     private static let ordered: [Site] = Locale.current.region?.identifier == "HR" ? croatia + world : world + croatia
 
     private static func sites(_ list: [(String, String)]) -> [Site] {

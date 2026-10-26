@@ -35,6 +35,10 @@ final class VoiceInput {
     private var ears: [Ear] = []
     private var finish: CheckedContinuation<String?, Never>?
 
+    /// Sites you go to, said the way they'd be said ("sib točka hr"), for the
+    /// recognizers to expect. Set by the browser from history and pins.
+    static var expectedSites: [String] = []
+
     /// The languages heard, the phone's own first.
     private static var locales: [Locale] {
         let all = [Locale(identifier: "hr-HR"), Locale(identifier: "en-US")]
@@ -84,7 +88,10 @@ final class VoiceInput {
                 request.requiresOnDeviceRecognition = true
             }
             // Words roko hears often: what it's asked to open and to do.
-            request.contextualStrings = ["roko", "todo", "to-do", "dot com", "točka hr", "index.hr", "jutarnji"]
+            // Short names ("SiB", "Index") are easily heard as other words; told
+            // to expect them, the recognizer hears them. Your sites first.
+            request.contextualStrings = Array((["roko", "todo", "to-do", "dot com", "točka hr"] + Self.expectedSites
+                                               + PopularSites.spokenNames).prefix(100))
             return Ear(locale: locale, recognizer: recognizer, request: request)
         }
         guard !ears.isEmpty else { throw URLError(.cannotConnectToHost) }
@@ -285,8 +292,11 @@ enum VoiceCommand {
             let plainHost = plain(host)
             if let ending, plainHost.split(separator: ".").last.map(String.init) != ending { return false }
             let theirs = plainHost.split(separator: ".").first.map(String.init) ?? plainHost
-            return stem.count >= 4 && distance(theirs, stem) <= (stem.count >= 5 ? 2 : 1)
+            if stem.count >= 4 { return distance(theirs, stem) <= (stem.count >= 5 ? 2 : 1) }
+            // A short name with its last letter lost ("si.hr" for sib.hr).
+            return stem.count >= 2 && theirs.count == stem.count + 1 && theirs.hasPrefix(stem)
         }
+        // The site you know: ones from your history before well-known ones.
         return near.first
     }
 
