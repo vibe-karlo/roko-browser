@@ -469,13 +469,13 @@ private struct WatchRow: View {
 /// The home screen icon: roko's marks in a few colours, from the logo design.
 private struct AppIconPicker: View {
     /// Asset names; "AppIcon" is the default.
-    private static let icons = ["AppIcon", "AppIcon-StarOrange", "AppIcon-StarLight", "AppIcon-StarFlame",
-                                "AppIcon-StarBlue", "AppIcon-StarGreen", "AppIcon-StarGold", "AppIcon-Chevrons",
+    private static let icons = ["AppIcon", "AppIcon-StarOrange", "AppIcon-StarFlame",
                                 "AppIcon-ChevronsGraphite", "AppIcon-Plus", "AppIcon-RollingO",
                                 "AppIcon-EclipseCream", "AppIcon-EclipseOnOrange", "AppIcon-EclipseOrange",
                                 "AppIcon-Ro", "AppIcon-RoOnOrange", "AppIcon-Octagon", "AppIcon-OctagonOnOrange",
                                 "AppIcon-Wordmark", "AppIcon-WordmarkOnOrange"]
-    @State private var current = UIApplication.shared.alternateIconName ?? "AppIcon"
+    /// An icon no longer offered counts as the default.
+    @State private var current = UIApplication.shared.alternateIconName.flatMap { icons.contains($0) ? $0 : nil } ?? "AppIcon"
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
 
     var body: some View {

@@ -35,12 +35,7 @@ let eclipse = Mark(viewBox: (0, 0, 600, 600), widthShare: 600.0 / 1024) {
 /// Icon set name, mark, tile colour, mark colour.
 let icons: [(String, Mark, String, String)] = [
     ("AppIcon-StarOrange", star, "#050506", "#FF5B1F"),
-    ("AppIcon-StarLight", star, "#A9A9A9", "#0E0E0F"),
     ("AppIcon-StarFlame", star, "#FF5B1F", "#0E0E0F"),
-    ("AppIcon-StarBlue", star, "#050506", "#2F6BFF"),
-    ("AppIcon-StarGreen", star, "#050506", "#00B37A"),
-    ("AppIcon-StarGold", star, "#050506", "#F2C200"),
-    ("AppIcon-Chevrons", chevrons, "#FF5B1F", "#0E0E0F"),
     ("AppIcon-ChevronsGraphite", chevrons, "#1A1A1B", "#A9A9A9"),
     ("AppIcon-Plus", forwardPlus, "#050506", "#FF5B1F"),
     ("AppIcon-RollingO", rollingO, "#15171B", "#FF5B1F"),
