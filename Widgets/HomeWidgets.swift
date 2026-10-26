@@ -131,10 +131,12 @@ private struct TodayWidgetView: View {
             }
         } else {
             // Side by side: the weather on the left, the list on the right.
-            HStack(alignment: .top, spacing: 16) {
+            HStack(alignment: .top, spacing: 14) {
+                // A little in from the edge; only as wide as "Partly cloudy" needs.
                 WeatherPanel(weather: entry.snapshot.weather, wide: false)
-                    .frame(width: 104, alignment: .leading)
+                    .frame(width: 84, alignment: .leading)
                     .frame(maxHeight: .infinity)
+                    .padding(.leading, 6)
                 VStack(alignment: .leading, spacing: 8) {
                     TodoHeader(left: due.count)
                     TodoList(items: Array(due.prefix(3)), more: max(0, due.count - 3), now: entry.date,
@@ -257,6 +259,7 @@ private struct WeatherPanel: View {
                         Text("\(Int(weather.temperature.rounded()))°")
                             .font(.system(size: 38, weight: .semibold).monospacedDigit())
                         Text(weather.condition).font(.system(size: 13, weight: .medium)).lineLimit(1)
+                            .minimumScaleFactor(0.8)
                             .padding(.top, 2)
                         Text(range(weather)).font(.system(size: 12).monospacedDigit()).foregroundStyle(Color.secondaryInk)
                     }
