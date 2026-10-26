@@ -43,7 +43,10 @@ struct BottomBar: View {
                     Group {
                         if isPrivate {
                             HStack(spacing: 6) {
+                                // Centred on the word's lowercase letters, not its
+                                // capitals: measured, it sat 1.3 points high.
                                 Glyph(.eyeClosed, size: 17)
+                                    .offset(y: 1.5)
                                 Text("Private").font(.system(size: 15, weight: .semibold))
                             }
                             .transition(.opacity)
