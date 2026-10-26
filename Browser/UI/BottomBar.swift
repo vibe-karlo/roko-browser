@@ -39,13 +39,20 @@ struct BottomBar: View {
             // Tap: the launcher. Hold: speak, and let go.
             Group {
                 ZStack {
-                    // On a private tab the closed eye sits beside the +, in orange.
-                    HStack(spacing: 10) {
+                    // On a private tab it says so, as what tapping does: a private search.
+                    Group {
                         if isPrivate {
-                            Glyph(.eyeClosed, size: 18).foregroundStyle(Theme.accent)
+                            HStack(spacing: 6) {
+                                Glyph(.eyeClosed, size: 17)
+                                Text("Private").font(.system(size: 15, weight: .semibold))
+                            }
+                            .transition(.opacity)
+                        } else {
+                            Glyph(.plus, size: 22, weight: 2)
+                                .transition(.opacity)
                         }
-                        Glyph(.plus, size: 22, weight: 2)
                     }
+                    .animation(.easeOut(duration: 0.2), value: isPrivate)
                     .opacity(browser.voiceListening ? 0 : 1)
                     Image(systemName: "mic.fill")
                         .font(.system(size: 17, weight: .semibold))
@@ -78,7 +85,7 @@ struct BottomBar: View {
             .animation(.snappy(duration: 0.2), value: browser.voiceListening)
             .gesture(holdToTalk)
             .accessibilityElement()
-            .accessibilityLabel(isPrivate ? "New tab, private browsing on" : "New tab")
+            .accessibilityLabel(isPrivate ? "Private search" : "New tab")
             .accessibilityHint(Preferences.holdToTalk ? "Hold to speak" : "")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { browser.showCommandBar() }
@@ -98,8 +105,7 @@ struct BottomBar: View {
         }
         .frame(height: Theme.barHeight + 8)
         .overlay(alignment: .bottom) { progressLine }
-        .modifier(BarSurface(isPrivate: isPrivate))
-        .animation(.easeOut(duration: 0.25), value: isPrivate)
+        .barSurface(cornerRadius: Theme.barRadius)
         // Alongside the + capsule's own hold, not over it: as a high-priority
         // gesture it held every touch until it knew it wasn't a swipe, so a
         // hold on + never reached the capsule.
@@ -273,18 +279,5 @@ struct GlyphButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundStyle(isEnabled ? (configuration.isPressed ? HierarchicalShapeStyle.secondary : .primary) : .tertiary)
-    }
-}
-
-/// The bar's surface, dark with an orange edge on a private tab.
-private struct BarSurface: ViewModifier {
-    let isPrivate: Bool
-
-    func body(content: Content) -> some View {
-        if isPrivate {
-            content.privateBarSurface(cornerRadius: Theme.barRadius)
-        } else {
-            content.barSurface(cornerRadius: Theme.barRadius)
-        }
     }
 }

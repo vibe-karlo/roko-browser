@@ -233,7 +233,7 @@ private struct TabCard: View {
         HStack(spacing: 8) {
             SiteIcon(host: tab.url?.displayHost ?? "", size: 20)
             if tab.isPrivate {
-                Glyph(.eyeClosed, size: 15).foregroundStyle(Theme.accent)
+                Glyph(.eyeClosed, size: 15).foregroundStyle(Theme.secondaryInk)
             }
             if isFocused {
                 Text(tab.displayTitle)

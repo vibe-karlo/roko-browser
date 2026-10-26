@@ -257,10 +257,6 @@ final class BrowserModel {
 
     func select(_ tab: BrowserTab) {
         let previous = selectedTab
-        // Into private browsing: say so, once, as it happens.
-        if tab.isPrivate, previous?.isPrivate != true {
-            showToast("Private tab: nothing is kept")
-        }
         selectedID = tab.id
         tab.lastActive = .now
         tab.wake()
