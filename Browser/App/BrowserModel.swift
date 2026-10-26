@@ -409,6 +409,10 @@ final class BrowserModel {
             case .open(let url):
                 panel = .none
                 openFromCommandBar(url)
+            case .words(let text) where ResearchDepth.prefersAnswer(text) && !TodoIntent.isLikely(text):
+                // A question said ("koji su rezultati izbora u srbiji"): answered at once.
+                panel = .none
+                browse(for: text)
             case .words(let text):
                 // A site's name said ("Sportske novosti"): the site, opened.
                 let rows = CommandRanker.rank(query: text, browser: self, suggestions: [])
