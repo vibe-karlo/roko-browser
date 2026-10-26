@@ -76,18 +76,27 @@ struct BottomBar: View {
         .frame(height: Theme.barHeight + 8)
         .overlay(alignment: .bottom) { progressLine }
         .barSurface(cornerRadius: Theme.barRadius)
-        .highPriorityGesture(swipes)
+        // Alongside the + capsule's own hold, not over it: as a high-priority
+        // gesture it held every touch until it knew it wasn't a swipe, so a
+        // hold on + never reached the capsule.
+        .simultaneousGesture(swipes)
         .sensoryFeedback(.selection, trigger: switches)
     }
 
     @State private var pressedAt: Date?
     @State private var holdTask: Task<Void, Never>?
+    @State private var swiped = false
 
     /// A tap opens the launcher; held past a third of a second, it listens
     /// until the finger lifts.
     private var holdToTalk: some Gesture {
         DragGesture(minimumDistance: 0)
-            .onChanged { _ in
+            .onChanged { value in
+                // A swipe across the bar (to switch tabs) isn't a hold or a tap.
+                if hypot(value.translation.width, value.translation.height) > 14 {
+                    holdTask?.cancel()
+                    swiped = true
+                }
                 guard pressedAt == nil else { return }
                 pressedAt = .now
                 holdTask = Task {
@@ -101,8 +110,11 @@ struct BottomBar: View {
             .onEnded { _ in
                 holdTask?.cancel()
                 pressedAt = nil
+                defer { swiped = false }
                 if browser.voiceListening {
                     browser.endVoice()
+                } else if swiped {
+                    return
                 } else if browser.panel != .command {
                     browser.launcherOrigin = capsuleFrame
                     browser.showCommandBar()

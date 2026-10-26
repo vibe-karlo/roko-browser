@@ -39,11 +39,16 @@ final class VoiceInput {
 
     /// Microphone and speech recognition, asked for the first time + is held.
     static func authorize() async -> Bool {
-        let speech = await withCheckedContinuation { continuation in
-            SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0 == .authorized) }
-        }
-        guard speech else { return false }
+        guard await speechAuthorized() else { return false }
         return await AVAudioApplication.requestRecordPermission()
+    }
+
+    /// Off the main actor: iOS answers on a queue of its own, and a reply
+    /// handler made on the main actor stops the app when it's called there.
+    nonisolated private static func speechAuthorized() async -> Bool {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            SFSpeechRecognizer.requestAuthorization { @Sendable status in continuation.resume(returning: status == .authorized) }
+        }
     }
 
     static var isAuthorized: Bool {
@@ -72,23 +77,38 @@ final class VoiceInput {
 
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
-        let requests = ears.map(\.request)
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
-            for request in requests { request.append(buffer) }
-            let level = Self.level(of: buffer)
-            Task { @MainActor in self?.level = level }
-        }
+        // The microphone's and the recognizers' callbacks come on their own
+        // queues: made outside the main actor (Self.tap, Self.listener), so
+        // Swift doesn't stop the app when they arrive there.
+        input.installTap(onBus: 0, bufferSize: 1024, format: format, block: Self.tap(ears.map(\.request), into: self))
         engine.prepare()
         try engine.start()
         isListening = true
 
         for index in ears.indices {
-            ears[index].task = ears[index].recognizer.recognitionTask(with: ears[index].request) { [weak self] result, error in
-                let transcription = result?.bestTranscription
-                let isFinal = result?.isFinal ?? false
-                let failed = error != nil
-                Task { @MainActor in self?.heard(index, transcription, isFinal: isFinal || failed) }
-            }
+            ears[index].task = ears[index].recognizer.recognitionTask(with: ears[index].request,
+                                                                      resultHandler: Self.listener(index, for: self))
+        }
+    }
+
+    nonisolated private static func tap(_ requests: [SFSpeechAudioBufferRecognitionRequest],
+                                        into input: VoiceInput) -> AVAudioNodeTapBlock {
+        let requests = UncheckedBox(requests)
+        let target = WeakBox(input)
+        return { buffer, _ in
+            for request in requests.value { request.append(buffer) }
+            let level = level(of: buffer)
+            Task { @MainActor in target.value?.level = level }
+        }
+    }
+
+    nonisolated private static func listener(_ index: Int, for input: VoiceInput)
+        -> @Sendable (SFSpeechRecognitionResult?, (any Error)?) -> Void {
+        let target = WeakBox(input)
+        return { result, error in
+            let transcription = result.map { UncheckedBox($0.bestTranscription) }
+            let isFinal = (result?.isFinal ?? false) || error != nil
+            Task { @MainActor in target.value?.heard(index, transcription?.value, isFinal: isFinal) }
         }
     }
 
@@ -225,4 +245,15 @@ enum VoiceCommand {
         guard !wanted.contains(".") else { return nil }
         return hosts.first { plain($0).split(separator: ".").first.map(String.init) == stem }
     }
+}
+
+/// Carries a value across threads that's only read there once, as handed over.
+nonisolated private struct UncheckedBox<Value>: @unchecked Sendable {
+    let value: Value
+    init(_ value: Value) { self.value = value }
+}
+
+nonisolated private final class WeakBox<Object: AnyObject>: @unchecked Sendable {
+    weak var value: Object?
+    init(_ value: Object) { self.value = value }
 }
