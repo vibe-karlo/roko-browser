@@ -554,7 +554,7 @@ private struct DayPicker: View {
 /// always gives up focus on Return, and the first letters typed after it
 /// were lost while it came back. UIKit's asks first, and here the answer is no.
 /// It takes the keyboard as it appears.
-private struct ReturnKeepingField: UIViewRepresentable {
+struct ReturnKeepingField: UIViewRepresentable {
     let placeholder: String
     @Binding var text: String
     let onReturn: () -> Void

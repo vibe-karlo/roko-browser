@@ -35,14 +35,26 @@ struct TodoIcon: View {
     let size: CGFloat
 
     var body: some View {
-        Glyph(.todo, size: size * 0.86)
+        CountedGlyph(glyph: .todo, count: left, size: size)
+    }
+}
+
+/// A glyph at a pin's size with a count on its top-right corner, in roko's
+/// orange: To-do's checklist, Shopping's basket.
+struct CountedGlyph: View {
+    let glyph: Glyph.Kind
+    let count: Int
+    let size: CGFloat
+
+    var body: some View {
+        Glyph(glyph, size: size * 0.86)
             .foregroundStyle(Theme.ink)
             .frame(width: size, height: size)
             .overlay(alignment: .topTrailing) {
-                Text(left > 99 ? "99+" : "\(left)")
+                Text(count > 99 ? "99+" : "\(count)")
                     .font(.system(size: size * 0.38, weight: .bold).monospacedDigit())
                     .foregroundStyle(.white)
-                    .padding(.horizontal, left > 9 ? size * 0.12 : 0)
+                    .padding(.horizontal, count > 9 ? size * 0.12 : 0)
                     .frame(minWidth: size * 0.56, minHeight: size * 0.56)
                     .background(Theme.accent, in: .capsule)
                     // Its own edge in the surface's colour, so it reads apart from the icon.
@@ -50,6 +62,6 @@ struct TodoIcon: View {
                     .fixedSize()
                     .offset(x: size * 0.22, y: -size * 0.2)
             }
-            .animation(.snappy, value: left)
+            .animation(.snappy, value: count)
     }
 }

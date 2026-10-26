@@ -6,7 +6,7 @@ struct CommandItem: Identifiable {
         case open(URL), switchTab(BrowserTab), openPin(Pin), search(String),
              browse(String), summarize, findOnPage, privateTab, settings, copy(String),
              pasteLink, openCopied(URL), todos, today, openApp(URL), ask(String), askAboutPage(String), addTodo(String, TodoWhen, DateComponents?),
-             payParking(city: String, zone: String), extendParking, endParking
+             payParking(city: String, zone: String), extendParking, endParking, shopping, addShopping(String)
     }
 
     let id: String
@@ -33,6 +33,7 @@ struct CommandBarView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \Pin.order) private var pins: [Pin]
     @Query(sort: \Todo.createdAt) private var todos: [Todo]
+    @Query(filter: #Predicate<ShoppingItem> { !$0.done }) private var toBuy: [ShoppingItem]
     /// Ticked in the bar a moment ago: still shown, struck through.
     @State private var justDone: Set<PersistentIdentifier> = []
     @State private var query = ""
@@ -812,6 +813,11 @@ struct CommandBarView: View {
                                         subtitle: left == 1 ? "One left for today" : "\(left) left for today",
                                         kind: "", icon: .glyph(.todo), action: .todos))
             }
+            if !toBuy.isEmpty {
+                rows.append(CommandItem(id: "shopping-left", title: "Shopping",
+                                        subtitle: toBuy.count == 1 ? "One thing to buy" : "\(toBuy.count) things to buy",
+                                        kind: "", icon: .glyph(.basket), action: .shopping))
+            }
             // Pinned answers, worked out again now: the weather, days until, a rate.
             for asked in PinnedAnswers.all {
                 let answer: CommandItem?
@@ -914,6 +920,11 @@ struct CommandBarView: View {
         case .privateTab: browser.showCommandBar(mode: .privateTab)
         case .settings: browser.panel = .settings
         case .todos: browser.panel = .todos
+        case .shopping: browser.panel = .shopping
+        case .addShopping(let typed):
+            let result = Shopping.add(typed, in: context)
+            browser.panel = .none
+            browser.showToast(Shopping.said(result))
         case .today: browser.panel = .today
         case .openApp(let url):
             browser.panel = .none
@@ -1080,6 +1091,13 @@ enum CommandRanker {
         guard !query.isEmpty else { return [] }
 
         var ranked: [(score: Int, item: CommandItem)] = []
+
+        // "shopping milk, eggs" or "kupovina mlijeko": onto the shopping list, on top.
+        if let typed = ShoppingQuery.items(in: query) {
+            let names = Shopping.items(in: typed)
+            ranked.append((1021, CommandItem(id: "add-shopping", title: names.joined(separator: ", "), subtitle: "Add to Shopping",
+                                             kind: "Add", icon: .glyph(.basket), action: .addShopping(typed))))
+        }
 
         // "todo call Petra tomorrow": a new to-do, on top, so Return adds it.
         if let draft = TodoDraft.parse(query) {
@@ -1253,13 +1271,16 @@ enum CommandRanker {
                                                                        kind: "Action", icon: .glyph(.todo), action: .todos)),
             (["today", "danas"], CommandItem(id: "action-today", title: "Today", subtitle: "Weather, calendar, to-dos, news",
                                              kind: "Action", icon: .glyph(.today), action: .today)),
+            (["shopping", "shopping list", "groceries", "kupovina", "namirnice", "popis za kupovinu"],
+             CommandItem(id: "action-shopping", title: "Shopping", subtitle: "Type \u{201C}shopping\u{201D} and what to buy to add it",
+                         kind: "Action", icon: .glyph(.basket), action: .shopping)),
         ]
         for (words, item) in actions where words.contains(where: { $0.hasPrefix(needle) }) {
             let needsPage = ["action-summarize", "action-find"].contains(item.id)
             if needsPage && browser.selectedTab == nil { continue }
             // Typed in full, a place in roko (Settings, To-do) is what's meant,
             // not a web search for the word: it goes first, and Return opens it.
-            let isPlace = ["action-settings", "action-todos", "action-today"].contains(item.id)
+            let isPlace = ["action-settings", "action-todos", "action-today", "action-shopping"].contains(item.id)
             let exact = words.contains(needle)
             // Above the calculator too: "today" opens Today rather than showing the date.
             ranked.append((isPlace && exact ? 1010 : needle.count >= 3 ? 880 : 500, item))

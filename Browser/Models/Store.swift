@@ -25,9 +25,11 @@ enum Store {
         let synced = ModelConfiguration("Synced", schema: Schema([Pin.self, HistoryEntry.self, Todo.self]),
                                         url: folder.appending(path: "synced.store"),
                                         cloudKitDatabase: syncs ? .private(cloudContainer) : .none)
-        let device = ModelConfiguration("Device", schema: Schema([SavedTab.self, Watch.self]),
+        // The shopping list stays here for now: shared with family it will go
+        // through CloudKit sharing, which needs the paid Developer Program.
+        let device = ModelConfiguration("Device", schema: Schema([SavedTab.self, Watch.self, ShoppingItem.self, ShoppingHabit.self]),
                                         url: folder.appending(path: "device.store"), cloudKitDatabase: .none)
-        let schema = Schema([Pin.self, HistoryEntry.self, Todo.self, SavedTab.self, Watch.self])
+        let schema = Schema([Pin.self, HistoryEntry.self, Todo.self, SavedTab.self, Watch.self, ShoppingItem.self, ShoppingHabit.self])
         let container: ModelContainer
         do {
             container = try ModelContainer(for: schema, configurations: synced, device)

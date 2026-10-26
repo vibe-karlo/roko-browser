@@ -130,6 +130,27 @@ on a phone. Our own search uses DuckDuckGo's HTML results and reads the pages in
 To time Browse for Me on a phone, launch a Debug build over the cable:
 `xcrun devicectl device process launch --console --device <id> com.growthstudio.roko -- -perf -browse "question"`.
 
+## Shopping
+
+A list that sorts itself into aisles (`Shopping/`). `Aisle.of` reads an item's words, Croatian
+or English, after folding case and accents and dropping amounts ("2x Mlijeko 1L" is "mlijeko"):
+whole words, stems ("mlijek" for mlijeko, mlijeka, mlijekom) and phrases ("kokosovo mlijeko"),
+each weighted. What a thing is outranks what it tastes of ("sok od naranče" is a drink, not
+fruit: fruit and vegetables count only on their own); a few words settle it whatever else is
+said ("smrznuto", "za pse", "gel za tuširanje"). A lookup takes about 0.1 ms. Words no rule
+knows go to Apple's on-device model in the background, and an item moved to another aisle is
+remembered (`ShoppingHabit.chosenAisle`). `Scripts/test_aisles.swift` checks it: 173 things
+people type, 101 items from October's Kaufland receipts (99 right; the two left are till
+abbreviations), and, given a shop's published price list, how its groups land (cleaning 80%
+Household, cosmetics 70% Personal care, drinks 70% Drinks).
+
+Each item added counts towards its `ShoppingHabit`: how often, and the days between (a second
+add the same day isn't another shop). Suggestions are habits bought at least twice and not on
+the list, those whose usual gap has come round first. Items bought more than a month ago are
+dropped from the list; habits stay. The list speaks English or Croatian (`ListLanguage`, Settings → Shopping list language): aisle names and its own words, with Croatian number forms ("svaka 3 dana", "svakih 5 dana", "21 stvar"); reading what's typed doesn't depend on it. Debug builds take `-seedShopping` for a few months of
+habits. Items and habits live in `device.store`: sharing a list with family will be CloudKit
+sharing, which needs the paid Developer Program (see "iCloud sync").
+
 ## Notify Me
 
 Like Safari's: in a page's menu, say what to look for (or nothing, for anything new) and how

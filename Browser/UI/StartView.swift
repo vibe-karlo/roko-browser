@@ -7,12 +7,13 @@ struct StartView: View {
     @Environment(BrowserModel.self) private var browser
     @Query(sort: \Pin.order) private var pins: [Pin]
     @Query private var todos: [Todo]
+    @Query(filter: #Predicate<ShoppingItem> { !$0.done }) private var toBuy: [ShoppingItem]
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
 
     var body: some View {
         VStack {
-            if pins.isEmpty && !todos.contains(where: \.isDueNow) {
+            if pins.isEmpty && !todos.contains(where: \.isDueNow) && toBuy.isEmpty {
                 Spacer()
                 Text("Pin a site from its page menu and it lives here.")
                     .font(.subheadline)
@@ -25,6 +26,9 @@ struct StartView: View {
                 Spacer()
                 LazyVGrid(columns: columns, spacing: 14) {
                     TodoPin(size: 34) { icon in
+                        icon.frame(maxWidth: .infinity, minHeight: 56).contentShape(.rect)
+                    }
+                    ShoppingPin(size: 34) { icon in
                         icon.frame(maxWidth: .infinity, minHeight: 56).contentShape(.rect)
                     }
                     ForEach(pins) { pin in

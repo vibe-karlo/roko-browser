@@ -17,7 +17,9 @@ struct Glyph: View {
              // To-do, and Today.
              todo, today, calendar, news,
              // Parking.
-             car
+             car,
+             // Shopping.
+             basket
     }
 
     let kind: Kind

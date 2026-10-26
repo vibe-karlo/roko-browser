@@ -6,7 +6,7 @@ import WebKit
 @Observable
 final class BrowserModel {
     enum Panel: Equatable {
-        case none, command, tabs, tools, settings, notifyMe, todos, today
+        case none, command, tabs, tools, settings, notifyMe, todos, today, shopping
     }
 
     enum CommandMode {
@@ -316,6 +316,7 @@ final class BrowserModel {
         switch url.absoluteString {
         case "roko://today": panel = .today
         case "roko://todo": panel = .todos
+        case "roko://shopping": panel = .shopping
         // The parking timer: the bar, with the time left on top.
         case "roko://parking", "roko://bar": showCommandBar()
         case "roko://parking/extend": Parking.shared.extend()

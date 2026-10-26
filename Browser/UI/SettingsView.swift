@@ -28,6 +28,7 @@ struct SettingsView: View {
     @AppStorage(Preferences.launcherTicksKey) private var launcherTicks = true
     @AppStorage(Preferences.pullToSummarizeKey) private var pullToSummarize = true
     @AppStorage(Preferences.todoAlertsKey) private var todoAlerts = true
+    @AppStorage(ListLanguage.key) private var shoppingLanguage: ListLanguage = .automatic
     @State private var confirmClear = false
     @State private var passkeyStatus = PasskeyAccess.status
     @State private var syncStatus = "Checking…"
@@ -170,6 +171,9 @@ struct SettingsView: View {
                     Toggle("Alert before a to-do's time", isOn: $todoAlerts)
                         .onChange(of: todoAlerts) { TodoAlerts.update() }
                     RemindersRow()
+                    Picker("Shopping list language", selection: $shoppingLanguage) {
+                        ForEach(ListLanguage.allCases) { Text($0.title).tag($0) }
+                    }
                     Button("News sites and topics") { choosingNewsSites = true }
                         .foregroundStyle(Theme.ink)
                     if TodayCalendar.isAllowed {
@@ -183,7 +187,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Today and to-dos")
                 } footer: {
-                    Text("Nudges are silent, at most two a day: at 8:30 if you haven't looked at Today, at 16:00 if to-dos are still open. To-do alerts come 15 minutes before, with sound. With Reminders on, your to-dos are also in a Reminders list, on every device with your iCloud.")
+                    Text("Nudges are silent, at most two a day: at 8:30 if you haven't looked at Today, at 16:00 if to-dos are still open. To-do alerts come 15 minutes before, with sound. With Reminders on, your to-dos are also in a Reminders list, on every device with your iCloud. The shopping list's aisles and words are in its language; what you type is understood in English and Croatian either way.")
                 }
                 .sheet(isPresented: $choosingNewsSites) {
                     NewsSitesSheet { TodayModel.shared.sitesChanged() }

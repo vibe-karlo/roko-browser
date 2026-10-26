@@ -113,6 +113,12 @@ struct BrowserView: View {
             }
         }
         .overlay {
+            if browser.panel == .shopping {
+                ShoppingView()
+                    .transition(.move(edge: .bottom))
+            }
+        }
+        .overlay {
             if let session = browser.browseForMe {
                 // Full screen, rising from the bar where the question was asked.
                 BrowseForMeView(session: session)
@@ -232,6 +238,10 @@ struct BrowserView: View {
             if Benchmark.isRequested { await Benchmark.run() }
             if !BrowseProbe.questions.isEmpty { await BrowseProbe.run() }
             if TopStoriesProbe.isRequested { await TopStoriesProbe.run() }
+            if ShoppingSeed.isRequested {
+                ShoppingSeed.run(in: context)
+                browser.panel = .shopping
+            }
             let arguments = ProcessInfo.processInfo.arguments
             // `-domProbe <script>`: run on the open tab every 5 seconds, for looking
             // at a page as roko's web view has it (a cookie pop-up no rule finds).
@@ -308,7 +318,8 @@ struct BrowserView: View {
     /// Text that reads on whatever is behind the status bar.
     private var statusBarStyle: UIStatusBarStyle {
         // The summary and Browse for Me sit on the app's own canvas.
-        if browser.summary != nil || browser.browseForMe != nil || browser.panel == .todos || browser.panel == .today {
+        if browser.summary != nil || browser.browseForMe != nil || browser.panel == .todos || browser.panel == .today
+            || browser.panel == .shopping {
             return .default
         }
         if browser.panel == .tabs { return .lightContent }  // the switcher is always dark
