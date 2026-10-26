@@ -6,6 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- The address bar knows a to-do when it sees one: "call Petra tomorrow", "kupiti mlijeko", "remind me to pay rent friday", "dentist at 15" put the to-do first (titled as it will be added, "Pay rent, for Friday"), so Return adds it, as Browse for Me goes first for a question. It reads doing words in English and Croatian, "remind me to" and "ne zaboravi", and words followed by a day or time; questions and look-ups ("how to pay rent", "weather tomorrow") stay searches.
 - Scrolling the address bar's list ticks for each row that passes under the field, like a picker wheel, while it's dragged or still gliding.
 - Typing an address, the site comes first: "index" offers index.hr itself, its front page, ahead of the articles you read on it, whether in history or open in tabs; the articles follow below. A page open in several tabs is one row.
 - The launcher's field goes to the top of the screen, as in Arc Search: it grows out of the bar's capsule and rises there in a fifth of a second, then the rows come in under it, down to the keyboard. Its place no longer depends on the keyboard, so a taller one (SwiftKey) or one that reports its size late can't make it jump.

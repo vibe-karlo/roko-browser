@@ -881,9 +881,11 @@ enum CommandRanker {
                 ranked.append((score, CommandItem(id: "browse-\(query)", title: "Browse for me", subtitle: "Reads the web and answers",
                                                 kind: "AI", icon: .glyph(.browse), action: .browse(query))))
                 // Or keep it: what was typed becomes a to-do ("call Petra tomorrow" for tomorrow).
-                if TodoDraft.parse(query) == nil, let draft = TodoDraft.parse("todo " + query) {
-                    ranked.append((845, CommandItem(id: "keep-todo", title: "Add to-do",
-                                                    subtitle: draft.when == .someday ? "Someday" : "For \(TodoDraft.phrase(draft.when, draft.time))",
+                // When it reads like one ("call Petra tomorrow", "kupiti mlijeko"), it's
+                // the first row, so Return adds it, as Browse for Me goes first for a question.
+                if TodoDraft.parse(query) == nil, let draft = TodoDraft.parse("todo " + TodoIntent.task(in: query)) {
+                    ranked.append((TodoIntent.isLikely(query) ? 915 : 845, CommandItem(id: "keep-todo", title: draft.title,
+                                                    subtitle: draft.when == .someday ? "New to-do, someday" : "New to-do for \(TodoDraft.phrase(draft.when, draft.time))",
                                                     kind: "To-do", icon: .glyph(.todo), action: .addTodo(draft.title, draft.when, draft.time))))
                 }
             }
@@ -1153,5 +1155,53 @@ extension WeatherQuery {
         if found == nil { found = await WeatherPlace.search(place).first }
         guard let found else { return nil }
         return try? await TodayWeather.fetch(at: found.coordinate, place: found.name)
+    }
+}
+
+/// Whether what's typed reads like something to do rather than something to
+/// look up: it starts with a doing word ("call", "buy", "pay", "nazvati",
+/// "kupiti"), says "remind me to" or "don't forget", or ends on a day or a
+/// time with words before it ("Ana's birthday tomorrow", "dentist at 15").
+/// A question ("how to pay rent") is never one.
+nonisolated enum TodoIntent {
+    private static let starts: [String] = [
+        // English
+        "call", "phone", "ring", "text", "email", "e-mail", "mail", "message", "reply", "send", "buy", "get", "pick up",
+        "pay", "book", "order", "renew", "cancel", "return", "fix", "clean", "wash", "finish", "submit", "prepare", "write",
+        "bring", "schedule", "follow up", "remind",
+        "don't forget", "dont forget", "remember to", "remind me", "need to", "have to", "todo", "to do",
+        // Croatian (infinitives, and the "I must / don't forget" ways in)
+        "nazvati", "nazovi", "zvati", "poslati", "pošalji", "posalji", "kupiti", "kupi", "platiti", "plati", "napisati",
+        "napiši", "odgovoriti", "odgovori", "rezervirati", "naručiti", "naruci", "naruči", "otkazati", "vratiti", "popraviti",
+        "očistiti", "ocistiti", "oprati", "završiti", "zavrsiti", "predati", "pripremiti",
+        "donijeti", "podsjeti", "ne zaboravi", "moram", "treba",
+    ]
+    private static let questions = ["how", "what", "why", "where", "when", "who", "which", "is ", "are ", "can ", "does ",
+                                    "do ", "kako", "što", "sto", "zašto", "zasto", "gdje", "kada", "tko", "koji", "je li"]
+    private static let lookups = ["weather", "forecast", "vrijeme", "vrijme", "vreme", "prognoza", "calendar", "kalendar",
+                                  "news", "vijesti", "score", "rezultat", "flights", "letovi", "rate", "tečaj", "tecaj"]
+    private static let leadIns = ["remind me to ", "remind me ", "don't forget to ", "dont forget to ", "don't forget ",
+                                  "remember to ", "need to ", "have to ", "podsjeti me da ", "podsjeti me ", "ne zaboravi ",
+                                  "moram ", "treba "]
+
+    static func isLikely(_ query: String) -> Bool {
+        let lower = query.lowercased().trimmingCharacters(in: .whitespaces)
+        guard lower.contains(" "), !lower.hasSuffix("?"),
+              !questions.contains(where: { lower.hasPrefix($0) }),
+              // "weather tomorrow", "calendar friday": looked up, not done.
+              WeatherQuery.place(in: lower) == nil,
+              !lookups.contains(where: { lower.hasPrefix($0 + " ") }) else { return false }
+        if starts.contains(where: { lower.hasPrefix($0 + " ") }) { return true }
+        // Words, then a day or a time: what it's for and when.
+        if let read = TodoDraft.read(query), !read.title.isEmpty, read.when != nil || read.time != nil { return true }
+        return false
+    }
+
+    /// The task itself, without "remind me to" and its kin.
+    static func task(in query: String) -> String {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        let lower = trimmed.lowercased()
+        guard let lead = leadIns.first(where: { lower.hasPrefix($0) }) else { return trimmed }
+        return String(trimmed.dropFirst(lead.count))
     }
 }
