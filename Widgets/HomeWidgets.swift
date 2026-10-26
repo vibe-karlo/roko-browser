@@ -134,6 +134,7 @@ private struct TodayWidgetView: View {
             HStack(alignment: .top, spacing: 16) {
                 WeatherPanel(weather: entry.snapshot.weather, wide: false)
                     .frame(width: 104, alignment: .leading)
+                    .frame(maxHeight: .infinity)
                 VStack(alignment: .leading, spacing: 8) {
                     TodoHeader(left: due.count)
                     TodoList(items: Array(due.prefix(3)), more: max(0, due.count - 3), now: entry.date,
@@ -248,14 +249,18 @@ private struct WeatherPanel: View {
                     }
                     .foregroundStyle(Color.ink)
                 } else {
-                    VStack(alignment: .leading, spacing: 4) {
-                        mark(weather, size: 24)
+                    // The mark on the list's header line, the reading on the
+                    // widget's bottom edge, as the list's last row would sit.
+                    VStack(alignment: .leading, spacing: 0) {
+                        mark(weather, size: 20)
+                        Spacer(minLength: 4)
                         Text("\(Int(weather.temperature.rounded()))°")
-                            .font(.system(size: 40, weight: .semibold).monospacedDigit())
+                            .font(.system(size: 38, weight: .semibold).monospacedDigit())
+                        Text(weather.condition).font(.system(size: 13, weight: .medium)).lineLimit(1)
                             .padding(.top, 2)
-                        Text(weather.condition).font(.system(size: 13, weight: .medium)).lineLimit(2)
                         Text(range(weather)).font(.system(size: 12).monospacedDigit()).foregroundStyle(Color.secondaryInk)
                     }
+                    .frame(maxHeight: .infinity, alignment: .topLeading)
                     .foregroundStyle(Color.ink)
                 }
             } else {
