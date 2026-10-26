@@ -19,6 +19,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - To-do's field: the chip says when in short ("Wed 15:00") and is a menu (Today, Tomorrow, This Week, Someday, Date and Time…) for when the words don't say. "at 3" means 15:00 (1 to 6 are the afternoon), and a day typed first ("Wednesday at 3") is read too.
 
 ### Fixed
+- Cookie bars a site writes itself, in its own words, are answered too (iq.dottivo.com's "We use Google tools to measure visits… They set cookies only if you accept."). When no known platform is found and the wording isn't one Autoconsent recognises, roko looks for a small pinned box that mentions cookies and has a button whose whole label says no ("Reject", "Decline", "Only necessary", "Odbij"…), and presses it, or its Accept where you've allowed cookies for the site.
 - Pages can ask you things again: alert(), confirm() and prompt() come up as dialogs titled with the site's name, so "Are you sure?" steps work (they used to answer No on their own). A tab out of sight gets no dialog.
 - Downloads work: a file a page hands over (a calendar invite, a PDF to save, a zip) opens in the share sheet, where Save to Files and Calendar are; a Wallet pass opens in Wallet.
 - A page that stops loading partway (the connection dropped mid-page) now says so, with Try Again, instead of sitting half drawn.

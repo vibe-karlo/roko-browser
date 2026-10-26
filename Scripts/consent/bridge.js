@@ -26,6 +26,49 @@ const BLOCKED = [
     'iframe[class*="optanon-category"][data-src]:not([src])', // OneTrust
 ].join(',');
 
+// A site's own cookie bar that no rule knows and whose wording Autoconsent's
+// heuristic misses ("We use Google tools to measure visits. They set cookies
+// only if you accept.", with Reject and Accept): a small fixed or sticky box
+// that talks about cookies and has a button saying no. Words in English,
+// Croatian and the larger European languages; whole button labels only, so a
+// "Reject" somewhere in a sentence is never pressed.
+const REJECT = /^(reject|reject all|reject cookies|decline|decline all|deny|deny all|refuse|refuse all|no,? thanks|only necessary|necessary only|only essential|essential only|use necessary cookies only|continue without accepting|odbij|odbij sve|odbaci|ne prihvaćam|ne prihvacam|samo nužni|samo nuzni|samo neophodni|ablehnen|alle ablehnen|nur notwendige|refuser|tout refuser|rifiuta|rifiuta tutto|rechazar|rechazar todo|weigeren|alles weigeren|odmítnout|odrzuć|odrzuc wszystko|avvisa|afvis|hylkää)$/i;
+const ACCEPT = /^(accept|accept all|accept cookies|allow|allow all|agree|i agree|ok|okay|got it|prihvati|prihvati sve|prihvaćam|prihvacam|slažem se|slazem se|akzeptieren|alle akzeptieren|accepter|tout accepter|accetta|accetta tutto|aceptar|aceptar todo|accepteren|přijmout|akceptuję)$/i;
+const COOKIE_WORDS = /cookie|kolačić|kolacic|kolačiće|keks|galleta|biscott/i;
+
+const label = (el) => (el.innerText || el.value || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim();
+
+const pinned = (el) => {
+    for (let node = el, depth = 0; node && node !== document.body && depth < 4; node = node.parentElement, depth++) {
+        const position = getComputedStyle(node).position;
+        if (position === 'fixed' || position === 'sticky') return true;
+    }
+    return false;
+};
+
+// The bar and its two buttons, or null. Cheap: only the page's top-level
+// boxes and anything named like a cookie notice are looked at.
+const plainBanner = () => {
+    const candidates = document.querySelectorAll(
+        'body > *, body > * > *, [role="dialog"], [role="alertdialog"], [role="region"], [aria-modal="true"], ' +
+        '[aria-label*="cookie" i], [id*="cookie" i], [class*="cookie" i], [id*="consent" i], [class*="consent" i]');
+    for (const box of candidates) {
+        if (box === document.body || box.tagName === 'SCRIPT' || box.tagName === 'STYLE') continue;
+        const rect = box.getBoundingClientRect();
+        if (rect.width < 120 || rect.height < 40 || rect.height > window.innerHeight * 0.9) continue;
+        if (typeof box.checkVisibility === 'function' && !box.checkVisibility({ checkVisibilityCSS: true })) continue;
+        const text = (box.innerText || '').slice(0, 1500);
+        if (!COOKIE_WORDS.test(text) && !COOKIE_WORDS.test(box.getAttribute('aria-label') || '')) continue;
+        const buttons = [...box.querySelectorAll('button, a[role="button"], [role="button"], input[type="button"], input[type="submit"]')]
+            .filter((b) => label(b).length <= 40);
+        if (!buttons.length || buttons.length > 6) continue;
+        const reject = buttons.find((b) => REJECT.test(label(b)));
+        if (!reject || !pinned(box)) continue;
+        return { box, reject, accept: buttons.find((b) => ACCEPT.test(label(b))) };
+    }
+    return null;
+};
+
 export function start(AutoConsent, filterCompactRules, compactRules) {
     if (window.__rokoConsent) return;
     window.__rokoConsent = true;
@@ -92,6 +135,25 @@ export function start(AutoConsent, filterCompactRules, compactRules) {
         return count;
     };
 
+    // When Autoconsent has found nothing: roko decides as for any pop-up,
+    // and its button is pressed.
+    const watchForPlainBanner = () => {
+        let handled = false;
+        for (const delay of [1500, 3500, 7000]) {
+            setTimeout(async () => {
+                if (handled || consent.foundCmp) return;
+                const banner = plainBanner();
+                if (!banner) return;
+                handled = true;
+                const reply = await post({ type: 'popupFound', cmp: 'roko-plain', url: location.href });
+                const button = reply && reply.type === 'optIn' ? banner.accept : banner.reject;
+                if (!button) return;
+                button.click();
+                if (button === banner.accept) accepted = true;
+            }, delay);
+        }
+    };
+
     const watchForBlockedContent = () => {
         let reported = false;
         for (const delay of [2000, 5000, 9000]) {
@@ -130,5 +192,8 @@ export function start(AutoConsent, filterCompactRules, compactRules) {
         },
         { autoconsent: [], compact: filterCompactRules(compactRules, { url: location.href, mainFrame }) },
     );
-    if (mainFrame) watchForBlockedContent();
+    if (mainFrame) {
+        watchForBlockedContent();
+        watchForPlainBanner();
+    }
 }

@@ -204,6 +204,14 @@ Cookie banners the cosmetic list hides are faded (opacity) for ten seconds befor
 removed, so Autoconsent can still find and answer them. Measured on an iPhone 17 Pro with the
 `-benchmark -benchConsent` harness, the scripts made no measurable difference to page loads.
 
+
+Bars a site writes itself, in words Autoconsent's heuristic doesn't recognise, get roko's own
+fallback in `Scripts/consent/bridge.js`: when no platform is found after 1.5, 3.5 and 7 seconds,
+it looks at the page's top-level boxes and anything named like a cookie notice for a pinned
+(fixed or sticky) one that mentions cookies and has a button whose whole label is a no
+("Reject", "Decline", "Only necessary", "Odbij", "Ablehnen"…). roko is asked as for any pop-up,
+and the reject button, or the accept one where cookies are allowed on the site, is pressed.
+Whole labels only, so a sentence containing "reject" is never clicked.
 ## To-do and Today
 
 To-do (`Models/Todo.swift`, `UI/TodoView.swift`) is one list of SwiftData models in the synced
