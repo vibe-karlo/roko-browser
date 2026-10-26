@@ -22,6 +22,11 @@ final class Todo {
     /// Its place in its section, dragged there; 0 until it's been moved, then
     /// the order it was added in decides.
     var order: Double = 0
+    /// The reminder it's kept in step with in Apple Reminders, when that's on.
+    var reminderID: String? = nil
+    /// Both sides as they were at the last sync (RemindersSync.fingerprint):
+    /// a side that differs from it is the one that changed.
+    var reminderState: String? = nil
 
     init(title: String, when: TodoWhen, at time: DateComponents? = nil, now: Date = .now) {
         self.title = title

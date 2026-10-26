@@ -7,6 +7,13 @@ import WidgetKit
 @MainActor
 enum WidgetBridge {
     private static var container: ModelContainer?
+    /// The latest weather, handed over by TodayModel as it changes.
+    private static var weather: TodayWeather?
+
+    static func weatherChanged(_ weather: TodayWeather?) {
+        self.weather = weather
+        update()
+    }
     /// The bar's pinned answers, as it last showed them.
     private static var answers: [WidgetSnapshot.Answer] = WidgetSnapshot.load()?.answers ?? []
 
@@ -24,6 +31,8 @@ enum WidgetBridge {
 
     static func start(_ container: ModelContainer) {
         self.container = container
+        // The weather saved last time (reading it here is safe: not from inside TodayModel's init).
+        weather = TodayModel.shared.weather
         applyTicks()
         update()
     }
@@ -57,7 +66,7 @@ enum WidgetBridge {
             .sorted { a, b in a.day == b.day ? Todo.listOrder(a, b) : (a.day ?? .distantFuture) < (b.day ?? .distantFuture) }
             .prefix(16)
             .map { WidgetSnapshot.Item(id: id($0), title: $0.title, day: $0.day ?? tomorrow, time: $0.time) }
-        let weather = TodayModel.shared.weather.map {
+        let weather = weather.map {
             WidgetSnapshot.Weather(temperature: $0.temperature, condition: $0.condition, glyph: $0.glyph,
                                    high: $0.high, low: $0.low, rainChance: $0.rainChance, place: $0.place,
                                    fetchedAt: $0.fetchedAt)

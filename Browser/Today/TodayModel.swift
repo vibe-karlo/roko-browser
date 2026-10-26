@@ -15,7 +15,9 @@ final class TodayModel {
 
     private(set) var weather: TodayWeather? {
         // The widgets show it too.
-        didSet { if weather != oldValue { WidgetBridge.update() } }
+        // Handed over rather than read back: this also runs while TodayModel.shared
+        // is still being made (loading the saved weather), when reading it would trap.
+        didSet { if weather != oldValue { WidgetBridge.weatherChanged(weather) } }
     }
     private(set) var top: [NewsStory] = []
     /// A section per followed page, then per topic.

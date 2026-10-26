@@ -415,3 +415,16 @@ marks those done at launch and each time it becomes active.
 The App Group is in `Shared/AppGroup.entitlements` (both targets), and in `Sync.entitlements` and
 `Browser.entitlements` for when either is switched on. Automatic signing registers it on the
 team; the first build after adding it needs Xcode's Signing & Capabilities to have the team set.
+
+## Reminders
+
+`Today/RemindersSync.swift` keeps to-dos and one Reminders list (EventKit, full access, asked
+when the switch is turned on) the same, both ways. Each to-do keeps its reminder's
+`calendarItemIdentifier` and a fingerprint of both sides at the last sync (title, day, time,
+done); on each round the side that no longer matches it changed, and the other is brought in
+line, Reminders winning when both changed. Unlinked to-dos go into the list (a reminder that reads
+the same, from another device, is taken rather than duplicated), unlinked reminders become
+to-dos, and the set of linked ids tells a deletion on one side from something new on the other.
+Rounds run at launch, on becoming active, after a save that touched a to-do and on
+`EKEventStoreChanged`, a second apart at most, and skip the changes they made themselves. A round
+is a few tens of milliseconds. Completed reminders older than two weeks aren't looked at.

@@ -168,6 +168,7 @@ struct SettingsView: View {
                         .onChange(of: reminders) { DailyReminders.update(in: context) }
                     Toggle("Alert before a to-do's time", isOn: $todoAlerts)
                         .onChange(of: todoAlerts) { TodoAlerts.update() }
+                    RemindersRow()
                     Button("News sites and topics") { choosingNewsSites = true }
                         .foregroundStyle(Theme.ink)
                     if TodayCalendar.isAllowed {
@@ -181,7 +182,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Today and to-dos")
                 } footer: {
-                    Text("Nudges are silent, at most two a day: at 8:30 if you haven't looked at Today, at 16:00 if to-dos are still open. To-do alerts come 15 minutes before, with sound.")
+                    Text("Nudges are silent, at most two a day: at 8:30 if you haven't looked at Today, at 16:00 if to-dos are still open. To-do alerts come 15 minutes before, with sound. With Reminders on, your to-dos are also in a Reminders list, on every device with your iCloud.")
                 }
                 .sheet(isPresented: $choosingNewsSites) {
                     NewsSitesSheet { TodayModel.shared.sitesChanged() }
@@ -345,6 +346,58 @@ private struct SavedSection: View {
         } label: {
             Text(title)
             Text(detail).monospacedDigit()
+        }
+    }
+}
+
+/// To-dos kept in step with a list in Apple Reminders, and so on every
+/// device signed in to iCloud.
+private struct RemindersRow: View {
+    @AppStorage(RemindersSync.enabledKey) private var on = false
+    @State private var listName = RemindersSync.isOn ? RemindersSync.list()?.title : nil
+    @State private var choosing = false
+    @State private var denied = false
+
+    var body: some View {
+        Toggle("Sync with Reminders", isOn: Binding(get: { on }, set: { wanted in
+            guard wanted else {
+                RemindersSync.turnOff()
+                on = false
+                return
+            }
+            Task {
+                guard await RemindersSync.requestAccess() else {
+                    denied = true
+                    return
+                }
+                on = true
+                listName = RemindersSync.list()?.title
+                RemindersSync.schedule(after: .zero)
+            }
+        }))
+        .alert("Reminders isn't allowed", isPresented: $denied) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+            }
+            Button("Not Now", role: .cancel) {}
+        } message: {
+            Text("Allow roko full access to Reminders in iOS Settings to keep your to-dos there too.")
+        }
+        if on {
+            Button { choosing = true } label: {
+                LabeledContent("List", value: listName ?? "roko")
+            }
+            .foregroundStyle(Theme.ink)
+            .confirmationDialog("Keep to-dos in", isPresented: $choosing, titleVisibility: .visible) {
+                ForEach(RemindersSync.lists(), id: \.calendarIdentifier) { list in
+                    Button(list.title) {
+                        RemindersSync.choose(list)
+                        listName = list.title
+                    }
+                }
+            } message: {
+                Text("To-dos and this list are kept the same, both ways. Changing it links your to-dos to the new list.")
+            }
         }
     }
 }

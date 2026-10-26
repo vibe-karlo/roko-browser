@@ -65,6 +65,8 @@
 	<string>Today shows the weather where you are, from a rough location. Paying for parking finds the zone you're in.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Hold + and speak to search, open a site or add a to-do. The microphone is on only while you hold it.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Your to-dos and a list in Reminders are kept the same, so they're on your Mac and Watch too.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>What you say while holding + is turned into words for the address bar, in English or Croatian.</string>
 	<key>NSSupportsLiveActivities</key>

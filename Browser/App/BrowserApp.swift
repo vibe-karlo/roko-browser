@@ -16,6 +16,7 @@ struct BrowserApp: App {
         UNUserNotificationCenter.current().delegate = NotificationRouter.shared
         TodoAlerts.watch(container)
         WidgetBridge.start(container)
+        RemindersSync.start(container)
         CopiedLink.arrived()
         SettingsSync.shared.start()
         // iCloud tells roko about changes from other devices with silent

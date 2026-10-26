@@ -65,6 +65,7 @@ targets:
         # Paid parking's time left, on the Lock Screen and in the Dynamic Island.
         NSSupportsLiveActivities: true
         NSCalendarsFullAccessUsageDescription: Today shows what's left on your calendar for the day. It stays on this iPhone.
+        NSRemindersFullAccessUsageDescription: Your to-dos and a list in Reminders are kept the same, so they're on your Mac and Watch too.
         # Required before Apple will grant the browser entitlements (default
         # browser, passkeys): the app must declare it opens http and https.
         CFBundleURLTypes:
