@@ -248,9 +248,12 @@ enum VoiceCommand {
             if host.range(of: #"^[a-z0-9\-]+(\.[a-z0-9\-]+)+$"#, options: .regularExpression) != nil {
                 // Matched against sites roko knows, ignoring hyphens: "glasslavonije.hr" is glas-slavonije.hr.
                 let known = Self.known(host, history: history)
-                if let url = URL(string: "https://" + (known ?? host) + (parts.count > 1 ? "/" + parts[1] : "")) {
-                    return known != nil || askedToOpen || address.count < 40 ? .open(url) : .words(address)
+                if let known, let url = URL(string: "https://" + known + (parts.count > 1 ? "/" + parts[1] : "")) {
+                    return .open(url)
                 }
+                // Not a site roko knows, even nearly: into the bar, not opened
+                // blind ("indeks.hr" heard for index.hr opened a stranger's site).
+                return .words(address)
             }
         }
 
@@ -269,11 +272,38 @@ enum VoiceCommand {
         }
         let wanted = plain(said)
         let stem = wanted.split(separator: ".").first.map(String.init) ?? wanted
-        let hosts = history(stem) + PopularSites.matching(stem, limit: 8).map(\.host)
+        let hosts = history(String(stem.prefix(3))) + PopularSites.allHosts
         // The exact site first, then one whose name is what was said.
         if let exact = hosts.first(where: { plain($0) == wanted }) { return exact }
-        guard !wanted.contains(".") else { return nil }
-        return hosts.first { plain($0).split(separator: ".").first.map(String.init) == stem }
+        if !wanted.contains("."), let named = hosts.first(where: { plain($0).split(separator: ".").first.map(String.init) == stem }) {
+            return named
+        }
+        // Heard nearly right ("indeks.hr", "jutarni.hr"): the known site a
+        // letter or two away, with the same ending.
+        let ending = wanted.contains(".") ? wanted.split(separator: ".").last.map(String.init) : nil
+        let near = hosts.filter { host in
+            let plainHost = plain(host)
+            if let ending, plainHost.split(separator: ".").last.map(String.init) != ending { return false }
+            let theirs = plainHost.split(separator: ".").first.map(String.init) ?? plainHost
+            return stem.count >= 4 && distance(theirs, stem) <= (stem.count >= 5 ? 2 : 1)
+        }
+        return near.first
+    }
+
+    /// Letters to change, add or drop to turn one word into the other.
+    private static func distance(_ a: String, _ b: String) -> Int {
+        let a = Array(a), b = Array(b)
+        var row = Array(0...b.count)
+        for i in 1...max(a.count, 1) where !a.isEmpty {
+            var previous = row[0]
+            row[0] = i
+            for j in 1...max(b.count, 1) where !b.isEmpty {
+                let current = row[j]
+                row[j] = min(row[j] + 1, row[j - 1] + 1, previous + (a[i - 1] == b[j - 1] ? 0 : 1))
+                previous = current
+            }
+        }
+        return row[b.count]
     }
 }
 

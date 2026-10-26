@@ -21,6 +21,9 @@ enum PopularSites {
         return found
     }
 
+    /// Every host, for matching a spoken name that's close but not exact.
+    static var allHosts: [String] { ordered.map(\.host) }
+
     private static let ordered: [Site] = Locale.current.region?.identifier == "HR" ? croatia + world : world + croatia
 
     private static func sites(_ list: [(String, String)]) -> [Site] {

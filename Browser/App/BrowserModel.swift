@@ -410,7 +410,20 @@ final class BrowserModel {
                 panel = .none
                 openFromCommandBar(url)
             case .words(let text):
-                voiceResult = text
+                // A site's name said ("Sportske novosti"): the site, opened.
+                let rows = CommandRanker.rank(query: text, browser: self, suggestions: [])
+                if !ResearchDepth.prefersAnswer(text), !TodoIntent.isLikely(text),
+                   let site = CommandRanker.siteNamed(text.lowercased(), in: rows) {
+                    panel = .none
+                    switch site.action {
+                    case .open(let url): openFromCommandBar(url)
+                    case .openPin(let pin): open(pin)
+                    case .switchTab(let tab): select(tab)
+                    default: voiceResult = text
+                    }
+                } else {
+                    voiceResult = text
+                }
             }
         }
     }

@@ -119,10 +119,17 @@ struct BottomBar: View {
                 }
                 guard pressedAt == nil else { return }
                 pressedAt = .now
-                UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.6)
                 withAnimation(.linear(duration: 0.3)) { holdFill = 1 }
                 holdTask = Task {
-                    try? await Task.sleep(for: .milliseconds(300))
+                    // Taps that grow as the hold counts, so it's felt filling up.
+                    let ramp = UIImpactFeedbackGenerator(style: .rigid)
+                    ramp.prepare()
+                    for (step, intensity) in [0.25, 0.45, 0.65, 0.85].enumerated() {
+                        if step > 0 { try? await Task.sleep(for: .milliseconds(75)) }
+                        guard !Task.isCancelled else { return }
+                        ramp.impactOccurred(intensity: intensity)
+                    }
+                    try? await Task.sleep(for: .milliseconds(75))
                     guard !Task.isCancelled else { return }
                     withAnimation(.easeOut(duration: 0.2)) { holdFill = 0 }
                     browser.launcherOrigin = capsuleFrame
