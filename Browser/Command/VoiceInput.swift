@@ -17,6 +17,10 @@ final class VoiceInput {
     private(set) var partial = ""
     /// How loud it is (0...1), for the field's listening mark.
     private(set) var level: Double = 0
+    /// When a voice was last heard (loud enough to be speech), for stopping
+    /// on its own after a pause when + was let go early.
+    private(set) var lastVoiceAt: Date?
+    private(set) var startedAt = Date.now
 
     private let engine = AVAudioEngine()
     private struct Ear {
@@ -61,7 +65,11 @@ final class VoiceInput {
         partial = ""
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.record, mode: .measurement, options: .duckOthers)
+        // Otherwise recording silences the taps that say it's listening.
+        try session.setAllowHapticsAndSystemSoundsDuringRecording(true)
         try session.setActive(true, options: .notifyOthersOnDeactivation)
+        startedAt = .now
+        lastVoiceAt = nil
 
         ears = Self.locales.compactMap { locale in
             guard let recognizer = SFSpeechRecognizer(locale: locale), recognizer.isAvailable else { return nil }
@@ -98,7 +106,10 @@ final class VoiceInput {
         return { buffer, _ in
             for request in requests.value { request.append(buffer) }
             let level = level(of: buffer)
-            Task { @MainActor in target.value?.level = level }
+            Task { @MainActor in
+                target.value?.level = level
+                if level > 0.12 { target.value?.lastVoiceAt = .now }
+            }
         }
     }
 

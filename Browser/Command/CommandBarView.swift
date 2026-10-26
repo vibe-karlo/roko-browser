@@ -174,6 +174,10 @@ struct CommandBarView: View {
         .onChange(of: VoiceInput.shared.partial) { _, heard in
             if browser.voiceListening { query = heard }
         }
+        // Done listening: the keyboard, to fix or add to what was heard.
+        .onChange(of: browser.voiceListening) { _, listening in
+            if !listening, browser.panel == .command { focused = true }
+        }
         .onChange(of: browser.voiceResult) { _, said in
             guard let said else { return }
             query = said
@@ -409,12 +413,16 @@ struct CommandBarView: View {
                     RowIcon(icon: shown.icon)
                 } else {
                     if browser.voiceListening {
-                        // Listening: the mark breathes with the voice.
+                        // Listening: the mark breathes with the voice; a tap stops it.
                         Image(systemName: "mic.fill")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(Theme.accent)
                             .scaleEffect(1 + VoiceInput.shared.level * 0.35)
                             .animation(.easeOut(duration: 0.08), value: VoiceInput.shared.level)
+                            .frame(width: 44, height: 44)
+                            .contentShape(.rect)
+                            .onTapGesture { browser.finishVoice() }
+                            .accessibilityLabel("Stop listening")
                     } else {
                         Glyph(showsPrivate ? .eyeClosed : contextGlyph, size: 18)
                             .foregroundStyle(showsPrivate ? Theme.accent : Theme.secondaryInk)

@@ -99,10 +99,10 @@ struct BottomBar: View {
                 }
                 guard pressedAt == nil else { return }
                 pressedAt = .now
+                UIImpactFeedbackGenerator(style: .soft).prepare()
                 holdTask = Task {
                     try? await Task.sleep(for: .milliseconds(320))
                     guard !Task.isCancelled else { return }
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     browser.launcherOrigin = capsuleFrame
                     browser.startVoice()
                 }

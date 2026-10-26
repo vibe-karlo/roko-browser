@@ -356,7 +356,10 @@ final class BrowserModel {
             return
         }
         do {
+            let tick = UIImpactFeedbackGenerator(style: .medium)
+            tick.prepare()
             try VoiceInput.shared.start()
+            tick.impactOccurred()
             voiceListening = true
             voiceResult = nil
             showCommandBar()
@@ -365,15 +368,38 @@ final class BrowserModel {
         }
     }
 
-    /// + let go: what was said is opened when it's a site roko knows, and
-    /// otherwise goes into the launcher as if typed, its best row ready.
+    /// + let go. Let go before saying anything (a quick hold), it keeps
+    /// listening and stops by itself after a pause in the speech, or eight
+    /// seconds of nothing; tapping the field's mark stops it too.
     func endVoice() {
         guard voiceListening else { return }
+        let voice = VoiceInput.shared
+        guard voice.lastVoiceAt == nil, voice.partial.isEmpty else { return finishVoice() }
+        voiceHandsFree?.cancel()
+        voiceHandsFree = Task {
+            while !Task.isCancelled, voiceListening {
+                try? await Task.sleep(for: .milliseconds(200))
+                let now = Date.now
+                if let last = voice.lastVoiceAt, !voice.partial.isEmpty, now.timeIntervalSince(last) > 1.4 { break }
+                if voice.lastVoiceAt == nil, now.timeIntervalSince(voice.startedAt) > 8 { break }
+            }
+            if !Task.isCancelled { finishVoice() }
+        }
+    }
+    private var voiceHandsFree: Task<Void, Never>?
+
+    /// Stop now: what was said is opened when it's a site roko knows, and
+    /// otherwise goes into the launcher as if typed, its best row ready.
+    /// Nothing heard, the launcher stays, with the keyboard.
+    func finishVoice() {
+        guard voiceListening else { return }
+        voiceHandsFree?.cancel()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         Task {
             let heard = await VoiceInput.shared.stop()
             voiceListening = false
             guard let heard, !heard.isEmpty else {
-                panel = .none
+                if panel == .command { showToast("Didn't catch that") }
                 return
             }
             let meaning = VoiceCommand.interpret(heard) { stem in
