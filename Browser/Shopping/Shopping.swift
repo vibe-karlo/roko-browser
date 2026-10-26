@@ -99,7 +99,9 @@ enum Shopping {
     /// and one already on the list not added twice. Answers what was added
     /// and what was already there.
     @discardableResult
-    static func add(_ typed: String, in context: ModelContext) -> (added: [ShoppingItem], already: [String]) {
+    /// `shop`: the list it goes on, when one is showing; nil (from the bar)
+    /// sends each thing to where it's usually bought.
+    static func add(_ typed: String, in context: ModelContext, to shop: Shop? = nil) -> (added: [ShoppingItem], already: [String]) {
         let listed = (try? context.fetch(FetchDescriptor<ShoppingItem>(predicate: #Predicate { !$0.done }))) ?? []
         var keys = Set(listed.map(\.key))
         var order = (listed.map(\.order).max() ?? 0) + 1
@@ -112,7 +114,7 @@ enum Shopping {
                 continue
             }
             let item = ShoppingItem(title: title, aisle: aisle(for: title, in: context))
-            item.shopName = habit(key, in: context)?.chosenShop ?? ""
+            item.shopName = shop?.rawValue ?? habit(key, in: context)?.chosenShop ?? ""
             item.order = order
             order += 1
             context.insert(item)
@@ -161,6 +163,11 @@ enum Shopping {
         }()
         habit.chosenAisle = aisle.rawValue
         try? context.save()
+    }
+
+    /// Where a thing is usually bought: where you've moved it before, else its aisle's shop.
+    static func usualShop(of item: ShoppingItem, in context: ModelContext) -> Shop {
+        habit(item.key, in: context)?.chosenShop.flatMap(Shop.init) ?? Shop.of(item.aisle)
     }
 
     /// Put on another shop's list: from now on that's where it goes.

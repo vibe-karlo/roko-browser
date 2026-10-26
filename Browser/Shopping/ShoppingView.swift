@@ -21,6 +21,9 @@ struct ShoppingView: View {
     @State private var listening = false
     @State private var heard = ""
     @State private var listenTask: Task<Void, Never>?
+    /// Just put on Trgovina though usually bought elsewhere: offered a move there.
+    @State private var elsewhere: [(item: ShoppingItem, shop: Shop)] = []
+    @State private var elsewhereTask: Task<Void, Never>?
     /// Which way the last swipe went, so the next list comes in from that side.
     @State private var swipedForward = true
     @Namespace private var barSpace
@@ -101,9 +104,22 @@ struct ShoppingView: View {
                     let next = at + (dx < 0 ? 1 : -1)
                     guard all.indices.contains(next) else { return }
                     swipedForward = dx < 0
+                    elsewhere = []
                     withAnimation(.snappy(duration: 0.28)) { shopName = all[next].rawValue }
                 })
-        .safeAreaInset(edge: .bottom, spacing: 0) { bar }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                elsewhereOffer
+                bar
+            }
+            // The list fades out behind the offer too, not peeking between it and the bar.
+            .background(alignment: .top) {
+                if !elsewhere.isEmpty {
+                    FadeEdge(color: Theme.canvas, height: 40).offset(y: -20)
+                    Theme.canvas.padding(.top, 20)
+                }
+            }
+        }
         .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas) }
         .background(Theme.canvas.ignoresSafeArea())
         .foregroundStyle(Theme.ink)
@@ -540,12 +556,69 @@ struct ShoppingView: View {
 
     // MARK: Changes
 
+    /// Onto the list showing. On Trgovina, what's usually bought at the
+    /// drugstore or pharmacy is offered a move there.
     private func add(_ typed: String) {
         var result: (added: [ShoppingItem], already: [String]) = ([], [])
-        withAnimation(.snappy) { result = Shopping.add(typed, in: context) }
-        // Said when it isn't plain on screen: already there, or on another shop's list.
-        if (result.added.isEmpty && !result.already.isEmpty) || result.added.contains(where: { $0.shop != shop }) {
-            browser.showToast(Shopping.said(result, showing: shop))
+        withAnimation(.snappy) { result = Shopping.add(typed, in: context, to: shop) }
+        if result.added.isEmpty, !result.already.isEmpty { browser.showToast(Shopping.said(result)) }
+        guard shop == .grocery else { return }
+        let offers = result.added.compactMap { item -> (item: ShoppingItem, shop: Shop)? in
+            let usual = Shopping.usualShop(of: item, in: context)
+            return usual == .grocery ? nil : (item, usual)
+        }
+        guard !offers.isEmpty else { return }
+        withAnimation(.snappy(duration: 0.25)) { elsewhere = offers }
+        elsewhereTask?.cancel()
+        elsewhereTask = Task {
+            try? await Task.sleep(for: .seconds(12))
+            if !Task.isCancelled { withAnimation(.snappy(duration: 0.25)) { elsewhere = [] } }
+        }
+    }
+
+    /// "Šampon is usually from Drogerija · Move": one tap puts it there, and
+    /// it goes there from then on.
+    @ViewBuilder
+    private var elsewhereOffer: some View {
+        if let first = elsewhere.first {
+            let shops = Set(elsewhere.map(\.shop))
+            HStack(spacing: 14) {
+                // One line: the thing, then the list it usually goes on.
+                HStack(spacing: 6) {
+                    Text(elsewhere.count == 1 ? first.item.title
+                         : ListLanguage.say("\(elsewhere.count) things", "\(elsewhere.count) stvari"))
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Text(shops.count == 1
+                         ? ListLanguage.say("usually \(first.shop.title)", "obično \(first.shop.title)")
+                         : ListLanguage.say("usually elsewhere", "obično drugdje"))
+                        .foregroundStyle(Theme.secondaryInk)
+                        .lineLimit(1)
+                        .layoutPriority(1)
+                }
+                .font(.system(size: 15, weight: .medium))
+                Spacer(minLength: 0)
+                Button(ListLanguage.say("Move", "Premjesti")) {
+                    withAnimation(.snappy) {
+                        for offer in elsewhere { Shopping.move(offer.item, to: offer.shop, in: context) }
+                        elsewhere = []
+                    }
+                    elsewhereTask?.cancel()
+                }
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.accentText)
+                .frame(minHeight: 44)
+            }
+            .padding(.leading, 18)
+            .padding(.trailing, 16)
+            .padding(.vertical, 2)
+            .barSurface(cornerRadius: 14)
+            .compositingGroup()
+            .padding(.horizontal, Theme.gutter)
+            .padding(.bottom, 8)
+            .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
+                                    removal: .opacity.animation(.easeOut(duration: 0.12))))
         }
     }
 
