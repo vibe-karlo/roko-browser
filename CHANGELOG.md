@@ -16,6 +16,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - To-do's field: the chip says when in short ("Wed 15:00") and is a menu (Today, Tomorrow, This Week, Someday, Date and Time…) for when the words don't say. "at 3" means 15:00 (1 to 6 are the afternoon), and a day typed first ("Wednesday at 3") is read too.
 
 ### Fixed
+- Swiping a page out of history no longer also opens it (which put it straight back in history).
 - Dictation in Croatian: "koji su rezultati izbora u srbiji" came out garbled. Croatian is now heard by Apple's servers (the on-device Croatian model was the weak link; English stays on the iPhone), and the hearing kept is the one whose words read as its own language, rather than the one the recognizer said it was surer of, which favoured English hearing Croatian as English-sounding words. The words shown while you speak follow the same choice.
 - Holding + says what it's doing: a soft tap the moment you press, roko's orange filling the capsule as the hold counts, then a firm tap and a mic in place of + when it's listening.
 - Holding + to speak: the launcher no longer closes the moment you let go. Let go before saying anything and it keeps listening, stopping on its own after a pause in what you say (or eight seconds of nothing); a tap on the mic mark stops it too. Nothing heard, it stays open with the keyboard. And it taps when it starts listening and when it stops: recording had been silencing roko's haptics.

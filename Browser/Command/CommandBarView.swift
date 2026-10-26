@@ -70,6 +70,8 @@ struct CommandBarView: View {
     @State private var listDragged = false
     /// The list is moving (dragged or still gliding): rows passing the slot tick.
     @State private var listMoving = false
+    /// A row was swiped a moment ago: taps on rows wait till this has passed.
+    @State private var swipeQuietUntil = Date.distantPast
     /// A light tick for each row that passes under the field, like a picker wheel.
     @State private var ticker = UISelectionFeedbackGenerator()
     /// Where the field ends up: at the top, under the status bar, as in Arc
@@ -238,12 +240,17 @@ struct CommandBarView: View {
                         if case .pasteLink = item.action {
                             copiedLinkRow
                         } else {
-                            Button { perform(item) } label: {
+                            Button {
+                                // A swipe that ends on the row isn't a tap on it.
+                                guard Date.now > swipeQuietUntil else { return }
+                                perform(item)
+                            } label: {
                                 CommandRow(item: item, isSelected: index == selection && (!query.isEmpty || previewing))
                             }
                             .buttonStyle(.plain)
                             // From history: swipe it away to the left to forget it.
-                            .modifier(SwipeToForget(enabled: Self.forgettable(item) != nil) {
+                            .modifier(SwipeToForget(enabled: Self.forgettable(item) != nil,
+                                                    swiping: { swipeQuietUntil = .now.addingTimeInterval(0.6) }) {
                                 if let (url, wholeSite) = Self.forgettable(item) { forget(url, wholeSite: wholeSite) }
                             })
                         }
@@ -1267,6 +1274,8 @@ nonisolated enum TodoIntent {
 /// A mostly vertical drag is left to the list, which scrolls.
 private struct SwipeToForget: ViewModifier {
     let enabled: Bool
+    /// Called while a row is being swiped, so its tap doesn't also fire.
+    let swiping: () -> Void
     let forget: () -> Void
     @State private var offset: CGFloat = 0
 
@@ -1284,7 +1293,9 @@ private struct SwipeToForget: ViewModifier {
                 .simultaneousGesture(DragGesture(minimumDistance: 24).onChanged { value in
                     guard abs(value.translation.width) > abs(value.translation.height) * 1.5 else { return }
                     offset = min(0, value.translation.width)
+                    swiping()
                 }.onEnded { value in
+                    if offset < 0 { swiping() }
                     if value.translation.width < -120 {
                         withAnimation(.easeIn(duration: 0.18)) { offset = -500 } completion: { forget(); offset = 0 }
                     } else {
