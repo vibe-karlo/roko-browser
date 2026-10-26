@@ -33,7 +33,6 @@ struct CommandBarView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \Pin.order) private var pins: [Pin]
     @Query(sort: \Todo.createdAt) private var todos: [Todo]
-    @Query(filter: #Predicate<ShoppingItem> { !$0.done }) private var toBuy: [ShoppingItem]
     /// Ticked in the bar a moment ago: still shown, struck through.
     @State private var justDone: Set<PersistentIdentifier> = []
     @State private var query = ""
@@ -640,7 +639,8 @@ struct CommandBarView: View {
         DispatchQueue.main.async {
             rebuild()
             HitchWatch.note("rows built")
-            withAnimation(.easeOut(duration: 0.14)) { browser.launcherRows = true }
+            // With the dimming behind them, not ahead of it: text never sits on the bare page.
+            withAnimation(.launcher.delay(0.04)) { browser.launcherRows = true }
         }
     }
 
@@ -815,11 +815,6 @@ struct CommandBarView: View {
                 rows.append(CommandItem(id: "todos-today", title: "To-do",
                                         subtitle: left == 1 ? "One left for today" : "\(left) left for today",
                                         kind: "", icon: .glyph(.todo), action: .todos))
-            }
-            if !toBuy.isEmpty {
-                rows.append(CommandItem(id: "shopping-left", title: ListLanguage.say("Shopping", "Kupovina"),
-                                        subtitle: ShoppingView.toBuy(toBuy.count),
-                                        kind: "", icon: .glyph(.basket), action: .shopping))
             }
             // Pinned answers, worked out again now: the weather, days until, a rate.
             for asked in PinnedAnswers.all {

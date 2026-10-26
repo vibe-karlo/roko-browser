@@ -150,17 +150,22 @@ struct BottomBar: View {
                 guard pressedAt == nil else { return }
                 pressedAt = .now
                 guard Preferences.holdToTalk else { return }
-                withAnimation(.linear(duration: 0.3)) { holdFill = 1 }
                 holdTask = Task {
-                    // Taps that grow as the hold counts, so it's felt filling up.
+                    // Not on a tap: the fill starts only once the finger has
+                    // stayed down longer than a tap does (it flashed orange
+                    // under every tap that opened the bar).
                     let ramp = UIImpactFeedbackGenerator(style: .rigid)
                     ramp.prepare()
-                    for (step, intensity) in [0.25, 0.45, 0.65, 0.85].enumerated() {
-                        if step > 0 { try? await Task.sleep(for: .milliseconds(75)) }
+                    try? await Task.sleep(for: .milliseconds(120))
+                    guard !Task.isCancelled else { return }
+                    withAnimation(.linear(duration: 0.24)) { holdFill = 1 }
+                    // Taps that grow as the hold counts, so it's felt filling up.
+                    for (step, intensity) in [0.3, 0.55, 0.8].enumerated() {
+                        if step > 0 { try? await Task.sleep(for: .milliseconds(80)) }
                         guard !Task.isCancelled else { return }
                         ramp.impactOccurred(intensity: intensity)
                     }
-                    try? await Task.sleep(for: .milliseconds(75))
+                    try? await Task.sleep(for: .milliseconds(80))
                     guard !Task.isCancelled else { return }
                     withAnimation(.easeOut(duration: 0.2)) { holdFill = 0 }
                     browser.launcherOrigin = capsuleFrame

@@ -35,6 +35,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Five app icons: the blue, green, yellow and grey stars, and the orange chevrons.
 
 ### Fixed
+- Opening the address bar no longer flashes orange at the + capsule (the hold-to-speak fill started at touch-down, so every tap showed a sliver of it; it now starts after 120 ms), and its rows come in just behind the dimming instead of ahead of it, so text never sits on the bare page. The Shopping row is gone from the address bar's list, like its pin.
 - The address bar opens in place: the field fades in at the top and settles a few points, the keyboard rising with it, instead of flying up from the bottom bar. On a warm open it starts appearing 38 ms after the tap (was 70) and has the keyboard at 39 ms (was 125); its rows are built once it's showing.
 - Opening the address bar with a copied link offered above the bar threw the link away instead of listing it in the bar.
 - A tab whose page had failed to load came back blank after a relaunch, loading nothing and showing no error: it's loaded again.
