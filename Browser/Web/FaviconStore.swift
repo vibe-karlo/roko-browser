@@ -31,12 +31,31 @@ final class FaviconStore {
         // Small files (a few KB); read once per host, then served from memory.
         // The site's own icon first; for well-known sites never visited, the
         // one bundled with the app (Scripts/fetch_site_icons.py).
-        guard let image = (try? Data(contentsOf: file)).flatMap(UIImage.init(data:)) ?? Self.bundled(host) else {
-            missing.insert(host)
-            return nil
+        guard let data = try? Data(contentsOf: file), let image = UIImage(data: data) else {
+            guard let bundled = Self.bundled(host) else {
+                missing.insert(host)
+                return nil
+            }
+            memory.setObject(bundled, forKey: host as NSString)
+            return bundled
+        }
+        // Kept from before icons were made small (a 180-pixel touch icon):
+        // shrunk once now, so it's never decoded at full size again.
+        if data.count > 12_000, let small = Self.small(image), let png = small.pngData() {
+            Task.detached(priority: .utility) { try? png.write(to: file) }
+            memory.setObject(small, forKey: host as NSString)
+            return small
         }
         memory.setObject(image, forKey: host as NSString)
         return image
+    }
+
+    /// Icons are drawn at 20 to 32 points: 96 pixels is plenty, and a fraction
+    /// of the memory and decoding of a full apple-touch-icon.
+    nonisolated private static func small(_ image: UIImage) -> UIImage? {
+        let side: CGFloat = 96
+        guard max(image.size.width, image.size.height) * image.scale > side else { return image }
+        return image.preparingThumbnail(of: CGSize(width: side, height: side))
     }
 
     /// "web.whatsapp.com" falls back to whatsapp.com's mark.
@@ -67,12 +86,18 @@ final class FaviconStore {
         guard let href = try? await webView.callAsyncJavaScript(script, contentWorld: .defaultClient) as? String,
               let url = URL(string: href),
               let (data, _) = try? await URLSession.quick.data(from: url),
-              let image = UIImage(data: data) else { return }
+              let full = UIImage(data: data) else { return }
+        // Shrunk and encoded off the main thread; only the small one is kept.
+        let made = await Task.detached(priority: .utility) { () -> (UIImage, Data)? in
+            guard let small = Self.small(full), let png = small.pngData() else { return nil }
+            return (small, png)
+        }.value
+        guard let (image, png) = made else { return }
 
         memory.setObject(image, forKey: host as NSString)
         missing.remove(host)
         version += 1
         let file = directory.appendingPathComponent(host)
-        Task.detached(priority: .utility) { try? data.write(to: file) }
+        Task.detached(priority: .utility) { try? png.write(to: file) }
     }
 }

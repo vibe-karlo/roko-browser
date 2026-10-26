@@ -18,6 +18,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - To-do's field: the chip says when in short ("Wed 15:00") and is a menu (Today, Tomorrow, This Week, Someday, Date and Time…) for when the words don't say. "at 3" means 15:00 (1 to 6 are the afternoon), and a day typed first ("Wednesday at 3") is read too.
 
 ### Fixed
+- Pages can ask you things again: alert(), confirm() and prompt() come up as dialogs titled with the site's name, so "Are you sure?" steps work (they used to answer No on their own). A tab out of sight gets no dialog.
+- Downloads work: a file a page hands over (a calendar invite, a PDF to save, a zip) opens in the share sheet, where Save to Files and Calendar are; a Wallet pass opens in Wallet.
+- A page that stops loading partway (the connection dropped mid-page) now says so, with Try Again, instead of sitting half drawn.
+- Pages no longer open other apps on their own: a link you tap to the App Store, Phone or Mail opens it at once, but a redirect or script asks first ("Open the App Store?"), and a tab out of sight never does.
+- Today's news is read and parsed off the main thread, and site icons are kept small (96 pixels, shrunk off the main thread), so Today and the address bar don't stutter while they fill in.
 - Closing the last private tab now also clears its cookies and storage; a private page's summary is no longer kept in the summary cache, and its icon is no longer saved.
 - Dictation can't get stuck on: a hold right after letting go no longer starts a second session that the first one then half-stopped (leaving the microphone on), closing the bar while listening stops it properly, and a microphone held by a call no longer leaves the next hold failing.
 - Allowing passkeys, and to-do alerts being laid out, no longer risk stopping the app: iOS answers those on a queue of its own, now handled off the main actor.

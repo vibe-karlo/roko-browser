@@ -629,6 +629,10 @@ extension BrowserModel: BrowserTabDelegate {
         try? context.save()
     }
 
+    func tab(_ tab: BrowserTab, says message: String) {
+        showToast(message)
+    }
+
     func tab(_ tab: BrowserTab, wantsNewTabWith url: URL) {
         open(url, inNewTab: true, isPrivate: tab.isPrivate)
     }

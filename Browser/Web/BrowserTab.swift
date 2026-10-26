@@ -7,6 +7,8 @@ protocol BrowserTabDelegate: AnyObject {
     func tab(_ tab: BrowserTab, wantsNewTabWith url: URL)
     /// The same page reloaded again and again, as people do when a page doesn't work.
     func tabKeepsReloading(_ tab: BrowserTab)
+    /// A short message for the person, about something that happened in the tab.
+    func tab(_ tab: BrowserTab, says message: String)
 }
 
 /// One tab. Its web view exists only while the tab is "live"; a hibernated tab
@@ -44,6 +46,8 @@ final class BrowserTab: NSObject, Identifiable {
     @ObservationIgnored fileprivate var reloads: [(url: URL, at: Date)] = []
     /// When the current page was asked for, for the -perf load timings.
     @ObservationIgnored fileprivate var navigationStarted: CFTimeInterval?
+    /// Files being downloaded, and where each is going.
+    @ObservationIgnored var downloads: [ObjectIdentifier: URL] = [:]
 
     init(id: UUID = UUID(), url: URL?, title: String = "", isPrivate: Bool = false,
          lastActive: Date = .now, restoreState: Data? = nil) {
@@ -379,8 +383,12 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
 
         if !["http", "https", "about", "blob", "data"].contains(scheme) {
             // tel:, mailto:, maps, App Store links: hand off to the system.
-            await UIApplication.shared.open(url)
+            await openOutside(url, tapped: navigationAction.navigationType == .linkActivated, in: webView)
             return (.cancel, preferences)
+        }
+        // A link with download, or a blob a page saves: a file, not a page.
+        if navigationAction.shouldPerformDownload {
+            return (.download, preferences)
         }
         if navigationAction.targetFrame?.isMainFrame == true, navigationAction.navigationType == .reload {
             noteReload(of: url)
@@ -441,6 +449,16 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
         let error = error as NSError
         perf("fail \(error.code)", webView.url)
         // Cancelled loads (a new navigation replaced this one) aren't failures.
+        guard error.code != NSURLErrorCancelled, error.code != 102 else { return }
+        loadError = error.localizedDescription
+    }
+
+    /// Failed after it had started drawing: the connection dropped mid-page.
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        let error = error as NSError
+        perf("fail late \(error.code)", webView.url)
+        // Cancelled (a new page asked for), or a frame WebKit stopped for a
+        // download or a hand-off to another app: not failures.
         guard error.code != NSURLErrorCancelled, error.code != 102 else { return }
         loadError = error.localizedDescription
     }

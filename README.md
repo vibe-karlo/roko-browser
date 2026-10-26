@@ -345,3 +345,13 @@ One screen, grouped by what you do, with long lists on pages of their own:
 Feature switches live in `Preferences` and are read where each feature runs, so turning one off
 takes effect at once. Voice languages and pull to summarize sync with the other settings; the
 haptics and alerts belong to the device.
+
+## What pages can ask
+
+`PageDialogs` answers what a page asks outside itself. alert(), confirm() and prompt() are
+system dialogs titled with the site's host, shown only for the page on screen. A link tapped to
+another app (tel:, mailto:, the App Store) opens it; one opened by a redirect or a script asks
+first. Files a page hands over (`Content-Disposition: attachment`, a `download` link, or a type
+WebKit can't show) download to a temporary folder and open in the share sheet, or in Wallet for a
+`.pkpass`. The delegate methods there are `@objc`: WebKit finds them by selector, and they sit
+outside the extension that declares the conformance.

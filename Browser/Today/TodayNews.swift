@@ -81,14 +81,14 @@ nonisolated struct FollowedSection: Codable, Equatable, Identifiable, Sendable {
 /// Reads the chosen sources and has Apple's on-device model pick from them.
 /// It only picks: headlines stay in the sites' own words, so nothing is lost
 /// in translation and nothing is paid for.
-enum TodayNews {
+nonisolated enum TodayNews {
     // MARK: Adding a source
 
     /// Finds how to read an address: a whole site's feed, or for a section
     /// ("…/sport/nk-osijek/"), a feed of just that section, or else the
     /// section page itself. Never the whole site's feed for a section: only
     /// that section was asked for.
-    static func find(_ address: String) async -> NewsSite? {
+    @concurrent static func find(_ address: String) async -> NewsSite? {
         let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = URL(string: trimmed.contains("://") ? trimmed : "https://\(trimmed)"), let rawHost = url.host() else { return nil }
         let host = rawHost.lowercased().hasPrefix("www.") ? String(rawHost.lowercased().dropFirst(4)) : rawHost.lowercased()
@@ -150,7 +150,7 @@ enum TodayNews {
     // MARK: Reading
 
     /// A source's newest stories.
-    static func stories(of source: NewsSite) async -> [NewsStory] {
+    @concurrent static func stories(of source: NewsSite) async -> [NewsStory] {
         if let feed = source.feed { return await stories(from: feed, host: source.host) ?? [] }
         if let page = source.page, let html = await text(at: page) {
             return await Task.detached(priority: .utility) { PageHeadlines.parse(html, page: page, host: source.host) }.value
@@ -159,7 +159,7 @@ enum TodayNews {
     }
 
     /// The stories of several sources, read at once, each source's newest first.
-    static func stories(of sources: [NewsSite]) async -> [String: [NewsStory]] {
+    @concurrent static func stories(of sources: [NewsSite]) async -> [String: [NewsStory]] {
         await withTaskGroup(of: (String, [NewsStory]).self) { group in
             for source in sources {
                 group.addTask { (source.id, await stories(of: source)) }
@@ -182,7 +182,7 @@ enum TodayNews {
     /// Without the model (or if it fails), each site's newest. Either way, at
     /// most two from one site, and never the same story twice: the small
     /// model was asked not to and still picked one crash from two sites.
-    static func top(_ stories: [NewsStory], count: Int = 6) async -> [NewsStory] {
+    @MainActor static func top(_ stories: [NewsStory], count: Int = 6) async -> [NewsStory] {
         let newest = stories.sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
         guard AppleModels.onDeviceAvailable, stories.count > count else { return varied(newest, count: count) }
         let offered = Array(stories.prefix(60))
@@ -244,7 +244,7 @@ enum TodayNews {
     /// Stories about a topic among `stories`: headlines that name it, then
     /// Apple's on-device model drops those about something else that shares
     /// the name ("Osijek" the city when it's NK Osijek you follow).
-    static func about(_ topic: String, in stories: [NewsStory], count: Int = 4) async -> [NewsStory] {
+    @MainActor static func about(_ topic: String, in stories: [NewsStory], count: Int = 4) async -> [NewsStory] {
         // The topic's most telling word, cut to a stem: "Osijek" finds "Osijeka" and "Osijeku" too.
         let words = folded(topic).split { !$0.isLetter && !$0.isNumber }.map(String.init)
         guard let key = words.max(by: { $0.count < $1.count }) else { return [] }
@@ -271,7 +271,7 @@ enum TodayNews {
 
     // MARK: Fetching
 
-    static func text(at url: URL) async -> String? {
+    @concurrent static func text(at url: URL) async -> String? {
         var request = URLRequest(url: url, timeoutInterval: 10)
         request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 roko",
                          forHTTPHeaderField: "User-Agent")
@@ -291,7 +291,7 @@ enum TodayNews {
         }
     }
 
-    static func stories(from feed: URL, host: String) async -> [NewsStory]? {
+    @concurrent static func stories(from feed: URL, host: String) async -> [NewsStory]? {
         var request = URLRequest(url: feed, timeoutInterval: 10)
         request.setValue("Mozilla/5.0 (iPhone) roko", forHTTPHeaderField: "User-Agent")
         guard let (data, response) = try? await URLSession.quick.data(for: request),
