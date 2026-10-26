@@ -16,6 +16,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - To-do's field: the chip says when in short ("Wed 15:00") and is a menu (Today, Tomorrow, This Week, Someday, Date and Time…) for when the words don't say. "at 3" means 15:00 (1 to 6 are the afternoon), and a day typed first ("Wednesday at 3") is read too.
 
 ### Fixed
+- The address bar tells a site, a search and a question apart better. A site's name ("Sportske novosti", "Glas Slavonije") puts the site first, from your tabs, pins and history, its front page ahead of its articles; a long query (six words or more) or one opening like a question in English or Croatian ("koji", "kakav", "objasni", "explain", "compare"…) puts Browse for Me first; and Add to-do no longer sits among the top rows unless the words read like a to-do.
 - Swiping a page out of history no longer also opens it (which put it straight back in history).
 - Dictation in Croatian: "koji su rezultati izbora u srbiji" came out garbled. Croatian is now heard by Apple's servers (the on-device Croatian model was the weak link; English stays on the iPhone), and the hearing kept is the one whose words read as its own language, rather than the one the recognizer said it was surer of, which favoured English hearing Croatian as English-sounding words. The words shown while you speak follow the same choice.
 - Holding + says what it's doing: a soft tap the moment you press, roko's orange filling the capsule as the hold counts, then a firm tap and a mic in place of + when it's listening.

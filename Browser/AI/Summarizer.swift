@@ -750,6 +750,8 @@ nonisolated enum ResearchDepth: Equatable {
         if searchCues.contains(where: text.contains) { return false }
         return query.trimmingCharacters(in: .whitespaces).hasSuffix("?")
             || questionStarts.contains(first)
+            // A long query is a question in all but its punctuation.
+            || words.count >= 6
             || text.contains(" or ") || text.contains(" ili ")  // "iPhone or Pixel": a choice
             || deepCues.contains(where: text.contains)
     }
@@ -758,7 +760,8 @@ nonisolated enum ResearchDepth: Equatable {
         "what", "who", "whose", "when", "where", "why", "how", "which", "should", "can", "could", "would",
         "will", "is", "are", "was", "were", "do", "does", "did",
         "što", "sto", "šta", "tko", "kada", "kad", "gdje", "zašto", "zasto", "kako", "koji", "koja", "koje",
-        "koliko", "kolika", "je", "ima", "isplati", "trebam", "trebaš", "mogu", "može", "smijem",
+        "koliko", "kolika", "je", "ima", "isplati", "trebam", "trebaš", "mogu", "može", "smijem", "kakav", "kakva",
+        "kakvo", "čiji", "ciji", "objasni", "usporedi", "explain", "compare", "tell",
     ]
     private static let searchCues = [
         " weather", " vrijeme u ", " prognoza", " near me", " u blizini", " login", " log in", " sign in",

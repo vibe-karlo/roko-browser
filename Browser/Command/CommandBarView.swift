@@ -900,6 +900,31 @@ enum CommandRanker {
         return item
     }
 
+    /// The row for a site called what was typed: a tab, pin, history page or
+    /// well-known site whose title starts with it as whole words, the one
+    /// with the shortest address first.
+    static func siteNamed(_ needle: String, in items: [CommandItem]) -> CommandItem? {
+        let candidates = items.filter { item in
+            let title = item.title.lowercased()
+            guard title.hasPrefix(needle) else { return false }
+            let rest = title.dropFirst(needle.count)
+            guard rest.isEmpty || rest.first.map({ !$0.isLetter }) == true else { return false }
+            switch item.action {
+            case .open, .switchTab, .openPin: return true
+            default: return false
+            }
+        }
+        func address(_ item: CommandItem) -> Int {
+            switch item.action {
+            case .open(let url): return url.path.count
+            case .switchTab(let tab): return tab.url?.path.count ?? 99
+            case .openPin(let pin): return URL(string: pin.url)?.path.count ?? 99
+            default: return 99
+            }
+        }
+        return candidates.min { address($0) < address($1) }
+    }
+
     static func rank(query rawQuery: String, browser: BrowserModel, suggestions: [String]) -> [CommandItem] {
         let query = rawQuery.trimmingCharacters(in: .whitespaces)
         let needle = query.lowercased()
@@ -947,7 +972,7 @@ enum CommandRanker {
                 // When it reads like one ("call Petra tomorrow", "kupiti mlijeko"), it's
                 // the first row, so Return adds it, as Browse for Me goes first for a question.
                 if TodoDraft.parse(query) == nil, let draft = TodoDraft.parse("todo " + TodoIntent.task(in: query)) {
-                    ranked.append((TodoIntent.isLikely(query) ? 915 : 845, CommandItem(id: "keep-todo", title: draft.title,
+                    ranked.append((TodoIntent.isLikely(query) ? 915 : 300, CommandItem(id: "keep-todo", title: draft.title,
                                                     subtitle: draft.when == .someday ? "New to-do, someday" : "New to-do for \(TodoDraft.phrase(draft.when, draft.time))",
                                                     kind: "To-do", icon: .glyph(.todo), action: .addTodo(draft.title, draft.when, draft.time))))
                 }
@@ -1105,6 +1130,17 @@ enum CommandRanker {
         for (offset, suggestion) in suggestions.enumerated() where folded(suggestion) != typed {
             ranked.append((400 - offset, CommandItem(id: "suggest-\(suggestion)", title: suggestion, subtitle: "",
                                                      kind: "", icon: .glyph(.search), action: .search(suggestion))))
+        }
+
+        // A site's name ("sportske novosti", "jutarnji", "glas slavonije"): the
+        // site itself first, ahead of a search for the name. Found among your
+        // tabs, pins and history whose title starts with what was typed, and
+        // the one nearest the site's front page wins (its title is the site's
+        // name, its address the shortest).
+        if needle.count >= 4, !ResearchDepth.prefersAnswer(query), !TodoIntent.isLikely(query),
+           let site = Self.siteNamed(needle, in: ranked.map(\.item)),
+           let index = ranked.firstIndex(where: { $0.item.id == site.id }) {
+            ranked[index].score = max(ranked[index].score, 940)
         }
 
         var seen = Set<String>()
