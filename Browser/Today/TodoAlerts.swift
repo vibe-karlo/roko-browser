@@ -31,7 +31,10 @@ enum TodoAlerts {
                 (note.userInfo?[key.rawValue] as? [PersistentIdentifier])?.contains { $0.entityName == "Todo" } ?? false
             }
             guard touched else { return }
-            MainActor.assumeIsolated { update() }
+            MainActor.assumeIsolated {
+                update()
+                WidgetBridge.update()
+            }
         }
         update()
     }

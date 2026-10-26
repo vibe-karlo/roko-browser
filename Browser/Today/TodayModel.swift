@@ -13,7 +13,10 @@ import Foundation
 final class TodayModel {
     static let shared = TodayModel()
 
-    private(set) var weather: TodayWeather?
+    private(set) var weather: TodayWeather? {
+        // The widgets show it too.
+        didSet { if weather != oldValue { WidgetBridge.update() } }
+    }
     private(set) var top: [NewsStory] = []
     /// A section per followed page, then per topic.
     private(set) var followed: [FollowedSection] = []

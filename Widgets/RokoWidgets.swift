@@ -5,6 +5,9 @@ import WidgetKit
 @main
 struct RokoWidgets: WidgetBundle {
     var body: some Widget {
+        TodoWidget()
+        TodayWidget()
+        AnswerWidget()
         ParkingLiveActivity()
     }
 }

@@ -316,7 +316,7 @@ final class BrowserModel {
         case "roko://today": panel = .today
         case "roko://todo": panel = .todos
         // The parking timer: the bar, with the time left on top.
-        case "roko://parking": showCommandBar()
+        case "roko://parking", "roko://bar": showCommandBar()
         case "roko://parking/extend": Parking.shared.extend()
         default:
             guard url.scheme?.hasPrefix("http") == true else { return }

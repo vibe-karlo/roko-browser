@@ -60,6 +60,8 @@ struct CommandBarView: View {
     @State private var blink = false
     /// An answer was read this time the bar is open (see countAnswer).
     @State private var answerCounted = false
+    /// What the rows were last built for.
+    @State private var rowsQuery = ""
     @FocusState private var focused: Bool
     /// How tall the list is, between the field and the keyboard.
     @State private var listHeight: CGFloat = 300
@@ -485,6 +487,12 @@ struct CommandBarView: View {
                 .autocorrectionDisabled()
                 .submitLabel(.go)
                 .onSubmit {
+                    // Return right on the last key: the rows may still be the
+                    // ones for one letter less ("Call the ban"). Build them now.
+                    if !previewing, rowsQuery != query {
+                        rebuild()
+                        selection = 0
+                    }
                     guard !query.trimmingCharacters(in: .whitespaces).isEmpty || previewing,
                           let item = items[safe: selection] else { return }
                     perform(item)
@@ -757,6 +765,7 @@ struct CommandBarView: View {
                 print(String(format: "PERF rank \"%@\" %.1fms, %d rows", query, (CFAbsoluteTimeGetCurrent() - started) * 1000, items.count))
             }
         }
+        rowsQuery = query
         guard browser.launcherContext == .web else {
             items = contextRows()
             return
@@ -822,6 +831,16 @@ struct CommandBarView: View {
                 rows.append(CommandItem(id: "answer-\(asked)", title: answer.title, subtitle: answer.subtitle,
                                         kind: "", icon: answer.icon, action: answer.action, mark: .pin))
             }
+            // The same answers, for the Answer widget on the Home or Lock Screen.
+            WidgetBridge.setAnswers(rows.compactMap { row in
+                guard row.id.hasPrefix("answer-") else { return nil }
+                let icon: String? = switch row.icon {
+                case .image(let name): name
+                case .glyph(let kind): "phosphor/\(kind.rawValue)"
+                case .site: nil
+                }
+                return (String(row.id.dropFirst("answer-".count)), row.title, row.subtitle, icon)
+            })
             var seen = Set<String>()
             for pin in pins {
                 guard let url = URL(string: pin.url) else { continue }

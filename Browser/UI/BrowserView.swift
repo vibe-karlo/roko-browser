@@ -250,6 +250,8 @@ struct BrowserView: View {
         // Coming back to the app always shows the bar; scrolling hides it again.
         // UIKit's own signal: it arrives whatever wraps the SwiftUI scene.
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            // To-dos ticked off in a widget meanwhile.
+            WidgetBridge.applyTicks()
             if browser.isBarCollapsed { browser.isBarCollapsed = false }
             // The first time on a new day: Today first.
             if TodayModel.shouldOpenNow(), browser.panel == .none, browser.summary == nil, browser.browseForMe == nil {

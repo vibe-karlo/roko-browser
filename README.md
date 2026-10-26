@@ -397,3 +397,21 @@ texts, act as if each one was sent.
 Adding a city: its zones and numbers in `ParkingCity`, its bounding box and zone tags in
 `Scripts/build_parking.py` (or another source of zone outlines, such as Zagreb's ArcGIS layers), then
 rebuild the data.
+
+## Widgets
+
+The `RokoWidgets` extension (`Widgets/`) has three Home Screen widgets and the parking Live
+Activity. They can't read roko's store, so the app writes a small copy into the App Group
+`group.com.growthstudio.roko` (`Shared/WidgetSnapshot.swift`): the to-dos due by tomorrow, the
+current weather and the bar's pinned answers. `App/WidgetBridge.swift` writes it after every save
+that touches a to-do, every new weather and every time the bar lists your pins, and only when it
+changed, which is also the only time widgets are asked to reload. A widget's timeline holds now
+and midnight, when tomorrow's to-dos become today's.
+
+Ticking a to-do in a widget runs `CompleteTodoIntent` in the extension: it adds the to-do's id to
+a list in the group's shared defaults and the widget redraws without it. roko takes the list and
+marks those done at launch and each time it becomes active.
+
+The App Group is in `Shared/AppGroup.entitlements` (both targets), and in `Sync.entitlements` and
+`Browser.entitlements` for when either is switched on. Automatic signing registers it on the
+team; the first build after adding it needs Xcode's Signing & Capabilities to have the team set.

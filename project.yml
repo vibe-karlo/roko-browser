@@ -22,8 +22,10 @@ targets:
       - path: Browser
         excludes:
           - "Info.plist"
-      # What the app and its widgets share (the parking Live Activity).
+      # What the app and its widgets share (the parking Live Activity, the widgets' data).
       - path: Shared
+        excludes:
+          - "*.entitlements"
     dependencies:
       - target: RokoWidgets
     info:
@@ -83,6 +85,10 @@ targets:
         # The alternates in Settings → App Icon (Scripts/make_alternate_icons.swift).
         ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: YES
         CODE_SIGN_STYLE: Automatic
+        # The App Group shared with the widgets (Shared/WidgetSnapshot.swift).
+        # Sync.entitlements and Browser.entitlements carry it too, for when
+        # either replaces this file below.
+        CODE_SIGN_ENTITLEMENTS: Shared/AppGroup.entitlements
         # Your team, kept here so regenerating the project doesn't drop it.
         DEVELOPMENT_TEAM: 6ZQC2F6CF2
         # iCloud sync (pins, history, settings) needs the paid Apple Developer
@@ -110,6 +116,8 @@ targets:
         excludes:
           - "Info.plist"
       - path: Shared
+        excludes:
+          - "*.entitlements"
     info:
       path: Widgets/Info.plist
       properties:
@@ -121,6 +129,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.growthstudio.roko.widgets
+        CODE_SIGN_ENTITLEMENTS: Shared/AppGroup.entitlements
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: 6ZQC2F6CF2
