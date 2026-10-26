@@ -1,4 +1,5 @@
 import AVFoundation
+import NaturalLanguage
 import Speech
 
 /// Hold + and speak: the words go into the address bar. English and Croatian
@@ -76,7 +77,12 @@ final class VoiceInput {
             let request = SFSpeechAudioBufferRecognitionRequest()
             request.shouldReportPartialResults = true
             request.addsPunctuation = false
-            if recognizer.supportsOnDeviceRecognition { request.requiresOnDeviceRecognition = true }
+            // English on the iPhone itself; Croatian on Apple's servers, whose
+            // Croatian is far better than the on-device model's (it garbled
+            // "koji su rezultati izbora u srbiji").
+            if locale.language.languageCode?.identifier == "en", recognizer.supportsOnDeviceRecognition {
+                request.requiresOnDeviceRecognition = true
+            }
             // Words roko hears often: what it's asked to open and to do.
             request.contextualStrings = ["roko", "todo", "to-do", "dot com", "točka hr", "index.hr", "jutarnji"]
             return Ear(locale: locale, recognizer: recognizer, request: request)
@@ -156,7 +162,8 @@ final class VoiceInput {
         if let transcription, !transcription.formattedString.isEmpty { ears[index].best = transcription }
         if isFinal { ears[index].finished = true }
         // While speaking, show the phone's language's hearing (the first), or any.
-        partial = (ears.first?.best ?? ears.compactMap(\.best).first)?.formattedString ?? partial
+        // While speaking, the hearing that sounds most like its own language so far.
+        partial = Self.choose(ears.compactMap { ear in ear.best.map { (ear.locale, $0) } }) ?? partial
         if !isListening, ears.allSatisfy(\.finished) { conclude() }
     }
 
@@ -166,18 +173,30 @@ final class VoiceInput {
         finish.resume(returning: Self.choose(ears.compactMap { ear in ear.best.map { (ear.locale, $0) } }))
     }
 
-    /// The hearing to keep: the one each word of which the recognizer was surer
-    /// of. Croatian letters (č, ć, š, ž, đ) in the Croatian hearing tip a close call.
+    /// The hearing to keep. A recognizer made to hear the wrong language still
+    /// writes words of its own language, so how sure it was says little (and
+    /// Apple's servers often report no confidence at all). What tells them apart
+    /// is whether the words read as that language: each hearing is scored by how
+    /// strongly its text reads as its own language, then by confidence where
+    /// there is one. Croatian letters (č, ć, š, ž, đ) in the Croatian hearing add to it.
     nonisolated static func choose(_ hearings: [(Locale, SFTranscription)]) -> String? {
-        let scored = hearings.map { locale, transcription -> (String, Double) in
-            let segments = transcription.segments
-            let confidence = segments.isEmpty ? 0 : segments.map { Double($0.confidence) }.reduce(0, +) / Double(segments.count)
+        let scored = hearings.compactMap { locale, transcription -> (String, Double)? in
             let text = transcription.formattedString
-            let croatian = locale.language.languageCode?.identifier == "hr"
-                && text.contains(where: { "čćšžđČĆŠŽĐ".contains($0) })
-            return (text, confidence + (croatian ? 0.08 : 0))
+            guard !text.isEmpty else { return nil }
+            let code = locale.language.languageCode?.identifier ?? ""
+            let recognizer = NLLanguageRecognizer()
+            recognizer.languageConstraints = [.croatian, .english, NLLanguage("sr"), NLLanguage("bs")]
+            recognizer.processString(text)
+            let hypotheses = recognizer.languageHypotheses(withMaximum: 4)
+            let fit = code == "hr"
+                ? (hypotheses[.croatian] ?? 0) + (hypotheses[NLLanguage("sr")] ?? 0) + (hypotheses[NLLanguage("bs")] ?? 0)
+                : hypotheses[.english] ?? 0
+            let confidences = transcription.segments.map { Double($0.confidence) }.filter { $0 > 0 }
+            let confidence = confidences.isEmpty ? 0.5 : confidences.reduce(0, +) / Double(confidences.count)
+            let letters = code == "hr" && text.contains(where: { "čćšžđČĆŠŽĐ".contains($0) }) ? 0.15 : 0
+            return (text, fit * 0.7 + confidence * 0.3 + letters)
         }
-        return scored.filter { !$0.0.isEmpty }.max { $0.1 < $1.1 }?.0
+        return scored.max { $0.1 < $1.1 }?.0
     }
 
     nonisolated private static func level(of buffer: AVAudioPCMBuffer) -> Double {

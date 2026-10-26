@@ -38,7 +38,15 @@ struct BottomBar: View {
 
             // Tap: the launcher. Hold: speak, and let go.
             Group {
-                Glyph(.plus, size: 22, weight: 2)
+                ZStack {
+                    Glyph(.plus, size: 22, weight: 2)
+                        .opacity(browser.voiceListening ? 0 : 1)
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Theme.accentText)
+                        .opacity(browser.voiceListening ? 1 : 0)
+                }
+                .animation(.snappy(duration: 0.15), value: browser.voiceListening)
                     .frame(width: 104, height: 38)
                     .background {
                         // Becomes the launcher's field: there only while the launcher isn't,
@@ -46,6 +54,15 @@ struct BottomBar: View {
                         // Hidden while the launcher's field stands in its place.
                         if browser.panel != .command || !onPage {
                             Capsule().fill(Theme.raised)
+                                // Held: roko's orange fills it from the left as the hold
+                                // counts, so it's clear something is about to happen.
+                                .overlay(alignment: .leading) {
+                                    GeometryReader { proxy in
+                                        Theme.accent.opacity(0.35)
+                                            .frame(width: proxy.size.width * holdFill)
+                                    }
+                                    .clipShape(.capsule)
+                                }
                         }
                     }
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { capsuleFrame = $0 }
@@ -86,6 +103,8 @@ struct BottomBar: View {
     @State private var pressedAt: Date?
     @State private var holdTask: Task<Void, Never>?
     @State private var swiped = false
+    /// How far the hold has counted, 0 to 1, drawn as the capsule's fill.
+    @State private var holdFill: CGFloat = 0
 
     /// A tap opens the launcher; held past a third of a second, it listens
     /// until the finger lifts.
@@ -94,20 +113,24 @@ struct BottomBar: View {
             .onChanged { value in
                 // A swipe across the bar (to switch tabs) isn't a hold or a tap.
                 if hypot(value.translation.width, value.translation.height) > 14 {
+                    if !swiped { withAnimation(.easeOut(duration: 0.15)) { holdFill = 0 } }
                     holdTask?.cancel()
                     swiped = true
                 }
                 guard pressedAt == nil else { return }
                 pressedAt = .now
-                UIImpactFeedbackGenerator(style: .soft).prepare()
+                UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.6)
+                withAnimation(.linear(duration: 0.3)) { holdFill = 1 }
                 holdTask = Task {
-                    try? await Task.sleep(for: .milliseconds(320))
+                    try? await Task.sleep(for: .milliseconds(300))
                     guard !Task.isCancelled else { return }
+                    withAnimation(.easeOut(duration: 0.2)) { holdFill = 0 }
                     browser.launcherOrigin = capsuleFrame
                     browser.startVoice()
                 }
             }
             .onEnded { _ in
+                withAnimation(.easeOut(duration: 0.15)) { holdFill = 0 }
                 holdTask?.cancel()
                 pressedAt = nil
                 defer { swiped = false }

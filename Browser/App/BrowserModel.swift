@@ -356,7 +356,7 @@ final class BrowserModel {
             return
         }
         do {
-            let tick = UIImpactFeedbackGenerator(style: .medium)
+            let tick = UIImpactFeedbackGenerator(style: .heavy)
             tick.prepare()
             try VoiceInput.shared.start()
             tick.impactOccurred()
@@ -529,6 +529,18 @@ final class BrowserModel {
     }
 
     // MARK: History
+
+    /// Forgets a page: every visit to that address, or to any address on that
+    /// site when `wholeSite` (as the launcher's site row stands for all of them).
+    func forget(_ url: URL, wholeSite: Bool = false) {
+        guard let context else { return }
+        let host = url.displayHost
+        let all = (try? context.fetch(FetchDescriptor<HistoryEntry>())) ?? []
+        for entry in all where wholeSite ? URL(string: entry.url)?.displayHost == host : entry.url == url.absoluteString {
+            context.delete(entry)
+        }
+        try? context.save()
+    }
 
     func history(matching query: String, limit: Int) -> [HistoryEntry] {
         guard let context else { return [] }

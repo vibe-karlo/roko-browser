@@ -242,6 +242,10 @@ struct CommandBarView: View {
                                 CommandRow(item: item, isSelected: index == selection && (!query.isEmpty || previewing))
                             }
                             .buttonStyle(.plain)
+                            // From history: swipe it away to the left to forget it.
+                            .modifier(SwipeToForget(enabled: Self.forgettable(item) != nil) {
+                                if let (url, wholeSite) = Self.forgettable(item) { forget(url, wholeSite: wholeSite) }
+                            })
                         }
                     }
                     .id(item.id)
@@ -250,6 +254,10 @@ struct CommandBarView: View {
                             Button("Unpin", role: .destructive) {
                                 browser.unpin(pin)
                                 rebuild()
+                            }
+                        } else if let (url, wholeSite) = Self.forgettable(item) {
+                            Button(role: .destructive) { forget(url, wholeSite: wholeSite) } label: {
+                                Label(wholeSite ? "Remove Site from History" : "Remove from History", systemImage: "trash")
                             }
                         } else if item.id.hasPrefix("answer-") {
                             Button("Unpin", role: .destructive) {
@@ -640,6 +648,23 @@ struct CommandBarView: View {
             return [CommandItem(id: "ask", title: text, subtitle: "Ask about this page", kind: "AI",
                                 icon: .glyph(.browse), action: .askAboutPage(text))]
         }
+    }
+
+    /// A row that comes from history (a page you were on, or a site you've
+    /// been to): it can be forgotten.
+    static func forgettable(_ item: CommandItem) -> (URL, Bool)? {
+        guard case .open(let url) = item.action else { return nil }
+        if item.id.hasPrefix("history-") || item.id.hasPrefix("recent-") { return (url, false) }
+        if item.id.hasPrefix("site-") { return (url, true) }
+        return nil
+    }
+
+    private func forget(_ url: URL, wholeSite: Bool) {
+        withAnimation(.snappy(duration: 0.25)) {
+            browser.forget(url, wholeSite: wholeSite)
+            rebuild()
+        }
+        browser.showToast(wholeSite ? "Site removed from history" : "Removed from history")
     }
 
     /// A weather answer: now, the day under it.
@@ -1234,5 +1259,41 @@ nonisolated enum TodoIntent {
         let lower = trimmed.lowercased()
         guard let lead = leadIns.first(where: { lower.hasPrefix($0) }) else { return trimmed }
         return String(trimmed.dropFirst(lead.count))
+    }
+}
+
+/// Swipe a row left to forget it: it follows the finger with a trash mark
+/// coming in behind, and past a third of the way, let go and it's gone.
+/// A mostly vertical drag is left to the list, which scrolls.
+private struct SwipeToForget: ViewModifier {
+    let enabled: Bool
+    let forget: () -> Void
+    @State private var offset: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content
+                .offset(x: offset)
+                .background(alignment: .trailing) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.accentText)
+                        .padding(.trailing, 20)
+                        .opacity(min(1, -offset / 80))
+                }
+                .simultaneousGesture(DragGesture(minimumDistance: 24).onChanged { value in
+                    guard abs(value.translation.width) > abs(value.translation.height) * 1.5 else { return }
+                    offset = min(0, value.translation.width)
+                }.onEnded { value in
+                    if value.translation.width < -120 {
+                        withAnimation(.easeIn(duration: 0.18)) { offset = -500 } completion: { forget(); offset = 0 }
+                    } else {
+                        withAnimation(.snappy(duration: 0.25)) { offset = 0 }
+                    }
+                })
+                .sensoryFeedback(.impact(weight: .light), trigger: offset < -120)
+        } else {
+            content
+        }
     }
 }
