@@ -72,6 +72,18 @@ extension View {
             .overlay(RoundedRectangle(cornerRadius: cornerRadius).strokeBorder(Theme.edge))
             .shadow(color: .black.opacity(0.14), radius: 5, y: 2)
     }
+
+    /// The bar on a private tab: always dark, light or dark mode, with an
+    /// edge in roko's orange, so a glance says nothing here is being kept.
+    func privateBarSurface(cornerRadius: CGFloat) -> some View {
+        self
+            .environment(\.colorScheme, .dark)
+            .foregroundStyle(Theme.ink)
+            .background(Theme.panel, in: .rect(cornerRadius: cornerRadius))
+            .environment(\.colorScheme, .dark)
+            .overlay(RoundedRectangle(cornerRadius: cornerRadius).strokeBorder(Theme.accent.opacity(0.45)))
+            .shadow(color: .black.opacity(0.14), radius: 5, y: 2)
+    }
 }
 
 nonisolated extension Color {

@@ -39,8 +39,14 @@ struct BottomBar: View {
             // Tap: the launcher. Hold: speak, and let go.
             Group {
                 ZStack {
-                    Glyph(.plus, size: 22, weight: 2)
-                        .opacity(browser.voiceListening ? 0 : 1)
+                    // On a private tab the closed eye sits beside the +, in orange.
+                    HStack(spacing: 10) {
+                        if isPrivate {
+                            Glyph(.eyeClosed, size: 18).foregroundStyle(Theme.accent)
+                        }
+                        Glyph(.plus, size: 22, weight: 2)
+                    }
+                    .opacity(browser.voiceListening ? 0 : 1)
                     Image(systemName: "mic.fill")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Theme.accentText)
@@ -72,7 +78,7 @@ struct BottomBar: View {
             .animation(.snappy(duration: 0.2), value: browser.voiceListening)
             .gesture(holdToTalk)
             .accessibilityElement()
-            .accessibilityLabel("New tab")
+            .accessibilityLabel(isPrivate ? "New tab, private browsing on" : "New tab")
             .accessibilityHint(Preferences.holdToTalk ? "Hold to speak" : "")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { browser.showCommandBar() }
@@ -92,7 +98,8 @@ struct BottomBar: View {
         }
         .frame(height: Theme.barHeight + 8)
         .overlay(alignment: .bottom) { progressLine }
-        .barSurface(cornerRadius: Theme.barRadius)
+        .modifier(BarSurface(isPrivate: isPrivate))
+        .animation(.easeOut(duration: 0.25), value: isPrivate)
         // Alongside the + capsule's own hold, not over it: as a high-priority
         // gesture it held every touch until it knew it wasn't a swipe, so a
         // hold on + never reached the capsule.
@@ -152,6 +159,8 @@ struct BottomBar: View {
                 }
             }
     }
+
+    private var isPrivate: Bool { browser.selectedTab?.isPrivate == true }
 
     private var onPage: Bool {
         ![.today, .todos].contains(browser.panel) && browser.browseForMe == nil && browser.summary == nil
@@ -264,5 +273,18 @@ struct GlyphButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundStyle(isEnabled ? (configuration.isPressed ? HierarchicalShapeStyle.secondary : .primary) : .tertiary)
+    }
+}
+
+/// The bar's surface, dark with an orange edge on a private tab.
+private struct BarSurface: ViewModifier {
+    let isPrivate: Bool
+
+    func body(content: Content) -> some View {
+        if isPrivate {
+            content.privateBarSurface(cornerRadius: Theme.barRadius)
+        } else {
+            content.barSurface(cornerRadius: Theme.barRadius)
+        }
     }
 }
