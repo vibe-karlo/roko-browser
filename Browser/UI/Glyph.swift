@@ -15,7 +15,9 @@ struct Glyph: View {
              // Cookie pop-ups, in Site Settings.
              cookie,
              // To-do, and Today.
-             todo, today, calendar, news
+             todo, today, calendar, news,
+             // Parking.
+             car
     }
 
     let kind: Kind

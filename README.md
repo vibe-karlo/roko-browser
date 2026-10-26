@@ -373,3 +373,27 @@ first. Files a page hands over (`Content-Disposition: attachment`, a `download` 
 WebKit can't show) download to a temporary folder and open in the share sheet, or in Wallet for a
 `.pkpass`. The delegate methods there are `@objc`: WebKit finds them by selector, and they sit
 outside the extension that declares the conformance.
+
+## Parking
+
+Paying for street parking by text (m-parking), in the cities in `Parking/ParkingCity.swift`: for now
+Osijek, with GPP Osijek's zones, numbers, prices, limits and charging hours (Croatian public holidays
+are free, Easter-based ones worked out). Typing "parking" asks for one precise location fix
+(`ParkingLocation`; with precise location off for roko, iOS is asked for it just this once, under the
+"Parking" purpose in Info.plist) and matches it to the city's paid parking areas, bundled as
+`Resources/Parking/<city>.json` from OpenStreetMap (© OpenStreetMap contributors, ODbL) by
+`python3 Scripts/build_parking.py`. Within 60 m of an area counts; another zone within 25 m of the
+nearest is offered too, since a wrong zone means a fine. Found nothing, roko says to check the signs
+rather than that parking is free: cities extend zones faster than the map follows.
+
+roko never sends the text: Messages opens with the number and the registration (Settings → Parking)
+written in, and only a sent message starts the timer. The session is kept in UserDefaults, and runs
+as a Live Activity (`Shared/ParkingActivity.swift`, drawn by the `RokoWidgets` extension in
+`Widgets/`) whose countdown iOS draws on its own, with nothing updating it. One text buys an hour;
+the end never goes past the end of charging, and "Add an hour" stops at a zone's daily limit
+(Osijek's zone 0: three hours). Launch with `-parkingTest` to have a simulator, which can't send
+texts, act as if each one was sent.
+
+Adding a city: its zones and numbers in `ParkingCity`, its bounding box and zone tags in
+`Scripts/build_parking.py` (or another source of zone outlines, such as Zagreb's ArcGIS layers), then
+rebuild the data.

@@ -22,6 +22,10 @@ targets:
       - path: Browser
         excludes:
           - "Info.plist"
+      # What the app and its widgets share (the parking Live Activity).
+      - path: Shared
+    dependencies:
+      - target: RokoWidgets
     info:
       path: Browser/Info.plist
       properties:
@@ -51,13 +55,22 @@ targets:
         # Today: the weather where you are, and what's on your calendar.
         NSMicrophoneUsageDescription: Hold + and speak to search, open a site or add a to-do. The microphone is on only while you hold it.
         NSSpeechRecognitionUsageDescription: What you say while holding + is turned into words for the address bar, in English or Croatian.
-        NSLocationWhenInUseUsageDescription: Today shows the weather where you are. Only a rough location is used, and only for the weather.
+        NSLocationWhenInUseUsageDescription: Today shows the weather where you are, from a rough location. Paying for parking finds the zone you're in.
+        # Parking: a zone border can run down the middle of a street, so a precise
+        # fix is asked for just this once when precise location is off for roko.
+        NSLocationTemporaryUsageDescriptionDictionary:
+          Parking: Finding the parking zone you're in needs your exact location, just this once.
+        # Paid parking's time left, on the Lock Screen and in the Dynamic Island.
+        NSSupportsLiveActivities: true
         NSCalendarsFullAccessUsageDescription: Today shows what's left on your calendar for the day. It stays on this iPhone.
         # Required before Apple will grant the browser entitlements (default
         # browser, passkeys): the app must declare it opens http and https.
         CFBundleURLTypes:
           - CFBundleURLName: Web
             CFBundleURLSchemes: [http, https]
+          # roko's own links: the parking Live Activity opens roko://parking.
+          - CFBundleURLName: roko
+            CFBundleURLSchemes: [roko]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.growthstudio.roko
@@ -87,3 +100,28 @@ targets:
         # CODE_SIGN_ENTITLEMENTS: Browser/Browser.entitlements
         # SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) ICLOUD_SYNC PRIVATE_CLOUD_COMPUTE
         ENABLE_PREVIEWS: YES
+
+  # The parking Live Activity (Widgets/RokoWidgets.swift).
+  RokoWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Widgets
+        excludes:
+          - "Info.plist"
+      - path: Shared
+    info:
+      path: Widgets/Info.plist
+      properties:
+        CFBundleDisplayName: roko
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.growthstudio.roko.widgets
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 6ZQC2F6CF2
+        SKIP_INSTALL: YES

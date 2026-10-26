@@ -34,6 +34,14 @@
 				<string>https</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>roko</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>roko</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
@@ -48,12 +56,19 @@
 	</dict>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Today shows what's left on your calendar for the day. It stays on this iPhone.</string>
+	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
+	<dict>
+		<key>Parking</key>
+		<string>Finding the parking zone you're in needs your exact location, just this once.</string>
+	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Today shows the weather where you are. Only a rough location is used, and only for the weather.</string>
+	<string>Today shows the weather where you are, from a rough location. Paying for parking finds the zone you're in.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Hold + and speak to search, open a site or add a to-do. The microphone is on only while you hold it.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>What you say while holding + is turned into words for the address bar, in English or Croatian.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>RokoShareServer</key>
 	<string>$(SHARE_SERVER)</string>
 	<key>UIApplicationSceneManifest</key>

@@ -27,6 +27,7 @@ struct BrowserApp: App {
             BrowserView()
                 .environment(browser)
                 .tint(Theme.accent)
+                .onOpenURL { browser.handleLink($0) }
                 .task { Appearance.apply() }
         }
         .modelContainer(container)

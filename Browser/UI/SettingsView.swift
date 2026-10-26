@@ -196,6 +196,8 @@ struct SettingsView: View {
                     }
                 }
 
+                ParkingSection()
+
                 Section {
                     NavigationLink {
                         AnswerLanguageSettings(chosen: $answerLanguage, kept: $keptLanguages)
@@ -256,7 +258,7 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Text("Filter lists: EasyList, EasyPrivacy and Fanboy's Cookie List (CC BY-SA 3.0). Cookie pop-ups: DuckDuckGo Autoconsent, with Consent-O-Matic's rules (MPL 2.0). Article extraction: Mozilla Readability (Apache 2.0).")
+                    Text("Filter lists: EasyList, EasyPrivacy and Fanboy's Cookie List (CC BY-SA 3.0). Cookie pop-ups: DuckDuckGo Autoconsent, with Consent-O-Matic's rules (MPL 2.0). Article extraction: Mozilla Readability (Apache 2.0). Parking zones: © OpenStreetMap contributors (ODbL).")
                         .font(.footnote)
                         .foregroundStyle(Theme.secondaryInk)
                 }
@@ -343,6 +345,43 @@ private struct SavedSection: View {
         } label: {
             Text(title)
             Text(detail).monospacedDigit()
+        }
+    }
+}
+
+/// Registrations for paying parking by text. The first is the one sent.
+private struct ParkingSection: View {
+    @State private var parking = Parking.shared
+    @State private var newPlate = ""
+
+    var body: some View {
+        Section {
+            ForEach(parking.plates, id: \.self) { plate in
+                HStack {
+                    Text(Parking.display(plate)).monospacedDigit()
+                    Spacer()
+                    if plate == parking.plates.first, parking.plates.count > 1 {
+                        Text("Used").foregroundStyle(Theme.secondaryInk)
+                    }
+                }
+                .contentShape(.rect)
+                .onTapGesture { withAnimation(.snappy) { parking.makeDefault(plate) } }
+                .accessibilityAddTraits(plate == parking.plates.first ? .isSelected : [])
+            }
+            .onDelete { parking.removePlates(at: $0) }
+            TextField("Add a registration, like OS 123 AB", text: $newPlate)
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+                .submitLabel(.done)
+                .onSubmit {
+                    withAnimation(.snappy) { parking.addPlate(newPlate) }
+                    newPlate = ""
+                }
+        } header: {
+            Text("Parking")
+        } footer: {
+            Text("In Osijek, type parking in the bar: roko finds your zone and writes the text with your registration, for you to send. The time left then shows on the Lock Screen."
+                 + (parking.plates.count > 1 ? " Tap a registration to use it." : ""))
         }
     }
 }

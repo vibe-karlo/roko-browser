@@ -5,7 +5,8 @@ struct CommandItem: Identifiable {
     enum Action {
         case open(URL), switchTab(BrowserTab), openPin(Pin), search(String),
              browse(String), summarize, findOnPage, privateTab, settings, copy(String),
-             pasteLink, openCopied(URL), todos, today, openApp(URL), ask(String), askAboutPage(String), addTodo(String, TodoWhen, DateComponents?)
+             pasteLink, openCopied(URL), todos, today, openApp(URL), ask(String), askAboutPage(String), addTodo(String, TodoWhen, DateComponents?),
+             payParking(city: String, zone: String), extendParking, endParking
     }
 
     let id: String
@@ -188,6 +189,13 @@ struct CommandBarView: View {
             browser.voiceResult = nil
         }
         .task(id: query) {
+            // "parking": where you are, in zones (a precise fix, once a minute at most).
+            guard ParkingQuery.matches(query) else { return }
+            await Parking.shared.locate()
+            rebuild()
+        }
+        .onChange(of: Parking.shared.session) { rebuild() }
+        .task(id: query) {
             // "weather in London", "vrijeme u Zagrebu": a town's weather, after a short pause.
             guard WeatherQuery.place(in: query) != nil else { return }
             try? await Task.sleep(for: .milliseconds(300))
@@ -273,7 +281,7 @@ struct CommandBarView: View {
                                 PinnedAnswers.remove(String(item.id.dropFirst("answer-".count)))
                                 rebuild()
                             }
-                        } else if ["calc", "weather", "weather-place", "calendar"].contains(item.id) {
+                        } else if ["calc", "weather", "weather-place", "calendar"].contains(item.id) || item.id.hasPrefix("parking-zone") {
                             // An answer kept with your pins, worked out again each time.
                             Button {
                                 PinnedAnswers.add(query.trimmingCharacters(in: .whitespaces))
@@ -598,6 +606,13 @@ struct CommandBarView: View {
     /// covers the capsule the field is growing out of.
     private func open() {
         answerCounted = false
+        Parking.shared.clearIfOver()
+        if PinnedAnswers.all.contains(where: ParkingQuery.matches) {
+            Task {
+                await Parking.shared.locate()
+                rebuild()
+            }
+        }
         // Opened with no capsule to grow from (on launch, with nothing open): just there.
         guard browser.launcherOrigin != .zero else {
             browser.launcherShown = true
@@ -685,6 +700,50 @@ struct CommandBarView: View {
         browser.showToast(wholeSite ? "Site removed from history" : "Removed from history")
     }
 
+    /// Parking, in a city roko pays in. Running: the time left, and a tap adds
+    /// an hour. Otherwise the zone you're in, one row a zone when you're on a
+    /// border, ready to write the text. Nothing outside those cities.
+    static func parkingRows(typed: Bool) -> [CommandItem] {
+        let parking = Parking.shared
+        let car = CommandItem.Icon.glyph(.car)
+        if let session = parking.active, let zone = session.zone {
+            let left = SavedStats.duration(session.endsAt.timeIntervalSinceNow.rounded(.up))
+            var rows = [CommandItem(id: "parking-running", title: "\(zone.name) · \(left) left",
+                                    subtitle: "Paid until \(session.endsAt.formatted(date: .omitted, time: .shortened)) · \(Parking.display(session.plate))",
+                                    kind: parking.canExtend ? "Add an hour" : "", icon: car, action: .extendParking)]
+            if typed {
+                rows.append(CommandItem(id: "parking-end", title: "End the parking timer", subtitle: "What's paid stays paid",
+                                        kind: "", icon: .glyph(.close), action: .endParking))
+            }
+            return rows
+        }
+        guard let match = parking.match else {
+            return parking.noZoneHere && typed
+                // Not "free here": the city's zones grow faster than the map, so the sign decides.
+                ? [CommandItem(id: "parking-none", title: "No paid zone found here", subtitle: "Check the signs · roko knows Osijek's zones 0 and I",
+                               kind: "", icon: car, action: .search("parking"))]
+                : []
+        }
+        let city = match.city
+        guard city.chargingEnds(after: .now) != nil else {
+            return [CommandItem(id: "parking-free", title: "Parking is free now", subtitle: "\(city.name) charges \(city.hoursLine)",
+                                kind: "", icon: car, action: .search("parking"))]
+        }
+        guard let plate = parking.plates.first else {
+            return [CommandItem(id: "parking-zone-\(match.zones[0].code)", title: "\(match.zones[0].name) · \(match.zones[0].price) an hour",
+                                subtitle: "Add your registration in Settings to pay by text",
+                                kind: "Settings", icon: car, action: .settings)]
+        }
+        let border = match.zones.count > 1
+        return match.zones.map { zone in
+            let limit = zone.maxMinutesPerDay.map { " · \($0 / 60) h a day" } ?? ""
+            return CommandItem(id: "parking-zone-\(zone.code)", title: "\(zone.name) · \(zone.price) an hour",
+                               subtitle: (border ? "Zone border, check the sign · " : "")
+                                   + "\(Parking.display(plate)) to \(zone.number)" + limit,
+                               kind: "Pay", icon: car, action: .payParking(city: city.id, zone: zone.code))
+        }
+    }
+
     /// A weather answer: now, the day under it.
     static func weatherRow(id: String, _ weather: TodayWeather, action: CommandItem.Action) -> CommandItem {
         CommandItem(id: id, title: "\(Int(weather.temperature.rounded()))° " + weather.condition + (weather.place.map { " in \($0)" } ?? ""),
@@ -707,6 +766,10 @@ struct CommandBarView: View {
         if let (asked, weather) = placeWeather, asked == query, WeatherQuery.place(in: query) != nil {
             items.insert(Self.weatherRow(id: "weather-place", weather, action: .search(query)), at: 0)
         }
+        // "parking" in a city roko pays in: your zone, ready to pay, or the time left.
+        if ParkingQuery.matches(query) {
+            items.insert(contentsOf: Self.parkingRows(typed: true), at: 0)
+        }
         // Asked for the weather and it's half an hour old: fetch it now (one small request).
         if items.contains(where: { $0.id == "weather" }),
            Date.now.timeIntervalSince(TodayModel.shared.weather?.fetchedAt ?? .distantPast) > 1800 {
@@ -717,6 +780,10 @@ struct CommandBarView: View {
         // then the last pages you were on, to scroll through and pick.
         if query.isEmpty {
             var rows: [CommandItem] = []
+            // Paid parking running: the time left comes before anything else.
+            if Parking.shared.active != nil {
+                rows.append(contentsOf: Self.parkingRows(typed: false))
+            }
             if hasCopiedLink {
                 rows.append(copiedURL.map {
                     CommandItem(id: "copied-link", title: $0.shortDisplay, subtitle: "Link you copied",
@@ -733,7 +800,11 @@ struct CommandBarView: View {
             // Pinned answers, worked out again now: the weather, days until, a rate.
             for asked in PinnedAnswers.all {
                 let answer: CommandItem?
-                if WeatherQuery.place(in: asked) != nil {
+                if ParkingQuery.matches(asked) {
+                    // Running, it's already on top; otherwise the zone you're in.
+                    guard Parking.shared.active == nil else { continue }
+                    answer = Self.parkingRows(typed: false).first
+                } else if WeatherQuery.place(in: asked) != nil {
                     answer = pinnedWeather[asked].map { Self.weatherRow(id: "", $0, action: .search(asked)) }
                         ?? CommandItem(id: "", title: "Weather", subtitle: asked, kind: "", icon: .glyph(.today), action: .search(asked))
                 } else if ["calendar", "kalendar", "next", "next meeting", "agenda", "raspored"].contains(asked.lowercased()) {
@@ -843,6 +914,17 @@ struct CommandBarView: View {
         case .askAboutPage(let question):
             browser.panel = .none
             if let summary = browser.summary { browser.ask(question, about: summary) }
+        case .payParking(let cityID, let code):
+            guard let city = ParkingCity.with(id: cityID), let zone = city.zone(code) else { break }
+            browser.panel = .none
+            Parking.shared.pay(zone, in: city)
+        case .extendParking:
+            browser.panel = .none
+            Parking.shared.extend()
+        case .endParking:
+            Parking.shared.end()
+            browser.showToast("Parking timer ended")
+            rebuild()
         case .copy(let result):
             UIPasteboard.general.string = result
             CopiedLink.copiedInRoko()
@@ -1379,5 +1461,17 @@ private struct SwipeToForget: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+/// "parking", "parkiranje", "platiti parking": asking to pay for parking.
+nonisolated enum ParkingQuery {
+    private static let words = ["parking", "parkiranje", "parkiraj", "parkirati", "parkiralište", "plati parking",
+                                "platiti parking", "pay parking", "pay for parking"]
+
+    static func matches(_ query: String) -> Bool {
+        let needle = query.trimmingCharacters(in: .whitespaces).lowercased()
+        // From "parki" on: "park" alone is as likely a park, and this asks where you are.
+        return needle.count >= 5 && words.contains { $0.hasPrefix(needle) || needle == $0 }
     }
 }

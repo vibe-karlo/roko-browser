@@ -142,14 +142,8 @@ final class BrowserModel {
         WebViewFactory.prewarm()
         restoreTabs()
         // A Notify Me notification opens its page.
-        NotificationRouter.shared.open = { [weak self] url in
-            // roko's own reminders open Today or To-do; Notify Me's open their page.
-            switch url.absoluteString {
-            case "roko://today": self?.panel = .today
-            case "roko://todo": self?.panel = .todos
-            default: self?.open(url, inNewTab: true)
-            }
-        }
+        NotificationRouter.shared.open = { [weak self] url in self?.handleLink(url) }
+        Parking.shared.say = { [weak self] message in self?.showToast(message) }
         // Cookies accepted because a site needs them: say so, once per site.
         ConsentHandler.shared.onAccepted = { [weak self] host, _ in
             self?.showToast("Accepted cookies: \(URL(string: "https://\(host)")?.displayHost ?? host) needs them")
@@ -315,6 +309,21 @@ final class BrowserModel {
     // MARK: Commands
 
     /// A brief confirmation above the bar, such as "Copied 3.11 mi".
+    /// roko's own links (from its reminders, the parking Live Activity) and
+    /// pages handed over by notifications or other apps.
+    func handleLink(_ url: URL) {
+        switch url.absoluteString {
+        case "roko://today": panel = .today
+        case "roko://todo": panel = .todos
+        // The parking timer: the bar, with the time left on top.
+        case "roko://parking": showCommandBar()
+        case "roko://parking/extend": Parking.shared.extend()
+        default:
+            guard url.scheme?.hasPrefix("http") == true else { return }
+            open(url, inNewTab: true)
+        }
+    }
+
     func showToast(_ text: String) {
         toast = text
         toastTask?.cancel()
