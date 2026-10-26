@@ -232,8 +232,20 @@ struct BrowserView: View {
             if Benchmark.isRequested { await Benchmark.run() }
             if !BrowseProbe.questions.isEmpty { await BrowseProbe.run() }
             if TopStoriesProbe.isRequested { await TopStoriesProbe.run() }
-            // `-pageLines <url>`: the page as Notify Me reads it.
             let arguments = ProcessInfo.processInfo.arguments
+            // `-domProbe <script>`: run on the open tab every 5 seconds, for looking
+            // at a page as roko's web view has it (a cookie pop-up no rule finds).
+            if let at = arguments.firstIndex(of: "-domProbe"), at + 1 < arguments.count {
+                for _ in 0..<6 {
+                    try? await Task.sleep(for: .seconds(5))
+                    let webView = browser.selectedTab?.webView
+                    let page = try? await webView?.evaluateJavaScript(arguments[at + 1])
+                    let probe = arguments.firstIndex(of: "-domProbeConsent").map { arguments[$0 + 1] } ?? arguments[at + 1]
+                    let consent = try? await webView?.evaluateJavaScript(probe, in: nil, contentWorld: ConsentHandler.world)
+                    print("DOM \(browser.selectedTab?.url?.host() ?? "-") page \(page.map { "\($0)" } ?? "nil") consent \(consent.map { "\($0)" } ?? "nil")")
+                }
+            }
+            // `-pageLines <url>`: the page as Notify Me reads it.
             if let at = arguments.firstIndex(of: "-pageLines"), at + 1 < arguments.count, let url = URL(string: arguments[at + 1]) {
                 let lines = await PageLines.fetch(url) ?? []
                 print("LINES \(lines.count), thin \(PageLines.isThin(lines))\n" + lines.prefix(6).joined(separator: "\n"))

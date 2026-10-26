@@ -202,6 +202,7 @@ bundles it with `Scripts/consent/bridge.js` into `consent-main.js` (pages, every
 `ConsentHandler` decides each answer.
 
 - **Reject** by default. A known pop-up is kept hidden while it's answered.
+- **Through the platform's API** when no rule sees the pop-up: index.hr's anti-adblock scrambles ids and classes for everything but its own scripts, so Didomi is asked in the page itself whether its notice is up, and answered there. Page-script checks get a second each, so one that never answers can't stall detection. Debug builds take `-domProbe <script>` to look at the open tab from the page's world and the consent world.
 - **Accept only where a site needs it**: rejecting didn't get past the pop-up (a cookie wall),
   or the page shows a platform's "accept cookies to see this video" placeholder. roko accepts
   through the platform's API, or reloads with the site's consent platform unblocked (the
@@ -250,7 +251,7 @@ day, and with "today". It reads:
   (`PageHeadlines`: links into the section, the element named for the headline, dates from
   the address). Topics are matched in the major Croatian feeds and your own: a stem of the
   topic's longest word, then, for multi-word topics, the on-device model keeps only those
-  really about it. Google News has no Croatian edition, so it isn't used. Apple's on-device model picks the front page
+  really about it. A club ("NK Osijek": NK, HNK, KK, RK…) is looked for on sport pages only, or by its full name, so the city's news stays out. Google News has no Croatian edition, so it isn't used. Apple's on-device model picks the front page
   from up to sixty headlines, each site's newest in turn (newest overall, a site that posts all
   day crowded the others out), then is asked about just its picks which only announce something
   (a club night, a film programme, a sale), and those go. At most two stories per site, filled

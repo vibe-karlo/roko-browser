@@ -44,6 +44,16 @@ enum TopStoriesProbe {
                       link: URL(string: "https://\(item.0)/\(index)")!, host: item.0,
                       published: now.addingTimeInterval(-Double(index) * 1200), summary: nil)
         }
+        // The 27 October NK Osijek section, which had the city's news in it.
+        let osijek = [
+            ("index.hr", "/vijesti/clanak/drzava-priprema-pomoc-majkama/1.aspx", "Država priprema pomoć majkama nakon poroda. Projekt bi mogao početi u Osijeku"),
+            ("glas-slavonije.hr", "/sport/nogomet/2026/10/26/matkovic", "Sad navijač, uskoro se vraća treninzima: Anton Matković produžio ugovor s Osijekom"),
+            ("jutarnji.hr", "/sport/nogomet/hnl/osijek-pretrpio", "Osijek pretrpio još jedan udarac na Opus Areni, trener otkrio: ‘Pao je na glavu. Osjećao je mučninu...’"),
+            ("index.hr", "/sport/clanak/trener-osijeka/2.aspx", "Trener Osijeka: Htio sam zaplakati nakon utakmice"),
+            ("glas-slavonije.hr", "/osijek/2026/10/26/radovi-zapadni-ulaz", "Kod zapadnog ulaza u Osijek sanacija kolnika, promet se odvija naizmjence"),
+        ].map { NewsStory(title: $0.2, link: URL(string: "https://\($0.0)\($0.1)")!, host: $0.0, published: now, summary: nil) }
+        let club = await TodayNews.about("NK Osijek", in: osijek)
+        print("TOPIC NK Osijek: " + club.map(\.title).joined(separator: " | "))
         for round in 1...3 {
             let started = Date.now
             let top = await TodayNews.top(stories)

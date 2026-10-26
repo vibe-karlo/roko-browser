@@ -299,14 +299,22 @@ nonisolated enum TodayNews {
     /// Stories about a topic among `stories`: headlines that name it, then
     /// Apple's on-device model drops those about something else that shares
     /// the name ("Osijek" the city when it's NK Osijek you follow).
+    /// What a club's name starts with: NK (nogometni klub), HNK, KK (košarka), RK (rukomet)…
+    private static let clubMarks: Set<String> = ["nk", "hnk", "gnk", "snk", "kk", "rk", "vk", "hk", "ok", "fc", "afc", "sc", "sk", "ac"]
+
     @MainActor static func about(_ topic: String, in stories: [NewsStory], count: Int = 4) async -> [NewsStory] {
         // The topic's most telling word, cut to a stem: "Osijek" finds "Osijeka" and "Osijeku" too.
         let words = folded(topic).split { !$0.isLetter && !$0.isNumber }.map(String.init)
         guard let key = words.max(by: { $0.count < $1.count }) else { return [] }
         let stem = key.count > 5 ? String(key.dropLast()) : key
+        // "NK Osijek" is a club: the city's news shares its name, so only the
+        // sport pages, or a headline naming the club itself.
+        let isClub = words.count > 1 && clubMarks.contains(words[0])
+        let named = folded(topic)
         let matching = varied(recent(stories, hours: 48).filter { story in
             let text = folded(story.title + " " + (story.summary ?? ""))
-            return text.split { !$0.isLetter && !$0.isNumber }.contains { $0.hasPrefix(stem) }
+            guard text.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).contains(where: { $0.hasPrefix(stem) }) else { return false }
+            return !isClub || text.contains(named) || story.link.path.lowercased().contains("sport")
         }, count: 20, perSite: 20)
         guard words.count > 1 || key.count < 6, AppleModels.onDeviceAvailable, !matching.isEmpty else {
             return Array(matching.prefix(count))
@@ -314,7 +322,8 @@ nonisolated enum TodayNews {
         let numbered = matching.enumerated().map { "\($0.offset + 1). \($0.element.title)" }
         let session = LanguageModelSession(model: AppleModels.summarizing, instructions: """
             You sort news headlines for someone who follows one subject. Keep only the headlines that are \
-            about that subject itself, not about something else that shares a word with it.
+            about that subject itself, not about something else that shares a word with it: following a \
+            football club named after its city (NK Osijek), news about the city itself is not about the club.
             """)
         let prompt = "Subject: \(topic)\n\nHeadlines:\n" + numbered.joined(separator: "\n") + "\n\nWhich are about \(topic)?"
         guard let picks = try? await session.respond(to: prompt, generating: TopicMatch.self).content.numbers else {

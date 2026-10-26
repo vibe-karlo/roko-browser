@@ -146,6 +146,24 @@ export function start(AutoConsent, filterCompactRules, compactRules) {
         return count;
     };
 
+    // A platform's pop-up no rule can see: index.hr's anti-adblock scrambles
+    // ids and classes for everything but the page's own scripts, so Didomi's
+    // #didomi-host reads "harzsgqw..." here. Its API still works: roko asks
+    // the page whether the notice is up and answers it there.
+    const watchForPlatformApi = () => {
+        let handled = false;
+        for (const delay of [2500, 5000, 9000, 14000]) {
+            setTimeout(async () => {
+                if (handled || consent.foundCmp) return;
+                const reply = await post({ type: 'rokoPlatform' });
+                if (!reply || !reply.answered) return;
+                handled = true;
+                countSaved(1);
+                if (reply.accepted) accepted = true;
+            }, delay);
+        }
+    };
+
     // When Autoconsent has found nothing: roko decides as for any pop-up,
     // and its button is pressed.
     const watchForPlainBanner = () => {
@@ -207,5 +225,6 @@ export function start(AutoConsent, filterCompactRules, compactRules) {
     if (mainFrame) {
         watchForBlockedContent();
         watchForPlainBanner();
+        watchForPlatformApi();
     }
 }

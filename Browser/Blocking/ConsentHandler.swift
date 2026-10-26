@@ -64,7 +64,10 @@ final class ConsentHandler: NSObject, WKScriptMessageHandlerWithReply {
               let webView = message.webView else { return (nil, nil) }
         // Decided for the site you're on, also when the pop-up sits in a frame.
         let host = webView.url?.host() ?? message.frameInfo.request.url?.host() ?? ""
-        if LaunchClock.isEnabled { print("CONSENT \(host) \(type) \(body["cmp"] ?? "") \(body["result"] ?? "")") }
+        if LaunchClock.isEnabled {
+            let state = type == "report" ? (body["state"].map { "\($0)" } ?? "").replacingOccurrences(of: "\n", with: " ").prefix(400) : ""
+            print("CONSENT \(host)\(message.frameInfo.isMainFrame ? "" : " (frame)") \(type) \(body["cmp"] ?? "") \(body["result"] ?? "") \(state)")
+        }
 
         switch type {
         case "popupFound":
@@ -74,9 +77,14 @@ final class ConsentHandler: NSObject, WKScriptMessageHandlerWithReply {
             // A rule step that needs the page's own script, such as a platform's API.
             let id = body["id"] as? String ?? ""
             let code = body["code"] as? String ?? "false"
-            let result = try? await webView.callAsyncJavaScript(
-                "try { return !!(await (\(code))); } catch (e) { return false; }",
-                in: message.frameInfo, contentWorld: .page)
+            // At most a second: a platform API that never calls back (index.hr's)
+            // left the step waiting, and Autoconsent, waiting for every rule, never
+            // got as far as the Didomi pop-up right there on the page.
+            let result = try? await webView.callAsyncJavaScript("""
+                try {
+                    return !!(await Promise.race([(async () => (\(code)))(), new Promise(done => setTimeout(() => done(false), 1000))]));
+                } catch (e) { return false; }
+                """, in: message.frameInfo, contentWorld: .page)
             return (["type": "evalResp", "id": id, "result": (result as? Bool) ?? false], nil)
 
         case "rokoWall":
@@ -95,6 +103,13 @@ final class ConsentHandler: NSObject, WKScriptMessageHandlerWithReply {
             if accepted > 0 { return (["type": "rokoRecheck"], nil) }
             await recover(webView, host: host)
             return (nil, nil)
+
+        case "rokoPlatform":
+            // Answered through the platform's API, as this site is answered.
+            let accept = acceptance(for: host) != nil
+            let answered = (try? await webView.evaluateJavaScript(accept ? Self.answerNotice(true) : Self.answerNotice(false),
+                                                                  in: nil, contentWorld: .page)) as? Int ?? 0
+            return (["answered": answered > 0, "accepted": accept && answered > 0], nil)
 
         case "rokoSaved":
             SavedStats.cookieBar(clicks: body["clicks"] as? Int ?? 1)
@@ -143,6 +158,24 @@ final class ConsentHandler: NSObject, WKScriptMessageHandlerWithReply {
         default:
             break
         }
+    }
+
+    /// A platform's notice that's showing, answered through its API: for pages
+    /// that scramble the names rules look for. Answers 1 if one was.
+    private static func answerNotice(_ accept: Bool) -> String {
+        """
+        (() => {
+          try {
+            const d = window.Didomi;
+            if (d && d.notice && typeof d.notice.isVisible === 'function' && d.notice.isVisible()) {
+              \(accept ? "d.setUserAgreeToAll()" : "d.setUserDisagreeToAll()");
+              if (d.notice.isVisible()) d.notice.hide();
+              return 1;
+            }
+          } catch (e) {}
+          return 0;
+        })()
+        """
     }
 
     /// "Accept all" through the consent platforms' own APIs, in the page's
