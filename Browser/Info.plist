@@ -50,6 +50,10 @@
 	<string>Today shows what's left on your calendar for the day. It stays on this iPhone.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Today shows the weather where you are. Only a rough location is used, and only for the weather.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Hold + and speak to search, open a site or add a to-do. The microphone is on only while you hold it.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>What you say while holding + is turned into words for the address bar, in English or Croatian.</string>
 	<key>RokoShareServer</key>
 	<string>$(SHARE_SERVER)</string>
 	<key>UIApplicationSceneManifest</key>

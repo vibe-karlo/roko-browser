@@ -42,6 +42,10 @@ final class BrowserModel {
     var launcherShown = false
     /// Its rows are in (after the field has landed).
     var launcherRows = false
+    /// + is held: the launcher is listening.
+    private(set) var voiceListening = false
+    /// What was said, once + is let go, for the launcher to take as typed.
+    var voiceResult: String?
     var isBarCollapsed = false
     var summary: SummaryModel? {
         // Closed before it's finished: stop there, as Browse for Me does.
@@ -339,6 +343,49 @@ final class BrowserModel {
         case .currentTab: open(url, inNewTab: selectedTab == nil)
         case .newTab: open(url, inNewTab: true)
         case .privateTab: open(url, inNewTab: true, isPrivate: true)
+        }
+    }
+
+    /// + held: the launcher opens out of it, listening. Asked for the
+    /// microphone the first time (then hold again).
+    func startVoice() {
+        guard VoiceInput.isAuthorized else {
+            Task {
+                if !(await VoiceInput.authorize()) { showToast("Allow the microphone and speech in Settings") }
+            }
+            return
+        }
+        do {
+            try VoiceInput.shared.start()
+            voiceListening = true
+            voiceResult = nil
+            showCommandBar()
+        } catch {
+            showToast("Couldn't start listening")
+        }
+    }
+
+    /// + let go: what was said is opened when it's a site roko knows, and
+    /// otherwise goes into the launcher as if typed, its best row ready.
+    func endVoice() {
+        guard voiceListening else { return }
+        Task {
+            let heard = await VoiceInput.shared.stop()
+            voiceListening = false
+            guard let heard, !heard.isEmpty else {
+                panel = .none
+                return
+            }
+            let meaning = VoiceCommand.interpret(heard) { stem in
+                self.history(matching: stem, limit: 12).compactMap { URL(string: $0.url)?.displayHost }
+            }
+            switch meaning {
+            case .open(let url):
+                panel = .none
+                openFromCommandBar(url)
+            case .words(let text):
+                voiceResult = text
+            }
         }
     }
 

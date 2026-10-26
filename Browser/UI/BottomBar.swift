@@ -36,10 +36,8 @@ struct BottomBar: View {
 
             Spacer(minLength: 8)
 
-            Button {
-                browser.launcherOrigin = capsuleFrame
-                browser.showCommandBar()
-            } label: {
+            // Tap: the launcher. Hold: speak, and let go.
+            Group {
                 Glyph(.plus, size: 22, weight: 2)
                     .frame(width: 104, height: 38)
                     .background {
@@ -53,8 +51,14 @@ struct BottomBar: View {
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { capsuleFrame = $0 }
                     .contentShape(.capsule)
             }
-            .buttonStyle(GlyphButtonStyle())
+            .scaleEffect(browser.voiceListening ? 1.06 : 1)
+            .animation(.snappy(duration: 0.2), value: browser.voiceListening)
+            .gesture(holdToTalk)
+            .accessibilityElement()
             .accessibilityLabel("New tab")
+            .accessibilityHint("Hold to speak")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { browser.showCommandBar() }
 
             Spacer(minLength: 8)
 
@@ -74,6 +78,36 @@ struct BottomBar: View {
         .barSurface(cornerRadius: Theme.barRadius)
         .highPriorityGesture(swipes)
         .sensoryFeedback(.selection, trigger: switches)
+    }
+
+    @State private var pressedAt: Date?
+    @State private var holdTask: Task<Void, Never>?
+
+    /// A tap opens the launcher; held past a third of a second, it listens
+    /// until the finger lifts.
+    private var holdToTalk: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { _ in
+                guard pressedAt == nil else { return }
+                pressedAt = .now
+                holdTask = Task {
+                    try? await Task.sleep(for: .milliseconds(320))
+                    guard !Task.isCancelled else { return }
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    browser.launcherOrigin = capsuleFrame
+                    browser.startVoice()
+                }
+            }
+            .onEnded { _ in
+                holdTask?.cancel()
+                pressedAt = nil
+                if browser.voiceListening {
+                    browser.endVoice()
+                } else if browser.panel != .command {
+                    browser.launcherOrigin = capsuleFrame
+                    browser.showCommandBar()
+                }
+            }
     }
 
     private var onPage: Bool {

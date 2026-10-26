@@ -151,6 +151,17 @@ nonisolated enum TodoDraft {
         var title = text.trimmingCharacters(in: .whitespacesAndNewlines)
         var when: TodoWhen?
         var time: DateComponents?
+        // Said first, as people do ("sutra nazvati mamu", "tomorrow call Ana"):
+        // a day at the start is read as if it came at the end.
+        let words = title.split(separator: " ")
+        for count in stride(from: min(3, words.count - 1), through: 1, by: -1) {
+            let head = words.prefix(count).joined(separator: " ")
+            if let (day, rest) = trailingDay("x " + head, now: now), rest == "x" {
+                when = day
+                title = words.dropFirst(count).joined(separator: " ")
+                break
+            }
+        }
         // "tomorrow at 15" or "at 15 tomorrow": either order.
         for _ in 0..<2 {
             if time == nil, let (clock, rest) = trailingTime(title) {

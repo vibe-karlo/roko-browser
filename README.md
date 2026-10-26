@@ -316,3 +316,13 @@ morning refresh for Today, Notify Me's checks, and local notifications.
 
 With -perf: `PERF` lines for launch, `PERF rank` for each keystroke, `HITCH` for frames over 40 ms
 while a summary opens, `SUMMARY` for its first words.
+
+## Speaking to the bar
+
+Holding + (`BottomBar.holdToTalk`, a third of a second) starts `VoiceInput`: `SFSpeechRecognizer`s
+for hr-HR and en-US fed the same microphone buffers, on the device where the language allows it.
+The live words go into the launcher's field; on release each recognizer's final transcription is
+scored by its mean segment confidence (Croatian letters tip a close call to Croatian) and the best
+kept. `VoiceCommand.interpret` turns spoken addresses ("dot", "točka", "slash", "w w w") and
+"open"/"otvori" plus a name into a known host (history first, then `PopularSites`, hyphens ignored)
+and opens it; everything else goes to the bar's own ranking, where `TodoIntent` puts a to-do first.

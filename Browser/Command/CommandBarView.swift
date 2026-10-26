@@ -170,6 +170,15 @@ struct CommandBarView: View {
         }
         .onChange(of: CurrencyRates.shared.date) { rebuild() }
         .onChange(of: TodayModel.shared.weather) { rebuild() }
+        // Speaking: the words come into the field as they're heard, and the rows follow.
+        .onChange(of: VoiceInput.shared.partial) { _, heard in
+            if browser.voiceListening { query = heard }
+        }
+        .onChange(of: browser.voiceResult) { _, said in
+            guard let said else { return }
+            query = said
+            browser.voiceResult = nil
+        }
         .task(id: query) {
             // "weather in London", "vrijeme u Zagrebu": a town's weather, after a short pause.
             guard WeatherQuery.place(in: query) != nil else { return }
@@ -399,8 +408,17 @@ struct CommandBarView: View {
                 if let shown {
                     RowIcon(icon: shown.icon)
                 } else {
-                    Glyph(showsPrivate ? .eyeClosed : contextGlyph, size: 18)
-                        .foregroundStyle(showsPrivate ? Theme.accent : Theme.secondaryInk)
+                    if browser.voiceListening {
+                        // Listening: the mark breathes with the voice.
+                        Image(systemName: "mic.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+                            .scaleEffect(1 + VoiceInput.shared.level * 0.35)
+                            .animation(.easeOut(duration: 0.08), value: VoiceInput.shared.level)
+                    } else {
+                        Glyph(showsPrivate ? .eyeClosed : contextGlyph, size: 18)
+                            .foregroundStyle(showsPrivate ? Theme.accent : Theme.secondaryInk)
+                    }
                 }
             }
             .frame(width: 22)
@@ -511,6 +529,7 @@ struct CommandBarView: View {
     }
 
     private var placeholder: String {
+        if browser.voiceListening { return "Listening, in English or Croatian…" }
         switch browser.launcherContext {
         case .todo: return "New to-do, e.g. Call Petra on Monday at 15"
         case .followUp: return "Ask a follow-up"
@@ -557,20 +576,24 @@ struct CommandBarView: View {
         guard browser.launcherOrigin != .zero else {
             browser.launcherShown = true
             browser.launcherRows = true
-            focused = true
+            focused = !browser.voiceListening
             return
         }
         // A frame later: drawn in the bar's place first, so there's somewhere to grow from.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
             withAnimation(.launcher) { browser.launcherShown = true }
             withAnimation(.easeOut(duration: 0.12).delay(Self.flight * 0.55)) { browser.launcherRows = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { focused = true }
+            // Listening, there's no keyboard: the rows have the room.
+            if !browser.voiceListening {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { focused = true }
+            }
         }
     }
 
     /// Back into the bar: the field shrinks into the capsule it came from,
     /// then the launcher is gone and the capsule is there in its place.
     private func dismiss() {
+        VoiceInput.shared.cancel()
         focused = false
         withAnimation(.easeIn(duration: 0.1)) { browser.launcherRows = false }
         withAnimation(.launcher) { browser.launcherShown = false } completion: {

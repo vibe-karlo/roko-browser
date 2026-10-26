@@ -49,6 +49,8 @@ targets:
         UIBackgroundModes: [fetch, remote-notification]
         BGTaskSchedulerPermittedIdentifiers: [com.growthstudio.roko.watch, com.growthstudio.roko.today]
         # Today: the weather where you are, and what's on your calendar.
+        NSMicrophoneUsageDescription: Hold + and speak to search, open a site or add a to-do. The microphone is on only while you hold it.
+        NSSpeechRecognitionUsageDescription: What you say while holding + is turned into words for the address bar, in English or Croatian.
         NSLocationWhenInUseUsageDescription: Today shows the weather where you are. Only a rough location is used, and only for the weather.
         NSCalendarsFullAccessUsageDescription: Today shows what's left on your calendar for the day. It stays on this iPhone.
         # Required before Apple will grant the browser entitlements (default
