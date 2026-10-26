@@ -21,6 +21,8 @@ struct ShoppingView: View {
     @State private var listening = false
     @State private var heard = ""
     @State private var listenTask: Task<Void, Never>?
+    /// Which way the last swipe went, so the next list comes in from that side.
+    @State private var swipedForward = true
     @Namespace private var barSpace
     /// Read so the list speaks a newly chosen language at once.
     @AppStorage(ListLanguage.key) private var language = ListLanguage.automatic.rawValue
@@ -60,20 +62,26 @@ struct ShoppingView: View {
             VStack(alignment: .leading, spacing: 0) {
                 shops
                     .padding(.bottom, 26)
-                if aisles.isEmpty {
-                    Text(ListLanguage.say("Nothing to buy here. Add something below.", "Ovdje nema ništa za kupiti. Dodaj nešto ispod."))
-                        .font(.system(size: 17))
-                        .foregroundStyle(Theme.secondaryInk)
-                        .padding(.top, 40)
-                        .padding(.bottom, 50)
-                        .frame(maxWidth: .infinity)
+                // One shop's list at a time, sliding in from the side it was swiped from.
+                VStack(alignment: .leading, spacing: 0) {
+                    if aisles.isEmpty {
+                        Text(ListLanguage.say("Nothing to buy here. Add something below.", "Ovdje nema ništa za kupiti. Dodaj nešto ispod."))
+                            .font(.system(size: 17))
+                            .foregroundStyle(Theme.secondaryInk)
+                            .padding(.top, 40)
+                            .padding(.bottom, 50)
+                            .frame(maxWidth: .infinity)
+                    }
+                    ForEach(aisles, id: \.0) { aisle, items in
+                        aisleView(aisle, items)
+                            .padding(.bottom, 30)
+                    }
+                    if !suggested.isEmpty { suggestions }
+                    if !bought.isEmpty { boughtSection }
                 }
-                ForEach(aisles, id: \.0) { aisle, items in
-                    aisleView(aisle, items)
-                        .padding(.bottom, 30)
-                }
-                if !suggested.isEmpty { suggestions }
-                if !bought.isEmpty { boughtSection }
+                .id(shopName)
+                .transition(.asymmetric(insertion: .offset(x: swipedForward ? 60 : -60).combined(with: .opacity),
+                                        removal: .opacity.animation(.easeOut(duration: 0.1))))
             }
             .padding(.horizontal, 22)
             .padding(.top, 26)
@@ -82,6 +90,19 @@ struct ShoppingView: View {
             .animation(.snappy(duration: 0.3), value: justDone)
         }
         .scrollDismissesKeyboard(.interactively)
+        // Swipe sideways for the next shop's list, as the tabs at the top read.
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 24)
+                .onEnded { value in
+                    let dx = value.translation.width, dy = value.translation.height
+                    guard abs(dx) > 70, abs(dx) > abs(dy) * 2, !listening else { return }
+                    let all = Shop.allCases
+                    guard let at = all.firstIndex(of: shop) else { return }
+                    let next = at + (dx < 0 ? 1 : -1)
+                    guard all.indices.contains(next) else { return }
+                    swipedForward = dx < 0
+                    withAnimation(.snappy(duration: 0.28)) { shopName = all[next].rawValue }
+                })
         .safeAreaInset(edge: .bottom, spacing: 0) { bar }
         .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas) }
         .background(Theme.canvas.ignoresSafeArea())
@@ -106,6 +127,7 @@ struct ShoppingView: View {
             ForEach(Shop.allCases) { each in
                 let left = items.filter { !$0.done && $0.shop == each }.count
                 Button {
+                    swipedForward = (Shop.allCases.firstIndex(of: each) ?? 0) > (Shop.allCases.firstIndex(of: shop) ?? 0)
                     withAnimation(.snappy(duration: 0.25)) { shopName = each.rawValue }
                 } label: {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {

@@ -6,6 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Swipe left or right on the shopping list for the next shop's list; it slides in from the side you swiped.
 - Shopping has three lists, a tap apart at the top: Trgovina (groceries), Drogerija (dm, Bipa) and Ljekarna (pharmacy), each with how much is left on it. Things go to the right one by themselves: "šampon" and "pelene" to the drugstore, "Brufen", "sirup za kašalj", "vitamin C" and "flasteri" to the pharmacy (a new Medicines and health aisle), the rest to groceries. Long-press one for Move to Shop, and it goes there from then on. Added from another list, a toast says where it went ("Šampon → Drogerija"). Suggestions are for the list showing.
 - Say a shopping list: the microphone in Shopping's bar listens, shows what it hears, and adds it all after a pause (or Gotovo). Spoken lists have no commas, so they're split on the things you buy and the everyday ones, the longest first: "mlijeko jaja kruh i banane" is four, "pileća prsa crveni luk i češnjak" three, "dvije banane i kilo jabuka" Banane and Jabuke. A word heard a letter off is put right ("sampon" is Šampon), and the recognizers are told to expect your things by name.
 - Settings, rethought after Safari, Chrome, Firefox, Arc, Brave, Edge and Orion: one screen of places, each with a mark and what it's set to (Search engine · Google, Tabs · After a day, Notify Me · 2 pages), opening a page of its own. Time saved stays on top, its breakdown a tap away. New: Clear browsing data (history, cookies and site data, cached files; the last hour, today or all time), Sites (every site treated differently, cookies accepted, blocking off, zoom, each reset with a swipe), Notifications (to-do alerts, nudges and Notify Me in one place, and a way to iOS Settings when they're off), and About (version, and what roko is built with). Shopping gets Forget What You Buy.
@@ -33,6 +34,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Five app icons: the blue, green, yellow and grey stars, and the orange chevrons.
 
 ### Fixed
+- The launcher opens and closes about twice as fast (0.11 s instead of 0.2), so it reads as the bar becoming the launcher rather than a flight.
 - The launcher's field flew up from the bar as an empty dark pill, its contents shown only once it landed: they now ride along at their own size, uncovered as the field widens. And an offer above the bar (cookies, a copied link) no longer lingers as a blank box when the bar opens; it's put away first.
 - The link you copied is offered above the bar only when roko can show which link it is; the bare Paste button stays in the address bar's list. "Page not working? Allow cookies" now takes three reloads within 45 seconds, not two in two minutes (following a live blog set it off).
 - Shopping's field no longer autocorrects: "šampon, brufen" became "Sampson, burden".

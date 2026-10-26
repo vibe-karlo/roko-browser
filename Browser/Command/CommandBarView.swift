@@ -89,7 +89,7 @@ struct CommandBarView: View {
     }
 
     /// How long the field takes to fly up, for what waits on it.
-    private static let flight: Double = 0.2
+    private static let flight: Double = 0.11
 
     private static var safeTop: CGFloat {
         let window = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first
@@ -633,7 +633,7 @@ struct CommandBarView: View {
         // A frame later: drawn in the bar's place first, so there's somewhere to grow from.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
             withAnimation(.launcher) { browser.launcherShown = true }
-            withAnimation(.easeOut(duration: 0.12).delay(Self.flight * 0.55)) { browser.launcherRows = true }
+            withAnimation(.easeOut(duration: 0.08).delay(Self.flight * 0.5)) { browser.launcherRows = true }
             // Listening, there's no keyboard: the rows have the room.
             if !browser.voiceListening {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { focused = true }
@@ -651,7 +651,7 @@ struct CommandBarView: View {
         }
         browser.cancelVoice()
         focused = false
-        withAnimation(.easeIn(duration: 0.1)) { browser.launcherRows = false }
+        withAnimation(.easeIn(duration: 0.06)) { browser.launcherRows = false }
         withAnimation(.launcher) { browser.launcherShown = false } completion: {
             // Something else opened meanwhile (a notification, Today in the
             // morning, a summary): that stays.
