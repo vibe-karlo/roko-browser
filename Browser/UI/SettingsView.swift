@@ -472,7 +472,9 @@ private struct AppIconPicker: View {
     private static let icons = ["AppIcon", "AppIcon-StarOrange", "AppIcon-StarLight", "AppIcon-StarFlame",
                                 "AppIcon-StarBlue", "AppIcon-StarGreen", "AppIcon-StarGold", "AppIcon-Chevrons",
                                 "AppIcon-ChevronsGraphite", "AppIcon-Plus", "AppIcon-RollingO",
-                                "AppIcon-EclipseCream", "AppIcon-EclipseOnOrange", "AppIcon-EclipseOrange"]
+                                "AppIcon-EclipseCream", "AppIcon-EclipseOnOrange", "AppIcon-EclipseOrange",
+                                "AppIcon-Ro", "AppIcon-RoOnOrange", "AppIcon-Octagon", "AppIcon-OctagonOnOrange",
+                                "AppIcon-Wordmark", "AppIcon-WordmarkOnOrange"]
     @State private var current = UIApplication.shared.alternateIconName ?? "AppIcon"
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
 

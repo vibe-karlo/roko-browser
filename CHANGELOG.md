@@ -6,6 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Six more app icons in Settings → App icon: the "ro" monogram, the octagonal O and the "roko" wordmark, each in orange on near-black and near-black on orange.
 - Answer language now has a default plus languages kept as they are, on one page (Settings → Answer language): Write in picks the language summaries, Browse for Me and Notify Me write in, and under it, Keep as they are lists every language to tick the others you read (shown even while Write in is Automatic, so it's clear more than one can be chosen): a page in your language or a kept one is summarized in its own language, anything else in yours. Croatian with English kept: a Croatian or English article stays as it is, a German one comes in Croatian.
 - Settings, rethought: grouped by what you do (Address bar, Voice, Pages, Today and to-dos, Summaries and answers, Privacy and sync), with Block, Notify Me, Shared pages and the app icon on pages of their own so the main screen stays short. New switches for features added lately: Hold + to speak, which languages dictation listens for (Croatian and English, or one), ticks as the bar's rows go by, pull further to summarize, and alerts before a to-do's time.
 - A question said while holding + ("koji su rezultati izbora u srbiji", "what's the best time to visit Rovinj") goes straight to Browse for Me; a site's name opens it; anything else lands in the bar.

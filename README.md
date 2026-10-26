@@ -3,6 +3,9 @@
 A fast, private iOS browser in the spirit of Arc Search, with Raycast's command-bar feel.
 The Xcode project and code are still named `Browser`; only the name on the home screen is roko.
 The app icon is drawn by `swift Scripts/make_app_icon.swift Browser/Resources/Assets.xcassets/AppIcon.appiconset`.
+The alternates in Settings → App icon come from `swift Scripts/make_alternate_icons.swift
+Browser/Resources/Assets.xcassets`: marks drawn in the script, and whole designed tiles from
+`Scripts/icons/*.svg` (named for their icon set) rendered as they are.
 SwiftUI shell around WebKit, no third-party dependencies.
 
 ## Run it

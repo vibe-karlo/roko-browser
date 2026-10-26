@@ -1,5 +1,7 @@
 // Draws roko's alternate app icons from the logo design file (marks J, K, T3, F),
-// as 1024 px app icon sets plus small previews for the Settings picker.
+// as 1024 px app icon sets plus small previews for the Settings picker. Icons
+// designed as whole tiles (Scripts/icons/*.svg, named for their icon set) are
+// drawn as they are.
 // Run: swift Scripts/make_alternate_icons.swift Browser/Resources/Assets.xcassets
 import AppKit
 
@@ -77,6 +79,17 @@ func png(_ svgText: String, pixels: Int, to url: URL, rounded: Bool = false) {
     try! rep.representation(using: .png, properties: [:])!.write(to: url)
 }
 
+/// A whole tile from Scripts/icons, rendered at any size.
+func designed(_ name: String) -> String {
+    let file = URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent()
+        .appendingPathComponent("icons/\(name).svg")
+    return try! String(contentsOf: file, encoding: .utf8)
+}
+
+/// Their order in the picker.
+let designedIcons = ["AppIcon-Ro", "AppIcon-RoOnOrange", "AppIcon-Octagon", "AppIcon-OctagonOnOrange",
+                     "AppIcon-Wordmark", "AppIcon-WordmarkOnOrange"]
+
 func writeJSON(_ object: Any, to url: URL) {
     try! JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]).write(to: url)
 }
@@ -99,6 +112,21 @@ for (name, mark, tile, color) in icons + [("AppIcon", star, "#1A1A1B", "#A9A9A9"
     let preview = previews.appendingPathComponent("\(name).imageset")
     try? FileManager.default.createDirectory(at: preview, withIntermediateDirectories: true)
     png(svg(mark, tile: tile, color: color, size: 180), pixels: 180, to: preview.appendingPathComponent("preview.png"), rounded: true)
+    writeJSON(["images": [["filename": "preview.png", "idiom": "universal"]], "info": ["author": "xcode", "version": 1]],
+              to: preview.appendingPathComponent("Contents.json"))
+    print(name)
+}
+
+for name in designedIcons {
+    let tile = designed(name)
+    let set = catalog.appendingPathComponent("\(name).appiconset")
+    try? FileManager.default.createDirectory(at: set, withIntermediateDirectories: true)
+    png(tile, pixels: 1024, to: set.appendingPathComponent("icon.png"))
+    writeJSON(["images": [["filename": "icon.png", "idiom": "universal", "platform": "ios", "size": "1024x1024"]],
+               "info": ["author": "xcode", "version": 1]], to: set.appendingPathComponent("Contents.json"))
+    let preview = previews.appendingPathComponent("\(name).imageset")
+    try? FileManager.default.createDirectory(at: preview, withIntermediateDirectories: true)
+    png(tile, pixels: 180, to: preview.appendingPathComponent("preview.png"), rounded: true)
     writeJSON(["images": [["filename": "preview.png", "idiom": "universal"]], "info": ["author": "xcode", "version": 1]],
               to: preview.appendingPathComponent("Contents.json"))
     print(name)
