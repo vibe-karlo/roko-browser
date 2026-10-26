@@ -24,6 +24,17 @@ enum PageZoom {
         return levels.last { $0 < current - 0.001 } ?? levels.first!
     }
 
+    /// Every site zoomed away from 100%: for Settings → Sites.
+    static func all() -> [String: CGFloat] {
+        UserDefaults.standard.dictionaryRepresentation().reduce(into: [:]) { sites, entry in
+            if entry.key.hasPrefix("zoom."), let level = entry.value as? Double { sites[String(entry.key.dropFirst(5))] = level }
+        }
+    }
+
+    static func forget(_ host: String) {
+        UserDefaults.standard.removeObject(forKey: key(host))
+    }
+
     private static func key(_ host: String) -> String {
         "zoom." + (host.hasPrefix("www.") ? String(host.dropFirst(4)) : host)
     }

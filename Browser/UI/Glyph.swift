@@ -19,7 +19,9 @@ struct Glyph: View {
              // Parking.
              car,
              // Shopping.
-             basket
+             basket,
+             // Settings.
+             palette, microphone, info, key, broom, globe, appIcon, notification
     }
 
     let kind: Kind

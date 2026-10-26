@@ -1,3 +1,4 @@
+import Network
 import SwiftData
 import SwiftUI
 
@@ -53,7 +54,9 @@ struct BrowserView: View {
                 }
 
                 if let error = tab.loadError {
-                    LoadErrorView(message: error) { if let url = tab.url { tab.load(url) } }
+                    LoadErrorView(error: error,
+                                  retry: { if let url = tab.url { tab.load(url) } },
+                                  search: { browser.open(SearchEngine.current.searchURL(for: $0), inNewTab: false) })
                 }
             } else {
                 StartView()
@@ -149,8 +152,10 @@ struct BrowserView: View {
                     .padding(.horizontal, 18)
                     .padding(.vertical, 11)
                     .barSurface(cornerRadius: 14)
+                    .compositingGroup()
                     .padding(.bottom, Theme.barHeight + 20)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
+                                            removal: .opacity.animation(.easeOut(duration: 0.12))))
                     .allowsHitTesting(false)
             }
         }
@@ -170,44 +175,40 @@ struct BrowserView: View {
                 .padding(.leading, 18)
                 .padding(.trailing, 16)
                 .barSurface(cornerRadius: 14)
+                // One piece: text and box arrive and leave together.
+                .compositingGroup()
                 .padding(.bottom, Theme.barHeight + 20)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
+                                        removal: .opacity.animation(.easeOut(duration: 0.12))))
             }
         }
         .animation(.snappy(duration: 0.3), value: browser.cookieOffer)
         .overlay(alignment: .bottom) {
             // Never over the page menu or another panel opened while it showed.
-            if browser.copiedLinkOffer, browser.cookieOffer == nil, browser.panel == .none {
+            if browser.copiedLinkOffer, browser.cookieOffer == nil, browser.panel == .none, let url = browser.copiedLinkURL {
                 // Opening roko with a link just copied, here or on a Mac. Built
                 // like the cookie offer: what it is, then one word to act.
                 HStack(spacing: 14) {
-                    if let url = browser.copiedLinkURL {
-                        HStack(spacing: 10) {
-                            SiteIcon(host: url.displayHost, size: 18)
-                            Text(url.shortDisplay)
-                                .font(.system(size: 15, weight: .medium))
-                        }
-                        Button("Open") { browser.openCopiedLink(url) }
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Theme.accentText)
-                            .frame(minHeight: 44)
-                            .contentShape(.rect)
-                    } else {
-                        // Spaced so "Paste" sits as "Allow cookies" does.
-                        HStack(spacing: 14 - PasteControl.inset) {
-                            Text("Link you copied")
-                                .font(.system(size: 15, weight: .medium))
-                            PasteControl { browser.openCopiedLink($0) }
-                        }
+                    HStack(spacing: 10) {
+                        SiteIcon(host: url.displayHost, size: 18)
+                        Text(url.shortDisplay)
+                            .font(.system(size: 15, weight: .medium))
                     }
+                    Button("Open") { browser.openCopiedLink(url) }
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.accentText)
+                        .frame(minHeight: 44)
+                        .contentShape(.rect)
                 }
                 .lineLimit(1)
-                .padding(.leading, browser.copiedLinkURL == nil ? 18 : 14)
-                .padding(.trailing, browser.copiedLinkURL == nil ? 16 - PasteControl.inset : 16)
+                .padding(.leading, 14)
+                .padding(.trailing, 16)
                 .barSurface(cornerRadius: 14)
+                .compositingGroup()
                 .padding(.horizontal, Theme.gutter)
                 .padding(.bottom, Theme.barHeight + 20)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
+                                        removal: .opacity.animation(.easeOut(duration: 0.12))))
             }
         }
         .animation(.snappy(duration: 0.3), value: browser.copiedLinkOffer)
@@ -238,6 +239,10 @@ struct BrowserView: View {
             if Benchmark.isRequested { await Benchmark.run() }
             if !BrowseProbe.questions.isEmpty { await BrowseProbe.run() }
             if TopStoriesProbe.isRequested { await TopStoriesProbe.run() }
+            if ProcessInfo.processInfo.arguments.contains("-showOffer") {
+                try? await Task.sleep(for: .seconds(4))
+                browser.showCookieOfferForTesting()
+            }
             if ShoppingSeed.isRequested {
                 ShoppingSeed.run(in: context)
                 browser.panel = .shopping
@@ -334,28 +339,134 @@ struct BrowserView: View {
     }
 }
 
+/// A page that didn't load: roko's eclipse, large, its inner disc slowly
+/// crossing while the page is down; what went wrong in a sentence, about the
+/// site by name; and the one thing that helps. Offline, it waits for the
+/// connection and loads the page by itself.
 private struct LoadErrorView: View {
-    let message: String
+    let error: LoadError
     let retry: () -> Void
+    let search: (String) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var online = Connection()
+
+    private var site: String { error.host ?? "This site" }
+
+    private var headline: String {
+        switch error.kind {
+        case .offline: "You're offline"
+        case .notFound: "\(site) doesn't exist"
+        case .notAnswering: "\(site) isn't answering"
+        case .slow: "\(site) is taking too long"
+        case .unsafe: "\(site) isn't safe to open"
+        case .crashed: "This page keeps stopping"
+        case .other: "\(site) didn't load"
+        }
+    }
+
+    private var line: String {
+        switch error.kind {
+        case .offline: online.isUp ? "Back online. Loading it again." : "It loads by itself once you're back online."
+        case .notFound: "Check the address, or search for it."
+        case .notAnswering: "It may be down for a moment."
+        case .slow: "Its server is slow right now."
+        case .unsafe: "Its certificate doesn't match. Someone could be reading what you send."
+        case .crashed: "It used more than this iPhone could give it."
+        case .other: error.detail
+        }
+    }
 
     var body: some View {
-        VStack(spacing: 14) {
-            Text("This page didn't load")
-                .font(.headline)
-                .foregroundStyle(Theme.ink)
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(Theme.secondaryInk)
-                .multilineTextAlignment(.center)
-            Button("Try again", action: retry)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(Theme.accent)
-                .padding(.top, 4)
+        VStack(spacing: 0) {
+            Spacer()
+            TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
+                // The inner disc drifts across and back, once every 9 seconds.
+                let phase = reduceMotion ? 0.5 : (sin(context.date.timeIntervalSinceReferenceDate * 2 * .pi / 9) + 1) / 2
+                Eclipse(shift: phase)
+                    .fill(Theme.ink, style: FillStyle(eoFill: true))
+                    .frame(width: 132, height: 132)
+            }
+            .accessibilityHidden(true)
+            .padding(.bottom, 44)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text(headline)
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+                Text(line)
+                    .font(.system(size: 17))
+                    .foregroundStyle(Theme.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .contentTransition(.opacity)
+                HStack(spacing: 28) {
+                    if error.kind == .notFound, let host = error.host {
+                        Button("Search instead") { search(host) }
+                            .foregroundStyle(Theme.accentText)
+                    }
+                    if error.kind != .unsafe {
+                        Button(error.kind == .offline ? "Try now" : "Try again", action: retry)
+                            .foregroundStyle(error.kind == .notFound ? Theme.secondaryInk : Theme.accentText)
+                    }
+                }
+                .font(.system(size: 17, weight: .semibold))
+                .frame(minHeight: 44)
+                .padding(.top, 8)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 32)
+            Spacer()
+            // Sits a little low, nearer the thumb and the bar.
+            Spacer().frame(height: Theme.barHeight + 40)
         }
-        .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.canvas)
+        .animation(.easeOut(duration: 0.25), value: online.isUp)
+        .onChange(of: online.isUp) { _, up in
+            if up, error.kind == .offline { retry() }
+        }
     }
+}
+
+/// roko's eclipse with its inner disc moved along: 0 left of where the app
+/// icon has it, 1 right of it, so the mark seems to pass through an eclipse.
+nonisolated private struct Eclipse: Shape {
+    var shift: Double
+    var animatableData: Double {
+        get { shift }
+        set { shift = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let side = min(rect.width, rect.height)
+        let unit = side / 600
+        let origin = CGPoint(x: rect.midX - side / 2, y: rect.midY - side / 2)
+        var path = Path()
+        path.addEllipse(in: CGRect(x: origin.x, y: origin.y, width: side, height: side))
+        // The app icon's cut-out sits at x 244; it travels 60...270, inside
+        // the disc (past 300 it would poke out of the edge as a sliver).
+        let x = 60 + 210 * shift
+        path.addEllipse(in: CGRect(x: origin.x + x * unit, y: origin.y + 150 * unit, width: 300 * unit, height: 300 * unit))
+        return path
+    }
+}
+
+/// Whether the iPhone has a connection, as it changes.
+@Observable
+private final class Connection {
+    private(set) var isUp = true
+    @ObservationIgnored private let monitor = NWPathMonitor()
+
+    init() {
+        monitor.pathUpdateHandler = { [weak self] path in
+            let up = path.status == .satisfied
+            Task { @MainActor in self?.isUp = up }
+        }
+        monitor.start(queue: DispatchQueue(label: "roko.connection"))
+    }
+
+    deinit { monitor.cancel() }
 }
 
 /// A panel that rises from the bottom edge and sits flush with it: rounded

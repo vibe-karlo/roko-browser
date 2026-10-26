@@ -81,8 +81,11 @@ final class BrowserModel {
             // Already on screen, not a link after all, or offered before: nothing to offer.
             if LaunchClock.isEnabled { print("CLIP offer \(CopiedLink.isRuledOut ? "ruled out" : url?.absoluteString ?? "paste button")") }
             if CopiedLink.isRuledOut { return }
-            if let url, isCurrentPage(url) { return }
-            if let url { CopiedLink.remember(url) }
+            // Only a link it can show: the Paste button alone, above the bar,
+            // is an empty capsule when iOS has nothing it will paste. It's
+            // still a row in the address bar.
+            guard let url, !isCurrentPage(url) else { return }
+            CopiedLink.remember(url)
             copiedLinkURL = url
             copiedLinkOffer = true
             copiedLinkTask?.cancel()
@@ -343,6 +346,7 @@ final class BrowserModel {
 
     func showCommandBar(prefill: String = "", mode: CommandMode = .newTab,
                         context: LauncherContext = .web, over screen: Panel = .none) {
+        dismissOffers()
         commandPrefill = prefill
         commandMode = mode
         launcherContext = context
@@ -617,9 +621,12 @@ final class BrowserModel {
     }
 
     /// On every device: entry by entry, so the removal syncs.
-    func clearHistory() {
+    /// Pages visited since `since` (all of them by default), gone from history.
+    func clearHistory(since: Date = .distantPast) {
         guard let context else { return }
-        ((try? context.fetch(FetchDescriptor<HistoryEntry>())) ?? []).forEach(context.delete)
+        let descriptor = FetchDescriptor<HistoryEntry>(predicate: #Predicate { $0.visitedAt >= since })
+        // One by one, so the deletions reach iCloud too (see README, "iCloud sync").
+        ((try? context.fetch(descriptor)) ?? []).forEach(context.delete)
         try? context.save()
     }
 }
@@ -670,6 +677,22 @@ extension BrowserModel: BrowserTabDelegate {
             try? await Task.sleep(for: .seconds(10))
             if !Task.isCancelled { cookieOffer = nil }
         }
+    }
+
+    #if DEBUG
+    /// `-showOffer`: the cookie offer, to look at.
+    func showCookieOfferForTesting() {
+        cookieOffer = selectedTab?.url?.host() ?? "example.com"
+    }
+    #endif
+
+    /// Gone as something else opens (the bar, a panel): not left behind it.
+    func dismissOffers() {
+        if cookieOffer != nil {
+            cookieOffer = nil
+            cookieOfferTask?.cancel()
+        }
+        dismissCopiedLink()
     }
 
     func allowCookies() {

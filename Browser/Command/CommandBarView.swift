@@ -536,9 +536,9 @@ struct CommandBarView: View {
         // Icons share one axis with the rows' icons below.
         .padding(.horizontal, 16)
         .frame(height: 56)
-        // What's in it comes in once it has nearly grown; the shape itself is the morph.
-        .opacity(opened ? 1 : 0)
-        .animation(opened ? .easeOut(duration: 0.18).delay(0.16) : .easeIn(duration: 0.1), value: opened)
+        // Shown all the way: at its own size, uncovered as the shape widens
+        // (LauncherMorph). Hidden until it landed, the field flew up as an
+        // empty dark pill.
         .background {
             // Scaled from the capsule, the corners start at the capsule's roundness.
             RoundedRectangle(cornerRadius: opened ? 18 : 28)

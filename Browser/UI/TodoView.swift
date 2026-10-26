@@ -557,6 +557,9 @@ private struct DayPicker: View {
 struct ReturnKeepingField: UIViewRepresentable {
     let placeholder: String
     @Binding var text: String
+    /// Off for lists in two languages: English autocorrect turned "šampon,
+    /// brufen" into "Sampson, burden".
+    var autocorrects = true
     let onReturn: () -> Void
 
     func makeUIView(context: Context) -> UITextField {
@@ -569,6 +572,10 @@ struct ReturnKeepingField: UIViewRepresentable {
                                                          attributes: [.foregroundColor: UIColor(Theme.secondaryInk)])
         field.returnKeyType = .done
         field.autocapitalizationType = .sentences
+        if !autocorrects {
+            field.autocorrectionType = .no
+            field.spellCheckingType = .no
+        }
         field.addTarget(context.coordinator, action: #selector(Coordinator.changed(_:)), for: .editingChanged)
         field.setContentHuggingPriority(.defaultLow, for: .horizontal)
         field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)

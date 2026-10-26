@@ -156,6 +156,13 @@ dropped from the list; habits stay. The list speaks English or Croatian (`ListLa
 habits. Items and habits live in `device.store`: sharing a list with family will be CloudKit
 sharing, which needs the paid Developer Program (see "iCloud sync").
 
+Shopping has three lists (`Shop`: groceries, drugstore, pharmacy). An item's shop follows its
+aisle (personal care and baby are the drugstore, medicines the pharmacy) unless it was moved,
+which `ShoppingHabit.chosenShop` remembers. A list said aloud (`Shopping.spokenItems`) is split
+greedily on known things, habits and `everyday.txt`, up to four words long, after dropping
+amounts ("dvije", "kilo") and joins ("i", "and"); a single word one edit from a known thing is
+corrected. The recognizers get the same words as `contextualStrings` (`VoiceInput.expectedWords`).
+
 ## Notify Me
 
 Like Safari's: in a page's menu, say what to look for (or nothing, for anything new) and how

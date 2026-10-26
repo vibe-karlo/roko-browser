@@ -60,6 +60,22 @@ final class ContentBlocker {
         defaults.set(Array(hosts), forKey: Self.allowKey(category))
     }
 
+    /// Sites where blocking is off, all of it or one kind, and what: for Settings → Sites.
+    func allowances() -> [String: [String]] {
+        var sites: [String: [String]] = [:]
+        for host in allowedHosts(nil) { sites[host, default: []].append("Nothing blocked") }
+        for category in Category.allCases {
+            for host in allowedHosts(category) { sites[host, default: []].append("\(category.title) allowed") }
+        }
+        return sites
+    }
+
+    /// Blocking as everywhere else again, every kind.
+    func forgetAllowances(for host: String) {
+        setAllowed(host: host, false)
+        for category in Category.allCases { setAllowed(host: host, category: category, false) }
+    }
+
     private func allowedHosts(_ category: Category?) -> Set<String> {
         Set(defaults.stringArray(forKey: Self.allowKey(category)) ?? [])
     }

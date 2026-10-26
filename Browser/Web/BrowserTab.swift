@@ -23,7 +23,7 @@ final class BrowserTab: NSObject, Identifiable {
     var progress: Double = 0
     var canGoBack = false
     var canGoForward = false
-    var loadError: String?
+    var loadError: LoadError?
     /// When the page was last reloaded after WebKit gave up on it.
     @ObservationIgnored private var lastCrashReload: Date?
     /// Counts hibernations and wakes, so a hibernation overtaken by either stops.
@@ -384,12 +384,13 @@ final class BrowserTab: NSObject, Identifiable {
 // MARK: - Navigation
 
 extension BrowserTab {
-    /// A second reload of the same page within two minutes: it probably isn't working.
+    /// A third reload of the same page within 45 seconds: it probably isn't
+    /// working. (Two in two minutes was just someone following a live blog.)
     fileprivate func noteReload(of url: URL) {
         let now = Date.now
-        reloads = reloads.filter { $0.url == url && now.timeIntervalSince($0.at) < 120 }
+        reloads = reloads.filter { $0.url == url && now.timeIntervalSince($0.at) < 45 }
         reloads.append((url, now))
-        if reloads.count == 2 { delegate?.tabKeepsReloading(self) }
+        if reloads.count == 3 { delegate?.tabKeepsReloading(self) }
     }
 }
 
@@ -469,7 +470,7 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
         perf("fail \(error.code)", webView.url)
         // Cancelled loads (a new navigation replaced this one) aren't failures.
         guard error.code != NSURLErrorCancelled, error.code != 102 else { return }
-        loadError = error.localizedDescription
+        loadError = LoadError(error)
     }
 
     /// Failed after it had started drawing: the connection dropped mid-page.
@@ -479,7 +480,7 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
         // Cancelled (a new page asked for), or a frame WebKit stopped for a
         // download or a hand-off to another app: not failures.
         guard error.code != NSURLErrorCancelled, error.code != 102 else { return }
-        loadError = error.localizedDescription
+        loadError = LoadError(error)
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
@@ -487,7 +488,7 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
         // minute at most: a page that brings WebKit down every time would
         // otherwise reload forever and drain the battery.
         if let last = lastCrashReload, Date.now.timeIntervalSince(last) < 60 {
-            loadError = "This page stopped working."
+            loadError = LoadError(kind: .crashed, host: webView.url?.host())
             return
         }
         lastCrashReload = .now
@@ -501,5 +502,49 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
             delegate?.tab(self, wantsNewTabWith: url)
         }
         return nil
+    }
+}
+
+/// Why a page didn't load, in the terms that decide what to do next.
+struct LoadError: Equatable {
+    enum Kind {
+        /// No connection at all: it loads by itself once there is one.
+        case offline
+        /// No such site: the address is probably wrong.
+        case notFound
+        /// The site is there but didn't answer, or took too long.
+        case notAnswering, slow
+        /// Its certificate is wrong: going on isn't offered.
+        case unsafe
+        /// WebKit gave up on the page more than once.
+        case crashed
+        case other
+    }
+
+    let kind: Kind
+    let host: String?
+    var detail: String = ""
+
+    init(kind: Kind, host: String?, detail: String = "") {
+        self.kind = kind
+        self.host = host.map { $0.hasPrefix("www.") ? String($0.dropFirst(4)) : $0 }
+        self.detail = detail
+    }
+
+    init(_ error: NSError) {
+        let failing = (error.userInfo[NSURLErrorFailingURLErrorKey] as? URL)
+            ?? (error.userInfo[NSURLErrorFailingURLStringErrorKey] as? String).flatMap(URL.init(string:))
+        let kind: Kind = switch error.code {
+        case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost, NSURLErrorDataNotAllowed,
+             NSURLErrorInternationalRoamingOff: .offline
+        case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed: .notFound
+        case NSURLErrorCannotConnectToHost, NSURLErrorBadServerResponse: .notAnswering
+        case NSURLErrorTimedOut: .slow
+        case NSURLErrorSecureConnectionFailed, NSURLErrorServerCertificateHasBadDate,
+             NSURLErrorServerCertificateUntrusted, NSURLErrorServerCertificateHasUnknownRoot,
+             NSURLErrorServerCertificateNotYetValid, NSURLErrorClientCertificateRejected: .unsafe
+        default: .other
+        }
+        self.init(kind: kind, host: failing?.host(), detail: error.localizedDescription)
     }
 }

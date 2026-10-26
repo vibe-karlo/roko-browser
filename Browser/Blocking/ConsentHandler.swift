@@ -51,6 +51,11 @@ final class ConsentHandler: NSObject, WKScriptMessageHandlerWithReply {
         defaults.set(hosts, forKey: Self.acceptKey)
     }
 
+    /// Every site where cookies are accepted, and why: for Settings → Sites.
+    func acceptedSites() -> [String: Reason] {
+        (defaults.dictionary(forKey: Self.acceptKey) as? [String: String] ?? [:]).compactMapValues(Reason.init)
+    }
+
     private static func normalize(_ host: String) -> String {
         let host = host.lowercased()
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host

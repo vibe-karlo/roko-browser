@@ -71,6 +71,9 @@ final class VoiceInput {
             && AVAudioApplication.shared.recordPermission == .granted
     }
 
+    /// Words to expect instead of sites and commands: Shopping's things.
+    static var expectedWords: [String]?
+
     func start() throws {
         // Still finishing the last one: starting now would be stopped by it.
         guard !isStopping else { throw VoiceBusy() }
@@ -98,8 +101,9 @@ final class VoiceInput {
             // Words roko hears often: what it's asked to open and to do.
             // Short names ("SiB", "Index") are easily heard as other words; told
             // to expect them, the recognizer hears them. Your sites first.
-            request.contextualStrings = Array((["roko", "todo", "to-do", "dot com", "točka hr"] + Self.expectedSites
-                                               + PopularSites.spokenNames).prefix(100))
+            request.contextualStrings = Self.expectedWords.map { Array($0.prefix(100)) }
+                ?? Array((["roko", "todo", "to-do", "dot com", "točka hr"] + Self.expectedSites
+                          + PopularSites.spokenNames).prefix(100))
             return Ear(locale: locale, recognizer: recognizer, request: request)
         }
         guard !ears.isEmpty else { throw URLError(.cannotConnectToHost) }

@@ -5,7 +5,7 @@ import Foundation
 /// not, with a brand or without: "mlijeko", "2 mlijeka", "milk", "Dukat
 /// mlijeko 2,8%" are all Dairy.
 nonisolated enum Aisle: String, CaseIterable, Codable, Identifiable, Sendable {
-    case produce, bakery, meat, dairy, frozen, pantry, breakfast, sweets, drinks, household, personal, baby, pets, other
+    case produce, bakery, meat, dairy, frozen, pantry, breakfast, sweets, drinks, household, personal, baby, pets, medicine, other
 
     var id: String { rawValue }
 
@@ -40,6 +40,8 @@ nonisolated enum Aisle: String, CaseIterable, Codable, Identifiable, Sendable {
         case (.baby, .croatian): "Za bebe"
         case (.pets, .english): "Pets"
         case (.pets, .croatian): "Kućni ljubimci"
+        case (.medicine, .english): "Medicines and health"
+        case (.medicine, .croatian): "Lijekovi i zdravlje"
         case (.other, .english): "Other"
         case (.other, .croatian): "Ostalo"
         }
@@ -211,14 +213,23 @@ nonisolated enum Aisle: String, CaseIterable, Codable, Identifiable, Sendable {
         .personal: """
             sampon*! regenerator*! balzam\\ za\\ kosu! gel\\ za\\ tusiranje! gel\\ za\\ tus! kupka*! sapun*! dezodor*! deozodor*! \
             deo! zubn*! pasta\\ za\\ zube! cetkic* konac\\ za\\ zube! vodica\\ za\\ usta! brijac*! britvic*! brijanj*! \
-            pjena\\ za\\ brijanje! krema*~ krema\\ za! losion*! uloz*! tampon*! higijensk*! vat* stapici\\ za\\ usi! maramic* \
-            flaster* nivea*! dove*! colgate*! elmex*! signal*! gillette*! always*! syoss*! garnier*! tosama*! gliss*! taft*! \
+            pjena\\ za\\ brijanje! krem*~ krema\\ za! kreme\\ za! losion*! uloz*! tampon*! higijensk*! vat* stapici\\ za\\ usi! maramic* \
+            nivea*! dove*! colgate*! elmex*! signal*! gillette*! always*! syoss*! garnier*! tosama*! gliss*! taft*! \
             wilkinson*! durex*! old\\ spice! lak\\ za\\ kosu! lak\\ za\\ nokte! boja\\ za\\ kosu! gel\\ za\\ kosu! maska\\ za\\ kosu! \
             ulje\\ za\\ kosu! ulje\\ za\\ tijelo! mlijeko\\ za\\ tijelo! mlijeko\\ za\\ suncanje! za\\ suncanje! \
             toaletna\\ voda! parfem*! ruz*! maskar*! prezervativ*! kondom*! lubrikant*! head\\ shoulders! pantene*! \
-            axe! balzam\\ za\\ usne! puder*! vitamin*! dodatak\\ prehrani! hansaplast*! magnezij*! probiotik*! \
+            axe! balzam\\ za\\ usne! puder*! \
             shampoo*! conditioner*! shower\\ gel! body\\ wash! soap*! deodorant*! toothpaste*! toothbrush*! floss*! \
             mouthwash*! razor*! shaving*! lotion*! moisturi*! sunscreen*! pads tampon*! cotton* plaster* wipes body\\ lotion!
+            """,
+        .medicine: """
+            lijek*! lijekovi! sirup\\ za\\ kasalj! sirup\\ protiv! kapi\\ za! sprej\\ za\\ nos! vitamin*! multivitamin*! \
+            dodatak\\ prehrani! magnezij*! probiotik*! cink! omega\\ 3! aspirin*! brufen*! lupocet*! paracetamol*! ibuprofen*! \
+            nurofen*! voltaren*! neofen*! plivadon*! caffetin*! andol*! strepsils*! septolete*! fervex*! coldrex*! \
+            flaster*! hansaplast*! zavoj*! toplomjer*! test\\ za\\ trudnocu! dezinfekcij*! antibiotik*! tablete\\ za\\ glavobolju! \
+            tablete\\ protiv! kreme\\ za\\ rane! mast\\ za! \
+            medicine*! medication*! painkiller*! cough\\ syrup! nasal\\ spray! vitamins! supplement*! plasters! bandage*! \
+            thermometer*! antiseptic*! pregnancy\\ test! eye\\ drops! throat\\ lozenges! allergy\\ tablets!
             """,
         .baby: """
             pelen*! pampers*! dojencad* djecja\\ hrana bebi* beb* adapt* vlazne\\ maramice \
@@ -288,5 +299,32 @@ nonisolated enum ListLanguage: String, CaseIterable, Identifiable, Sendable {
     /// The words for the list's language: English, then Croatian.
     static func say(_ english: String, _ croatian: String) -> String {
         current == .croatian ? croatian : english
+    }
+}
+
+/// Which shop a thing is bought in: the supermarket, the drugstore (dm,
+/// Bipa) or the pharmacy (ljekarna). Each has its own list.
+nonisolated enum Shop: String, CaseIterable, Identifiable, Sendable {
+    case grocery, drugstore, pharmacy
+
+    var id: String { rawValue }
+
+    static let key = "shopping.shop"
+
+    var title: String {
+        switch self {
+        case .grocery: ListLanguage.say("Groceries", "Trgovina")
+        case .drugstore: ListLanguage.say("Drugstore", "Drogerija")
+        case .pharmacy: ListLanguage.say("Pharmacy", "Ljekarna")
+        }
+    }
+
+    /// Where a thing in this aisle is usually bought.
+    static func of(_ aisle: Aisle) -> Shop {
+        switch aisle {
+        case .personal, .baby: .drugstore
+        case .medicine: .pharmacy
+        default: .grocery
+        }
     }
 }

@@ -8,7 +8,9 @@ extension Animation {
 /// The launcher's field, drawn first exactly over the bar capsule that was
 /// tapped (`from`, on screen), then grown into its own place (`to`): one
 /// shape widening and rising out of the bar, and shrinking back into it on
-/// close. Scaled and moved, not laid out again, so nothing reflows mid-way.
+/// close. Its frame grows, not its scale: what's in it stays its own size,
+/// clipped by the growing shape, so the field is never an empty pill in
+/// flight (scaled, its contents had to be hidden until it landed).
 struct LauncherMorph: ViewModifier {
     let from: CGRect
     let to: CGRect
@@ -16,10 +18,11 @@ struct LauncherMorph: ViewModifier {
 
     func body(content: Content) -> some View {
         let ready = from != .zero && to != .zero
+        let small = !opened && ready
         content
-            .scaleEffect(x: opened || !ready ? 1 : from.width / to.width,
-                         y: opened || !ready ? 1 : from.height / to.height)
-            .offset(x: opened || !ready ? 0 : from.midX - to.midX,
-                    y: opened || !ready ? 0 : from.midY - to.midY)
+            .frame(width: small ? from.width : nil, height: small ? from.height : nil, alignment: .leading)
+            .clipShape(RoundedRectangle(cornerRadius: opened ? 18 : 28))
+            .frame(maxWidth: .infinity)
+            .offset(x: small ? from.midX - to.midX : 0, y: small ? from.midY - to.midY : 0)
     }
 }

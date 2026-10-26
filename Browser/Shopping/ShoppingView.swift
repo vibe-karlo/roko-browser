@@ -17,12 +17,20 @@ struct ShoppingView: View {
     @State private var adding = false
     @State private var draft = ""
     @State private var showsBought = false
+    /// Listening for a list said aloud; what's heard so far.
+    @State private var listening = false
+    @State private var heard = ""
+    @State private var listenTask: Task<Void, Never>?
     @Namespace private var barSpace
     /// Read so the list speaks a newly chosen language at once.
     @AppStorage(ListLanguage.key) private var language = ListLanguage.automatic.rawValue
+    /// The shop whose list is showing: groceries, the drugstore, the pharmacy.
+    @AppStorage(Shop.key) private var shopName = Shop.grocery.rawValue
+
+    private var shop: Shop { Shop(rawValue: shopName) ?? .grocery }
 
     private var toBuy: [ShoppingItem] {
-        items.filter { !$0.done || justDone.contains($0.persistentModelID) }
+        items.filter { $0.shop == shop && (!$0.done || justDone.contains($0.persistentModelID)) }
     }
 
     /// On the list and not yet bought, by how it's known.
@@ -39,25 +47,21 @@ struct ShoppingView: View {
     }
 
     private var bought: [ShoppingItem] {
-        items.filter { $0.done && !justDone.contains($0.persistentModelID) }
+        items.filter { $0.shop == shop && $0.done && !justDone.contains($0.persistentModelID) }
             .sorted { ($0.doneAt ?? .distantPast) > ($1.doneAt ?? .distantPast) }
     }
 
     private var suggested: [ShoppingHabit] {
-        Shopping.suggestions(habits, excluding: listed)
+        Shopping.suggestions(habits, excluding: listed, in: shop)
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                let left = items.filter { !$0.done }.count
-                Text(Self.toBuy(left))
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Theme.secondaryInk)
+                shops
                     .padding(.bottom, 26)
-                    .animation(nil, value: left)
                 if aisles.isEmpty {
-                    Text(ListLanguage.say("Nothing to buy. Add something below.", "Ništa za kupiti. Dodaj nešto ispod."))
+                    Text(ListLanguage.say("Nothing to buy here. Add something below.", "Ovdje nema ništa za kupiti. Dodaj nešto ispod."))
                         .font(.system(size: 17))
                         .foregroundStyle(Theme.secondaryInk)
                         .padding(.top, 40)
@@ -91,6 +95,38 @@ struct ShoppingView: View {
         } action: { _, pulled in
             if pulled { close() }
         }
+    }
+
+    // MARK: Shops
+
+    /// Each shop's list, a tap apart: the one showing in ink, each with how
+    /// many things are left on it.
+    private var shops: some View {
+        HStack(spacing: 22) {
+            ForEach(Shop.allCases) { each in
+                let left = items.filter { !$0.done && $0.shop == each }.count
+                Button {
+                    withAnimation(.snappy(duration: 0.25)) { shopName = each.rawValue }
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(each.title)
+                            .font(.system(size: 17, weight: each == shop ? .semibold : .regular))
+                        if left > 0 {
+                            Text("\(left)")
+                                .font(.system(size: 15).monospacedDigit())
+                        }
+                    }
+                    .foregroundStyle(each == shop ? Theme.ink : Theme.secondaryInk)
+                    .frame(minHeight: 44)
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(each.title + (left > 0 ? ", \(left)" : ""))
+                .accessibilityAddTraits(each == shop ? .isSelected : [])
+            }
+            Spacer(minLength: 0)
+        }
+        .sensoryFeedback(.selection, trigger: shopName)
     }
 
     // MARK: Aisles
@@ -159,6 +195,15 @@ struct ShoppingView: View {
             }
         } label: {
             Label(ListLanguage.say("Move to Aisle", "Premjesti u odjel"), systemImage: "arrow.turn.down.right")
+        }
+        Menu {
+            ForEach(Shop.allCases.filter { $0 != item.shop }) { other in
+                Button(other.title) {
+                    withAnimation(.snappy) { Shopping.move(item, to: other, in: context) }
+                }
+            }
+        } label: {
+            Label(ListLanguage.say("Move to Shop", "Premjesti u trgovinu"), systemImage: "storefront")
         }
         Divider()
         Button(role: .destructive) { delete(item) } label: { Label(ListLanguage.say("Delete", "Obriši"), systemImage: "trash") }
@@ -303,7 +348,32 @@ struct ShoppingView: View {
     /// adds them. Above the field, what you've bought before that starts so.
     @ViewBuilder
     private var bar: some View {
-        if adding {
+        if listening {
+            // What's heard, as it's heard; done after a pause, or with a tap.
+            HStack(spacing: 12) {
+                Glyph(.microphone, size: 18)
+                    .foregroundStyle(Theme.accent)
+                Text(heard.isEmpty ? ListLanguage.say("Say what to buy", "Reci što kupiti") : heard)
+                    .font(.system(size: 17))
+                    .foregroundStyle(heard.isEmpty ? Theme.secondaryInk : Theme.ink)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentTransition(.opacity)
+                Button(ListLanguage.say("Done", "Gotovo")) { finishListening() }
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Theme.accentText)
+                    .frame(minHeight: 44)
+            }
+            .padding(.leading, 22)
+            .padding(.trailing, 18)
+            .frame(minHeight: Theme.barHeight + 8)
+            .background { Capsule().fill(Theme.raised) }
+            .barSurface(cornerRadius: Theme.barRadius)
+            .padding(.horizontal, Theme.gutter)
+            .padding(.bottom, 4)
+            .background(alignment: .top) { FadeEdge(color: Theme.canvas, height: 40).offset(y: 12) }
+            .transition(.opacity)
+        } else if adding {
             VStack(spacing: 0) {
                 let completions = Shopping.completions(for: draft, in: habits, excluding: listed)
                 if !completions.isEmpty {
@@ -346,7 +416,7 @@ struct ShoppingView: View {
                     .transition(.opacity)
                 }
                 HStack(spacing: 10) {
-                    ReturnKeepingField(placeholder: ListLanguage.say("Milk, eggs, bread", "Mlijeko, jaja, kruh"), text: $draft) {
+                    ReturnKeepingField(placeholder: ListLanguage.say("Milk, eggs, bread", "Mlijeko, jaja, kruh"), text: $draft, autocorrects: false) {
                         add(draft)
                         draft = ""
                     }
@@ -379,8 +449,65 @@ struct ShoppingView: View {
             ContextBar(leading: .init(glyph: .close, label: ListLanguage.say("Close", "Zatvori"), action: close),
                        glyph: .plus, title: ListLanguage.say("Add to list", "Dodaj na popis"),
                        launch: { withAnimation(.launcher) { adding = true } },
+                       trailing: .init(glyph: .microphone, label: ListLanguage.say("Say a list", "Izgovori popis"), action: listen),
                        morphs: false, fieldSpace: barSpace)
                 .transition(.opacity)
+        }
+    }
+
+    // MARK: Listening
+
+    /// Everyday things and what you've bought, for the recognizers to expect
+    /// and for splitting what's said into things.
+    private var known: [String] {
+        habits.sorted { $0.count > $1.count }.map(\.title) + ShoppingCatalogue.shared.everyday
+    }
+
+    private func listen() {
+        guard VoiceInput.isAuthorized else {
+            Task {
+                if !(await VoiceInput.authorize()) {
+                    browser.showToast(ListLanguage.say("Allow the microphone and speech in Settings",
+                                                       "Dopusti mikrofon i govor u Postavkama"))
+                }
+            }
+            return
+        }
+        VoiceInput.expectedWords = known
+        do { try VoiceInput.shared.start() } catch {
+            VoiceInput.expectedWords = nil
+            return
+        }
+        heard = ""
+        withAnimation(.snappy(duration: 0.25)) { listening = true }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        let voice = VoiceInput.shared
+        listenTask = Task {
+            // A list takes a breath between things: done after 2 seconds of quiet.
+            while !Task.isCancelled, listening {
+                try? await Task.sleep(for: .milliseconds(200))
+                heard = voice.partial
+                let now = Date.now
+                if let last = voice.lastVoiceAt, !voice.partial.isEmpty, now.timeIntervalSince(last) > 2 { break }
+                if voice.lastVoiceAt == nil, now.timeIntervalSince(voice.startedAt) > 8 { break }
+            }
+            if !Task.isCancelled { finishListening() }
+        }
+    }
+
+    private func finishListening() {
+        guard listening else { return }
+        listenTask?.cancel()
+        Task {
+            let said = await VoiceInput.shared.stop() ?? heard
+            VoiceInput.expectedWords = nil
+            withAnimation(.snappy(duration: 0.25)) { listening = false }
+            let things = Shopping.spokenItems(said, known: known)
+            guard !things.isEmpty else {
+                browser.showToast(ListLanguage.say("Didn't catch that", "Nisam čuo"))
+                return
+            }
+            add(things.joined(separator: ", "))
         }
     }
 
@@ -394,7 +521,10 @@ struct ShoppingView: View {
     private func add(_ typed: String) {
         var result: (added: [ShoppingItem], already: [String]) = ([], [])
         withAnimation(.snappy) { result = Shopping.add(typed, in: context) }
-        if result.added.isEmpty, !result.already.isEmpty { browser.showToast(Shopping.said(result)) }
+        // Said when it isn't plain on screen: already there, or on another shop's list.
+        if (result.added.isEmpty && !result.already.isEmpty) || result.added.contains(where: { $0.shop != shop }) {
+            browser.showToast(Shopping.said(result, showing: shop))
+        }
     }
 
     private func toggle(_ item: ShoppingItem) {
@@ -423,6 +553,12 @@ struct ShoppingView: View {
     }
 
     private func close() {
+        if listening {
+            listenTask?.cancel()
+            VoiceInput.shared.cancel()
+            VoiceInput.expectedWords = nil
+            listening = false
+        }
         browser.panel = .none
     }
 }

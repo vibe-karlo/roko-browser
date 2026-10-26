@@ -13,6 +13,8 @@ final class ShoppingItem {
     var createdAt: Date = Date.now
     /// Its place in its aisle, dragged there; 0 until moved, then as added.
     var order: Double = 0
+    /// A `Shop`, when it was put in one; empty: where its aisle is bought.
+    var shopName: String = ""
 
     init(title: String, aisle: Aisle) {
         self.title = title
@@ -23,6 +25,8 @@ final class ShoppingItem {
         get { Aisle(rawValue: aisleName) ?? .other }
         set { aisleName = newValue.rawValue }
     }
+
+    var shop: Shop { Shop(rawValue: shopName) ?? Shop.of(aisle) }
 
     var key: String { Aisle.key(title) }
 }
@@ -37,6 +41,8 @@ final class ShoppingHabit {
     var title: String = ""
     /// Chosen by you (an item moved to another aisle); nil: worked out.
     var chosenAisle: String?
+    /// A `Shop` chosen by you (moved to another store's list); nil: by its aisle.
+    var chosenShop: String?
     var count: Int = 0
     var lastAdded: Date?
     /// Days between one time it was added and the next, summed, and how many.
@@ -46,6 +52,11 @@ final class ShoppingHabit {
     init(key: String, title: String) {
         self.key = key
         self.title = title
+    }
+
+    /// The shop it's bought in: where you put it, else where its aisle is.
+    var shop: Shop {
+        chosenShop.flatMap(Shop.init) ?? Shop.of(chosenAisle.flatMap(Aisle.init) ?? Aisle.of(title))
     }
 
     /// How often it's usually bought, in days; nil until it's been bought twice.
@@ -101,6 +112,7 @@ enum Shopping {
                 continue
             }
             let item = ShoppingItem(title: title, aisle: aisle(for: title, in: context))
+            item.shopName = habit(key, in: context)?.chosenShop ?? ""
             item.order = order
             order += 1
             context.insert(item)
@@ -112,9 +124,15 @@ enum Shopping {
         return (added, already)
     }
 
-    /// What a toast says after adding.
-    static func said(_ result: (added: [ShoppingItem], already: [String])) -> String {
+    /// What a toast says after adding: where it went, when that's not the
+    /// list on screen ("Šampon → Drogerija").
+    static func said(_ result: (added: [ShoppingItem], already: [String]), showing shop: Shop? = nil) -> String {
         let say = ListLanguage.say
+        if let shop, let elsewhere = result.added.first(where: { $0.shop != shop }) {
+            let others = result.added.filter { $0.shop != shop }
+            return others.count == 1 ? "\(elsewhere.title) → \(elsewhere.shop.title)"
+                : say("\(others.count) items → other shops", "\(others.count) stvari → druge trgovine")
+        }
         return switch (result.added.count, result.already.count) {
         case (0, 0): ""
         case (0, 1): say("\(result.already[0]) is already on the list", "\(result.already[0]) je već na popisu")
@@ -142,6 +160,18 @@ enum Shopping {
             return new
         }()
         habit.chosenAisle = aisle.rawValue
+        try? context.save()
+    }
+
+    /// Put on another shop's list: from now on that's where it goes.
+    static func move(_ item: ShoppingItem, to shop: Shop, in context: ModelContext) {
+        item.shopName = shop.rawValue
+        let habit = habit(item.key, in: context) ?? {
+            let new = ShoppingHabit(key: item.key, title: item.title)
+            context.insert(new)
+            return new
+        }()
+        habit.chosenShop = shop.rawValue
         try? context.save()
     }
 
@@ -190,10 +220,10 @@ enum Shopping {
 
     /// What to suggest: things you buy now and then that aren't on the list,
     /// the ones whose usual gap has come round first, then the most often bought.
-    static func suggestions(_ habits: [ShoppingHabit], excluding listed: Set<String>, limit: Int = 6,
-                            now: Date = .now) -> [ShoppingHabit] {
+    static func suggestions(_ habits: [ShoppingHabit], excluding listed: Set<String>, in shop: Shop? = nil,
+                            limit: Int = 6, now: Date = .now) -> [ShoppingHabit] {
         habits
-            .filter { $0.count >= 2 && !listed.contains($0.key) }
+            .filter { $0.count >= 2 && !listed.contains($0.key) && (shop == nil || $0.shop == shop) }
             .map { habit -> (ShoppingHabit, Double) in
                 let since = habit.lastAdded.map { now.timeIntervalSince($0) / 86_400 } ?? 0
                 // Due: as long ago as it usually is. Otherwise how often it's bought.
@@ -253,7 +283,7 @@ nonisolated struct AisleGuess {
 /// `Aisle` as the model answers it (an enum it can only pick from).
 @Generable
 nonisolated enum AisleChoice {
-    case produce, bakery, meat, dairy, frozen, pantry, breakfast, sweets, drinks, household, personal, baby, pets, other
+    case produce, bakery, meat, dairy, frozen, pantry, breakfast, sweets, drinks, household, personal, baby, pets, medicine, other
 
     var aisle: Aisle { Aisle(rawValue: String(describing: self)) ?? .other }
 }
@@ -267,6 +297,88 @@ nonisolated enum ShoppingQuery {
         guard let prefix = prefixes.first(where: { lower.hasPrefix($0) }) else { return nil }
         let rest = query.dropFirst(prefix.count).trimmingCharacters(in: .whitespaces)
         return rest.isEmpty ? nil : rest
+    }
+}
+
+// MARK: Spoken lists
+
+extension Shopping {
+    /// A list said aloud, as items: "mlijeko jaja kruh i dvije banane" has no
+    /// commas, so it's split where the words you've bought before and the
+    /// everyday things begin and end, the longest first ("pileća prsa" is one).
+    /// A word heard nearly right is put right ("sampon" is Šampon).
+    nonisolated static func spokenItems(_ heard: String, known: [String]) -> [String] {
+        let byKey = Dictionary(known.map { (Aisle.key($0), $0) }, uniquingKeysWith: { a, _ in a })
+        let joins: Set<String> = ["i", "and", "pa", "te", "plus", "also", "jos", "još"]
+        // Counted or measured: "dvije", "two", "kilo" say how much, not what.
+        let amounts: Set<String> = ["jedan", "jedna", "jedno", "dva", "dvije", "tri", "cetiri", "pet", "kilo", "kila",
+                                    "litra", "litre", "pakiranje", "paket", "one", "two", "three", "four", "five",
+                                    "a", "an", "some", "pack", "packs", "bottle", "bottles", "of", "malo", "vise"]
+        let words = heard.lowercased()
+            .split { !$0.isLetter && !$0.isNumber }
+            .map(String.init)
+            .filter { !amounts.contains(Aisle.key($0)) && !$0.allSatisfy(\.isNumber) }
+        var items: [String] = [], loose: [String] = []
+        func flushLoose() {
+            if !loose.isEmpty { items.append(capitalized(loose.joined(separator: " "))) }
+            loose = []
+        }
+        var index = 0
+        while index < words.count {
+            if joins.contains(words[index]) {
+                flushLoose()
+                index += 1
+                continue
+            }
+            var matched: (title: String, length: Int)?
+            for length in stride(from: min(4, words.count - index), through: 1, by: -1) {
+                let phrase = Aisle.key(words[index..<index + length].joined(separator: " "))
+                if let title = byKey[phrase] ?? nearly(phrase, in: byKey) {
+                    matched = (title, length)
+                    break
+                }
+            }
+            if let matched {
+                flushLoose()
+                items.append(matched.title)
+                index += matched.length
+            } else {
+                // Not known as it is: a thing of its own if it reads as one,
+                // else part of the next ("crveni" in "crveni luk" alone).
+                let word = words[index]
+                if Aisle.of(word) != .other, loose.isEmpty {
+                    items.append(capitalized(word))
+                } else {
+                    loose.append(word)
+                }
+                index += 1
+            }
+        }
+        flushLoose()
+        return items
+    }
+
+    /// A known thing one letter off: speech often loses č, ć, š, ž ("sampon").
+    nonisolated private static func nearly(_ key: String, in byKey: [String: String]) -> String? {
+        guard key.count >= 5, !key.contains(" ") else { return nil }
+        return byKey.first { other, _ in
+            !other.contains(" ") && abs(other.count - key.count) <= 1 && editDistance(other, key) <= 1
+        }?.value
+    }
+
+    nonisolated private static func editDistance(_ a: String, _ b: String) -> Int {
+        let a = Array(a), b = Array(b)
+        var row = Array(0...b.count)
+        for i in 1...max(a.count, 1) where i <= a.count {
+            var previous = row[0]
+            row[0] = i
+            for j in 1...max(b.count, 1) where j <= b.count {
+                let saved = row[j]
+                row[j] = a[i - 1] == b[j - 1] ? previous : min(previous, row[j], row[j - 1]) + 1
+                previous = saved
+            }
+        }
+        return row[b.count]
     }
 }
 
@@ -291,6 +403,7 @@ nonisolated final class ShoppingCatalogue: Sendable {
 
     /// Everyday things first: they're what a list mostly says.
     private let entries: [Entry]
+    private let everydayCount: Int
 
     private init() {
         func read(_ name: String) -> [String] {
@@ -298,8 +411,13 @@ nonisolated final class ShoppingCatalogue: Sendable {
                   let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
             return text.split(separator: "\n").map(String.init)
         }
-        entries = (read("everyday") + read("products")).map { Entry(title: $0, key: Aisle.key($0)) }
+        let everyday = read("everyday")
+        everydayCount = everyday.count
+        entries = (everyday + read("products")).map { Entry(title: $0, key: Aisle.key($0)) }
     }
+
+    /// The everyday things, for expecting them by ear and for splitting a spoken list.
+    var everyday: [String] { Array(entries.prefix(while: { !$0.title.isEmpty }).prefix(everydayCount).map(\.title)) }
 
     /// Those whose words start with what's typed: names starting with it
     /// first ("Jogurt"), then ones with it inside ("Dukat jogurt").
