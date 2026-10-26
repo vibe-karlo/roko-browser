@@ -132,6 +132,7 @@ final class SummaryModel: Identifiable {
             do {
                 guard try await write(page, with: engine, in: language, appleWritesIt: appleWritesIt) else { continue }
                 phase = .done
+                SavedStats.summary(pageWords: SavedStats.words(in: page.text), summaryWords: SavedStats.words(in: text))
                 if let url, !text.isEmpty {
                     SummaryCache.store(.init(text: text, engine: self.engine, note: note, at: .now), for: url)
                 }
@@ -578,6 +579,7 @@ final class BrowseForMeModel: Identifiable {
             // Cancelled, the stream just ends: closed, not done.
             try Task.checkCancellation()
             phase = .done
+            SavedStats.answer(pagesRead: pages.count, answerWords: SavedStats.words(in: text))
             return true
         } catch is CancellationError {
             return true
@@ -616,6 +618,7 @@ final class BrowseForMeModel: Identifiable {
             // An answer that cites nothing still shows where it looked.
             if sources.isEmpty { sources = Array(found.prefix(6)) }
             phase = .done
+            SavedStats.answer(pagesRead: max(steps.count, sources.count), answerWords: SavedStats.words(in: text))
         } catch is CancellationError {
             return
         } catch {

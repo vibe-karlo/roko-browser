@@ -344,7 +344,10 @@ and opens it; everything else goes to the bar's own ranking, where `TodoIntent` 
 
 ## Settings
 
-One screen, grouped by what you do, with long lists on pages of their own:
+One screen, grouped by what you do, with long lists on pages of their own. It opens on what roko
+has saved you (`App/SavedStats.swift`): counts in UserDefaults, bumped where each thing happens
+(the consent bridge's `rokoSaved` message, a summary or Browse for Me answer finishing, the bar
+closing on an answer, once each time it's open), and turned into time by stated estimates.
 
 - **Appearance**, and the app icon (its own page).
 - **Address bar**: search engine, suggestions, the copied link, ticks as rows go by.

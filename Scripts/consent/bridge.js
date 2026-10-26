@@ -87,9 +87,20 @@ export function start(AutoConsent, filterCompactRules, compactRules) {
         }
     };
 
+    // One pop-up answered: for Settings' count of what roko saved you.
+    let counted = false;
+    const countSaved = (clicks) => {
+        if (counted) return;
+        counted = true;
+        post({ type: 'rokoSaved', clicks: Math.max(1, clicks || 0) });
+    };
+
     const send = async (message) => {
         const reply = await post(message);
         if (message.type === 'optInResult' && message.result) accepted = true;
+        if ((message.type === 'optOutResult' || message.type === 'optInResult') && message.result) {
+            countSaved(consent && consent.state && consent.state.clicks);
+        }
         if (message.type === 'optOutResult' && !message.result) {
             if (await stillInTheWay()) {
                 // No way past it but accepting: roko accepts, if the site may.
@@ -149,6 +160,7 @@ export function start(AutoConsent, filterCompactRules, compactRules) {
                 const button = reply && reply.type === 'optIn' ? banner.accept : banner.reject;
                 if (!button) return;
                 button.click();
+                countSaved(1);
                 if (button === banner.accept) accepted = true;
             }, delay);
         }

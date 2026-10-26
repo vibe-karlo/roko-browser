@@ -96,6 +96,10 @@ final class ConsentHandler: NSObject, WKScriptMessageHandlerWithReply {
             await recover(webView, host: host)
             return (nil, nil)
 
+        case "rokoSaved":
+            SavedStats.cookieBar(clicks: body["clicks"] as? Int ?? 1)
+            return (nil, nil)
+
         case "rokoStillBlocked":
             await recover(webView, host: host)
             return (nil, nil)

@@ -88,6 +88,8 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                SavedSection()
+
                 Section {
                     Picker("Appearance", selection: $appearance) {
                         ForEach(Appearance.allCases) { Text($0.title).tag($0) }
@@ -280,6 +282,68 @@ struct SettingsView: View {
     private var blockingSummary: String {
         let on = ContentBlocker.Category.allCases.filter(ContentBlocker.shared.isEnabled).count
         return on == ContentBlocker.Category.allCases.count ? "All" : on == 0 ? "Off" : "\(on) of \(ContentBlocker.Category.allCases.count)"
+    }
+}
+
+/// What roko has saved you: the time first, then where it came from.
+private struct SavedSection: View {
+    @State private var totals = SavedStats.totals
+
+    var body: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 4) {
+                if totals.seconds > 0 {
+                    Text(SavedStats.duration(totals.seconds))
+                        .font(.system(size: 44, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(Theme.ink)
+                        .contentTransition(.numericText())
+                    Text(totals.since.map { "saved since \($0.formatted(.dateTime.day().month(.wide)))" } ?? "saved")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.secondaryInk)
+                } else {
+                    Text("Nothing saved yet")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                    Text("Cookie pop-ups roko answers, summaries, Browse for Me and answers in the bar add up here.")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.secondaryInk)
+                }
+            }
+            .padding(.vertical, 6)
+            .accessibilityElement(children: .combine)
+
+            if totals.seconds > 0 {
+                row("Cookie pop-ups", detail: "\(totals.cookieBars) answered · " + count(totals.cookieClicks, "click"),
+                    seconds: totals.cookieSeconds)
+                row("Summaries", detail: count(totals.summaries, "page"), seconds: totals.summarySeconds)
+                row("Browse for Me", detail: count(totals.answers, "answer"), seconds: totals.answerSeconds)
+                row("Answers in the bar", detail: count(totals.instant, "answer") + ": weather, sums, rates, time zones",
+                    seconds: totals.instantSeconds)
+            }
+        } footer: {
+            if totals.seconds > 0 {
+                Text("Estimates: 3 seconds a click, reading at 230 words a minute, a search plus a minute for each page Browse for Me read, and 10 to 20 seconds for each answer in the bar. Only counts, on this iPhone.")
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: SavedStats.changed)) { _ in
+            withAnimation(.snappy) { totals = SavedStats.totals }
+        }
+        .contextMenu {
+            Button("Start Counting Again", role: .destructive) { SavedStats.reset() }
+        }
+    }
+
+    private func count(_ n: Int, _ word: String) -> String {
+        "\(n) \(word)\(n == 1 ? "" : "s")"
+    }
+
+    private func row(_ title: String, detail: String, seconds: Double) -> some View {
+        LabeledContent {
+            Text(SavedStats.duration(seconds)).monospacedDigit()
+        } label: {
+            Text(title)
+            Text(detail).monospacedDigit()
+        }
     }
 }
 

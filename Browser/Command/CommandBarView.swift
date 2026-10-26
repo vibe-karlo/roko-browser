@@ -57,6 +57,8 @@ struct CommandBarView: View {
     @State private var copiedURL: URL?
     /// Mid-blink of the private switch's eye.
     @State private var blink = false
+    /// An answer was read this time the bar is open (see countAnswer).
+    @State private var answerCounted = false
     @FocusState private var focused: Bool
     /// How tall the list is, between the field and the keyboard.
     @State private var listHeight: CGFloat = 300
@@ -595,6 +597,7 @@ struct CommandBarView: View {
     /// only then does the keyboard come, rising under it, so the keyboard never
     /// covers the capsule the field is growing out of.
     private func open() {
+        answerCounted = false
         // Opened with no capsule to grow from (on launch, with nothing open): just there.
         guard browser.launcherOrigin != .zero else {
             browser.launcherShown = true
@@ -616,6 +619,11 @@ struct CommandBarView: View {
     /// Back into the bar: the field shrinks into the capsule it came from,
     /// then the launcher is gone and the capsule is there in its place.
     private func dismiss() {
+        // Closed on a typed answer (a sum, a rate, the weather): read, so it counts.
+        if !query.isEmpty, let top = items.first(where: { $0.id == topRow }) ?? items.first,
+           !top.id.hasPrefix("answer-") {
+            countAnswer(top)
+        }
         browser.cancelVoice()
         focused = false
         withAnimation(.easeIn(duration: 0.1)) { browser.launcherRows = false }
@@ -769,8 +777,34 @@ struct CommandBarView: View {
         }
     }
 
+    /// An answer read in the bar, for Settings' count of time saved: once
+    /// each time the bar is open. Seconds it would take another way: the
+    /// Weather app or a search, a calculator or a rate looked up, Calendar.
+    private func countAnswer(_ item: CommandItem) {
+        guard !answerCounted, let seconds = Self.answerSeconds(item) else { return }
+        answerCounted = true
+        SavedStats.instantAnswer(seconds: seconds)
+    }
+
+    static func answerSeconds(_ item: CommandItem) -> Double? {
+        let weatherWords = ["weather", "forecast", "vrijeme", "vreme", "prognoza"]
+        let calendarWords = ["calendar", "kalendar", "next", "next meeting", "agenda", "raspored"]
+        if item.id.hasPrefix("answer-") {
+            let asked = String(item.id.dropFirst(7)).lowercased()
+            if weatherWords.contains(asked) || WeatherQuery.place(in: asked) != nil { return 20 }
+            return calendarWords.contains(asked) ? 10 : 12
+        }
+        switch item.id {
+        case "calc": return 12
+        case "calendar": return 10
+        case _ where item.id.hasPrefix("weather"): return 20
+        default: return nil
+        }
+    }
+
     private func perform(_ item: CommandItem) {
         focused = false
+        countAnswer(item)
         switch item.action {
         case .open(let url): browser.openFromCommandBar(url)
         case .switchTab(let tab): browser.select(tab); browser.panel = .none
