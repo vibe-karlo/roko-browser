@@ -135,6 +135,8 @@ enum Conversion {
 
     /// 8700 → "2 h 25 min"; days and seconds only when they're there.
     private static func timespan(_ seconds: Double) -> String {
+        // "1/0 h", a billion years: no time span to show (Int() of those stops the app).
+        guard seconds.isFinite, abs(seconds) < 1e12 else { return "too long" }
         var rest = Int(seconds.rounded())
         var parts: [String] = []
         for (size, label) in [(86_400, "d"), (3_600, "h"), (60, "min"), (1, "s")] where rest >= size {

@@ -136,7 +136,7 @@ Like Safari's: in a page's menu, say what to look for (or nothing, for anything 
 often to check. `Watcher` reads the page with plain HTTP, off the main thread: one line per
 paragraph, list item or heading, plus the page's JSON-LD offers ("Offer: Linen Shirt M, 39.95
 EUR, in stock") and its `<option>` choices, marked when unavailable. It compares the lines with
-the last reading. For anything new, new lines of real text (not a clock or a counter) go to
+the last reading. A page with too little of those (glas-slavonije.hr is all boxes and links) is read by its links' text instead; `-pageLines <url>` prints a page as Notify Me reads it in a Debug build. For anything new, new lines of real text (not a clock or a counter) go to
 Apple's on-device model, which writes the notification. For something specific, the model
 answers about one version of the page at a time ("does it show it? quote the line"), and roko
 notifies only when the answer turns from no to yes; asked about added and removed lines at once,
@@ -144,8 +144,11 @@ the small model announced "back in stock" for a size that had just sold out.
 
 iOS wakes roko for these checks (`BGAppRefreshTask`) when it chooses, so "hourly" means at most
 hourly; roko also checks whatever is due when you open it. Pages that only show their text once
-their scripts run are read in a hidden web view, which works only while roko is open. To force
-every check in a Debug build, launch with `-checkWatches`.
+their scripts run are read in a hidden web view, which works only while roko is open; their
+row in Settings says so. Each run books the next wake-up, including one that finds a check
+already running. Settings → Notify Me says when something stops it quietly: notifications off,
+Background App Refresh off, or Low Power Mode. To force every check in a Debug build, launch
+with `-checkWatches`; with `-perf`, each step is logged (`WATCH`).
 
 ## Not done yet
 
@@ -181,9 +184,12 @@ opens it in the Mac's default browser, private tabs never). iOS hands web pages 
 to Safari only, so the way back is Universal Clipboard: copy a link on the Mac, and roko
 offers it above the bar once when you open roko, then in the address bar for five minutes. It
 only checks that there is a link; the system Paste button hands the link over, which needs no
-permission prompt. To see the link itself first, turn on Settings → Show the link you copied
-and set roko's Paste from Other Apps to Allow in iOS Settings; otherwise iOS asks for each
-link. A link to the page already on screen isn't offered.
+permission prompt (and finds the link in a pasted sentence). To see the link itself first, turn
+on Settings → Show the link you copied and set roko's Paste from Other Apps to Allow in iOS
+Settings; otherwise iOS asks for each link. Then roko reads the whole copy and offers it only
+when it's one link on its own: iOS's own check says yes to a sentence that mentions index.hr
+and to "CHANGELOG.md". A link to the page already on screen isn't offered, nor one offered or
+opened from an earlier copy in the last three days.
 
 ## Cookie pop-ups
 
@@ -245,8 +251,12 @@ day, and with "today". It reads:
   the address). Topics are matched in the major Croatian feeds and your own: a stem of the
   topic's longest word, then, for multi-word topics, the on-device model keeps only those
   really about it. Google News has no Croatian edition, so it isn't used. Apple's on-device model picks the front page
-  from up to sixty headlines; at most two stories per site, and headlines sharing most of
-  their words count as one story. Without the model, each site's newest.
+  from up to sixty headlines, each site's newest in turn (newest overall, a site that posts all
+  day crowded the others out), then is asked about just its picks which only announce something
+  (a club night, a film programme, a sale), and those go. At most two stories per site, filled
+  from the rest of the model's picks, never the newest; headlines sharing most of their words,
+  or two in a short headline, count as one story. Without the model, each site's newest. To try
+  the pick on a fixed day of headlines in a Debug build, launch with `-topProbe`.
 
 What it last showed is kept in `today.json`, so it opens at once. The weather and calendar
 are fetched on every opening; everything refreshes with a tap on "Updated", when opened

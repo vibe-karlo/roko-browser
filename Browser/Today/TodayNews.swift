@@ -185,20 +185,70 @@ nonisolated enum TodayNews {
     @MainActor static func top(_ stories: [NewsStory], count: Int = 6) async -> [NewsStory] {
         let newest = stories.sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
         guard AppleModels.onDeviceAvailable, stories.count > count else { return varied(newest, count: count) }
-        let offered = Array(stories.prefix(60))
+        // Each site's newest in turn: taken newest-first overall, a site that
+        // posts all day (index.hr) filled the list and the others went unseen.
+        let offered = balanced(newest, limit: 60)
         let numbered = offered.enumerated().map { "\($0.offset + 1). \($0.element.title) (\($0.element.host))" }
         let session = LanguageModelSession(model: AppleModels.summarizing, instructions: """
             You are an editor choosing a front page. From today's headlines, pick the stories that matter \
-            most to a general reader: big national and world news, things that affect daily life. Not \
-            gossip, quizzes, horoscopes, promotions, product demos or minor sport.
+            most to a general reader: big national and world news, and things that affect daily life. \
+            Several headlines about the same event are one story: pick only its most informative one. \
+            Leave out gossip, quizzes, horoscopes, promotions and deals, reviews, videos, minor sport, and \
+            event listings or what's-on notices (a concert, a party, a club night, a mass, a film programme).
             """)
         let prompt = "Headlines:\n" + numbered.joined(separator: "\n") + "\n\nPick the \(count + 4) most important."
         guard let picks = try? await session.respond(to: prompt, generating: FrontPage.self).content.numbers else {
             return varied(newest, count: count)
         }
-        let chosen = picks.compactMap { offered.indices.contains($0 - 1) ? offered[$0 - 1] : nil }
-        // Short of picks after the rules, the newest fill in.
-        return varied(chosen + newest, count: count)
+        let chosen = await withoutListings(picks.compactMap { offered.indices.contains($0 - 1) ? offered[$0 - 1] : nil })
+        var result = varied(chosen, count: count)
+        // Short after two a site: the rest of the picks, rather than whatever a
+        // site posted last (that's how two event listings made Top stories).
+        for story in chosen where result.count < count && !result.contains(where: { told($0, story) }) {
+            result.append(story)
+        }
+        // The model picked next to nothing: the newest fill in.
+        return result.count >= 3 ? result : varied(result + newest, count: count)
+    }
+
+    /// The picks less what only announces something: told to leave out event
+    /// listings, the model still put a club night and a film programme on the
+    /// front page, but asked just this about a handful, it spots them.
+    @MainActor private static func withoutListings(_ picks: [NewsStory]) async -> [NewsStory] {
+        guard !picks.isEmpty else { return picks }
+        let numbered = picks.enumerated().map { "\($0.offset + 1). \($0.element.title)" }
+        let session = LanguageModelSession(model: AppleModels.summarizing, instructions: """
+            Some headlines report news: something that happened or was decided. Others only announce \
+            something upcoming or on offer: a concert, a party, a club night, a mass, a film or theatre \
+            programme, a premiere, a sale, deals. Find the ones that only announce.
+            """)
+        let prompt = "Headlines:\n" + numbered.joined(separator: "\n")
+        guard let out = try? await session.respond(to: prompt, generating: NotNews.self).content.numbers else { return picks }
+        let dropped = Set(out)
+        // Wrong about most of them, it's guessing: keep them all.
+        guard dropped.count * 2 <= picks.count else { return picks }
+        return picks.enumerated().filter { !dropped.contains($0.offset + 1) }.map(\.element)
+    }
+
+    /// Up to `limit` stories, each site's next newest in turn.
+    static func balanced(_ newest: [NewsStory], limit: Int) -> [NewsStory] {
+        var bySite: [String: [NewsStory]] = [:], sites: [String] = []
+        for story in newest {
+            if bySite[story.host] == nil { sites.append(story.host) }
+            bySite[story.host, default: []].append(story)
+        }
+        var result: [NewsStory] = []
+        for round in 0... {
+            let next = sites.compactMap { bySite[$0]?.dropFirst(round).first }
+            guard !next.isEmpty else { break }
+            result += next.prefix(limit - result.count)
+            if result.count >= limit { break }
+        }
+        return result
+    }
+
+    private static func told(_ a: NewsStory, _ b: NewsStory) -> Bool {
+        a.link == b.link || sameStory(a.title, b.title)
     }
 
     /// In order, skipping a third story from one site and any story already told.
@@ -207,18 +257,23 @@ nonisolated enum TodayNews {
         var perSite: [String: Int] = [:]
         for story in stories where result.count < count {
             guard perSite[story.host, default: 0] < limit,
-                  !result.contains(where: { $0.link == story.link || sameStory($0.title, story.title) }) else { continue }
+                  !result.contains(where: { told($0, story) }) else { continue }
             result.append(story)
             perSite[story.host, default: 0] += 1
         }
         return result
     }
 
-    /// Two headlines about one event share most of their words that matter.
+    /// Two headlines about one event share most of their words that matter,
+    /// or two of them in a short headline: "Studenti proglasili pobjedu. Vučić
+    /// priznao poraz" and "Vučić srušen na izborima, studenti pobijedili" ("pobjedu"
+    /// and "pobijedili" don't meet as stems).
     static func sameStory(_ a: String, _ b: String) -> Bool {
         let left = stems(a), right = stems(b)
         guard !left.isEmpty, !right.isEmpty else { return false }
-        return Double(left.intersection(right).count) / Double(min(left.count, right.count)) >= 0.5
+        let shared = left.intersection(right).count
+        let share = Double(shared) / Double(min(left.count, right.count))
+        return share >= 0.5 || (shared >= 2 && share >= 0.4)
     }
 
     /// Words that matter, cut to a rough stem: "poginula" and "poginuo" meet as "poginu".
@@ -307,6 +362,12 @@ nonisolated struct FrontPage {
 }
 
 @Generable
+nonisolated struct NotNews {
+    @Guide(description: "The numbers of the headlines that announce something upcoming or on offer; none if none do")
+    var numbers: [Int]
+}
+
+@Generable
 nonisolated struct TopicMatch {
     @Guide(description: "The numbers of the headlines about the subject; none if no headline is")
     var numbers: [Int]
@@ -371,11 +432,33 @@ nonisolated enum PageHeadlines {
     }
 
     static func decode(_ text: String) -> String {
-        text.replacingOccurrences(of: "&amp;", with: "&").replacingOccurrences(of: "&quot;", with: "\"")
-            .replacingOccurrences(of: "&#39;", with: "'").replacingOccurrences(of: "&#039;", with: "'")
-            .replacingOccurrences(of: "&nbsp;", with: " ").replacingOccurrences(of: "&lt;", with: "<")
-            .replacingOccurrences(of: "&gt;", with: ">")
+        var text = text.replacingOccurrences(of: "&amp;", with: "&")
+        guard text.contains("&") else { return text }
+        for (name, character) in named { text = text.replacingOccurrences(of: name, with: character) }
+        // Numbered: "iFixit&#8217;s", "&#x2019;".
+        guard text.contains("&#") else { return text }
+        var result = "", rest = text[...]
+        while let start = rest.range(of: "&#") {
+            result += rest[..<start.lowerBound]
+            let after = rest[start.upperBound...]
+            guard let end = after.firstIndex(of: ";"), after.distance(from: after.startIndex, to: end) <= 7 else {
+                result += "&#"
+                rest = after
+                continue
+            }
+            let digits = after[..<end]
+            let value = digits.first == "x" || digits.first == "X" ? UInt32(digits.dropFirst(), radix: 16) : UInt32(digits)
+            if let value, let scalar = Unicode.Scalar(value) { result.unicodeScalars.append(scalar) } else { result += "&#" + digits + ";" }
+            rest = after[after.index(after: end)...]
+        }
+        return result + rest
     }
+
+    private static let named: [(String, String)] = [
+        ("&quot;", "\""), ("&apos;", "'"), ("&nbsp;", " "), ("&lt;", "<"), ("&gt;", ">"),
+        ("&rsquo;", "\u{2019}"), ("&lsquo;", "\u{2018}"), ("&rdquo;", "\u{201D}"), ("&ldquo;", "\u{201C}"),
+        ("&ndash;", "\u{2013}"), ("&mdash;", "\u{2014}"), ("&hellip;", "\u{2026}"),
+    ]
 }
 
 /// RSS 2.0 and Atom, the two feed formats news sites use.

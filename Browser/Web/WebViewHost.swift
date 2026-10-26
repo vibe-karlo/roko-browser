@@ -163,6 +163,7 @@ struct WebViewHost: UIViewRepresentable {
         @objc private func panChanged(_ pan: UIPanGestureRecognizer) {
             switch pan.state {
             case .began:
+                preview.forget()
                 haptic.prepare()
                 firmHaptic.prepare()
                 // A pull from the top may become the summary: the page as it is

@@ -86,7 +86,20 @@ struct BottomBar: View {
             }
             .scaleEffect(browser.voiceListening ? 1.06 : 1)
             .animation(.snappy(duration: 0.2), value: browser.voiceListening)
-            .gesture(holdToTalk)
+            .gesture(holdToTalk.updating($touching) { _, touching, _ in touching = true })
+            // A hold cut short (an alert, a call, Control Center) never ends: reset it
+            // once the touch is gone, so the next hold works and the microphone stops.
+            .onChange(of: touching) { _, now in
+                guard !now else { return }
+                DispatchQueue.main.async {
+                    guard pressedAt != nil else { return }  // ended normally meanwhile
+                    withAnimation(.easeOut(duration: 0.15)) { holdFill = 0 }
+                    holdTask?.cancel()
+                    pressedAt = nil
+                    swiped = false
+                    if browser.voiceListening { browser.endVoice() }
+                }
+            }
             .accessibilityElement()
             .accessibilityLabel(isPrivate ? "Private search" : "New tab")
             .accessibilityHint(Preferences.holdToTalk ? "Hold to speak" : "")
@@ -117,6 +130,7 @@ struct BottomBar: View {
     }
 
     @State private var pressedAt: Date?
+    @GestureState private var touching = false
     @State private var holdTask: Task<Void, Never>?
     @State private var swiped = false
     /// How far the hold has counted, 0 to 1, drawn as the capsule's fill.

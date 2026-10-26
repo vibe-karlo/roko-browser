@@ -2,8 +2,9 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
-// roko's colours, light and dark, as in the app's Theme.
-private extension Color {
+// roko's colours, light and dark, as in the app's Theme. Not main-actor: SwiftUI
+// resolves dynamic colours off the main thread (the app crashed on this once).
+nonisolated private extension Color {
     init(light: UInt32, dark: UInt32) {
         self.init(uiColor: UIColor { traits in
             let hex = traits.userInterfaceStyle == .dark ? dark : light

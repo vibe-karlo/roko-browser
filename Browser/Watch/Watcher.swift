@@ -29,7 +29,8 @@ enum Watcher {
         guard let url = URL(string: watch.url) else { return }
         var lines = await PageLines.fetch(url)
         // Next to nothing without its scripts: read it rendered instead, from now on.
-        if lines.map(PageLines.isThin) ?? true, let rendered = await RenderedPage.lines(of: url) {
+        if lines.map(PageLines.isThin) ?? true, let rendered = await RenderedPage.lines(of: url),
+           lines == nil || !PageLines.isThin(rendered) {
             lines = rendered
             watch.needsRendering = true
         }
@@ -41,7 +42,12 @@ enum Watcher {
     /// Checks every watch that's due. In the background only the pages that
     /// can be read without running their scripts; with roko open, all of them.
     static func runDue(in container: ModelContainer, inBackground: Bool, force: Bool = false) async {
-        guard !isRunning else { return }
+        // One already going (iOS woke roko as it opened): it books the next
+        // wake-up when it's done, but so does this, so the chain never breaks.
+        guard !isRunning else {
+            WatchScheduler.schedule(in: container.mainContext)
+            return
+        }
         isRunning = true
         defer { isRunning = false }
         let context = container.mainContext
@@ -49,10 +55,12 @@ enum Watcher {
         let due = watches.filter { watch in
             (force || watch.nextCheck <= .now.addingTimeInterval(5 * 60)) && !(inBackground && watch.needsRendering)
         }
+        if LaunchClock.isEnabled { print("WATCH \(due.count) of \(watches.count) due\(inBackground ? " in the background" : "")") }
         if !due.isEmpty {
             // All at once, off the main thread: the background allows only seconds.
             let read = await withTaskGroup(of: (Int, [String]?).self) { group in
-                for (index, watch) in due.enumerated() where !watch.needsRendering {
+                // Plainly first even where scripts were needed: roko may read it now.
+                for (index, watch) in due.enumerated() {
                     guard let url = URL(string: watch.url) else { continue }
                     group.addTask { (index, await PageLines.fetch(url)) }
                 }
@@ -63,12 +71,21 @@ enum Watcher {
             for (index, watch) in due.enumerated() {
                 guard !Task.isCancelled else { break }
                 var lines = read[index]
-                if watch.needsRendering, let url = URL(string: watch.url) { lines = await RenderedPage.lines(of: url) }
+                if watch.needsRendering, let url = URL(string: watch.url) {
+                    if let plain = lines, !PageLines.isThin(plain) {
+                        watch.needsRendering = false  // back to being checked in the background too
+                    } else {
+                        lines = await RenderedPage.lines(of: url)
+                    }
+                }
                 // Offline, or the page didn't load: it's still due, so next time.
                 guard let lines else { continue }
                 await compare(watch, with: lines)
+                // Each as it's done: a page read in a web view takes up to 20
+                // seconds, and roko left before then kept nothing, so the next
+                // check compared with the old reading and told the same news again.
+                try? context.save()
             }
-            try? context.save()
         }
         WatchScheduler.schedule(watches)
     }
@@ -76,6 +93,7 @@ enum Watcher {
     private static func compare(_ watch: Watch, with lines: [String]) async {
         let old = watch.snapshot.split(separator: "\n").map(String.init)
         watch.lastChecked = .now
+        if LaunchClock.isEnabled { print("WATCH \(watch.host): \(lines.count) lines, was \(old.count)") }
         // Far shorter than before: an error page or a wall, not the page. Keep the old reading.
         guard lines.joined().count * 3 >= old.joined().count else { return }
         watch.snapshot = lines.joined(separator: "\n")
@@ -84,6 +102,7 @@ enum Watcher {
         let before = Set(old), after = Set(lines)
         let added = lines.filter { !before.contains($0) }
         let removed = old.filter { !after.contains($0) }
+        if LaunchClock.isEnabled { print("WATCH \(watch.host): \(added.count) added, \(removed.count) removed") }
         let verdict: (happened: Bool, notification: String)
         if watch.lookFor.isEmpty {
             // Anything new: new lines of real text, not a time or a counter ticking on.
@@ -96,6 +115,7 @@ enum Watcher {
             verdict = await WatchJudge.becameTrue(watch.lookFor, before: old, now: lines, removed: removed, added: added)
                 ?? WatchJudge.guess(lookFor: watch.lookFor, added: added)
         }
+        if LaunchClock.isEnabled { print("WATCH \(watch.host): \(verdict.happened ? "news" : "nothing"), \(verdict.notification)") }
         guard verdict.happened, !verdict.notification.isEmpty else { return }
         watch.lastNews = verdict.notification
         watch.lastNewsAt = .now
@@ -159,6 +179,14 @@ nonisolated enum PageLines {
         for match in WebResearcher.matches(#"<(p|li|h[1-6]|td|dt|dd|figcaption)\b[^>]*>([\s\S]*?)</\1>"#, in: body) {
             let text = WebResearcher.plain(match[1])
             if text.count >= 3 { lines.append(String(text.prefix(400))) }
+        }
+        // A page built of divs and links (glas-slavonije.hr) has no paragraphs
+        // or headings at all: its headlines are the links' text.
+        if isThin(lines) {
+            for match in WebResearcher.matches(#"<a\b[^>]*>([\s\S]*?)</a>"#, in: body) {
+                let text = WebResearcher.plain(match[0])
+                if (25...400).contains(text.count) { lines.append(text) }
+            }
         }
         // Each line once, in page order, up to a long article's worth.
         var seen: Set<String> = [], kept: [String] = [], length = 0
@@ -424,11 +452,15 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     }
     private var pending: URL?
 
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                            didReceive response: UNNotificationResponse) async {
+    /// On the main actor, so it also finishes there: iOS completes the tap
+    /// with UIKit work that must be on the main thread. Finished on a
+    /// background thread (as a nonisolated method did), a tap stopped roko.
+    @MainActor
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse) async {
         guard let link = response.notification.request.content.userInfo["url"] as? String,
               let url = URL(string: link) else { return }
-        await route(url)
+        route(url)
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
@@ -453,7 +485,11 @@ enum WatchScheduler {
         }
         let request = BGAppRefreshTaskRequest(identifier: taskID)
         request.earliestBeginDate = max(next, .now.addingTimeInterval(15 * 60))
-        Task { try? await BGTaskScheduler.shared.submitTaskRequest(request) }
+        Task {
+            do { try await BGTaskScheduler.shared.submitTaskRequest(request) } catch {
+                if LaunchClock.isEnabled { print("WATCH can't book a background check: \(error)") }
+            }
+        }
     }
 
     static func schedule(in context: ModelContext) {

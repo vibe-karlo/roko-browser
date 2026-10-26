@@ -22,11 +22,6 @@ final class Todo {
     /// Its place in its section, dragged there; 0 until it's been moved, then
     /// the order it was added in decides.
     var order: Double = 0
-    /// The reminder it's kept in step with in Apple Reminders, when that's on.
-    var reminderID: String? = nil
-    /// Both sides as they were at the last sync (RemindersSync.fingerprint):
-    /// a side that differs from it is the one that changed.
-    var reminderState: String? = nil
 
     init(title: String, when: TodoWhen, at time: DateComponents? = nil, now: Date = .now) {
         self.title = title
@@ -272,8 +267,10 @@ nonisolated enum TodoDraft {
 
         // "in 3 days", "za 3 dana".
         let inDays = #"\s+(?:in|za)\s+(\d{1,3})\s+(?:days?|dana?)$"#
-        if let match = lower.range(of: inDays, options: .regularExpression),
-           let count = Int(lower[match].filter(\.isNumber)), let kept = rest(dropping: String(text[match])) {
+        // Matched in `text` itself: lowercasing can change a string's length
+        // ("İ"), so a range found in `lower` may not fit `text`.
+        if let match = text.range(of: inDays, options: [.regularExpression, .caseInsensitive]),
+           let count = Int(text[match].filter(\.isNumber)), let kept = rest(dropping: String(text[match])) {
             return (count == 0 ? .today : count == 1 ? .tomorrow : .date(day(count)), kept)
         }
 

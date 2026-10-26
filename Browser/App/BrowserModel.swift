@@ -78,8 +78,11 @@ final class BrowserModel {
         Task {
             guard await CopiedLink.shouldOfferAboveBar() else { return }
             let url = await CopiedLink.peek()
-            // Already on screen: nothing to offer.
+            // Already on screen, not a link after all, or offered before: nothing to offer.
+            if LaunchClock.isEnabled { print("CLIP offer \(CopiedLink.isRuledOut ? "ruled out" : url?.absoluteString ?? "paste button")") }
+            if CopiedLink.isRuledOut { return }
             if let url, isCurrentPage(url) { return }
+            if let url { CopiedLink.remember(url) }
             copiedLinkURL = url
             copiedLinkOffer = true
             copiedLinkTask?.cancel()
@@ -100,6 +103,7 @@ final class BrowserModel {
 
     func openCopiedLink(_ url: URL) {
         CopiedLink.took()
+        CopiedLink.remember(url)
         copiedLinkOffer = false
         copiedLinkTask?.cancel()
         open(url, inNewTab: true)
@@ -275,10 +279,7 @@ final class BrowserModel {
 
     func close(_ tab: BrowserTab) {
         guard let index = tabs.firstIndex(where: { $0.id == tab.id }) else { return }
-        Task {
-            await tab.hibernate()
-            tab.discardSnapshot()
-        }
+        tab.close()
         tabs.remove(at: index)
         if tab.isPrivate, !tabs.contains(where: \.isPrivate) { WebViewFactory.endPrivateSession() }
         defer { scheduleSave() }
@@ -388,6 +389,8 @@ final class BrowserModel {
             voiceListening = true
             voiceResult = nil
             showCommandBar()
+        } catch is VoiceBusy {
+            // Let go a moment ago and still hearing the end of it: this hold waits.
         } catch {
             showToast("Couldn't start listening")
         }
@@ -412,9 +415,12 @@ final class BrowserModel {
         }
     }
     private var voiceHandsFree: Task<Void, Never>?
+    /// Bumped when listening is called off: words that arrive after that are dropped.
+    @ObservationIgnored private var voiceSession = 0
 
     /// The launcher closed while listening: stop, and forget what was heard.
     func cancelVoice() {
+        voiceSession += 1
         voiceHandsFree?.cancel()
         voiceHandsFree = nil
         guard voiceListening else { return }
@@ -430,8 +436,11 @@ final class BrowserModel {
         guard voiceListening else { return }
         voiceHandsFree?.cancel()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        let session = voiceSession
         Task {
             let heard = await VoiceInput.shared.stop()
+            // The bar was closed while the last words came in: they don't act.
+            guard session == voiceSession else { return }
             voiceListening = false
             guard let heard, !heard.isEmpty else {
                 if panel == .command { showToast("Didn't catch that") }

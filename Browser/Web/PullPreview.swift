@@ -105,6 +105,13 @@ final class PullPreview: UIView {
         }
     }
 
+    /// A new pull: the last one's picture (perhaps another page's) goes.
+    func forget() {
+        guard isHidden else { return }
+        snapshot = nil
+        page.image = nil
+    }
+
     /// Handed over: the summary has taken its place.
     func hide() {
         isHidden = true

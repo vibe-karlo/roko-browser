@@ -146,7 +146,8 @@ struct CommandBarView: View {
         .task {
             guard browser.launcherContext == .web, await CopiedLink.isWaiting() else { return }
             copiedURL = await CopiedLink.peek()
-            // The page you're on isn't worth a row.
+            // Not a link after all, offered before, or the page you're on: not worth a row.
+            if CopiedLink.isRuledOut { return }
             if let copiedURL, browser.isCurrentPage(copiedURL) { return }
             hasCopiedLink = true
             rebuild()
@@ -725,6 +726,11 @@ struct CommandBarView: View {
             }
             return rows
         }
+        if parking.tooRough, typed {
+            return [CommandItem(id: "parking-rough", title: "Turn on Precise Location for roko",
+                                subtitle: "Only a rough location came, too rough to pick a parking zone",
+                                kind: "Settings", icon: car, action: .openApp(URL(string: UIApplication.openSettingsURLString)!))]
+        }
         guard let match = parking.match else {
             return parking.noZoneHere && typed
                 // Not "free here": the city's zones grow faster than the map, so the sign decides.
@@ -843,8 +849,8 @@ struct CommandBarView: View {
             })
             var seen = Set<String>()
             for pin in pins {
-                guard let url = URL(string: pin.url) else { continue }
-                seen.insert(pin.url)
+                // Pinned twice (on two devices before they synced): one row, one id.
+                guard let url = URL(string: pin.url), seen.insert(pin.url).inserted else { continue }
                 rows.append(CommandItem(id: "pin-\(pin.url)", title: pin.title.isEmpty ? pin.host : pin.title,
                                         subtitle: url.displayHost, kind: "", icon: .site(pin.host),
                                         action: .openPin(pin), mark: .pin))
@@ -953,6 +959,7 @@ struct CommandBarView: View {
             break  // its row has the system Paste button instead
         case .openCopied(let url):
             CopiedLink.took()
+            CopiedLink.remember(url)
             browser.openFromCommandBar(url)
         }
     }

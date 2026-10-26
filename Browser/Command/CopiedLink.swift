@@ -88,8 +88,39 @@ enum CopiedLink {
         let count = UIPasteboard.general.changeCount
         return !ownCounts.contains(count) && count != countWhenLeft
     }
-    /// What reading the clipboard found, once per copy, so iOS asks at most once.
-    private static var peeked: (count: Int, url: URL?)?
+    /// What reading the clipboard found, once per copy, so iOS asks at most
+    /// once. `read`: roko saw the whole copy, so a nil `url` means it isn't a link.
+    private static var peeked: (count: Int, url: URL?, read: Bool)?
+
+    /// Links offered or opened from a copy, and when: the same link copied
+    /// again later (or brought back by Universal Clipboard) isn't news.
+    private static var recent: [String: Double] = defaults.dictionary(forKey: "copiedLink.recent") as? [String: Double] ?? [:] {
+        didSet { defaults.set(recent, forKey: "copiedLink.recent") }
+    }
+    private static let recentFor: TimeInterval = 3 * 24 * 3600
+
+    /// This copy turned out not to be worth offering: read and found to be
+    /// something else (a sentence, a file name), or a link offered before.
+    static var isRuledOut: Bool {
+        guard let peeked, peeked.count == UIPasteboard.general.changeCount else { return false }
+        guard let url = peeked.url else { return peeked.read }
+        guard let at = recent[url.absoluteString] else { return false }
+        return Date.now.timeIntervalSince1970 - at < recentFor && offeredCount[url.absoluteString] != peeked.count
+    }
+    /// The copy each recent link was offered from: shown again for that same copy is fine.
+    private static var offeredCount: [String: Int] = defaults.dictionary(forKey: "copiedLink.recentCount") as? [String: Int] ?? [:] {
+        didSet { defaults.set(offeredCount, forKey: "copiedLink.recentCount") }
+    }
+
+    /// Offered or opened: not offered again from another copy for a few days.
+    static func remember(_ url: URL) {
+        let now = Date.now.timeIntervalSince1970
+        var kept = recent.filter { now - $0.value < recentFor }
+        kept[url.absoluteString] = now
+        recent = kept
+        offeredCount = offeredCount.filter { kept[$0.key] != nil }
+            .merging([url.absoluteString: UIPasteboard.general.changeCount]) { $1 }
+    }
 
     static func isWaiting() async -> Bool {
         let board = UIPasteboard.general
@@ -110,6 +141,7 @@ enum CopiedLink {
         guard let seen, Date.now.timeIntervalSince(seen.at) < window else { return false }
         // Throws when the clipboard is empty.
         let found = try? await board.detectedPatterns(for: [\.probableWebURL])
+        if LaunchClock.isEnabled { print("CLIP types \(board.types) url \(found?.contains(\.probableWebURL) ?? false)") }
         return found?.contains(\.probableWebURL) ?? false
     }
 
@@ -136,12 +168,40 @@ enum CopiedLink {
         if let ownCopy, ownCopy.count == count { return ownCopy.url }
         if let peeked, peeked.count == count { return peeked.url }
         guard UserDefaults.standard.bool(forKey: showKey) else { return nil }
-        // Throws when iOS asked and you said no; then the Paste button it is.
-        let found = try? await UIPasteboard.general.detectedValues(for: [\.probableWebURL])
-        let url = found.flatMap { Omnibox.url(from: $0.probableWebURL) }.flatMap(web)
-        peeked = (count, url)
+        // The whole copy, not just the link iOS spots in it: "see you at
+        // index.hr" and "CHANGELOG.md" both look like links to iOS.
+        let board = UIPasteboard.general
+        if board.hasURLs, let url = board.url.flatMap(web) {
+            peeked = (count, url, true)
+            return url
+        }
+        // Nil when iOS asked and you said no; then the Paste button it is.
+        guard let text = board.string else {
+            peeked = (count, nil, false)
+            return nil
+        }
+        let url = link(text)
+        peeked = (count, url, true)
         return url
     }
+
+    /// The copy as a link, when that's all it is.
+    static func link(_ text: String) -> URL? {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.contains(where: \.isWhitespace), !text.contains("@"),
+              let url = Omnibox.url(from: text).flatMap(web) else { return nil }
+        // Written as a link ("https://…", "www.…"): it is one.
+        let lower = text.lowercased()
+        if lower.hasPrefix("http://") || lower.hasPrefix("https://") || lower.hasPrefix("www.") { return url }
+        // Bare, "CHANGELOG.md" and "notes.zip" are file names, though .md and .zip are web endings too.
+        let ending = url.host()?.split(separator: ".").last.map { $0.lowercased() } ?? ""
+        return fileEndings.contains(ending) ? nil : url
+    }
+
+    /// Real web endings that are far more often a file's.
+    private static let fileEndings: Set<String> = ["md", "zip", "mov", "swift", "py", "sh", "rs", "pl", "ps",
+                                                   "app", "so", "cs", "ai", "csv", "doc", "pdf", "png", "jpg"]
+
 
     /// Something roko copied: never offered back.
     static func copiedInRoko() {
@@ -161,21 +221,29 @@ enum CopiedLink {
                 return url
             }
             if provider.canLoadObject(ofClass: String.self), let text = await load(String.self, from: provider),
-               let url = Omnibox.url(from: text.trimmingCharacters(in: .whitespacesAndNewlines)) {
+               let url = Omnibox.url(from: text.trimmingCharacters(in: .whitespacesAndNewlines)) ?? linkInside(text) {
                 return url
             }
         }
         return nil
     }
 
+    /// The first web link in some text: the Paste button handed over a sentence with one in it.
+    private static func linkInside(_ text: String) -> URL? {
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else { return nil }
+        return detector.matches(in: text, range: NSRange(text.startIndex..., in: text))
+            .compactMap(\.url).first { web($0) != nil }
+    }
+
     private static func web(_ url: URL) -> URL? {
         url.scheme?.hasPrefix("http") == true ? url : nil
     }
 
-    private static func load<T: _ObjectiveCBridgeable & Sendable>(_ type: T.Type, from provider: NSItemProvider) async -> T?
+    /// Off the main actor: the item provider answers on a queue of its own.
+    nonisolated private static func load<T: _ObjectiveCBridgeable & Sendable>(_ type: T.Type, from provider: NSItemProvider) async -> T?
         where T._ObjectiveCType: NSItemProviderReading {
-        await withCheckedContinuation { continuation in
-            _ = provider.loadObject(ofClass: type) { value, _ in continuation.resume(returning: value) }
+        await withCheckedContinuation { (continuation: CheckedContinuation<T?, Never>) in
+            _ = provider.loadObject(ofClass: type) { @Sendable value, _ in continuation.resume(returning: value) }
         }
     }
 }

@@ -21,6 +21,8 @@ final class Parking {
     private(set) var matchedAt: Date?
     /// Located and not near any paid parking (as opposed to not located yet).
     private(set) var noZoneHere = false
+    /// Only a rough fix came (Precise Location off): too rough to pick a zone.
+    private(set) var tooRough = false
 
     struct Session: Codable, Equatable {
         var cityID: String
@@ -44,6 +46,13 @@ final class Parking {
            let saved = try? JSONDecoder().decode(Session.self, from: data), saved.endsAt > .now {
             session = saved
             activity = Activity<ParkingActivityAttributes>.activities.first
+        } else {
+            // Ran out while roko was closed: its timer goes from the Lock Screen too.
+            UserDefaults.standard.removeObject(forKey: "parking.session")
+            for stray in Activity<ParkingActivityAttributes>.activities {
+                let handle = ActivityHandle(activity: stray)
+                Task { await handle.activity.end(nil, dismissalPolicy: .immediate) }
+            }
         }
     }
 
@@ -91,6 +100,14 @@ final class Parking {
     func locate() async {
         if let matchedAt, Date.now.timeIntervalSince(matchedAt) < 60 { return }
         guard let location = await ParkingLocation.shared.current() else { return }
+        // A zone border can run down a street: a fix off by more than this could
+        // pick the wrong zone, and a wrong zone is a fine.
+        tooRough = location.horizontalAccuracy > 150
+        guard !tooRough else {
+            match = nil
+            noZoneHere = false
+            return
+        }
         let found = await Task.detached(priority: .userInitiated) { ParkingZones.match(location) }.value
         match = found
         noZoneHere = found == nil && ParkingCity.all.contains { $0.contains(location.coordinate) }
@@ -252,16 +269,23 @@ enum MessageComposer {
 
     static func send(to number: String, body: String, pretend: Bool = false) async -> Bool {
         if pretend { return true }
-        guard canSend, let top = PageDialogs.top else { return false }
+        // One text at a time: a second tap ("Add an hour" twice) waits for nothing.
+        guard canSend, delegate == nil, let top = PageDialogs.top, !top.isBeingDismissed else { return false }
         return await withCheckedContinuation { continuation in
             let compose = MFMessageComposeViewController()
             compose.recipients = [number]
             compose.body = body
             let delegate = Delegate()
-            delegate.done = { continuation.resume(returning: $0) }
+            delegate.done = { sent in
+                Self.delegate = nil
+                continuation.resume(returning: sent)
+            }
             Self.delegate = delegate
             compose.messageComposeDelegate = delegate
-            top.present(compose, animated: true)
+            top.present(compose, animated: true) {
+                // Not shown after all: not sent.
+                if compose.presentingViewController == nil { delegate.done?(false); delegate.done = nil }
+            }
         }
     }
 }

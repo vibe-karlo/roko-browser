@@ -36,7 +36,25 @@ enum Store {
             print("Synced store unavailable, using this device only: \(error)")
             let local = ModelConfiguration("Synced", schema: Schema([Pin.self, HistoryEntry.self, Todo.self]),
                                            url: folder.appending(path: "synced.store"), cloudKitDatabase: .none)
-            container = try! ModelContainer(for: schema, configurations: local, device)
+            if let opened = try? ModelContainer(for: schema, configurations: local, device) {
+                container = opened
+            } else {
+                // Still not: a damaged file, a full disk, or the phone not yet unlocked
+                // (a background launch). Put the files aside, keeping them, and start
+                // afresh; failing that, run with nothing saved rather than not at all.
+                print("Store unavailable, starting a new one: \(error)")
+                let stamp = Int(Date.now.timeIntervalSince1970)
+                for suffix in ["", "-shm", "-wal"] {
+                    let file = folder.appending(path: "synced.store" + suffix)
+                    try? FileManager.default.moveItem(at: file, to: folder.appending(path: "synced.store.broken-\(stamp)" + suffix))
+                }
+                if let fresh = try? ModelContainer(for: schema, configurations: local, device) {
+                    container = fresh
+                } else {
+                    let memory = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+                    container = try! ModelContainer(for: schema, configurations: memory)
+                }
+            }
         }
         moveFromSingleStore(into: container, folder: folder)
         return container

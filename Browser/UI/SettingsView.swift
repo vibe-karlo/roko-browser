@@ -1,6 +1,7 @@
 import CloudKit
 import SwiftData
 import SwiftUI
+import UserNotifications
 
 struct SettingsView: View {
     @Environment(BrowserModel.self) private var browser
@@ -521,9 +522,23 @@ private struct WatchesSettings: View {
     @Environment(BrowserModel.self) private var browser
     @Environment(\.modelContext) private var context
     @Query(sort: \Watch.createdAt) private var watches: [Watch]
+    /// What's keeping Notify Me from working fully, if anything.
+    @State private var blocked: String?
+    @State private var canFix = false
 
     var body: some View {
         Form {
+            if let blocked, !watches.isEmpty {
+                Section {
+                    Text(blocked).foregroundStyle(Theme.ink)
+                    if canFix {
+                        Button("Open iOS Settings") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                        }
+                        .foregroundStyle(Theme.accentText)
+                    }
+                }
+            }
             Section {
                 if watches.isEmpty {
                     Text("None yet. In a page's menu, choose Notify Me.")
@@ -548,6 +563,28 @@ private struct WatchesSettings: View {
         .scrollContentBackground(.hidden)
         .background(Theme.panel)
         .navigationTitle("Notify Me")
+        .task { await check() }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            Task { await check() }
+        }
+    }
+
+    /// Notifications off, Background App Refresh off, or Low Power Mode: each
+    /// stops Notify Me without a word, so say so here.
+    private func check() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        if settings.authorizationStatus == .denied {
+            blocked = "Notifications are off for roko, so it can't tell you what it finds."
+            canFix = true
+        } else if UIApplication.shared.backgroundRefreshStatus != .available {
+            blocked = ProcessInfo.processInfo.isLowPowerModeEnabled
+                ? "Low Power Mode pauses checks while roko is closed. Pages are checked when you open it."
+                : "Background App Refresh is off for roko, so pages are only checked when you open it."
+            canFix = !ProcessInfo.processInfo.isLowPowerModeEnabled
+        } else {
+            blocked = nil
+            canFix = false
+        }
     }
 }
 
@@ -618,7 +655,9 @@ private struct WatchRow: View {
             return "\(news) · \(at.formatted(.relative(presentation: .named)))"
         }
         guard let checked = watch.lastChecked else { return "Not checked yet" }
-        return "Nothing yet · checked \(checked.formatted(.relative(presentation: .named)))"
+        // iOS runs no web views for an app in the background.
+        let when = watch.needsRendering ? " · checked while roko is open" : ""
+        return "Nothing yet · checked \(checked.formatted(.relative(presentation: .named)))" + when
     }
 }
 

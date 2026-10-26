@@ -231,6 +231,13 @@ struct BrowserView: View {
         .task {
             if Benchmark.isRequested { await Benchmark.run() }
             if !BrowseProbe.questions.isEmpty { await BrowseProbe.run() }
+            if TopStoriesProbe.isRequested { await TopStoriesProbe.run() }
+            // `-pageLines <url>`: the page as Notify Me reads it.
+            let arguments = ProcessInfo.processInfo.arguments
+            if let at = arguments.firstIndex(of: "-pageLines"), at + 1 < arguments.count, let url = URL(string: arguments[at + 1]) {
+                let lines = await PageLines.fetch(url) ?? []
+                print("LINES \(lines.count), thin \(PageLines.isThin(lines))\n" + lines.prefix(6).joined(separator: "\n"))
+            }
         }
         #endif
         .onChange(of: scenePhase) { _, phase in
@@ -250,8 +257,10 @@ struct BrowserView: View {
         // Coming back to the app always shows the bar; scrolling hides it again.
         // UIKit's own signal: it arrives whatever wraps the SwiftUI scene.
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            // To-dos ticked off in a widget meanwhile.
+            // To-dos ticked off in a widget meanwhile, and changes from other devices.
             WidgetBridge.applyTicks()
+            WidgetBridge.update()
+            TodoAlerts.update()
             if browser.isBarCollapsed { browser.isBarCollapsed = false }
             // The first time on a new day: Today first.
             if TodayModel.shouldOpenNow(), browser.panel == .none, browser.summary == nil, browser.browseForMe == nil {

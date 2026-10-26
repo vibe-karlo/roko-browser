@@ -75,8 +75,8 @@ enum DateMath {
         } else {
             return nil
         }
-        // Only things that name a date; "5 + 3 days" is not one.
-        guard let start = date(base, future: true) else { return nil }
+        // Only things that name a date; "5 + 3 days" is not one. Nor a million years away.
+        guard amount <= 100_000, let start = date(base, future: true) else { return nil }
         let component: Calendar.Component = unit.hasPrefix("w") ? .weekOfYear : unit.hasPrefix("m") ? .month
             : unit.hasPrefix("y") ? .year : .day
         guard let result = calendar.date(byAdding: component, value: sign * amount, to: start) else { return nil }

@@ -73,7 +73,8 @@ final class VoiceInput {
 
     func start() throws {
         // Still finishing the last one: starting now would be stopped by it.
-        guard !isListening, !isStopping else { return }
+        guard !isStopping else { throw VoiceBusy() }
+        guard !isListening else { return }
         partial = ""
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.record, mode: .measurement, options: .duckOthers)
@@ -349,3 +350,6 @@ nonisolated private final class WeakBox<Object: AnyObject>: @unchecked Sendable 
     weak var value: Object?
     init(_ value: Object) { self.value = value }
 }
+
+/// Asked to listen while the last words are still coming in.
+nonisolated struct VoiceBusy: Error {}

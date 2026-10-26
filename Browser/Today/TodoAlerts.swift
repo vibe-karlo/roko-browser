@@ -39,33 +39,42 @@ enum TodoAlerts {
         update()
     }
 
+    /// The alerts being laid out; a newer layout waits for it, so two quick
+    /// saves can't interleave and leave the older set behind.
+    private static var laying: Task<Void, Never>?
+
     static func update() {
         guard let context = container?.mainContext else { return }
         let now = Date.now
         let due = ((try? context.fetch(FetchDescriptor<Todo>())) ?? [])
-            .compactMap { todo -> (String, Date, String)? in
-                guard Preferences.todoAlerts, !todo.done, let time = todo.time, time.addingTimeInterval(-lead) > now else { return nil }
-                return (todo.title, time, prefix + String(Int(time.timeIntervalSinceReferenceDate)) + "." + todo.title)
+            .compactMap { todo -> (String, Date, Date, String)? in
+                guard Preferences.todoAlerts, !todo.done, let time = todo.time, time > now else { return nil }
+                // Due within the quarter of an hour: in a few seconds rather than never.
+                let at = max(time.addingTimeInterval(-lead), now.addingTimeInterval(5))
+                return (todo.title, time, at, prefix + String(Int(time.timeIntervalSinceReferenceDate)) + "." + todo.title)
             }
             .sorted { $0.1 < $1.1 }
             // iOS keeps 64 at most, and the daily reminders and Notify Me need room.
             .prefix(40)
         let center = UNUserNotificationCenter.current()
         let prefix = prefix
+        let previous = laying
+        previous?.cancel()
         // Awaited rather than a reply handler: iOS answers on a queue of its own.
-        Task {
+        laying = Task {
+            await previous?.value
+            guard !Task.isCancelled else { return }
             let old = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(prefix) }
             center.removePendingNotificationRequests(withIdentifiers: old)
-            for (title, time, id) in due {
+            for (title, time, at, id) in due {
+                guard !Task.isCancelled else { return }
                 let content = UNMutableNotificationContent()
                 content.title = title
                 content.body = "At " + time.formatted(date: .omitted, time: .shortened)
                 content.sound = .default
                 content.userInfo = ["url": "roko://todo"]
-                let moment = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute],
-                                                             from: time.addingTimeInterval(-lead))
-                try? await center.add(UNNotificationRequest(identifier: id, content: content,
-                                                            trigger: UNCalendarNotificationTrigger(dateMatching: moment, repeats: false)))
+                let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, at.timeIntervalSinceNow), repeats: false)
+                try? await center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
             }
         }
     }

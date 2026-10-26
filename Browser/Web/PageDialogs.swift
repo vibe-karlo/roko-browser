@@ -24,16 +24,23 @@ enum PageDialogs {
     /// tab out of sight gets the quiet answer (false, nothing typed).
     static func ask(_ webView: WKWebView, title: String, message: String,
                     buttons: [(String, UIAlertAction.Style)], field: String? = nil) async -> (index: Int, text: String?)? {
-        guard webView.window != nil, let top else { return nil }
+        // Nothing on screen to show it over, or something already being shown
+        // or taken away: answered as if dismissed, so the page doesn't wait forever.
+        guard webView.window != nil, let top, !top.isBeingDismissed, !top.isBeingPresented,
+              !(top is UIAlertController) else { return nil }
         return await withCheckedContinuation { continuation in
-            let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+            let alert = PageAlert(title: title, message: message, preferredStyle: .alert)
+            alert.answer = { continuation.resume(returning: $0) }
             if let field { alert.addTextField { $0.text = field } }
             for (index, (label, style)) in buttons.enumerated() {
                 alert.addAction(UIAlertAction(title: label, style: style) { [weak alert] _ in
-                    continuation.resume(returning: (index, alert?.textFields?.first?.text))
+                    alert?.reply((index, alert?.textFields?.first?.text))
                 })
             }
-            top.present(alert, animated: true)
+            top.present(alert, animated: true) {
+                // Not shown after all (the screen under it went away): no answer.
+                if alert.presentingViewController == nil { alert.reply(nil) }
+            }
         }
     }
 
@@ -51,6 +58,24 @@ enum PageDialogs {
 
 /// Delegate methods kept out of BrowserTab.swift: marked @objc, as WebKit
 /// finds them by selector and they sit outside the extension that conforms.
+/// An alert that answers exactly once: with the button tapped, or with
+/// nothing when it goes away some other way (the sheet under it closed).
+final class PageAlert: UIAlertController {
+    var answer: (((index: Int, text: String?)?) -> Void)?
+
+    func reply(_ value: (index: Int, text: String?)?) {
+        guard let answer else { return }
+        self.answer = nil
+        answer(value)
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        // After a moment: a tapped button's handler may run just after this.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [self] in reply(nil) }
+    }
+}
+
 extension BrowserTab: WKDownloadDelegate {
     // MARK: Dialogs
 

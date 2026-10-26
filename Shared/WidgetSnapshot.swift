@@ -90,7 +90,9 @@ nonisolated struct WidgetSnapshot: Codable, Equatable {
     /// The app takes them, once it has marked them done.
     static func takeTicked() -> [String] {
         let all = ticked
-        shared?.removeObject(forKey: "widget.ticked")
+        guard !all.isEmpty else { return [] }
+        // Only these: one ticked in a widget meanwhile stays for next time.
+        shared?.set(ticked.filter { !all.contains($0) }, forKey: "widget.ticked")
         return all
     }
 }

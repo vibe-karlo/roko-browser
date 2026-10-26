@@ -26,6 +26,8 @@ final class BrowserTab: NSObject, Identifiable {
     var loadError: String?
     /// When the page was last reloaded after WebKit gave up on it.
     @ObservationIgnored private var lastCrashReload: Date?
+    /// Counts hibernations and wakes, so a hibernation overtaken by either stops.
+    @ObservationIgnored private var hibernation = 0
     /// Asks sites for their desktop layout; set from the page menu.
     private(set) var wantsDesktopSite = false
     /// The language this tab's pages are translated into, if any. Stays on for
@@ -126,6 +128,8 @@ final class BrowserTab: NSObject, Identifiable {
     // MARK: Lifecycle
 
     func wake() {
+        // A hibernation still taking its snapshot is called off: this tab is wanted.
+        hibernation += 1
         guard webView == nil else { return }
         let webView = WebViewFactory.make(isPrivate: isPrivate)
         webView.navigationDelegate = self
@@ -144,9 +148,24 @@ final class BrowserTab: NSObject, Identifiable {
 
     func hibernate() async {
         guard let webView else { return }
+        hibernation += 1
+        let ticket = hibernation
         let configuration = WKSnapshotConfiguration()
         configuration.snapshotWidth = 360
         keep(try? await webView.takeSnapshot(configuration: configuration))
+        // Selected meanwhile (wake), or another hibernation got here first: leave it.
+        guard ticket == hibernation, self.webView === webView else { return }
+        tearDown(webView)
+    }
+
+    /// Closed: the page goes at once, with no picture taken of it.
+    func close() {
+        hibernation += 1
+        if let webView { tearDown(webView) }
+        discardSnapshot()
+    }
+
+    private func tearDown(_ webView: WKWebView) {
         restoreState = webView.interactionState as? Data
         observations.removeAll()
         webView.stopLoading()
