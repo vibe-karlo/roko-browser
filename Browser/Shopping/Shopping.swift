@@ -205,16 +205,29 @@ enum Shopping {
             .map(\.0)
     }
 
-    /// What's typed so far, finished from what you've bought before: "mli" is milk.
+    /// The thing being typed (after the last comma), finished: from what
+    /// you've bought before first, then everyday things, then a shop's range.
+    /// "mli" is Mlijeko; "jog" is Jogurt, then Dukat jogurt.
     static func completions(for typed: String, in habits: [ShoppingHabit], excluding listed: Set<String>,
-                            limit: Int = 3) -> [ShoppingHabit] {
-        let key = Aisle.key(typed)
+                            limit: Int = 4) -> [Completion] {
+        let key = Aisle.key(typed.split(separator: ",").last.map(String.init) ?? "")
         guard key.count >= 2 else { return [] }
-        return habits
-            .filter { !listed.contains($0.key) && $0.key != key && ($0.key.hasPrefix(key) || $0.key.contains(" " + key)) }
-            .sorted { $0.count > $1.count }
-            .prefix(limit)
-            .map { $0 }
+        let starts = { (other: String) in other.hasPrefix(key) || other.contains(" " + key) }
+        var seen = listed.union([key])
+        var found: [Completion] = []
+        for habit in habits.filter({ starts($0.key) }).sorted(by: { $0.count > $1.count })
+        where seen.insert(habit.key).inserted {
+            found.append(Completion(title: habit.title, aisle: habit.chosenAisle.flatMap(Aisle.init) ?? Aisle.of(habit.title)))
+        }
+        for entry in ShoppingCatalogue.shared.matching(key, limit: limit * 3) where found.count < limit && seen.insert(entry.key).inserted {
+            found.append(Completion(title: entry.title, aisle: Aisle.of(entry.title)))
+        }
+        return Array(found.prefix(limit))
+    }
+
+    /// What was typed with its last piece finished: "mlijeko, jaja, kr" and Kruh.
+    nonisolated static func finishing(_ typed: String, with title: String) -> String {
+        (typed.split(separator: ",").dropLast().map(String.init) + [title]).joined(separator: ", ")
     }
 
     static func habit(_ key: String, in context: ModelContext) -> ShoppingHabit? {
@@ -254,5 +267,52 @@ nonisolated enum ShoppingQuery {
         guard let prefix = prefixes.first(where: { lower.hasPrefix($0) }) else { return nil }
         let rest = query.dropFirst(prefix.count).trimmingCharacters(in: .whitespaces)
         return rest.isEmpty ? nil : rest
+    }
+}
+
+/// A thing to finish the typing with, and where it goes.
+nonisolated struct Completion: Identifiable, Sendable {
+    let title: String
+    let aisle: Aisle
+    var id: String { title }
+}
+
+/// Everyday things in Croatian and English, then what one shop sells
+/// (Resources/Shopping: built from a published price list, sizes and till
+/// abbreviations taken out), for finishing what's typed. Read once, off the
+/// main thread, as Shopping opens.
+nonisolated final class ShoppingCatalogue: Sendable {
+    static let shared = ShoppingCatalogue()
+
+    struct Entry: Sendable {
+        let title: String
+        let key: String
+    }
+
+    /// Everyday things first: they're what a list mostly says.
+    private let entries: [Entry]
+
+    private init() {
+        func read(_ name: String) -> [String] {
+            guard let url = Bundle.main.url(forResource: name, withExtension: "txt"),
+                  let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
+            return text.split(separator: "\n").map(String.init)
+        }
+        entries = (read("everyday") + read("products")).map { Entry(title: $0, key: Aisle.key($0)) }
+    }
+
+    /// Those whose words start with what's typed: names starting with it
+    /// first ("Jogurt"), then ones with it inside ("Dukat jogurt").
+    func matching(_ key: String, limit: Int) -> [Entry] {
+        var first: [Entry] = [], inside: [Entry] = []
+        for entry in entries {
+            if entry.key.hasPrefix(key) {
+                first.append(entry)
+                if first.count >= limit { break }
+            } else if inside.count < limit, entry.key.contains(" " + key) {
+                inside.append(entry)
+            }
+        }
+        return Array((first + inside).prefix(limit))
     }
 }

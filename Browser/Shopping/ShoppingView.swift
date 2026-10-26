@@ -83,6 +83,8 @@ struct ShoppingView: View {
         .background(Theme.canvas.ignoresSafeArea())
         .foregroundStyle(Theme.ink)
         .onAppear { Shopping.tidy(in: context) }
+        // Ready before the first letter: read off the main thread.
+        .task { await Task.detached(priority: .utility) { _ = ShoppingCatalogue.shared }.value }
         // Pull down past the top to close, as To-do does.
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y < -geometry.contentInsets.top - 90
@@ -306,28 +308,36 @@ struct ShoppingView: View {
                 let completions = Shopping.completions(for: draft, in: habits, excluding: listed)
                 if !completions.isEmpty {
                     VStack(alignment: .leading, spacing: 0) {
-                        ForEach(completions) { habit in
+                        ForEach(completions) { completion in
                             Button {
-                                add(habit.title)
+                                add(Shopping.finishing(draft, with: completion.title))
                                 draft = ""
                             } label: {
                                 HStack(spacing: 12) {
                                     Glyph(.plus, size: 13, weight: 2)
                                         .foregroundStyle(Theme.secondaryInk)
-                                    Text(habit.title)
+                                    Text(completion.title)
                                         .font(.system(size: 17))
                                         .foregroundStyle(Theme.ink)
-                                    Spacer(minLength: 0)
-                                    Text(Aisle(rawValue: habit.chosenAisle ?? "").map(\.title) ?? Aisle.of(habit.title).title)
-                                        .font(.system(size: 13))
-                                        .foregroundStyle(Theme.secondaryInk)
                                         .lineLimit(1)
+                                        // The name, whole, before its aisle.
+                                        .layoutPriority(1)
+                                    Spacer(minLength: 8)
+                                    // Its aisle when it fits whole; a clipped "Mlij…" says nothing.
+                                    ViewThatFits {
+                                        Text(completion.aisle.title)
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(Theme.secondaryInk)
+                                            .lineLimit(1)
+                                            .fixedSize()
+                                        Color.clear.frame(width: 0, height: 0)
+                                    }
                                 }
                                 .frame(minHeight: 44)
                                 .contentShape(.rect)
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel(ListLanguage.say("Add ", "Dodaj ") + habit.title)
+                            .accessibilityLabel(ListLanguage.say("Add ", "Dodaj ") + completion.title)
                         }
                     }
                     .padding(.horizontal, Theme.gutter + 18)
@@ -431,29 +441,5 @@ private struct ItemEditor: View {
             .onSubmit { focused = false }
             .onAppear { focused = true }
             .onChange(of: focused) { _, now in if !now { finish(item.title) } }
-    }
-}
-
-/// With your pins while there's something to buy: the basket with how many
-/// as a notification number. Nothing on the list, and it isn't there.
-struct ShoppingPin<Label: View>: View {
-    @Environment(BrowserModel.self) private var browser
-    @Query(filter: #Predicate<ShoppingItem> { !$0.done }) private var items: [ShoppingItem]
-    let size: CGFloat
-    @ViewBuilder let frame: (AnyView) -> Label
-
-    init(size: CGFloat, @ViewBuilder frame: @escaping (AnyView) -> Label) {
-        self.size = size
-        self.frame = frame
-    }
-
-    var body: some View {
-        if !items.isEmpty {
-            Button { browser.panel = .shopping } label: {
-                frame(AnyView(CountedGlyph(glyph: .basket, count: items.count, size: size)))
-            }
-            .buttonStyle(RowButtonStyle())
-            .accessibilityLabel("Shopping, \(items.count) to buy")
-        }
     }
 }

@@ -146,7 +146,12 @@ Household, cosmetics 70% Personal care, drinks 70% Drinks).
 
 Each item added counts towards its `ShoppingHabit`: how often, and the days between (a second
 add the same day isn't another shop). Suggestions are habits bought at least twice and not on
-the list, those whose usual gap has come round first. Items bought more than a month ago are
+the list, those whose usual gap has come round first. While typing, the last piece (after a comma)
+is finished from habits, then `everyday.txt` (346 everyday things, Croatian and English, kept by
+hand), then `products.txt` (4,563 names from one Osijek hypermarket's published price list, built
+by `Scripts/build_shopping_catalogue.py`, which leaves out till abbreviations and sizes).
+`ShoppingCatalogue` reads both once, off the main thread, as Shopping opens (30 ms); a match
+scans them in under 3 ms. Items bought more than a month ago are
 dropped from the list; habits stay. The list speaks English or Croatian (`ListLanguage`, Settings → Shopping list language): aisle names and its own words, with Croatian number forms ("svaka 3 dana", "svakih 5 dana", "21 stvar"); reading what's typed doesn't depend on it. Debug builds take `-seedShopping` for a few months of
 habits. Items and habits live in `device.store`: sharing a list with family will be CloudKit
 sharing, which needs the paid Developer Program (see "iCloud sync").

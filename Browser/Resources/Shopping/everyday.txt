@@ -1,0 +1,346 @@
+Mlijeko
+Jaja
+Kruh
+Pecivo
+Kifle
+Tost
+Maslac
+Margarin
+Sir
+Svježi sir
+Mozzarella
+Parmezan
+Gouda
+Jogurt
+Kefir
+Kiselo vrhnje
+Vrhnje za kuhanje
+Slatko vrhnje
+Puding
+Mliječni namaz
+Banane
+Jabuke
+Kruške
+Naranče
+Mandarine
+Limun
+Grožđe
+Jagode
+Borovnice
+Maline
+Kivi
+Ananas
+Avokado
+Breskve
+Lubenica
+Dinja
+Šljive
+Trešnje
+Rajčice
+Krastavci
+Paprika
+Tikvice
+Patlidžan
+Luk
+Crveni luk
+Mladi luk
+Češnjak
+Mrkva
+Krumpir
+Batat
+Salata
+Rukola
+Špinat
+Blitva
+Kupus
+Brokula
+Cvjetača
+Gljive
+Šampinjoni
+Poriluk
+Celer
+Peršin
+Kukuruz
+Grašak
+Mahune
+Cikla
+Đumbir
+Piletina
+Pileća prsa
+Pileći bataci
+Pileća krilca
+Puretina
+Mljeveno meso
+Junetina
+Svinjetina
+Kotleti
+Odrezak
+Kobasice
+Hrenovke
+Ćevapi
+Pljeskavice
+Šunka
+Salama
+Pršut
+Slanina
+Kulen
+Pašteta
+Riba
+Losos
+Tuna
+Oslić
+Srdele
+Lignje
+Kozice
+Sladoled
+Smrznuto povrće
+Smrznuti grašak
+Pommes frites
+Riblji štapići
+Pizza
+Smrznuta pizza
+Brašno
+Šećer
+Sol
+Papar
+Ulje
+Maslinovo ulje
+Ocat
+Riža
+Tjestenina
+Špageti
+Penne
+Njoki
+Lazanje
+Tortelini
+Mlinci
+Griz
+Palenta
+Zobene pahuljice
+Kvasac
+Prašak za pecivo
+Vanilin šećer
+Kakao
+Grah
+Leća
+Slanutak
+Tunjevina
+Kukuruz u konzervi
+Pelati
+Pasirana rajčica
+Koncentrat rajčice
+Kečap
+Majoneza
+Senf
+Ajvar
+Masline
+Kiseli krastavci
+Vegeta
+Juha
+Temeljac
+Kokosovo mlijeko
+Orasi
+Bademi
+Lješnjaci
+Sjemenke
+Med
+Džem
+Nutella
+Kikiriki maslac
+Kava
+Mljevena kava
+Kapsule za kavu
+Čaj
+Kamilica
+Pahuljice
+Muesli
+Granola
+Čokolada
+Keksi
+Napolitanke
+Bomboni
+Čips
+Smoki
+Kokice
+Krekeri
+Slani štapići
+Žvakaće gume
+Voda
+Mineralna voda
+Gazirana voda
+Sok
+Sok od naranče
+Sok od jabuke
+Cedevita
+Coca-Cola
+Ledeni čaj
+Pivo
+Vino
+Crno vino
+Bijelo vino
+Prošek
+Deterdžent
+Deterdžent za suđe
+Tablete za perilicu suđa
+Omekšivač
+Prašak za rublje
+Toaletni papir
+Papirnati ručnici
+Salvete
+Vrećice za smeće
+Spužve
+Krpe
+Aluminijska folija
+Prozirna folija
+Papir za pečenje
+Sredstvo za čišćenje
+Sredstvo za WC
+Osvježivač zraka
+Baterije
+Žarulja
+Svijeće
+Šampon
+Regenerator
+Gel za tuširanje
+Sapun
+Pasta za zube
+Četkica za zube
+Konac za zube
+Dezodorans
+Krema za ruke
+Krema za lice
+Britvice
+Pjena za brijanje
+Uložci
+Tamponi
+Vata
+Štapići za uši
+Maramice
+Flasteri
+Pelene
+Vlažne maramice
+Dječja hrana
+Hrana za pse
+Hrana za mačke
+Pijesak za mačke
+Milk
+Eggs
+Bread
+Rolls
+Butter
+Cheese
+Cream cheese
+Yogurt
+Sour cream
+Cream
+Bananas
+Apples
+Pears
+Oranges
+Lemons
+Grapes
+Strawberries
+Blueberries
+Raspberries
+Avocados
+Tomatoes
+Cucumbers
+Peppers
+Zucchini
+Onions
+Garlic
+Carrots
+Potatoes
+Sweet potatoes
+Lettuce
+Spinach
+Broccoli
+Mushrooms
+Ginger
+Herbs
+Chicken
+Chicken breast
+Minced beef
+Beef
+Pork
+Sausages
+Ham
+Bacon
+Salmon
+Shrimp
+Ice cream
+Frozen peas
+Frozen pizza
+Fish fingers
+Fries
+Flour
+Sugar
+Salt
+Pepper
+Olive oil
+Vinegar
+Rice
+Pasta
+Spaghetti
+Oats
+Yeast
+Baking powder
+Beans
+Lentils
+Chickpeas
+Canned tomatoes
+Ketchup
+Mayonnaise
+Mustard
+Honey
+Jam
+Peanut butter
+Nuts
+Coconut milk
+Stock cubes
+Coffee
+Tea
+Cereal
+Chocolate
+Biscuits
+Crisps
+Popcorn
+Crackers
+Sweets
+Water
+Sparkling water
+Orange juice
+Apple juice
+Beer
+Wine
+Soda
+Washing-up liquid
+Dishwasher tablets
+Laundry detergent
+Fabric softener
+Toilet paper
+Paper towels
+Napkins
+Bin bags
+Sponges
+Kitchen foil
+Cling film
+Baking paper
+Cleaner
+Batteries
+Shampoo
+Conditioner
+Shower gel
+Soap
+Toothpaste
+Toothbrush
+Deodorant
+Razors
+Tissues
+Plasters
+Nappies
+Baby wipes
+Baby food
+Dog food
+Cat food
+Cat litter

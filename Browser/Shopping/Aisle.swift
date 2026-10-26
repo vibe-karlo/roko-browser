@@ -142,7 +142,7 @@ nonisolated enum Aisle: String, CaseIterable, Codable, Identifiable, Sendable {
             prsa* batak* bataci* krilca* krila* zabatak* rebarc* vrat* but* rolad* cevap* cevapc* pljeskavic* kobasic* \
             hrenovk* safalad* virsl* slanin* panceta* pancet* sunk* salam* kulen* cajn* mortadel* pecenic* pasteta* \
             pastete* argeta* cvarc* riba* ribe* ribu* losos* tun* tuna*~ oslic* bakalar* srdel* skus* orad* brancin* \
-            pastrv* lignj* hobotnic* skamp* kozic* dagnj* kamenic* pecenic* cevap* \
+            pastrv* lignj* hobotnic* skamp* kozic* dagnj* kamenic* pecenic* cevap* prsut* \
             meat* chicken* turkey* beef* veal* pork* lamb* mince* minced steak* chop* chops fillet* breast* thigh* \
             drumstick* wing* wings ribs sausage* hot\\ dog* bacon* ham hams salami* prosciutto* pate* pâté fish salmon* \
             tuna\\ steak cod* hake* sardine* mackerel* trout* squid* octopus* shrimp* prawn* mussel* oyster*
@@ -157,7 +157,7 @@ nonisolated enum Aisle: String, CaseIterable, Codable, Identifiable, Sendable {
             parmesan* cottage\\ cheese cream\\ cheese custard*
             """,
         .frozen: """
-            smrznut*! zamrznut*! sladoled*! ledo!  pommes*! pomfrit*! krumpirici*! kroket*! \
+            smrznut*! zamrznut*! sladoled*! ledo!  pommes*! pomfrit*! krumpirici*! kroket*! pizz* \
             frozen*! ice\\ cream! fries! fish\\ fingers! fish\\ sticks! riblji\\ stapic*!
             """,
         .pantry: """
@@ -168,7 +168,7 @@ nonisolated enum Aisle: String, CaseIterable, Codable, Identifiable, Sendable {
             koncentrat* pasirana\\ rajcica kecap* ketchup* majonez* senf* gorusic* hren\\ umak kvas* kvasac* prasak* \
             vanilin* puding\\ prasak cokoladni\\ prah kakao* sezam* lan* lana* chia* suncokret*~ orasi* orah* lesnjak* \
             badem* kikiriki*~ grozdice* brusnic*~ juha* juhe* temeljac* bujon* kocka\\ za\\ juhu kokosovo\\ mlijeko! \
-            grasak* grah* kukuruz* tortel* orasc* orasast* zelatin* dekstroz* skrob* gustin* mljevena\\ paprika! \
+            grasak* grah* kukuruz* tortel* orasc* orasast* ljesnja* sjemenk* zelatin* dekstroz* skrob* gustin* mljevena\\ paprika! \
             kiseli\\ krastav*! kisele\\ paprike! ajvar* pelat* masline* maslin*~ humus* hummus* pesto* \
             flour* sugar* salt pepper\\ ground spice* oregano cinnamon* oil olive\\ oil vinegar* pasta* noodle* rice \
             couscous* oats*~ beans* lentil* chickpea* canned* tin tinned sauce* passata* ketchup mayo* mayonnaise* \
@@ -178,7 +178,7 @@ nonisolated enum Aisle: String, CaseIterable, Codable, Identifiable, Sendable {
         .breakfast: """
             kav* kava kave kavu espresso* nescafe* franck* barcaff* cappuccino* caj* caja caju cajevi kakao\\ napitak \
             pahuljic* muesli* musli* zitarice* cornflakes* corn\\ flakes granol* med meda medom dzem* pekmez* marmelad* \
-            nutell* lino\\ lada linolad* kasa kase kasu \
+            nutell* lino\\ lada linolad* kasa kase kasu kamilic* \
             coffee* tea teas teabag* cereal* granola* honey jam* marmalade* porridge* oatmeal*
             """,
         .sweets: """
@@ -204,7 +204,7 @@ nonisolated enum Aisle: String, CaseIterable, Codable, Identifiable, Sendable {
             cisto* domestos*! ajax*! cif*! fairy*! frosch*! bref*! tablete\\ za\\ perilicu! sjajilo*! sol\\ za\\ perilicu! spuzv* krp* \
             vrec* vreca* folij* papirnat* ubrus* salvet* toaletn* wc\\ papir zewa* violeta* alu\\ folija pecni\\ papir \
             papir\\ za\\ pecenje baterij* zarulj* sibic* svijec* osvjezivac* izbjeljivac* varikin* \
-            detergent* washing\\ powder fabric\\ softener softener* cleaner* cleaning* bleach* dish\\ soap dishwasher* \
+            detergent* washing\\ up! washing\\ powder fabric\\ softener softener* cleaner* cleaning* bleach* dish\\ soap dishwasher* \
             sponge* cloth* bin\\ bags trash\\ bags rubbish\\ bags bags foil* cling\\ film baking\\ paper paper\\ towel* \
             toilet\\ paper toilet\\ roll* napkin* tissues battery* batteries bulb* matches candle* air\\ freshener
             """,
