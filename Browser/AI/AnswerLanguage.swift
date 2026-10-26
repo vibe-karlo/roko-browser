@@ -109,16 +109,38 @@ nonisolated struct WritingLanguage: Hashable, Identifiable {
 
 /// Settings → Answer language: what summaries, Browse for Me and Notify Me
 /// write in. Automatic (nothing stored) follows the page or the question.
+/// With a language chosen, a page in it, or in one of the languages kept as
+/// they are, is written about in its own language; any other page in the
+/// chosen one. Say Croatian, keeping English: a Croatian or English article
+/// stays as it is, a German one comes in Croatian.
 nonisolated enum AnswerLanguage {
     static let key = "answerLanguage"
+    static let keptKey = "answerLanguage.kept"
 
     static var chosen: WritingLanguage? {
         UserDefaults.standard.string(forKey: key).flatMap(WritingLanguage.with(code:))
     }
 
+    /// Languages written in as they are, besides the chosen one.
+    static var kept: [WritingLanguage] {
+        (UserDefaults.standard.stringArray(forKey: keptKey) ?? []).compactMap(WritingLanguage.with(code:))
+    }
+
     /// What to write in for this page or question; nil when it can't be told,
     /// and the models are left to follow it themselves.
     static func target(for text: String, host: String = "", declared: String? = nil) -> WritingLanguage? {
-        chosen ?? WritingLanguage.detected(in: text, host: host, declared: declared)
+        let detected = WritingLanguage.detected(in: text, host: host, declared: declared)
+        guard let chosen else { return detected }
+        guard let detected else { return chosen }
+        let own = [chosen] + kept
+        // "sr-Latn" kept covers a page that reads as plain "sr" too.
+        return own.contains { $0.code == detected.code || $0.code.hasPrefix(detected.code + "-") } ? detected : chosen
+    }
+
+    /// For telling cached summaries apart: the same page under other settings
+    /// may be written in another language.
+    static var signature: String {
+        guard let chosen else { return "auto" }
+        return ([chosen.code] + kept.map(\.code).sorted()).joined(separator: "+")
     }
 }

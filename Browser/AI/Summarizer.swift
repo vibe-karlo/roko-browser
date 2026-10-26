@@ -313,7 +313,7 @@ enum SummaryCache {
     static func key(for url: URL) -> String {
         var parts = URLComponents(url: url, resolvingAgainstBaseURL: false)
         parts?.fragment = nil
-        return (parts?.string ?? url.absoluteString) + "|" + (AnswerLanguage.chosen?.code ?? "auto")
+        return (parts?.string ?? url.absoluteString) + "|" + AnswerLanguage.signature
     }
 
     static func entry(for url: URL) -> Entry? {

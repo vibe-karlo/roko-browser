@@ -102,7 +102,11 @@ app rather than reporting an error.
 
 Settings → Answer language picks what summaries, Browse for Me and Notify Me write in:
 Automatic (the page's or the question's own language) or one of about thirty languages
-(`AI/AnswerLanguage.swift`). Whether Apple's models write a language well comes from
+(`AI/AnswerLanguage.swift`). With a language chosen, Keep as they are lists the languages left
+alone: a page or question in the chosen language or a kept one is written about in its own
+language, any other in the chosen one (Croatian, keeping English: Croatian and English pages
+stay as they are, a German one comes in Croatian). Cached summaries are keyed by both, so
+changing either writes them afresh. Whether Apple's models write a language well comes from
 `SystemLanguageModel.supportsLocale`, except Croatian, Serbian and Bosnian: tested, they write
 those with mixed-up words and broken endings whatever the prompt says, so those go to Claude
 first when there's a key. When Apple's models do handle one (no key, Claude off or failing),

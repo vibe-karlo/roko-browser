@@ -11,6 +11,7 @@ struct SettingsView: View {
     @AppStorage(CopiedLink.showKey) private var showsCopiedLink = false
     @AppStorage(Appearance.key) private var appearance: Appearance = .system
     @AppStorage(AnswerLanguage.key) private var answerLanguage = ""
+    @State private var keptLanguages = UserDefaults.standard.stringArray(forKey: AnswerLanguage.keptKey) ?? []
     @State private var shared = AnswerSharing.all
     @AppStorage(TodayModel.openKey) private var opensToday = true
     @AppStorage(DailyReminders.key) private var reminders = true
@@ -54,15 +55,25 @@ struct SettingsView: View {
         }
     }
 
+    /// The kept languages by their own names, for the row.
+    private var keptSummary: String {
+        let names = keptLanguages.filter { $0 != answerLanguage }.compactMap { WritingLanguage.with(code: $0)?.name }
+        return names.isEmpty ? "None" : names.joined(separator: ", ")
+    }
+
     /// Says what the choice costs: a language Apple's models write badly goes
     /// to Claude every time, which is slower and paid.
     private var answerLanguageFooter: String {
         guard let language = WritingLanguage.with(code: answerLanguage) else {
             return "Summaries, Browse for Me and Notify Me write in the language of the page or the question."
         }
-        return language.appleWritesWell
+        let kept = keptLanguages.filter { $0 != answerLanguage }.compactMap { WritingLanguage.with(code: $0)?.english }
+        let rule = kept.isEmpty
             ? "Summaries, Browse for Me and Notify Me write in \(language.english)."
-            : "Apple's models write \(language.english) poorly, so Claude writes summaries and answers: a few seconds slower than on the iPhone, and paid with your API key. Without a key, they're in English."
+            : "Pages in \(([language.english] + kept).formatted(.list(type: .or))) are written about in their own language; any other in \(language.english)."
+        return language.appleWritesWell
+            ? rule
+            : rule + " Apple's models write \(language.english) poorly, so Claude writes summaries and answers: a few seconds slower than on the iPhone, and paid with your API key. Without a key, they're in English."
     }
 
     private var passkeyLabel: String {
@@ -188,6 +199,13 @@ struct SettingsView: View {
                         ForEach(WritingLanguage.all) { Text($0.name).tag($0.code) }
                     }
                     .pickerStyle(.navigationLink)
+                    if !answerLanguage.isEmpty {
+                        NavigationLink {
+                            KeptLanguagesSettings(chosen: answerLanguage, kept: $keptLanguages)
+                        } label: {
+                            LabeledContent("Keep as they are", value: keptSummary)
+                        }
+                    }
                     Toggle("Use Claude", isOn: $claudeEnabled)
                     if claudeEnabled {
                         SecureField("Claude API key", text: $apiKey)
@@ -268,6 +286,38 @@ struct SettingsView: View {
     private var blockingSummary: String {
         let on = ContentBlocker.Category.allCases.filter(ContentBlocker.shared.isEnabled).count
         return on == ContentBlocker.Category.allCases.count ? "All" : on == 0 ? "Off" : "\(on) of \(ContentBlocker.Category.allCases.count)"
+    }
+}
+
+/// Languages written in as they are, besides the chosen one.
+private struct KeptLanguagesSettings: View {
+    let chosen: String
+    @Binding var kept: [String]
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(WritingLanguage.all.filter { $0.code != chosen }) { language in
+                    Button {
+                        if kept.contains(language.code) { kept.removeAll { $0 == language.code } } else { kept.append(language.code) }
+                        UserDefaults.standard.set(kept, forKey: AnswerLanguage.keptKey)
+                    } label: {
+                        LabeledContent(language.name) {
+                            if kept.contains(language.code) {
+                                Image(systemName: "checkmark").foregroundStyle(Theme.accent)
+                            }
+                        }
+                        .foregroundStyle(Theme.ink)
+                    }
+                    .accessibilityAddTraits(kept.contains(language.code) ? .isSelected : [])
+                }
+            } footer: {
+                Text("A page in one of these is summarized and answered in its own language, not translated.")
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(Theme.panel)
+        .navigationTitle("Keep as they are")
     }
 }
 
