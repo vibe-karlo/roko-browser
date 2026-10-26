@@ -102,7 +102,7 @@ app rather than reporting an error.
 
 Settings → Answer language picks what summaries, Browse for Me and Notify Me write in:
 Automatic (the page's or the question's own language) or one of about thirty languages
-(`AI/AnswerLanguage.swift`). With a language chosen, Keep as they are lists the languages left
+(`AI/AnswerLanguage.swift`). One page holds both: Write in (the default), and Keep as they are, the languages left
 alone: a page or question in the chosen language or a kept one is written about in its own
 language, any other in the chosen one (Croatian, keeping English: Croatian and English pages
 stay as they are, a German one comes in Croatian). Cached summaries are keyed by both, so

@@ -55,10 +55,11 @@ struct SettingsView: View {
         }
     }
 
-    /// The kept languages by their own names, for the row.
-    private var keptSummary: String {
-        let names = keptLanguages.filter { $0 != answerLanguage }.compactMap { WritingLanguage.with(code: $0)?.name }
-        return names.isEmpty ? "None" : names.joined(separator: ", ")
+    /// The chosen language, then the kept ones, by their own names: "Hrvatski, English".
+    private var languageSummary: String {
+        guard let chosen = WritingLanguage.with(code: answerLanguage) else { return "Automatic" }
+        let kept = keptLanguages.filter { $0 != answerLanguage }.compactMap { WritingLanguage.with(code: $0)?.name }
+        return ([chosen.name] + kept).joined(separator: ", ")
     }
 
     /// Says what the choice costs: a language Apple's models write badly goes
@@ -194,17 +195,10 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Picker("Answer language", selection: $answerLanguage) {
-                        Text("Automatic").tag("")
-                        ForEach(WritingLanguage.all) { Text($0.name).tag($0.code) }
-                    }
-                    .pickerStyle(.navigationLink)
-                    if !answerLanguage.isEmpty {
-                        NavigationLink {
-                            KeptLanguagesSettings(chosen: answerLanguage, kept: $keptLanguages)
-                        } label: {
-                            LabeledContent("Keep as they are", value: keptSummary)
-                        }
+                    NavigationLink {
+                        AnswerLanguageSettings(chosen: $answerLanguage, kept: $keptLanguages)
+                    } label: {
+                        LabeledContent("Answer language", value: languageSummary)
                     }
                     Toggle("Use Claude", isOn: $claudeEnabled)
                     if claudeEnabled {
@@ -289,13 +283,28 @@ struct SettingsView: View {
     }
 }
 
-/// Languages written in as they are, besides the chosen one.
-private struct KeptLanguagesSettings: View {
-    let chosen: String
+/// What summaries and answers are written in: one language, and the
+/// languages left as they are.
+private struct AnswerLanguageSettings: View {
+    @Binding var chosen: String
     @Binding var kept: [String]
 
     var body: some View {
         Form {
+            Section {
+                Picker("Write in", selection: $chosen) {
+                    Text("Automatic").tag("")
+                    ForEach(WritingLanguage.all) { Text($0.name).tag($0.code) }
+                }
+                .pickerStyle(.menu)
+            } footer: {
+                Text(chosen.isEmpty
+                     ? "Automatic writes about every page in its own language. Choose one to have the rest translated into it."
+                     : "Pages in other languages are written about in this one, except those you keep below.")
+            }
+
+            // Always shown, so it's clear more than one language can stay as it
+            // is; dimmed until there's a language to translate the rest into.
             Section {
                 ForEach(WritingLanguage.all.filter { $0.code != chosen }) { language in
                     Button {
@@ -307,17 +316,22 @@ private struct KeptLanguagesSettings: View {
                                 Image(systemName: "checkmark").foregroundStyle(Theme.accent)
                             }
                         }
-                        .foregroundStyle(Theme.ink)
+                        .foregroundStyle(chosen.isEmpty ? Theme.secondaryInk : Theme.ink)
                     }
                     .accessibilityAddTraits(kept.contains(language.code) ? .isSelected : [])
                 }
+            } header: {
+                Text("Keep as they are")
             } footer: {
-                Text("A page in one of these is summarized and answered in its own language, not translated.")
+                Text(chosen.isEmpty
+                     ? "Choose a language to write in first. Pages in the languages ticked here then stay in their own."
+                     : "A page in one of these is summarized and answered in its own language, not translated.")
             }
+            .disabled(chosen.isEmpty)
         }
         .scrollContentBackground(.hidden)
         .background(Theme.panel)
-        .navigationTitle("Keep as they are")
+        .navigationTitle("Answer language")
     }
 }
 
