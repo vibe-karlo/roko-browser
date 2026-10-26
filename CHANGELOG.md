@@ -6,6 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Scrolling the address bar's list ticks for each row that passes under the field, like a picker wheel, while it's dragged or still gliding.
 - Typing an address, the site comes first: "index" offers index.hr itself, its front page, ahead of the articles you read on it, whether in history or open in tabs; the articles follow below. A page open in several tabs is one row.
 - The launcher's field goes to the top of the screen, as in Arc Search: it grows out of the bar's capsule and rises there in a fifth of a second, then the rows come in under it, down to the keyboard. Its place no longer depends on the keyboard, so a taller one (SwiftKey) or one that reports its size late can't make it jump.
 - The launcher grows out of the bar for real: its field starts exactly on the capsule you tapped and widens and rises into place, with the keyboard coming up under it, then sinks back into the capsule on close. (The capsule used to fade out while a field appeared at the top: the frames it measured included its own movement, so it never moved.)

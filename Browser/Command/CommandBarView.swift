@@ -68,6 +68,10 @@ struct CommandBarView: View {
     private var rowsShown: Bool { browser.launcherRows }
     /// A finger is on the list.
     @State private var listDragged = false
+    /// The list is moving (dragged or still gliding): rows passing the slot tick.
+    @State private var listMoving = false
+    /// A light tick for each row that passes under the field, like a picker wheel.
+    @State private var ticker = UISelectionFeedbackGenerator()
     /// Where the field ends up: at the top, under the status bar, as in Arc
     /// Search. Fixed, so it's known before anything is laid out and no keyboard
     /// (the system's, SwiftKey, one that says its size late) can move it.
@@ -164,7 +168,6 @@ struct CommandBarView: View {
             selection = index
             withAnimation(.snappy(duration: 0.18)) { previewing = index > 0 || query.isEmpty }
         }
-        .sensoryFeedback(.selection, trigger: selection)
         .onChange(of: CurrencyRates.shared.date) { rebuild() }
         .onChange(of: TodayModel.shared.weather) { rebuild() }
         .task(id: query) {
@@ -274,7 +277,17 @@ struct CommandBarView: View {
         // Pulled down past its top by a finger, the list closes the bar, as a sheet
         // would. Only by a finger: while the list lays itself out it can pass
         // that point on its own, which closed the bar the moment it opened.
-        .onScrollPhaseChange { _, phase in listDragged = phase == .interacting }
+        .onScrollPhaseChange { _, phase in
+            listDragged = phase == .interacting
+            listMoving = phase != .idle
+            if listMoving { ticker.prepare() }
+        }
+        // Which row is passing the slot, in row heights scrolled; each change ticks.
+        .onScrollGeometryChange(for: Int.self) { geometry in
+            Int(((geometry.contentOffset.y + geometry.contentInsets.top) / 62).rounded())
+        } action: { old, new in
+            if listMoving, new != old, new >= 0 { ticker.selectionChanged() }
+        }
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y < -geometry.contentInsets.top - 60
         } action: { _, pulled in
@@ -532,6 +545,7 @@ struct CommandBarView: View {
         guard !items.isEmpty else { return .ignored }
         selection = min(max(selection + step, 0), items.count - 1)
         scrollRequest = items[selection].id
+        ticker.selectionChanged()
         return .handled
     }
 
