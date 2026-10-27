@@ -38,6 +38,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Five app icons: the blue, green, yellow and grey stars, and the orange chevrons.
 
 ### Fixed
+- Big numbers lead only where someone came for them: a recipe's time, servings and difficulty, a price, a distance. News and essays open on their gist ("2028" over a story about a football club's US partnership is gone), an explanation gets one only when a number is the answer, and a year or a date never shows as one.
 - A short question is answered in the phone's language unless it's clearly another: "cast iron vs nonstick pan" came back in Vietnamese, since a few words are too little to tell a language by. Under 120 characters, the guess leans on the phone's languages and needs 90% confidence to leave them.
 - Answers read more cleanly. A sentence that repeats the one before it (60% of its words the same) is dropped. A checklist's note ("for frying", "optional") sits under the item instead of out on the right, and an amount the item already says isn't shown twice. Side-by-side tables keep their value columns the same width, left-aligned, with headings level at the bottom. Steps and checklists have no icon by their heading, so it doesn't compete with step 1. Source numbers take the page type's colour (grey on a general answer) instead of orange on every band.
 - Browse for Me shows pictures only when they're photos that loaded: logos, placeholders, wordmarks and text banners (fewer than 60 colours on a small thumbnail) are left out, and with none left the row isn't shown.

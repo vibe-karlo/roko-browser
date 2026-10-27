@@ -149,7 +149,7 @@ struct MarkdownText: View {
                 page.title = String(line.dropFirst(2))
             } else if line.hasPrefix("%% ") {
                 let parts = Self.fields(line.dropFirst(3))
-                if let value = parts.first, !value.isEmpty, page.stats.count < 3 {
+                if let value = parts.first, !value.isEmpty, !Self.isDate(value), page.stats.count < 3 {
                     page.stats.append(Self.stat(id: page.stats.count, value: value, label: parts.count > 1 ? parts[1] : ""))
                 }
             } else if line.hasPrefix("=> ") {
@@ -196,6 +196,9 @@ struct MarkdownText: View {
             }
         }
         if page.kind == .general { page.kind = Self.kind(guessedFrom: page) }
+        // News and essays lead with their gist: a big number over them was
+        // always one the model reached for, never one the reader came for.
+        if page.kind == .article { page.stats = [] }
         return page
     }
 
@@ -214,6 +217,16 @@ struct MarkdownText: View {
         if !page.picks.isEmpty || lines.contains(where: { if case .versus = $0 { true } else { false } }) { return .compare }
         if lines.contains(where: { if case .person = $0 { true } else { false } }) { return .article }
         return .general
+    }
+
+    /// A year or a date isn't a number anyone came for, however the model
+    /// felt about it: "2028" over a story about the Olympics set nothing up.
+    private static func isDate(_ value: String) -> Bool {
+        let value = value.trimmingCharacters(in: .whitespaces)
+        return value.wholeMatch(of: /(1[5-9]|20)\d{2}\.?/) != nil
+            // "12. 3." or "12. 3. 2025." (but not 4.2), or "3/14/2025".
+            || value.wholeMatch(of: /\d{1,2}\.\s?\d{1,2}\.(\s?\d{4}\.?)?/) != nil
+            || value.wholeMatch(of: /\d{1,2}\/\d{1,2}\/\d{2,4}/) != nil
     }
 
     /// A big number kept short: "4 servings" over "servings" is "4", and

@@ -175,7 +175,7 @@ nonisolated struct GeneratedItem {
 }
 
 nonisolated let kindGuide = "What the page or question is: recipe for cooking and baking, howto for instructions and tutorials, compare for reviews and choosing between things, article for news and essays, general for anything else"
-nonisolated let statsGuide = "Up to three numbers someone wants before anything else: for a recipe only its total time, servings and difficulty, never an ingredient's amount; for a price or a distance, that figure. None if no such number matters"
+nonisolated let statsGuide = "Only numbers someone came for: a recipe's total time, servings and difficulty, never an ingredient's amount; a price; a distance. None for news or an essay, and none for an explanation unless a number is the answer: never a year, a date, an age or a count that only sets the scene. When in doubt, none"
 nonisolated let checklistHeadingGuide = "For a recipe or a how-to, the heading of what's needed, two words such as Ingredients or You need, in the answer's language; otherwise an empty string"
 nonisolated let checklistGuide = "For a recipe, every ingredient with its amount; for a how-to, what's needed first. Otherwise none"
 nonisolated let stepsHeadingGuide = "For a recipe or a how-to, the heading of the steps, one word such as Method or Steps, in the answer's language; otherwise an empty string"

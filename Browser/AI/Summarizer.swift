@@ -25,9 +25,10 @@ private func answerShape(sections: String = "three to five", picks: Bool = false
 
     Rules: the first line names what this is: recipe for cooking and baking, howto for \
     instructions and tutorials, compare for reviews and choosing, article for news and essays, \
-    general for anything else. Then up to three "%% " lines with the numbers someone wants first \
-    (a recipe's time, servings and difficulty; a price; a distance), or none if no number \
-    matters. One "> " line with the gist.\(openingRule)\(choiceRule) Then \(sections) "## " \
+    general for anything else. Then "%% " lines only for numbers someone came for: a recipe's time, \
+    servings and difficulty; a price; a distance. At most three. An article has none, and \
+    neither has an explanation unless a number is the answer: never a year, a date, an age or \
+    a count that only sets the scene, and when in doubt, none. One "> " line with the gist.\(openingRule)\(choiceRule) Then \(sections) "## " \
     sections with headings of two to five words, written for this answer. The word in brackets \
     only chooses the section's icon: pick the closest from [\(AnswerTopic.vocabulary)], or leave \
     the brackets empty if none fits, and use each at most once.
