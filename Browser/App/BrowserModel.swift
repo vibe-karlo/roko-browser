@@ -607,8 +607,14 @@ final class BrowserModel {
         guard let context else { return }
         let host = url.displayHost
         let all = (try? context.fetch(FetchDescriptor<HistoryEntry>())) ?? []
-        for entry in all where wholeSite ? URL(string: entry.url)?.displayHost == host : entry.url == url.absoluteString {
-            context.delete(entry)
+        // The launcher shows the same page under two addresses as one row
+        // (same site, same title): forgetting the row forgets both.
+        let titles = Set(all.filter { $0.url == url.absoluteString && !$0.title.isEmpty }.map(\.title))
+        for entry in all {
+            let onSite = URL(string: entry.url)?.displayHost == host
+            if wholeSite ? onSite : entry.url == url.absoluteString || (onSite && titles.contains(entry.title)) {
+                context.delete(entry)
+            }
         }
         try? context.save()
     }

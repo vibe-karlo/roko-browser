@@ -40,7 +40,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - When Apple's model fails, Browse for Me and summaries say how ("declined to summarize this page", "too much to read at once", "busy") instead of "needs Apple Intelligence" or "The model refused to answer."; without a Claude key, they say a key would take over.
 - Browse for Me's own search asks DuckDuckGo for the phone's region, and keeps one page per site, so one site no longer fills most of the sources.
 - Search suggestions are asked for in the phone's language and region (Google's hl and gl, DuckDuckGo's kl), not wherever the network is: "new york" no longer suggested "new yorker osijek" on an American phone.
-- A site open in a tab is one row in the bar, not two ("Apple, Already open" and "Apple, Open").
+- A site open in a tab is one row in the bar, not two ("Apple, Already open" and "Apple, Open"), and the same page under two addresses is one row in the recent list; removing that row from history removes both.
 - Opening the address bar no longer flashes orange at the + capsule (the hold-to-speak fill started at touch-down, so every tap showed a sliver of it; it now starts after 120 ms), and its rows come in just behind the dimming instead of ahead of it, so text never sits on the bare page. The Shopping row is gone from the address bar's list, like its pin.
 - The address bar opens in place: the field fades in at the top and settles a few points, the keyboard rising with it, instead of flying up from the bottom bar. On a warm open it starts appearing 38 ms after the tap (was 70) and has the keyboard at 39 ms (was 125); its rows are built once it's showing.
 - Opening the address bar with a copied link offered above the bar threw the link away instead of listing it in the bar.
