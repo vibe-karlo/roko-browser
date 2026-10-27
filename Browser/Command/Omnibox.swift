@@ -26,7 +26,10 @@ enum SearchEngine: String, CaseIterable, Identifiable {
         case .brave: "https://search.brave.com/search"
         }
         var components = URLComponents(string: base)!
-        components.queryItems = [URLQueryItem(name: "q", value: query)]
+        // The page in the phone's language and for where it is, not wherever
+        // the network seems to be (an English phone on a Croatian network got
+        // Google in Croatian).
+        components.queryItems = [URLQueryItem(name: "q", value: query)] + (self == .google ? localeItems : [])
         return components.url!
     }
 

@@ -23,12 +23,20 @@ struct ContextBar: View {
     var morphs = true
     /// Where the capsule widens into a field of the screen's own (To-do's), if any.
     var fieldSpace: Namespace.ID? = nil
+    /// A small control of the screen's own in the right-hand place (Browse for
+    /// Me's AI and search switch), instead of `trailing`. Both sides then take
+    /// its width, so the middle stays in the middle.
+    var accessory: AnyView? = nil
+    var accessoryWidth: CGFloat = 64
+    /// The title when the whole one doesn't fit beside the accessory.
+    var shortTitle: String? = nil
     @Environment(BrowserModel.self) private var browser
     @State private var capsuleFrame: CGRect = .zero
 
     var body: some View {
         HStack(spacing: 0) {
             place(leading)
+                .frame(width: accessory == nil ? nil : accessoryWidth + 13, alignment: .leading)
             Spacer(minLength: 8)
             Button {
                 browser.launcherOrigin = capsuleFrame
@@ -36,9 +44,15 @@ struct ContextBar: View {
             } label: {
                 HStack(spacing: 8) {
                     Glyph(glyph, size: 17, weight: 1.8)
-                    Text(title).font(.system(size: 16, weight: .medium))
+                    // Whole or shorter, never cut off: "Ask a follow-up" or "Follow up".
+                    ViewThatFits(in: .horizontal) {
+                        Text(title)
+                        if let short = shortTitle { Text(short) }
+                    }
+                    .font(.system(size: 16, weight: .medium))
+                    .lineLimit(1)
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 18)
                 .frame(minWidth: 104)
                 .frame(height: 38)
                 .background {
@@ -55,7 +69,14 @@ struct ContextBar: View {
             }
             .buttonStyle(GlyphButtonStyle())
             Spacer(minLength: 8)
-            place(trailing)
+            if let accessory {
+                // 13 points from the edge, as the close button's circle is on the left.
+                accessory
+                    .frame(width: accessoryWidth, alignment: .trailing)
+                    .padding(.trailing, 13)
+            } else {
+                place(trailing)
+            }
         }
         .frame(height: Theme.barHeight + 8)
         .barSurface(cornerRadius: Theme.barRadius)

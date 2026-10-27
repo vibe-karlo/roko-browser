@@ -80,7 +80,8 @@ struct BrowseForMeView: View {
                         TurnSection(turn: turn, isLatest: index == session.turns.count - 1, icons: icons,
                                     reword: { session.reask(turn, as: $0) },
                                     ask: { session.ask($0) },
-                                    open: open)
+                                    open: open,
+                                    share: shareAction(for: turn))
                             .padding(.top, index == 0 ? 0 : 56)
                             // A follow-up's section is at least a screen tall, so it can
                             // come up to the top while it's still only a question.
@@ -116,29 +117,29 @@ struct BrowseForMeView: View {
     // MARK: Footer
 
     private var footer: some View {
-        VStack(spacing: 6) {
-            // The page's own line: signed for screenshots, and AI or the search engine's results.
-            HStack(spacing: 12) {
-                RokoSignature()
-                Spacer(minLength: 8)
-                AnswerOrSearch(showsSearch: $session.showsSearch)
+        // One bar: close, a follow-up from its middle, and where the page
+        // comes from (the AI answer or the search engine's results) on the
+        // right. The roko signature and Share sit at the end of the answer.
+        ContextBar(leading: .init(glyph: .close, label: "Close", action: close),
+                   glyph: .browse, title: "Ask a follow-up",
+                   launch: { browser.showCommandBar(context: .followUp) },
+                   fades: false,
+                   accessory: AnyView(AnswerOrSearch(showsSearch: $session.showsSearch)),
+                   accessoryWidth: AnswerOrSearch.width,
+                   shortTitle: "Follow up")
+            .padding(.top, 6)
+            // See-through while the light is up, so its brightest part shows.
+            // It turns solid at the light's own pace, so no dark band crosses the light as it sinks.
+            .background(Theme.canvas.opacity(edgesClear && !session.showsSearch ? 0 : 1))
+            .background(alignment: .top) {
+                FadeEdge(color: Theme.canvas).opacity(edgesClear || session.showsSearch ? 0 : 1)
             }
-            .padding(.horizontal, 22)
-            // The app's bar, for an answer: a follow-up from its middle, share beside it.
-            ContextBar(leading: .init(glyph: .close, label: "Close", action: close),
-                       glyph: .browse, title: "Ask a follow-up",
-                       launch: { browser.showCommandBar(context: .followUp) }, 
-                       trailing: AnswerSharing.isAvailable && session.turns.contains(where: { $0.phase == .done })
-                           ? .init(glyph: .share, label: "Share this page", action: share) : nil,
-                       fades: false)
-        }
-        .padding(.top, 6)
-        // See-through while the light is up, so its brightest part shows.
-        // It turns solid at the light's own pace, so no dark band crosses the light as it sinks.
-        .background(Theme.canvas.opacity(edgesClear && !session.showsSearch ? 0 : 1))
-        .background(alignment: .top) {
-            FadeEdge(color: Theme.canvas).opacity(edgesClear || session.showsSearch ? 0 : 1)
-        }
+    }
+
+    /// Share, for an answer that's finished, where sharing is set up.
+    private func shareAction(for turn: BrowseForMeModel) -> (() -> Void)? {
+        guard AnswerSharing.isAvailable, turn.phase == .done else { return nil }
+        return { share() }
     }
 
     private func close() {
@@ -166,17 +167,20 @@ struct BrowseForMeView: View {
     }
 }
 
-/// Answer or search results, for the whole page. The selection slides between them.
+/// Answer or search results, for the whole page: two marks in the bar, the
+/// one showing lit. The selection slides between them.
 private struct AnswerOrSearch: View {
     @Binding var showsSearch: Bool
     @Namespace private var selection
 
+    static let width: CGFloat = 3 + 34 + 34 + 3
+
     var body: some View {
         HStack(spacing: 0) {
-            // "AI" beside "Google": both name where the page comes from.
-            segment(.browse, "AI", isOn: !showsSearch) { showsSearch = false }
+            segment(.browse, isOn: !showsSearch) { showsSearch = false }
                 .accessibilityLabel("AI answer")
-            segment(.search, SearchEngine.current.name, isOn: showsSearch) { showsSearch = true }
+            segment(.search, isOn: showsSearch) { showsSearch = true }
+                .accessibilityLabel("\(SearchEngine.current.name) results")
         }
         .padding(3)
         .background(Theme.raised, in: .capsule)
@@ -184,23 +188,18 @@ private struct AnswerOrSearch: View {
         .sensoryFeedback(.selection, trigger: showsSearch)
     }
 
-    private func segment(_ glyph: Glyph.Kind, _ title: String, isOn: Bool, action: @escaping () -> Void) -> some View {
+    private func segment(_ glyph: Glyph.Kind, isOn: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 7) {
-                Glyph(glyph, size: 14)
-                Text(title).font(.system(size: 14, weight: .medium))
-            }
-            .foregroundStyle(isOn ? Theme.ink : Theme.secondaryInk)
-            .fixedSize()
-            .padding(.horizontal, 13)
-            .frame(height: 38)
-            .background {
-                if isOn {
-                    Capsule().fill(Theme.ink.opacity(0.12))
-                        .matchedGeometryEffect(id: "selection", in: selection)
+            Glyph(glyph, size: 16, weight: 1.8)
+                .foregroundStyle(isOn ? Theme.ink : Theme.secondaryInk)
+                .frame(width: 34, height: 32)
+                .background {
+                    if isOn {
+                        Capsule().fill(Theme.ink.opacity(0.12))
+                            .matchedGeometryEffect(id: "selection", in: selection)
+                    }
                 }
-            }
-            .contentShape(.capsule)
+                .contentShape(.capsule)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isOn ? .isSelected : [])
@@ -224,6 +223,8 @@ private struct TurnSection: View {
     let reword: (String) -> Void
     let ask: (String) -> Void
     let open: (URL) -> Void
+    /// Shares the page, once there's something to share.
+    var share: (() -> Void)? = nil
 
     /// Rewording the question, in place.
     @State private var editing = false
@@ -261,10 +262,29 @@ private struct TurnSection: View {
                 MarkdownText(markdown: turn.answer, isStreaming: turn.phase == .writing)
                     .transition(Self.reveal(2))
                 if !credit.isEmpty {
-                    Text(credit)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.faintInk)
-                        .transition(.opacity)
+                    // Signed, so a screenshot of the answer says where it's from,
+                    // with Share on the same line once the last answer is in.
+                    HStack(spacing: 10) {
+                        RokoSignature()
+                        Text(credit)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.faintInk)
+                        Spacer(minLength: 8)
+                        if isLatest, let share {
+                            Button(action: share) {
+                                HStack(spacing: 6) {
+                                    Glyph(.share, size: 15, weight: 1.8)
+                                    Text("Share").font(.system(size: 15, weight: .medium))
+                                }
+                                .foregroundStyle(Theme.secondaryInk)
+                                .frame(minHeight: 44)
+                                .contentShape(.rect)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Share this page")
+                        }
+                    }
+                    .transition(.opacity)
                 }
                 if isLatest, !turn.followUps.isEmpty { followUps.transition(Self.reveal(1)) }
             }
