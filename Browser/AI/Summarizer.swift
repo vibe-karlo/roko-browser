@@ -148,7 +148,7 @@ final class SummaryModel: Identifiable {
                 note = nil
             }
         }
-        phase = .failed(lastError.localizedDescription)
+        phase = .failed(AppleModels.explain(lastError, doing: "summarize this page") ?? lastError.localizedDescription)
     }
 
     private enum Engine { case appleCloud, onDevice, claude }
@@ -401,6 +401,18 @@ final class BrowseForMeModel: Identifiable {
         task = Task { await run() }
     }
 
+    /// Asks again after a failure, from the search on.
+    func retry() {
+        guard phase.isFailure else { return }
+        appleError = nil
+        text = ""
+        sources = []
+        steps = []
+        images = []
+        phase = .searching(query)
+        start()
+    }
+
     /// Stops searching and writing: the answer was closed or replaced.
     func cancel() {
         task?.cancel()
@@ -526,8 +538,13 @@ final class BrowseForMeModel: Identifiable {
             return
         }
         if case .failed = phase { return }
-        phase = .failed("Browse for Me needs Apple Intelligence on this iPhone, or a Claude API key in Settings.")
+        // Apple's model was tried and failed: say how, not that it's missing.
+        phase = .failed(appleError.flatMap { AppleModels.explain($0, doing: "answer this") }
+            ?? "Browse for Me needs Apple Intelligence on this iPhone, or a Claude API key in Settings.")
     }
+
+    /// Why Apple's model last failed here, for the message if nothing else answers.
+    @ObservationIgnored private var appleError: Error?
 
     /// Returns false (leaving the next engine to try) when the model itself fails.
     private func runApple(_ model: some LanguageModel, budget: Int, perPage: Int, label: String,
@@ -587,6 +604,7 @@ final class BrowseForMeModel: Identifiable {
             // Closed mid-way (a cancelled request fails as URLError.cancelled):
             // leave it as it was, and don't go on to the next engine.
             if Task.isCancelled { return true }
+            appleError = error
             text = ""
             sources = []
             steps = []

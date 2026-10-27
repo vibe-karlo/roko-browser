@@ -569,7 +569,10 @@ struct CommandBarView: View {
     }
 
     private var placeholder: String {
-        if browser.voiceListening { return "Listening, in English or Croatian…" }
+        if browser.voiceListening {
+            let languages = Preferences.voiceLanguages
+            return languages.count > 1 ? "Listening, in \(Preferences.voiceLanguageNames)…" : "Listening…"
+        }
         switch browser.launcherContext {
         case .todo: return "New to-do, e.g. Call Petra on Monday at 15"
         case .followUp: return "Ask a follow-up"
@@ -860,9 +863,13 @@ struct CommandBarView: View {
                                         action: .openPin(pin), mark: .pin))
             }
             let firstRecent = rows.count
+            // The same page under two addresses (with and without "www.", a
+            // trailing slash) is one row: matched by site and title too.
+            var seenPages = Set<String>()
             for entry in browser.history(matching: "", limit: 30) {
                 guard rows.count - firstRecent < 8, let url = URL(string: entry.url), !browser.isCurrentPage(url),
-                      seen.insert(entry.url).inserted else { continue }
+                      seen.insert(entry.url).inserted,
+                      seenPages.insert("\(url.displayHost)|\(entry.title.isEmpty ? url.path : entry.title)").inserted else { continue }
                 rows.append(CommandItem(id: "recent-\(entry.url)", title: entry.title.isEmpty ? url.displayHost : entry.title,
                                         subtitle: url.displayHost, kind: "", icon: .site(url.displayHost), action: .open(url)))
             }
@@ -1176,6 +1183,9 @@ enum CommandRanker {
             if let value = score(title: tab.displayTitle, host: onSite && base == 560 ? "" : tab.url?.displayHost ?? "", base: base)
                 ?? (onSite ? base : nil) {
                 ranked.append((value, tabItem(tab)))
+                // A site's front page open in a tab: not offered again as a
+                // well-known site ("Apple, Already open" and "Apple, Open").
+                if let url = tab.url, url.path.count <= 1 { offeredHosts.insert(url.displayHost) }
             }
         }
         for pin in pins {

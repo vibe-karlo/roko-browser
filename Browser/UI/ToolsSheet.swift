@@ -159,36 +159,59 @@ struct ToolsSheet: View {
         .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.edge))
     }
 
-    /// Translate into English or Croatian; the language in use is lit, and
-    /// tapping it again brings back the original.
+    /// Translate into the language used last (or the one the page is in now);
+    /// tapping it again brings back the original. With more than one chosen in
+    /// Settings, a long press offers the others.
     private func translateRow(_ tab: BrowserTab) -> some View {
-        HStack(spacing: 14) {
+        let targets = TranslationTarget.allCases
+        let shown = tab.translation ?? targets.first ?? TranslationTarget(rawValue: "en")
+        let isOn = tab.translation != nil
+        return HStack(spacing: 14) {
             Glyph(.translate).foregroundStyle(Theme.secondaryInk).frame(width: 24)
-            Text(tab.translation == nil ? "Translate" : "Translated").font(.system(size: 16))
+            Text(isOn ? "Translated" : "Translate").font(.system(size: 16))
             Spacer()
-            HStack(spacing: 0) {
-                ForEach(TranslationTarget.allCases) { target in
-                    let isOn = tab.translation == target
-                    Button {
-                        tab.translate(to: isOn ? nil : target)
-                        browser.panel = .none
-                        browser.showToast(isOn ? "Showing the original" : "Translating to \(target.name)")
-                    } label: {
-                        Text(target.name)
-                            .font(.system(size: 14, weight: isOn ? .semibold : .regular))
-                            .foregroundStyle(isOn ? Theme.accent : Theme.ink)
-                            .padding(.horizontal, 12)
-                            .frame(height: 38)
-                            .contentShape(.rect)
+            Menu {
+                ForEach(targets.filter { $0 != shown }) { target in
+                    Button(target.name) { translate(tab, to: target) }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(shown.name)
+                        .font(.system(size: 14, weight: isOn ? .semibold : .regular))
+                        .foregroundStyle(isOn ? Theme.accent : Theme.ink)
+                    if targets.count > 1 {
+                        // More are a long press away.
+                        Glyph(.chevronUp, size: 10, weight: 2)
+                            .rotationEffect(.degrees(180))
+                            .foregroundStyle(Theme.secondaryInk)
                     }
-                    .buttonStyle(RowButtonStyle())
-                    .accessibilityLabel(isOn ? "Show original" : "Translate to \(target.name)")
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 38)
+                .background(Theme.panel, in: .capsule)
+                .contentShape(.capsule)
+            } primaryAction: {
+                if isOn {
+                    tab.translate(to: nil)
+                    browser.panel = .none
+                    browser.showToast("Showing the original")
+                } else {
+                    translate(tab, to: shown)
                 }
             }
-            .background(Theme.panel, in: .capsule)
+            .menuIndicator(.hidden)
+            .accessibilityLabel(isOn ? "Show original" : "Translate to \(shown.name)")
+            .accessibilityHint(targets.count > 1 ? "Touch and hold for other languages" : "")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
+    }
+
+    private func translate(_ tab: BrowserTab, to target: TranslationTarget) {
+        TranslationTarget.used(target)
+        tab.translate(to: target)
+        browser.panel = .none
+        browser.showToast("Translating to \(target.name)")
     }
 
     private func isWatched(_ tab: BrowserTab) -> Bool {

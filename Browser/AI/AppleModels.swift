@@ -1,3 +1,4 @@
+import Foundation
 import FoundationModels
 
 /// Apple's two models. The cloud one (Private Cloud Compute) is larger and
@@ -45,10 +46,12 @@ enum AppleModels {
     /// Streams the growing answer text.
     static func stream(_ model: some LanguageModel, instructions: String, prompt: String) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
+            let heartbeat = Heartbeat()
             let task = Task {
                 do {
                     let session = LanguageModelSession(model: model, instructions: instructions)
                     for try await snapshot in session.streamResponse(to: prompt) {
+                        heartbeat.last = .now
                         continuation.yield(snapshot.content)
                     }
                     continuation.finish()
@@ -56,7 +59,70 @@ enum AppleModels {
                     continuation.finish(throwing: error)
                 }
             }
-            continuation.onTermination = { _ in task.cancel() }
+            let watch = watchForQuiet(heartbeat, task: task, continuation: continuation)
+            continuation.onTermination = { _ in task.cancel(); watch.cancel() }
+        }
+    }
+
+    // MARK: Going quiet
+
+    /// A model can go quiet without failing: no first words, nothing more, and
+    /// no error either. Browse for Me sat on "Writing your answer" for minutes
+    /// that way. This long without a word counts as failed.
+    static var quietLimit: Duration {
+        #if DEBUG
+        // `-quietLimit 1` to see what happens when the model goes quiet.
+        let seconds = UserDefaults.standard.double(forKey: "quietLimit")
+        if seconds > 0 { return .seconds(seconds) }
+        #endif
+        return .seconds(30)
+    }
+
+    /// The model said nothing for `quietLimit`.
+    struct WentQuiet: LocalizedError {
+        var errorDescription: String? { "Apple's on-device model stopped answering." }
+    }
+
+    /// When the model last wrote something (or was asked).
+    final class Heartbeat {
+        var last = ContinuousClock.now
+    }
+
+    /// Ends the stream with `WentQuiet` once nothing has come for `quietLimit`.
+    static func watchForQuiet<Output: Sendable>(_ heartbeat: Heartbeat, task: Task<Void, Never>,
+                                                continuation: AsyncThrowingStream<Output, Error>.Continuation) -> Task<Void, Never> {
+        Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { return }
+                if ContinuousClock.now - heartbeat.last > quietLimit {
+                    task.cancel()
+                    continuation.finish(throwing: WentQuiet())
+                    return
+                }
+            }
+        }
+    }
+
+    /// What to say when Apple's model fails, in place of the framework's own
+    /// words ("The model refused to answer."). Nil for failures it can't explain.
+    static func explain(_ error: Error, doing: String) -> String? {
+        let claude = ClaudeClient.configured == nil ? " With a Claude API key in Settings, Claude takes over when this happens." : ""
+        if error is WentQuiet {
+            return "Apple's on-device model stopped before it could \(doing). Try again in a moment."
+        }
+        guard let error = error as? LanguageModelError else { return nil }
+        switch error {
+        case .guardrailViolation, .refusal:
+            return "Apple's on-device model declined to \(doing).\(claude)"
+        case .contextSizeExceeded:
+            return "There was too much to read at once for Apple's on-device model.\(claude)"
+        case .rateLimited, .timeout:
+            return "Apple's on-device model is busy. Try again in a moment."
+        case .unsupportedLanguageOrLocale:
+            return "Apple's on-device model doesn't write this language yet.\(claude)"
+        default:
+            return nil
         }
     }
 }
@@ -213,11 +279,13 @@ extension AppleModels {
                                                 titled: Bool = true) -> AsyncThrowingStream<String, Error>
     where Answer.PartiallyGenerated: AnswerDraft {
         AsyncThrowingStream { continuation in
+            let heartbeat = Heartbeat()
             let task = Task {
                 var latest: Answer.PartiallyGenerated?
                 do {
                     let session = LanguageModelSession(model: model, instructions: instructions)
                     for try await snapshot in session.streamResponse(to: prompt, generating: Answer.self) {
+                        heartbeat.last = .now
                         latest = snapshot.content
                         continuation.yield(snapshot.content.markdown(titled: titled, droppingUnfinished: false))
                     }
@@ -232,7 +300,8 @@ extension AppleModels {
                     continuation.finish(throwing: error)
                 }
             }
-            continuation.onTermination = { _ in task.cancel() }
+            let watch = watchForQuiet(heartbeat, task: task, continuation: continuation)
+            continuation.onTermination = { _ in task.cancel(); watch.cancel() }
         }
     }
 }

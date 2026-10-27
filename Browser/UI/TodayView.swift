@@ -549,7 +549,7 @@ struct NewsSitesSheet: View {
                         }
                     }
                     HStack {
-                        TextField("A site or page, e.g. glas-slavonije.hr/sport/nk-osijek", text: $address)
+                        TextField(Audience.isCroatian ? "A site or page, e.g. glas-slavonije.hr/sport/nk-osijek" : "A site or page, e.g. bbc.com/sport/formula1", text: $address)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .keyboardType(.URL)
@@ -570,7 +570,7 @@ struct NewsSitesSheet: View {
                         .onDelete { topics.remove(atOffsets: $0) }
                     HStack {
                         // Names: autocorrect made "Hajduk" into "Handful".
-                        TextField("A topic, e.g. NK Osijek", text: $topic)
+                        TextField(Audience.isCroatian ? "A topic, e.g. NK Osijek" : "A topic, e.g. Formula 1", text: $topic)
                             .autocorrectionDisabled()
                             .onSubmit(addTopic)
                         Button("Add", action: addTopic).disabled(topic.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -578,7 +578,7 @@ struct NewsSitesSheet: View {
                 } header: {
                     Text("Topics")
                 } footer: {
-                    Text("Stories about each topic from the major Croatian news sites and yours, picked on this iPhone. Swipe to remove one.")
+                    Text("Stories about each topic from major news sites and yours, picked on this iPhone. Swipe to remove one.")
                 }
             }
             .scrollContentBackground(.hidden)

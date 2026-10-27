@@ -43,12 +43,17 @@ final class VoiceInput {
     /// recognizers to expect. Set by the browser from history and pins.
     static var expectedSites: [String] = []
 
-    /// The languages heard, the phone's own first.
+    /// The languages heard, the phone's own first: for each, the recognizer
+    /// for the phone's region if there is one ("en-GB" in Britain), else the
+    /// US one, else any.
     private static var locales: [Locale] {
-        let all = Preferences.voiceLanguages.codes.map(Locale.init(identifier:))
-        let phone = Locale.current.language.languageCode?.identifier
-        return all.sorted { a, b in
-            (a.language.languageCode?.identifier == phone ? 0 : 1) < (b.language.languageCode?.identifier == phone ? 0 : 1)
+        let supported = SFSpeechRecognizer.supportedLocales()
+        let region = Locale.current.region?.identifier
+        return Preferences.voiceLanguages.compactMap { code in
+            let options = supported.filter { $0.language.languageCode?.identifier == code }
+            return options.first { $0.region?.identifier == region }
+                ?? options.first { $0.region?.identifier == "US" }
+                ?? options.min { $0.identifier < $1.identifier }
         }
     }
 
@@ -214,17 +219,19 @@ final class VoiceInput {
     /// strongly its text reads as its own language, then by confidence where
     /// there is one. Croatian letters (č, ć, š, ž, đ) in the Croatian hearing add to it.
     nonisolated static func choose(_ hearings: [(Locale, SFTranscription)]) -> String? {
+        // Croatian reads much like Serbian and Bosnian: any of the three counts for it.
+        let heard = Set(hearings.compactMap { $0.0.language.languageCode?.identifier })
+        let constraints = heard.flatMap { $0 == "hr" ? ["hr", "sr", "bs"] : [$0] }.map(NLLanguage.init(rawValue:))
         let scored = hearings.compactMap { locale, transcription -> (String, Double)? in
             let text = transcription.formattedString
             guard !text.isEmpty else { return nil }
             let code = locale.language.languageCode?.identifier ?? ""
             let recognizer = NLLanguageRecognizer()
-            recognizer.languageConstraints = [.croatian, .english, NLLanguage("sr"), NLLanguage("bs")]
+            recognizer.languageConstraints = constraints
             recognizer.processString(text)
-            let hypotheses = recognizer.languageHypotheses(withMaximum: 4)
-            let fit = code == "hr"
-                ? (hypotheses[.croatian] ?? 0) + (hypotheses[NLLanguage("sr")] ?? 0) + (hypotheses[NLLanguage("bs")] ?? 0)
-                : hypotheses[.english] ?? 0
+            let hypotheses = recognizer.languageHypotheses(withMaximum: constraints.count)
+            let fit = (code == "hr" ? ["hr", "sr", "bs"] : [code])
+                .reduce(0) { $0 + (hypotheses[NLLanguage(rawValue: $1)] ?? 0) }
             let confidences = transcription.segments.map { Double($0.confidence) }.filter { $0 > 0 }
             let confidence = confidences.isEmpty ? 0.5 : confidences.reduce(0, +) / Double(confidences.count)
             let letters = code == "hr" && text.contains(where: { "čćšžđČĆŠŽĐ".contains($0) }) ? 0.15 : 0

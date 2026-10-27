@@ -20,8 +20,14 @@ nonisolated struct NewsSite: Codable, Equatable, Hashable, Identifiable, Sendabl
     var isSection: Bool { path != nil }
     var title: String { name ?? host }
 
-    /// Well-known sites with their feeds, to pick from without typing.
-    static let suggestions: [NewsSite] = [
+    /// Well-known sites with their feeds, to pick from without typing: Croatia's
+    /// only for a phone in Croatia or reading Croatian.
+    static var suggestions: [NewsSite] {
+        Audience.isCroatian ? known : known.filter { !$0.host.hasSuffix(".hr") }
+    }
+
+    /// Every site whose feed roko knows.
+    static let known: [NewsSite] = [
         ("index.hr", "https://www.index.hr/rss"),
         ("jutarnji.hr", "https://www.jutarnji.hr/feed"),
         ("vecernji.hr", "https://www.vecernji.hr/feeds/latest"),
@@ -33,6 +39,7 @@ nonisolated struct NewsSite: Codable, Equatable, Hashable, Identifiable, Sendabl
         ("dnevnik.hr", "https://www.dnevnik.hr/assets/feed/articles"),
         ("bbc.com", "https://feeds.bbci.co.uk/news/rss.xml"),
         ("theguardian.com", "https://www.theguardian.com/world/rss"),
+        ("nytimes.com", "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"),
         ("theverge.com", "https://www.theverge.com/rss/index.xml"),
         ("news.ycombinator.com", "https://hnrss.org/frontpage"),
     ].map { NewsSite(host: $0.0, feed: URL(string: $0.1)) }
@@ -94,7 +101,7 @@ nonisolated enum TodayNews {
         let host = rawHost.lowercased().hasPrefix("www.") ? String(rawHost.lowercased().dropFirst(4)) : rawHost.lowercased()
         let path = url.path(percentEncoded: false).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let isSection = !path.isEmpty
-        if !isSection, let known = NewsSite.suggestions.first(where: { $0.host == host }) { return known }
+        if !isSection, let known = NewsSite.known.first(where: { $0.host == host }) { return known }
 
         let html = await text(at: url)
         let declared = html.map { feedLinks(in: $0, base: url) } ?? []
@@ -287,13 +294,20 @@ nonisolated enum TodayNews {
 
     // MARK: Topics
 
-    /// Croatian news feeds topics are looked for in, besides your own
-    /// sources: the national sites and the sports pages, where most of what
-    /// a Croatian reader follows turns up.
-    static let topicPool: [NewsSite] = NewsSite.suggestions.filter { $0.host.hasSuffix(".hr") } + [
+    /// News feeds topics are looked for in, besides your own sources: the
+    /// national sites and the sports pages, where most of what people follow
+    /// turns up. Croatia's for a phone in Croatia or reading Croatian.
+    static var topicPool: [NewsSite] { Audience.isCroatian ? croatianPool : worldPool }
+
+    private static let croatianPool: [NewsSite] = NewsSite.known.filter { $0.host.hasSuffix(".hr") } + [
         NewsSite(host: "jutarnji.hr", feed: URL(string: "https://www.jutarnji.hr/sportske/feed"), path: "/sportske", name: "Sportske novosti"),
         NewsSite(host: "index.hr", feed: URL(string: "https://www.index.hr/rss/sport"), path: "/sport", name: "Index Sport"),
         NewsSite(host: "glas-slavonije.hr", feed: nil, path: "/sport", page: URL(string: "https://glas-slavonije.hr/sport/"), name: "Glas Slavonije Sport"),
+    ]
+
+    private static let worldPool: [NewsSite] = NewsSite.known.filter { ["bbc.com", "theguardian.com", "nytimes.com"].contains($0.host) } + [
+        NewsSite(host: "bbc.com", feed: URL(string: "https://feeds.bbci.co.uk/sport/rss.xml"), path: "/sport", name: "BBC Sport"),
+        NewsSite(host: "theguardian.com", feed: URL(string: "https://www.theguardian.com/uk/sport/rss"), path: "/sport", name: "Guardian Sport"),
     ]
 
     /// Stories about a topic among `stories`: headlines that name it, then

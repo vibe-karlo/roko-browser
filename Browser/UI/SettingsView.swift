@@ -20,6 +20,7 @@ struct SettingsView: View {
     @State private var plates = Parking.shared.plates
     @State private var notifications = "On"
     @State private var changedSites = 0
+    @State private var translateLanguages = TranslationTarget.chosen
 
     var body: some View {
         NavigationStack {
@@ -36,6 +37,9 @@ struct SettingsView: View {
                         Form { AppIconPicker() }.settingsPage("App icon")
                     }
                     link(.tab, "Tabs", archive.title) { TabsSettings() }
+                    link(.translate, "Translate", translateLanguages.count == 1
+                         ? TranslationTarget(rawValue: translateLanguages[0]).name
+                         : "\(translateLanguages.count) languages") { TranslateSettings() }
                 }
 
                 Section {
@@ -85,6 +89,7 @@ struct SettingsView: View {
             .onAppear {
                 plates = Parking.shared.plates
                 changedSites = SitesSettings.sites().count
+                translateLanguages = TranslationTarget.chosen
                 Task { notifications = await NotificationSettings.summary() }
             }
         }
@@ -241,7 +246,7 @@ private struct BarSettings: View {
     @AppStorage(CopiedLink.showKey) private var showsCopiedLink = false
     @AppStorage(Preferences.launcherTicksKey) private var launcherTicks = true
     @AppStorage(Preferences.holdToTalkKey) private var holdToTalk = true
-    @AppStorage(Preferences.voiceLanguagesKey) private var voiceLanguages: Preferences.VoiceLanguages = .both
+    @AppStorage(Preferences.voiceLanguagesKey) private var voiceLanguages = "both"
 
     var body: some View {
         Form {
@@ -260,9 +265,17 @@ private struct BarSettings: View {
             }
             Section {
                 Toggle("Hold + to speak", isOn: $holdToTalk)
-                if holdToTalk {
+                // Only with more than one language to hear: the phone's, or English beside it.
+                let languages = Audience.voiceLanguages
+                if holdToTalk, languages.count > 1 {
                     Picker("Listen for", selection: $voiceLanguages) {
-                        ForEach(Preferences.VoiceLanguages.allCases) { Text($0.title).tag($0) }
+                        Text(languages.map(Audience.name(of:)).joined(separator: " and ")).tag("both")
+                        ForEach(languages, id: \.self) { Text(Audience.name(of: $0)).tag($0) }
+                    }
+                    .onAppear {
+                        // How earlier versions stored a single language.
+                        if voiceLanguages == "english" { voiceLanguages = "en" }
+                        if voiceLanguages == "croatian" { voiceLanguages = "hr" }
                     }
                 }
             } header: {
@@ -385,7 +398,7 @@ private struct ShoppingSettings: View {
                     ForEach(ListLanguage.allCases) { Text($0.title).tag($0) }
                 }
             } footer: {
-                Text("Aisles and the list's own words are in this language. What you type is understood in English and Croatian either way.")
+                Text("Aisles and the list's own words are in this language. What you type is understood in either language.")
             }
             Section {
                 Button("Forget What You Buy", role: .destructive) { confirmForget = true }
@@ -907,6 +920,36 @@ private struct AnswerLanguageSettings: View {
         .scrollContentBackground(.hidden)
         .background(Theme.panel)
         .navigationTitle("Answer language")
+    }
+}
+
+/// The languages the page menu translates into.
+private struct TranslateSettings: View {
+    @State private var chosen = TranslationTarget.chosen
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(TranslationTarget.offered) { language in
+                    let isOn = chosen.contains(language.rawValue)
+                    Button {
+                        if isOn { chosen.removeAll { $0 == language.rawValue } } else { chosen.append(language.rawValue) }
+                        TranslationTarget.chosen = chosen
+                    } label: {
+                        LabeledContent(language.name) {
+                            if isOn { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
+                        }
+                        .foregroundStyle(Theme.ink)
+                    }
+                    // One always stays: the page menu needs something to offer.
+                    .disabled(isOn && chosen.count == 1)
+                    .accessibilityAddTraits(isOn ? .isSelected : [])
+                }
+            } footer: {
+                Text("The page menu offers the language you used last. With more than one chosen, touch and hold it for the others.")
+            }
+        }
+        .settingsPage("Translate")
     }
 }
 

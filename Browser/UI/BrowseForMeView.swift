@@ -243,7 +243,13 @@ private struct TurnSection: View {
                     .transition(.asymmetric(insertion: .opacity,
                                             removal: .opacity.animation(.easeOut(duration: 0.12))))
             } else if case .failed(let message) = turn.phase {
-                Text(message).foregroundStyle(Theme.secondaryInk)
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(message).foregroundStyle(Theme.secondaryInk)
+                    Button("Try again") { turn.retry() }
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                        .buttonStyle(.plain)
+                }
             } else {
                 // Pictures first, then the sources: the faces of the answer
                 // up top, its footnotes compact beneath them. They arrive in

@@ -6,6 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Choose the languages pages are translated into (Settings → Translate; about thirty). The page menu offers the one used last; with more than one chosen, touch and hold it for the others, marked by a small chevron. Until you choose, it's English and the phone's own language.
 - Shopping adds to the list showing: on Drogerija or Ljekarna, what you type or say goes there. On Trgovina, something usually bought elsewhere still goes on Trgovina, with a one-line offer above the bar ("Flasteri obično Ljekarna · Premjesti"); one tap moves it, and it goes there from then on. Added from the address bar, things still go to their usual shop.
 - Swipe left or right on the shopping list for the next shop's list; it slides in from the side you swiped.
 - Shopping has three lists, a tap apart at the top: Trgovina (groceries), Drogerija (dm, Bipa) and Ljekarna (pharmacy), each with how much is left on it. Things go to the right one by themselves: "šampon" and "pelene" to the drugstore, "Brufen", "sirup za kašalj", "vitamin C" and "flasteri" to the pharmacy (a new Medicines and health aisle), the rest to groceries. Long-press one for Move to Shop, and it goes there from then on. Added from another list, a toast says where it went ("Šampon → Drogerija"). Suggestions are for the list showing.
@@ -35,6 +36,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Five app icons: the blue, green, yellow and grey stars, and the orange chevrons.
 
 ### Fixed
+- Browse for Me no longer waits for ever. Apple's on-device model sometimes went quiet without failing (seen in the simulator after other requests): no words, no error, "Writing your answer" for minutes. Now 30 seconds without a word ends it, and it says so, with Try again under it. Summaries get the same limit.
+- When Apple's model fails, Browse for Me and summaries say how ("declined to summarize this page", "too much to read at once", "busy") instead of "needs Apple Intelligence" or "The model refused to answer."; without a Claude key, they say a key would take over.
+- Browse for Me's own search asks DuckDuckGo for the phone's region, and keeps one page per site, so one site no longer fills most of the sources.
+- Search suggestions are asked for in the phone's language and region (Google's hl and gl, DuckDuckGo's kl), not wherever the network is: "new york" no longer suggested "new yorker osijek" on an American phone.
+- A site open in a tab is one row in the bar, not two ("Apple, Already open" and "Apple, Open").
 - Opening the address bar no longer flashes orange at the + capsule (the hold-to-speak fill started at touch-down, so every tap showed a sliver of it; it now starts after 120 ms), and its rows come in just behind the dimming instead of ahead of it, so text never sits on the bare page. The Shopping row is gone from the address bar's list, like its pin.
 - The address bar opens in place: the field fades in at the top and settles a few points, the keyboard rising with it, instead of flying up from the bottom bar. On a warm open it starts appearing 38 ms after the tap (was 70) and has the keyboard at 39 ms (was 125); its rows are built once it's showing.
 - Opening the address bar with a copied link offered above the bar threw the link away instead of listing it in the bar.
@@ -160,6 +166,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Notify Me, as in Safari: in a page's menu, say what to look for ("size M in stock", or nothing for anything new) and check hourly, daily or weekly. roko reads the page in the background, Apple's on-device model decides whether it's what you asked for, and a notification opens the page. Settings lists the watched pages.
 
 ### Changed
+- Croatian shows only to someone in Croatia or reading Croatian, read from the phone's region and languages. Dictation listens for the phone's languages (with English beside a single other one), and says "Listening…" or "Listening, in English or German…"; Settings offers the phone's languages to choose from. Translate offers English and the phone's own language, by its own name ("Deutsch"). Today suggests Croatian news sites, and looks for topics in them, only for a Croatian phone; elsewhere it's BBC, The Guardian and The New York Times, with their sport pages, and the examples are bbc.com/sport/formula1 and Formula 1. The speech permission no longer names languages.
 - Croatian pages are summarized by Claude Haiku when there's an API key; Apple's on-device model writes poor Croatian. English stays on the iPhone.
 - Claude summaries use Haiku 5.5, and Browse for Me uses Haiku for quick and ordinary questions and Sonnet 5.5 for deep ones, instead of Opus.
 - Browse for Me always searches the web before answering, so every answer has sources.

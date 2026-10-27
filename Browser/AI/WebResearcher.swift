@@ -28,16 +28,21 @@ nonisolated enum WebResearcher {
     /// DuckDuckGo's lightweight HTML results: no key, no JavaScript, direct links.
     static func search(_ query: String) async throws -> [Page] {
         var components = URLComponents(string: "https://html.duckduckgo.com/html/")!
-        components.queryItems = [URLQueryItem(name: "q", value: query)]
+        // Results for where the phone is: with no region, DuckDuckGo guessed
+        // from the address and mixed in pages from elsewhere.
+        components.queryItems = [URLQueryItem(name: "q", value: query), URLQueryItem(name: "kl", value: Audience.duckDuckGoRegion)]
         let (data, _) = try await session.data(from: components.url!)
         let html = String(decoding: data, as: UTF8.self)
 
         let links = matches(#"class="result__a" href="([^"]+)"[^>]*>(.*?)</a>"#, in: html)
         let snippets = matches(#"class="result__snippet"[^>]*>(.*?)</a>"#, in: html).map { $0[0] }
         var pages: [Page] = []
+        var hosts = Set<String>()
         for (index, link) in links.enumerated() {
             guard let url = URL(string: decodeEntities(link[0])), let host = url.host(),
                   !host.contains("duckduckgo.com") else { continue }  // ads route through DDG
+            // One page per site, so a site with several hits doesn't crowd out the others.
+            guard hosts.insert(url.displayHost).inserted else { continue }
             let snippet = index < snippets.count ? plain(snippets[index]) : ""
             pages.append(Page(url: url, title: plain(link[1]), snippet: snippet))
         }

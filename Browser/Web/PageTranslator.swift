@@ -3,16 +3,50 @@ import NaturalLanguage
 import Translation
 import WebKit
 
-/// The languages the page menu offers to translate into.
-enum TranslationTarget: String, CaseIterable, Identifiable {
-    case english = "en", croatian = "hr"
+/// A language the page menu offers to translate into.
+struct TranslationTarget: Hashable, Identifiable, Sendable {
+    /// Its code, "en".
+    let rawValue: String
     var id: String { rawValue }
 
+    /// Its own name for itself: "English", "Deutsch".
     var name: String {
-        switch self {
-        case .english: "English"
-        case .croatian: "Hrvatski"
+        WritingLanguage.with(code: rawValue)?.name
+            ?? Locale(identifier: rawValue).localizedString(forLanguageCode: rawValue)?
+                .capitalized(with: Locale(identifier: rawValue)) ?? rawValue
+    }
+
+    /// The code Google's translator knows it by.
+    var googleCode: String {
+        ["nb": "no", "sr-Cyrl": "sr", "zh-Hans": "zh-CN"][rawValue] ?? rawValue
+    }
+
+    /// Every language that can be chosen: those roko writes in, but Serbian in
+    /// Latin script, which Google only writes in Cyrillic.
+    static var offered: [TranslationTarget] {
+        WritingLanguage.all.filter { $0.code != "sr-Latn" }.map { TranslationTarget(rawValue: $0.code) }
+    }
+
+    static let key = "translate.languages"
+
+    /// The languages chosen in Settings, the one used last first. Until any
+    /// are chosen: English, and the phone's own language when that's another.
+    static var chosen: [String] {
+        get {
+            let stored = UserDefaults.standard.stringArray(forKey: key) ?? []
+            return stored.isEmpty ? ["en"] + Audience.spoken.filter { $0 != "en" }.prefix(1) : stored
         }
+        set { UserDefaults.standard.set(newValue, forKey: key) }
+    }
+
+    /// The page menu's: the last used first.
+    static var allCases: [TranslationTarget] { chosen.map(TranslationTarget.init(rawValue:)) }
+
+    /// Used just now: first in line next time.
+    static func used(_ target: TranslationTarget) {
+        var codes = chosen
+        codes.removeAll { $0 == target.rawValue }
+        chosen = [target.rawValue] + codes
     }
 }
 
@@ -137,7 +171,7 @@ final class PageTranslator: NSObject, WKScriptMessageHandler {
                 return responses.map(\.targetText)
             }
         }
-        return try await google(texts, to: target.rawValue)
+        return try await google(texts, to: target.googleCode)
     }
 
     /// Google Translate's free web endpoint, as its own page widget uses it.

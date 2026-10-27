@@ -68,7 +68,7 @@
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>Your to-dos and a list in Reminders are kept the same, so they're on your Mac and Watch too.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>What you say while holding + is turned into words for the address bar, in English or Croatian.</string>
+	<string>What you say while holding + is turned into words for the address bar.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>RokoShareServer</key>

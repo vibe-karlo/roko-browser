@@ -56,7 +56,7 @@ targets:
         BGTaskSchedulerPermittedIdentifiers: [com.growthstudio.roko.watch, com.growthstudio.roko.today]
         # Today: the weather where you are, and what's on your calendar.
         NSMicrophoneUsageDescription: Hold + and speak to search, open a site or add a to-do. The microphone is on only while you hold it.
-        NSSpeechRecognitionUsageDescription: What you say while holding + is turned into words for the address bar, in English or Croatian.
+        NSSpeechRecognitionUsageDescription: What you say while holding + is turned into words for the address bar.
         NSLocationWhenInUseUsageDescription: Today shows the weather where you are, from a rough location. Paying for parking finds the zone you're in.
         # Parking: a zone border can run down the middle of a street, so a precise
         # fix is asked for just this once when precise location is off for roko.

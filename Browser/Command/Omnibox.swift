@@ -51,10 +51,22 @@ enum SearchEngine: String, CaseIterable, Identifiable {
         }
     }
 
+    /// The phone's language and region, so suggestions are for where it is
+    /// and not wherever the network happens to be ("new yorker osijek").
+    private var localeItems: [URLQueryItem] {
+        let language = Locale.current.language.languageCode?.identifier ?? "en"
+        let region = Locale.current.region?.identifier
+        switch self {
+        case .google: return [URLQueryItem(name: "hl", value: language)] + (region.map { [URLQueryItem(name: "gl", value: $0.lowercased())] } ?? [])
+        case .duckDuckGo: return [URLQueryItem(name: "kl", value: Audience.duckDuckGoRegion)]
+        case .brave, .kagi: return []
+        }
+    }
+
     func fetchSuggestions(for query: String) async -> [String] {
         guard let (endpoint, parse) = suggestions,
               var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else { return [] }
-        components.queryItems = (components.queryItems ?? []) + [URLQueryItem(name: "q", value: query)]
+        components.queryItems = (components.queryItems ?? []) + [URLQueryItem(name: "q", value: query)] + localeItems
         guard let url = components.url,
               let (data, _) = try? await URLSession.quick.data(from: url) else { return [] }
         return parse(data)

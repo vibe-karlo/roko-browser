@@ -126,6 +126,14 @@ searches) and gets a longer answer. Claude always searches before answering, wit
 search tool: the newer one filters results by running code and was two to three times slower
 on a phone. Our own search uses DuckDuckGo's HTML results and reads the pages in parallel
 (plain HTTP, no web views).
+It asks for the phone's region (`kl`, `Audience.duckDuckGoRegion`) and keeps one page per site.
+Apple's models get 30 seconds of quiet before a request counts as failed
+(`AppleModels.quietLimit`; `-quietLimit 1` in a Debug build shows the failure).
+
+Croatian things (news sites, Croatian dictation and translation) are offered only when the
+phone's region is Croatia or Croatian is among its languages (`Audience.isCroatian`).
+Translate goes into the languages chosen in Settings → Translate (`TranslationTarget.chosen`), the
+last used first; Google's translator gets its own codes for a few (`no`, `sr`, `zh-CN`).
 
 To time Browse for Me on a phone, launch a Debug build over the cable:
 `xcrun devicectl device process launch --console --device <id> com.growthstudio.roko -- -perf -browse "question"`.
