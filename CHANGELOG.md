@@ -198,6 +198,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - The address field's icons line up with the rows above it.
 
 ### Performance
+- Blocking lists half the size and quicker to load, blocking the same: ad and tracker servers that no longer exist are dropped (17,617, checked against two public resolvers), plain host rules ship as a list of hosts made into rules only when compiling, and hiding rules ship as lines. In the app: 16 MB of lists is now 7.4 MB, the compiled lists 49 MB are 38.6 MB, compiling after an update is about 15% quicker, and the hiding indexes load in a third of the time.
 - The light's grain is made from random bytes in well under a millisecond, instead of 90 ms through Core Image: a hitch the first time a light showed. The pull's light is drawn off the main thread after the first page; the first pull took 92 ms to draw it, now 0.2 ms.
 - The first page after launch starts about 0.16 s sooner: it waits only for the request rules; the hiding indexes now decode in parallel.
 - Tab saves are batched and no longer run on every page load; tab pictures compress off the main thread.

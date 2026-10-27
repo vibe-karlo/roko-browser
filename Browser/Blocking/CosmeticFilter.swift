@@ -11,12 +11,33 @@ final class CosmeticFilter: NSObject, WKScriptMessageHandlerWithReply {
     static let world = WKContentWorld.world(name: "cosmetic")
     static let handlerName = "cosmetic"
 
-    // Decoded off the main thread, so its conformance can't be main-actor bound.
-    private nonisolated struct Index: Decodable, Sendable {
-        let keyed: [String: [String]]
-        let always: [String]
-        let scoped: [String: [String]]
-        let untouched: [String]
+    /// One list's hiding rules, read off the main thread from the lines
+    /// Scripts/build_blocklists.py writes ("key<TAB>selector", then sections
+    /// each opened by a \u{1} line): half the time the same index took as JSON.
+    /// Substrings of the file's text, so reading copies nothing.
+    private nonisolated struct Index: Sendable {
+        var keyed: [Substring: [Substring]] = [:]
+        var always: [Substring] = []
+        var scoped: [Substring: [Substring]] = [:]
+        var untouched: [Substring] = []
+
+        init(text: String) {
+            var section = 0
+            for line in text.split(separator: "\n") {
+                if line.first == "\u{1}" {
+                    section += 1
+                    continue
+                }
+                switch section {
+                case 0, 2:
+                    guard let tab = line.firstIndex(of: "\t") else { continue }
+                    let key = line[..<tab], selector = line[line.index(after: tab)...]
+                    if section == 0 { keyed[key, default: []].append(selector) } else { scoped[key, default: []].append(selector) }
+                case 1: always.append(line)
+                default: untouched.append(line)
+                }
+            }
+        }
     }
 
     private var indexes: [ContentBlocker.Category: Index] = [:]
@@ -35,15 +56,15 @@ final class CosmeticFilter: NSObject, WKScriptMessageHandlerWithReply {
         await loading.value
     }
 
-    /// Decodes the indexes (about 3 MB of JSON) off the main thread, in parallel.
+    /// Reads the indexes off the main thread, in parallel.
     private func decodeAll() async {
         let files = ContentBlocker.Category.allCases.compactMap { category in
-            Bundle.main.url(forResource: "\(category.rawValue)-hide", withExtension: "json").map { (category, $0) }
+            Bundle.main.url(forResource: "\(category.rawValue)-hide", withExtension: "txt").map { (category, $0) }
         }
         await withTaskGroup(of: (ContentBlocker.Category, Index?).self) { group in
             for (category, url) in files {
                 group.addTask(priority: .userInitiated) {
-                    (category, try? JSONDecoder().decode(Index.self, from: Data(contentsOf: url)))
+                    (category, (try? String(contentsOf: url, encoding: .utf8)).map(Index.init(text:)))
                 }
             }
             for await (category, index) in group { indexes[category] = index }
@@ -61,26 +82,26 @@ final class CosmeticFilter: NSObject, WKScriptMessageHandlerWithReply {
         let isFirst = body["first"] as? Bool ?? false
         let hosts = Self.suffixes(of: host)
 
-        var selectors: [String] = []
+        var selectors: [Substring] = []
         // Cookie banners are faded out rather than removed: the consent script
         // (ConsentHandler) has to find a banner to answer it, and a removed one
         // can't be found. The page script removes them for good a little later.
-        var faded: [String] = []
+        var faded: [Substring] = []
         // Overlays (cookie banners, pop-ups) often lock page scrolling; the page
         // script checks these against the page and unlocks it if one was hidden.
-        var overlays: [String] = []
+        var overlays: [Substring] = []
         // Whether the page script may fold away ad boxes left empty by blocking.
         var collapseAds = false
         for category in ContentBlocker.Category.allCases where ContentBlocker.shared.isEnabled(category) {
-            guard let index = indexes[category], !hosts.contains(where: index.untouched.contains),
+            guard let index = indexes[category], !hosts.contains(where: { index.untouched.contains(Substring($0)) }),
                   !ContentBlocker.shared.isAllowed(host: host, category: category) else { continue }
             if category == .ads { collapseAds = true }
-            var found: [String] = []
+            var found: [Substring] = []
             if isFirst {
                 found += index.always
-                for host in hosts { found += index.scoped[host] ?? [] }
+                for host in hosts { found += index.scoped[Substring(host)] ?? [] }
             }
-            for key in keys { found += index.keyed[key] ?? [] }
+            for key in keys { found += index.keyed[Substring(key)] ?? [] }
             if category == .cookies { faded += found } else { selectors += found }
             if category == .cookies || category == .popups { overlays += found }
         }
@@ -89,7 +110,8 @@ final class CosmeticFilter: NSObject, WKScriptMessageHandlerWithReply {
         if LaunchClock.isEnabled {
             print("HIDE \(host) keys=\(keys.count) first=\(isFirst) selectors=\(selectors.count) faded=\(faded.count)")
         }
-        return (["css": css, "faded": faded, "overlays": overlays, "collapseAds": isFirst && collapseAds], nil)
+        return (["css": css, "faded": faded.map(String.init), "overlays": overlays.map(String.init),
+                 "collapseAds": isFirst && collapseAds], nil)
     }
 
     /// "news.bbc.co.uk" → ["news.bbc.co.uk", "bbc.co.uk", "co.uk", "uk"].

@@ -6,15 +6,29 @@ Unsupported syntax (scriptlets, procedural cosmetics, regex rules, redirect
 options and so on) is skipped rather than approximated: a rule that matches
 too much breaks pages, a rule that is missing only lets an ad through.
 
+Domains that no longer exist are dropped: EasyList has kept ad servers for
+years, and about a fifth of them are gone. A host counts as gone only when
+both Cloudflare's and Google's resolvers say it doesn't exist (NXDOMAIN),
+asked over HTTPS so a filtering resolver on this Mac can't make a live ad
+server look dead. Answers are cached in Scripts/.cache/dns.json for 30 days.
+
+Plain "block this host" rules, nine in ten, ship as a list of hosts
+(<name>-hosts.txt) that the app turns into rules when it compiles: a fifth of
+the size of the same rules as JSON.
+
 Usage:
     python3 -I Scripts/build_blocklists.py            # download + convert
-    python3 -I Scripts/build_blocklists.py --offline  # reuse Scripts/.cache
+    python3 -I Scripts/build_blocklists.py --offline  # reuse Scripts/.cache, no DNS
+    python3 -I Scripts/build_blocklists.py --offline --dns  # cached lists, fresh DNS
 """
 
 import json
 import re
 import sys
+import time
+import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -62,7 +76,17 @@ BAD_SELECTOR = re.compile(
 )
 
 SEPARATOR = "[/:?&=]"
-DOMAIN_ANCHOR = "^[^:]+://+([^:/]+\\.)?"
+# Subdomains as "anything up to a slash": WebKit compiles that a tenth smaller
+# than "anything without a colon or slash", and matches the same real addresses.
+DOMAIN_ANCHOR = "^[^:]+://+([^/]+\\.)?"
+
+# A whole host at the start of a domain-anchored rule, followed by something
+# that ends a host: only then is it a full name worth asking DNS about
+# ("||ads.example" alone could be the start of a longer one).
+ANCHORED_HOST = re.compile(r"((?:[a-z0-9-]+\\\.)+[a-z]{2,63})(?=\[/:\?&=\]|\$|/|:)")
+
+# How long a DNS answer is trusted before it's asked again.
+DNS_DAYS = 30
 
 
 def fetch(name: str, url: str, offline: bool) -> list[str]:
@@ -262,10 +286,72 @@ def convert(lines: list[str]) -> tuple[list[dict], dict, dict]:
     return rules, cosmetic, stats
 
 
+def hiding_text(cosmetic: dict) -> str:
+    """The hiding index as lines, which the app reads in half the time JSON
+    takes: "key<TAB>selector" lines, then a \\x01 line before the selectors
+    for every page, another before "site<TAB>selector" lines, and another
+    before the sites left alone. Selectors never hold a tab or a line break."""
+    lines = [f"{key}\t{selector}" for key, selectors in cosmetic["keyed"].items() for selector in selectors]
+    lines += ["\x01always", *cosmetic["always"], "\x01scoped"]
+    lines += [f"{site}\t{selector}" for site, selectors in cosmetic["scoped"].items() for selector in selectors]
+    lines += ["\x01untouched", *cosmetic["untouched"]]
+    assert not any("\n" in line or line.count("\t") > 1 for line in lines)
+    return "\n".join(lines) + "\n"
+
+
+def anchored_host(rule: dict) -> str | None:
+    url_filter = rule["trigger"].get("url-filter", "")
+    if not url_filter.startswith(DOMAIN_ANCHOR):
+        return None
+    match = ANCHORED_HOST.match(url_filter, len(DOMAIN_ANCHOR))
+    return match.group(1).replace("\\.", ".") if match else None
+
+
+def is_plain_host(rule: dict, host: str) -> bool:
+    """Blocks a host and nothing else: no types, no domains, no party."""
+    return (rule["action"]["type"] == "block" and list(rule["trigger"]) == ["url-filter"]
+            and rule["trigger"]["url-filter"] == DOMAIN_ANCHOR + host.replace(".", "\\.") + SEPARATOR)
+
+
+def nxdomain(host: str, server: str) -> bool | None:
+    base = {"cloudflare": "https://cloudflare-dns.com/dns-query?", "google": "https://dns.google/resolve?"}[server]
+    request = urllib.request.Request(base + urllib.parse.urlencode({"name": host, "type": "A"}),
+                                     headers={"accept": "application/dns-json", "User-Agent": "BrowserBlocklistBuilder/1.0"})
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                return json.load(response).get("Status") == 3
+        except Exception:
+            time.sleep(1 + attempt)
+    return None  # no answer: kept, as if alive
+
+
+def dead_hosts(hosts: set[str], offline: bool) -> set[str]:
+    """Hosts both resolvers say don't exist, from the cache and fresh lookups."""
+    path = CACHE / "dns.json"
+    cache: dict[str, list] = json.loads(path.read_text()) if path.exists() else {}
+    now = time.time()
+    stale = sorted(h for h in hosts if h not in cache or now - cache[h][1] > DNS_DAYS * 86400)
+    if stale and not (offline and "--dns" not in sys.argv):
+        print(f"dns: asking about {len(stale)} hosts")
+        with ThreadPoolExecutor(64) as pool:
+            first = list(pool.map(lambda h: nxdomain(h, "cloudflare"), stale))
+        candidates = [h for h, gone in zip(stale, first) if gone]
+        with ThreadPoolExecutor(64) as pool:
+            second = dict(zip(candidates, pool.map(lambda h: nxdomain(h, "google"), candidates)))
+        for host, gone in zip(stale, first):
+            if gone is None:
+                continue  # no answer: ask again next time
+            cache[host] = [bool(gone and second.get(host)), now]
+        path.write_text(json.dumps(cache, separators=(",", ":")))
+    return {h for h in hosts if cache.get(h, [False])[0]}
+
+
 def main() -> int:
     offline = "--offline" in sys.argv
     OUT.mkdir(parents=True, exist_ok=True)
     sources: dict[str, list[str]] = {}
+    converted: dict[str, tuple[list[dict], dict, dict]] = {}
     for name, url in LISTS.items():
         print(f"{name}:")
         lines = fetch(name, url, offline)
@@ -276,16 +362,38 @@ def main() -> int:
             shared = {line.strip() for line in sources[DEDUPE_AGAINST[name]]}
             lines = [line for line in lines if line.strip() not in shared]
         sources[name] = lines
-        rules, cosmetic, stats = convert(lines)
-        if len(rules) > MAX_RULES:
-            print(f"  {len(rules)} rules is over WebKit's {MAX_RULES} limit", file=sys.stderr)
+        converted[name] = convert(lines)
+
+    # Every host named in full, by a rule or as a site hiding rules are for.
+    hosts = set()
+    for rules, cosmetic, _ in converted.values():
+        hosts |= {h for h in map(anchored_host, rules) if h}
+        hosts |= set(cosmetic["scoped"])
+    dead = dead_hosts(hosts, offline)
+    print(f"dns: {len(dead)} of {len(hosts)} hosts no longer exist")
+
+    for name, (rules, cosmetic, stats) in converted.items():
+        kept, plain = [], []
+        for rule in rules:
+            host = anchored_host(rule)
+            if host in dead:
+                continue
+            if host and is_plain_host(rule, host):
+                plain.append(host)
+            else:
+                kept.append(rule)
+        cosmetic["scoped"] = {site: selectors for site, selectors in cosmetic["scoped"].items() if site not in dead}
+        if len(kept) + len(plain) > MAX_RULES:
+            print(f"  {len(kept) + len(plain)} rules is over WebKit's {MAX_RULES} limit", file=sys.stderr)
             return 1
-        (OUT / f"{name}.json").write_text(json.dumps(rules, separators=(",", ":")))
-        (OUT / f"{name}-hide.json").write_text(json.dumps(cosmetic, separators=(",", ":")))
+        (OUT / f"{name}.json").write_text(json.dumps(kept, separators=(",", ":")))
+        (OUT / f"{name}-hosts.txt").write_text("\n".join(sorted(set(plain))) + "\n")
+        (OUT / f"{name}-hide.txt").write_text(hiding_text(cosmetic))
+        (OUT / f"{name}-hide.json").unlink(missing_ok=True)  # the format before
         print(
-            f"  {stats['input']} filters -> {stats['output']} network rules "
-            f"({stats['block']} block, {stats['allow']} allow), {stats['hide']} hiding rules "
-            f"({len(cosmetic['keyed'])} keys, {len(cosmetic['always'])} always, "
+            f"{name}: {stats['input']} filters -> {len(kept) + len(plain)} network rules "
+            f"({len(plain)} plain hosts, {stats['output'] - len(kept) - len(plain)} for dead hosts dropped), "
+            f"{stats['hide']} hiding rules ({len(cosmetic['keyed'])} keys, {len(cosmetic['always'])} always, "
             f"{len(cosmetic['scoped'])} sites), {stats['skipped']} skipped"
         )
     return 0

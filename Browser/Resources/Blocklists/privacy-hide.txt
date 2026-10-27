@@ -1,0 +1,5 @@
+#cxense-recs-in-article	#cxense-recs-in-article
+.embed-responsive-trendmd	.embed-responsive-trendmd
+always
+scoped
+untouched

@@ -89,20 +89,28 @@ enum Benchmark {
 
         for name in ["ads", "privacy", "cookies"] {
             guard let url = Bundle.main.url(forResource: name, withExtension: "json"),
-                  let data = try? Data(contentsOf: url),
-                  let rules = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { continue }
+                  let text = try? ContentBlocker.rules(json: url, hosts: Bundle.main.url(forResource: "\(name)-hosts", withExtension: "txt")),
+                  let rules = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [[String: Any]] else { continue }
             if let list = await compile(rules, "bench-net-\(name)") { network.append(list) }
 
             // Rebuild the old style: every hiding rule inside the WebKit list.
             var old: [[String: Any]] = []
-            if let hideURL = Bundle.main.url(forResource: "\(name)-hide", withExtension: "json"),
-               let hideData = try? Data(contentsOf: hideURL),
-               let index = try? JSONSerialization.jsonObject(with: hideData) as? [String: Any] {
-                let keyed = (index["keyed"] as? [String: [String]] ?? [:]).values.flatMap { $0 }
-                old += hide(keyed + (index["always"] as? [String] ?? []))
-                for (domain, selectors) in index["scoped"] as? [String: [String]] ?? [:] {
-                    old += hide(selectors, domains: [domain])
+            if let hideURL = Bundle.main.url(forResource: "\(name)-hide", withExtension: "txt"),
+               let text = try? String(contentsOf: hideURL, encoding: .utf8) {
+                // The same lines CosmeticFilter reads: keyed, every page, per site.
+                var section = 0, everywhere: [String] = [], scoped: [String: [String]] = [:]
+                for line in text.split(separator: "\n") {
+                    if line.first == "\u{1}" { section += 1; continue }
+                    let parts = line.split(separator: "\t", maxSplits: 1).map(String.init)
+                    switch section {
+                    case 0: if parts.count == 2 { everywhere.append(parts[1]) }
+                    case 1: everywhere.append(String(line))
+                    case 2: if parts.count == 2 { scoped[parts[0], default: []].append(parts[1]) }
+                    default: break
+                    }
                 }
+                old += hide(everywhere)
+                for (domain, selectors) in scoped { old += hide(selectors, domains: [domain]) }
             }
             if let list = await compile(old + rules, "bench-legacy-\(name)") { legacy.append(list) }
         }

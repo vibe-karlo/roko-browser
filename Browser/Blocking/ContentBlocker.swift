@@ -135,8 +135,9 @@ final class ContentBlocker {
                 continue
             }
             do {
+                let hosts = Bundle.main.url(forResource: "\(category.rawValue)-hosts", withExtension: "txt")
                 let json = try await Task.detached(priority: .utility) {
-                    try String(contentsOf: url, encoding: .utf8)
+                    try Self.rules(json: url, hosts: hosts)
                 }.value
                 let list: WKContentRuleList? = try await store.compileContentRuleList(
                     forIdentifier: identifier, encodedContentRuleList: json)
@@ -156,8 +157,30 @@ final class ContentBlocker {
         controllers.allObjects.forEach { apply(to: $0, host: nil) }
     }
 
+    /// A list's rules as WebKit takes them: its plain hosts (shipped one per
+    /// line, a fifth of the size as JSON) made into block rules, then the rest,
+    /// whose exceptions must come last. Only when compiling, once per update.
+    nonisolated static func rules(json: URL, hosts: URL?) throws -> String {
+        let rest = try String(contentsOf: json, encoding: .utf8)
+        guard let hosts, let text = try? String(contentsOf: hosts, encoding: .utf8) else { return rest }
+        var out = "["
+        out.reserveCapacity(rest.utf8.count + text.utf8.count * 4)
+        var any = false
+        for host in text.split(separator: "\n") where !host.isEmpty {
+            if any { out += "," }
+            any = true
+            out += #"{"trigger":{"url-filter":"^[^:]+://+([^/]+\\.)?"#
+            out += host.replacingOccurrences(of: ".", with: #"\\."#)
+            out += #"[/:?&=]"},"action":{"type":"block"}}"#
+        }
+        let others = rest.trimmingCharacters(in: .whitespacesAndNewlines).dropFirst()  // without its "["
+        return out + (others.first == "]" || !any ? "" : ",") + others
+    }
+
     private static func identifier(for category: Category, file: URL) -> String {
-        let size = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        let hosts = Bundle.main.url(forResource: "\(category.rawValue)-hosts", withExtension: "txt")
+        let size = ((try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+            + ((try? hosts?.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
         return "\(category.rawValue)-\(build)-\(size)"
     }

@@ -48,6 +48,25 @@ The first converts EasyList, EasyPrivacy and Fanboy's Cookie List to WebKit's fo
 second compiles them with the real WebKit engine to prove they load. Bump the build number
 when you ship new lists so the app recompiles them.
 
+The build keeps the lists lean without losing anything that can still serve an ad:
+
+- Domains that no longer exist are dropped. A host goes only when both Cloudflare's and
+  Google's resolvers answer NXDOMAIN (asked over HTTPS, so a filtering resolver on the Mac
+  can't make a live ad server look dead); no answer keeps it. In October 2026 that was 17,617
+  of 138,561 hosts, a fifth of EasyList's ad servers. Answers are cached for 30 days in
+  `Scripts/.cache/dns.json`; `--offline --dns` refreshes them without downloading the lists.
+- Plain "block this host" rules ship as `<name>-hosts.txt`, one host per line, and the app
+  makes them into rules only when it compiles (`ContentBlocker.rules`, about 0.1 s).
+- Hiding rules ship as lines (`<name>-hide.txt`), which load in a third of the time JSON took.
+
+| | Before | After |
+| --- | --- | --- |
+| Lists in the app | 16 MB | 7.4 MB |
+| Compiled on the phone | 49 MB | 38.6 MB |
+| Network rules | 118,000 | 102,000 |
+| Compiling them (Mac) | 2.9 s | 2.5 s |
+| Loading the hiding indexes (Mac) | ~175 ms | ~60 ms |
+
 ## Speed
 
 Measured with the built-in benchmark (7 news and reference sites, 3 cache-free loads each):
