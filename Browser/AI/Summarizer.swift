@@ -5,21 +5,31 @@ import WebKit
 
 /// The shape every AI answer takes, so the app can lay it out as a page:
 /// a lead line, then a few sections each tagged with a topic the app draws as an icon.
-private func answerShape(sections: String = "three to five") -> String {
-    """
+private func answerShape(sections: String = "three to five", picks: Bool = false, keyPoints: Bool = false) -> String {
+    let opening = keyPoints ? "\n> - <one of the three things most worth knowing>" : ""
+    let choice = picks ? "\n=> <option> | <its price or deciding number> | <who it suits, a few words>" : ""
+    let openingRule = keyPoints ? " Then three \"> - \" lines, the three things most worth knowing beyond the gist, each at most 15 words." : ""
+    let choiceRule = picks ? """
+         If the question asks which to choose or what is best, then two to four "=> " lines, best \
+        first: the option's name, its price or deciding number as short as "$299" or "40 hours" (nothing \
+        at all if the sources give none), and \
+        who it suits, separated by " | ". Otherwise no "=> " lines.
+        """ : ""
+    return """
     Format, in Markdown (angle brackets mark what you write):
 
-    > <the gist, one or two sentences>
-    ## [<topic>] <heading for this answer>
+    > <the gist, one or two sentences>\(opening)\(choice)
+    ## [<topic>] <heading, two to five words>
     <one or two short sentences>
-    ## [<topic>] <heading for this answer>
+    ## [<topic>] <heading, two to five words>
     - **<key term>:** <detail>
     - **<key term>:** <detail>
 
-    Rules: one "> " line with the gist. Then \(sections) "## " sections with headings written for \
-    this answer. The word in brackets only chooses the section's icon: pick the closest from \
-    [\(AnswerTopic.vocabulary)], and use each at most once. Under each heading, one or two short \
-    sentences or two to four "- " lines. No emoji. No preamble, no sign-off.
+    Rules: one "> " line with the gist.\(openingRule)\(choiceRule) Then \(sections) "## " sections with \
+    headings of two to five words, written for this answer. The word in brackets only chooses the \
+    section's icon: pick the closest from [\(AnswerTopic.vocabulary)], or leave the brackets empty \
+    if none fits, and use each at most once. Under each heading, one or two short sentences or two \
+    to four "- " lines; each line is one sentence of at most 20 words. No emoji. No preamble, no sign-off.
     """
 }
 
@@ -59,6 +69,17 @@ final class SummaryModel: Identifiable {
     private(set) var phase: Phase = .reading
     private(set) var engine = ""
     private(set) var note: String?
+    /// The page's length in words, once it's read.
+    private(set) var pageWords: Int?
+
+    /// "6 min read → 40 s": the time the summary saved, for a page worth it.
+    var readingTime: String? {
+        guard phase == .done, let pageWords else { return nil }
+        let pageMinutes = Int((Double(pageWords) / 230).rounded())
+        guard pageMinutes >= 2 else { return nil }
+        let seconds = max(10, Int((Double(SavedStats.words(in: text)) / 230 * 60 / 10).rounded()) * 10)
+        return "\(pageMinutes) min read → \(seconds < 60 ? "\(seconds) s" : "\(seconds / 60) min")"
+    }
 
     init(title: String, host: String, snapshot: UIImage?) {
         self.title = title
@@ -87,6 +108,7 @@ final class SummaryModel: Identifiable {
             text = cached.text
             engine = cached.engine
             note = cached.note
+            pageWords = cached.pageWords
             phase = .done
             return
         }
@@ -108,6 +130,7 @@ final class SummaryModel: Identifiable {
             return
         }
         phase = .writing
+        pageWords = SavedStats.words(in: page.text)
 
         // Apple's models write some languages well and others badly (Croatian
         // with Serbian words and broken endings), and no prompt fixes that. So
@@ -134,7 +157,7 @@ final class SummaryModel: Identifiable {
                 phase = .done
                 SavedStats.summary(pageWords: SavedStats.words(in: page.text), summaryWords: SavedStats.words(in: text))
                 if let url, !text.isEmpty {
-                    SummaryCache.store(.init(text: text, engine: self.engine, note: note, at: .now), for: url)
+                    SummaryCache.store(.init(text: text, engine: self.engine, note: note, at: .now, pageWords: pageWords), for: url)
                 }
                 return
             } catch is CancellationError {
@@ -215,7 +238,7 @@ final class SummaryModel: Identifiable {
 
     private func stream(_ client: ClaudeClient, prompt: String, model: ClaudeClient.Model,
                         language: WritingLanguage?) async throws {
-        let instructions = summaryGuidance(language) + "\n\n" + answerShape()
+        let instructions = summaryGuidance(language) + "\n\n" + answerShape(sections: "two to four", keyPoints: true)
         for try await event in client.stream(system: instructions, prompt: prompt, model: model,
                                              effort: "low", maxTokens: 4_096) {
             if case .text(let chunk) = event {
@@ -313,6 +336,8 @@ enum SummaryCache {
         let engine: String
         let note: String?
         let at: Date
+        /// The page's length in words, for "6 min read → 40 s" (absent in older entries).
+        var pageWords: Int? = nil
     }
 
     private static let lifetime: TimeInterval = 24 * 3600
@@ -432,6 +457,11 @@ final class BrowseForMeModel: Identifiable {
         stopLookingForPictures()
     }
 
+    /// The answer without its source marks, for sharing and for follow-ups.
+    var plainAnswer: String {
+        answer.replacingOccurrences(of: #"\[\[[\d,]+\]\]"#, with: "", options: .regularExpression)
+    }
+
     /// The answer without its follow-up lines (nor the lone "?" a follow-up
     /// line starts as while it streams in).
     var answer: String {
@@ -470,13 +500,13 @@ final class BrowseForMeModel: Identifiable {
             One to three searches and four to six trustworthy sources. Write a compact answer \
             page. First line: "# " and a specific title. Lead with what the person most likely \
             wants to know.
-            """ + answerShape()
+            """ + answerShape(picks: true)
         case .deep: """
             Research this properly: search from several angles and read at least six \
             trustworthy sources. Give specifics: names, numbers, prices, dates and trade-offs. \
             Where sources disagree, say so. First line: "# " and a specific title. Lead with \
             what the person most likely wants to know.
-            """ + answerShape(sections: "five to seven")
+            """ + answerShape(sections: "five to seven", picks: true)
         }
         // Haiku answered "why is the sky blue" from memory, with no search and
         // so no sources; the feature promises an answer read from the web.
@@ -683,6 +713,15 @@ final class BrowseForMeModel: Identifiable {
             case .source(let page):
                 // Cited by the answer: these are its sources.
                 if !JunkSites.contains(page.url), !sources.contains(where: { $0.url.displayHost == page.url.displayHost }) { sources.append(page) }
+            case .cited(let pages):
+                // A small number after the passage, for the source card it came
+                // from: "[[2]]", which the page draws as a tappable mark.
+                let numbers = pages.compactMap { page in sources.firstIndex { $0.url.displayHost == page.url.displayHost } }
+                    .map { $0 + 1 }
+                    .reduce(into: [Int]()) { if !$0.contains($1) { $0.append($1) } }
+                if !numbers.isEmpty, !text.isEmpty {
+                    text += "[[" + numbers.prefix(3).map(String.init).joined(separator: ",") + "]]"
+                }
             case .text(let chunk):
                 text += chunk
                 phase = .writing
@@ -817,9 +856,10 @@ nonisolated enum ResearchDepth: Equatable {
 /// The language an answer will be written in, as far as choosing a model goes:
 /// The topics a section can be tagged with; each is a Phosphor icon in the assets.
 nonisolated enum AnswerTopic {
-    static let all = ["idea", "check", "warning", "money", "time", "place", "people", "privacy", "speed", "star",
-                      "trend", "learn", "health", "tools", "world", "list", "question", "date", "battery", "device",
-                      "code", "nature", "food", "quote", "travel", "sport", "law", "news", "compare", "settings",
-                      "weather"]
+    /// Only topics whose icon can't be mistaken: "device" put a phone beside a
+    /// coffee machine, "idea" a bulb beside anything. A section that fits none
+    /// has no icon.
+    static let all = ["check", "warning", "money", "time", "date", "place", "people", "privacy", "speed", "star",
+                      "health", "battery", "nature", "food", "travel", "sport", "law", "news", "compare", "weather"]
     static let vocabulary = all.joined(separator: ", ")
 }

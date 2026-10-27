@@ -135,7 +135,7 @@ enum AnswerSharing {
     /// The finished questions and answers, as the page shows them.
     private static func payload(for session: BrowseSession) throws -> Data {
         let turns = session.turns.filter { $0.phase == .done }.map { turn in
-            Payload.Turn(question: turn.query, answer: turn.answer,
+            Payload.Turn(question: turn.query, answer: turn.plainAnswer,
                          sources: turn.sources.map { Payload.Source(url: $0.url.absoluteString, title: $0.title) },
                          // https only: a plain-http picture can't show on an https page.
                          images: turn.images.filter { $0.scheme == "https" }.map(\.absoluteString))

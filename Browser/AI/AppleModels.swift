@@ -136,7 +136,9 @@ nonisolated struct GeneratedAnswer {
     var title: String
     @Guide(description: "The gist in one or two plain sentences")
     var gist: String
-    @Guide(description: "Three to five sections, each about a different aspect", .count(3...5))
+    @Guide(description: "Three more facts most worth knowing, not the gist again, one short sentence each, at most 15 words", .count(3))
+    var keyPoints: [String]
+    @Guide(description: "Two to four sections with the details, each about a different aspect", .count(2...4))
     var sections: [GeneratedSection]
 }
 
@@ -147,8 +149,19 @@ nonisolated struct GeneratedSection {
     var topic: String
     @Guide(description: "A heading of two to four words, written for this answer")
     var heading: String
-    @Guide(description: "Two to four short points, one sentence each; start with a key term in **bold** when there is one", .count(2...4))
+    @Guide(description: "Two to four short points, one sentence each, at most 20 words; start with a key term in **bold** when there is one", .count(2...4))
     var points: [String]
+}
+
+/// One option to choose, for an answer about which to pick.
+@Generable
+nonisolated struct GeneratedPick {
+    @Guide(description: "The option's name, as the sources write it")
+    var name: String
+    @Guide(description: "Its price or deciding number from the sources, as short as $299 or 40 hours; an empty string if the sources give none")
+    var figure: String
+    @Guide(description: "Who or what it suits best, three to six words")
+    var suits: String
 }
 
 /// The short shape, for a quick question: the answer itself, and a few
@@ -174,6 +187,9 @@ nonisolated struct ResearchedAnswer {
     var title: String
     @Guide(description: "The gist in one or two plain sentences")
     var gist: String
+    // First, so the verdict is the first thing written and read.
+    @Guide(description: "Only when the question asks which to choose or what is best: the two to four top options, best first. Otherwise none", .count(0...4))
+    var picks: [GeneratedPick]
     // Made to write at least three, the small model padded thin sources with
     // sections on what they don't say ("prices are not specified").
     @Guide(description: "Two to five sections, each about a different aspect the sources cover", .count(2...5))
@@ -213,8 +229,8 @@ extension GeneratedAnswer.PartiallyGenerated: AnswerDraft {
     var isUseful: Bool { sections?.isEmpty == false }
 
     func markdown(titled: Bool, droppingUnfinished: Bool) -> String {
-        sectionedMarkdown(title: titled ? title : nil, gist: gist, sections: sections ?? [], followUps: [],
-                          droppingUnfinished: droppingUnfinished)
+        sectionedMarkdown(title: titled ? title : nil, gist: gist, keyPoints: keyPoints ?? [], sections: sections ?? [],
+                          followUps: [], droppingUnfinished: droppingUnfinished)
     }
 }
 
@@ -222,15 +238,17 @@ extension ResearchedAnswer.PartiallyGenerated: AnswerDraft {
     var isUseful: Bool { sections?.isEmpty == false }
 
     func markdown(titled: Bool, droppingUnfinished: Bool) -> String {
-        sectionedMarkdown(title: titled ? title : nil, gist: gist, sections: sections ?? [], followUps: followUps ?? [],
-                          droppingUnfinished: droppingUnfinished)
+        sectionedMarkdown(title: titled ? title : nil, gist: gist, picks: picks ?? [], sections: sections ?? [],
+                          followUps: followUps ?? [], droppingUnfinished: droppingUnfinished)
     }
 }
 
 /// Title, gist and sections, then any follow-ups as "?? " lines (Browse for Me
 /// lifts those out of the answer). Cut off mid-way, the last item is dropped:
 /// a follow-up if they had begun, otherwise a point.
-private nonisolated func sectionedMarkdown(title: String?, gist: String?, sections: [GeneratedSection.PartiallyGenerated],
+private nonisolated func sectionedMarkdown(title: String?, gist: String?, keyPoints: [String] = [],
+                                           picks: [GeneratedPick.PartiallyGenerated] = [],
+                                           sections: [GeneratedSection.PartiallyGenerated],
                                            followUps: [String], droppingUnfinished: Bool) -> String {
     var sections = sections, followUps = followUps
     if droppingUnfinished {
@@ -244,6 +262,11 @@ private nonisolated func sectionedMarkdown(title: String?, gist: String?, sectio
     var lines: [String] = []
     if let title, !title.isEmpty { lines.append("# \(title)") }
     if let gist, !gist.isEmpty { lines.append("> \(gist)") }
+    for point in keyPoints where !point.isEmpty { lines.append("> - \(point)") }
+    for pick in picks {
+        guard let name = pick.name, !name.isEmpty else { continue }
+        lines.append("=> \(name) | \(pick.figure ?? "") | \(pick.suits ?? "")")
+    }
     for section in sections {
         guard let heading = section.heading, !heading.isEmpty else { continue }
         lines.append("## [\(section.topic ?? "")] \(heading)")

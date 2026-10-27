@@ -170,6 +170,16 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Notify Me, as in Safari: in a page's menu, say what to look for ("size M in stock", or nothing for anything new) and check hourly, daily or weekly. roko reads the page in the background, Apple's on-device model decides whether it's what you asked for, and a notification opens the page. Settings lists the watched pages.
 
 ### Changed
+- Summaries and Browse for Me answers are easier to read and to search for the part you need:
+  - **Verdict first.** For "which" and "best" questions, the top two to four options come right under the gist: name, who it suits, and its price on the right. Details follow.
+  - **Key points.** A summary opens with three things worth knowing beyond the gist.
+  - **Shorter lines.** Every bullet is one sentence of at most 20 words.
+  - **Brighter text.** Body text is a step brighter. Bold terms, prices, percentages and measures are in full white, so you can skim the left edge and the numbers. There's more room between sections.
+  - **Jump to a section.** An answer with four or more sections opens with a row of its section names; tap one to go there.
+  - **Fewer, truer icons.** A section only gets an icon that fits. No more phone beside a coffee machine.
+  - **Source numbers.** Facts from Claude's answers end with a small number for the page they came from; tap it to open that page.
+  - **Summary card and timing.** The page card shrinks once the summary arrives, and the signature says what was saved ("16 min read → 50 s").
+  - **"Ask".** The summary's bar now says just "Ask".
 - Browse for Me's bottom is one bar: close, Follow up in the middle, and a small two-mark switch on the right for the AI answer or the search engine's results. The roko signature, with who wrote the answer, and Share now end each answer, so they no longer float over the text.
 - The shopping list is tighter: items are 38 points apart instead of 48, with less room under each aisle's name, so more of the list fits on screen. The circle is still a thumb wide, so ticking things off while walking stays easy.
 - Croatian shows only to someone in Croatia or reading Croatian, read from the phone's region and languages. Dictation listens for the phone's languages (with English beside a single other one), and says "Listening…" or "Listening, in English or German…"; Settings offers the phone's languages to choose from. Translate offers English and the phone's own language, by its own name ("Deutsch"). Today suggests Croatian news sites, and looks for topics in them, only for a Croatian phone; elsewhere it's BBC, The Guardian and The New York Times, with their sport pages, and the examples are bbc.com/sport/formula1 and Formula 1. The speech permission no longer names languages.

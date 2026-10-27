@@ -16,6 +16,8 @@ enum ClaudeEvent {
     /// Claude started another search or tool. Any text before it was it
     /// thinking aloud ("let me read the key ones"), not the answer.
     case usingTool
+    /// A passage of the answer has ended, citing these pages.
+    case cited([Source])
 }
 
 struct ClaudeError: LocalizedError {
@@ -209,6 +211,9 @@ struct ClaudeClient {
                 }
                 if blocks[index]?["type"] as? String == "text" {
                     AITrace.log("  text \((blocks[index]?["text"] as? String ?? "").count) chars")
+                    // The passage is whole: its sources, for a marker after it.
+                    let cited = (blocks[index]?["citations"] as? [[String: Any]] ?? []).compactMap(Self.source(from:))
+                    if !cited.isEmpty { continuation.yield(.cited(cited)) }
                 }
 
             case "message_delta":

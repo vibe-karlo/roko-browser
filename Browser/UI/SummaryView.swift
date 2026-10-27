@@ -21,7 +21,10 @@ struct SummaryView: View {
     /// on through its flood. Set here, so it never flickers solid for the frame
     /// between the light going and the flood starting.
     @State private var edgesClear = false
-    private let cardHeight: CGFloat = 210
+    private let fullCardHeight: CGFloat = 210
+    /// Once the summary is there, the card makes room for it: the page is a
+    /// reminder by then, not something to read.
+    private var cardHeight: CGFloat { model.text.isEmpty || model.isClosing ? fullCardHeight : 120 }
 
     init(model: SummaryModel) {
         self.model = model
@@ -53,10 +56,11 @@ struct SummaryView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
                             card(width: proxy.size.width)
+                                .animation(.smooth(duration: 0.6), value: model.text.isEmpty)
                                 .modifier(CardFlight(flight: flight))
                                 .offset(y: lift)
                                 .id("card")
-                            content
+                            content(scroller)
                                 .opacity(textShown ? 1 : 0)
                                 .offset(y: textShown || model.isClosing ? 0 : 12)
                         }
@@ -159,7 +163,7 @@ struct SummaryView: View {
     // MARK: The summary
 
     @ViewBuilder
-    private var content: some View {
+    private func content(_ scroller: ScrollViewProxy) -> some View {
         Group {
             switch model.phase {
             case .failed(let message):
@@ -176,13 +180,19 @@ struct SummaryView: View {
                                                 removal: .opacity.animation(.easeOut(duration: 0.12))))
                 } else {
                     VStack(alignment: .leading, spacing: 24) {
-                        MarkdownText(markdown: model.text, isStreaming: model.phase == .writing)
+                        MarkdownText(markdown: model.text, isStreaming: model.phase == .writing,
+                                     jump: { id in
+                                         withAnimation(.snappy(duration: 0.45)) {
+                                             scroller.scrollTo(id, anchor: UnitPoint(x: 0.5, y: 0.06))
+                                         }
+                                     },
+                                     anchor: "summary")
                         // Signed at the end, so a screenshot says where it came from,
                         // and it never floats over the text above the bar.
                         if model.phase == .done {
                             HStack(alignment: .firstTextBaseline, spacing: 10) {
                                 RokoSignature()
-                                Text(Self.credit(model.engine) + (model.note.map { " · \($0)" } ?? ""))
+                                Text([Self.credit(model.engine), model.readingTime, model.note].compactMap { $0 }.joined(separator: " · "))
                                     .font(.system(size: 13))
                                     .foregroundStyle(Theme.faintInk)
                                     .lineLimit(2)
@@ -206,7 +216,7 @@ struct SummaryView: View {
     /// The app's bar: back to the page, and a question about it from the middle.
     private var footer: some View {
         ContextBar(leading: .init(glyph: .close, label: "Back to the page", action: close),
-                   glyph: .browse, title: "Ask about this page",
+                   glyph: .browse, title: "Ask",
                    launch: { browser.showCommandBar(context: .aboutPage) }, fades: false)
             .padding(.top, 6)
             // See-through while the light is up, so its brightest part shows.

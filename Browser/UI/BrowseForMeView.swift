@@ -81,7 +81,12 @@ struct BrowseForMeView: View {
                                     reword: { session.reask(turn, as: $0) },
                                     ask: { session.ask($0) },
                                     open: open,
-                                    share: shareAction(for: turn))
+                                    share: shareAction(for: turn),
+                                    jump: { id in
+                                        withAnimation(.snappy(duration: 0.45)) {
+                                            scroller.scrollTo(id, anchor: UnitPoint(x: 0.5, y: 0.06))
+                                        }
+                                    })
                             .padding(.top, index == 0 ? 0 : 56)
                             // A follow-up's section is at least a screen tall, so it can
                             // come up to the top while it's still only a question.
@@ -117,9 +122,9 @@ struct BrowseForMeView: View {
     // MARK: Footer
 
     private var footer: some View {
-        // One bar: close, Follow up in its middle, and where the page
-        // comes from (the AI answer or the search engine's results) on the
-        // right. The roko signature and Share sit at the end of the answer.
+        // One bar: close on the left as on every screen, Follow up in its
+        // middle, and where the page comes from (the AI answer or the search
+        // engine's results) on the right. The roko signature and Share sit at the end of the answer.
         ContextBar(leading: .init(glyph: .close, label: "Close", action: close),
                    glyph: .browse, title: "Follow up",
                    launch: { browser.showCommandBar(context: .followUp) },
@@ -224,6 +229,8 @@ private struct TurnSection: View {
     let open: (URL) -> Void
     /// Shares the page, once there's something to share.
     var share: (() -> Void)? = nil
+    /// Scrolls the page to a part of this answer.
+    var jump: ((String) -> Void)? = nil
 
     /// Rewording the question, in place.
     @State private var editing = false
@@ -258,7 +265,9 @@ private struct TurnSection: View {
                     pictures.transition(Self.reveal(0))
                 }
                 if !turn.sources.isEmpty { sources.transition(Self.reveal(1)) }
-                MarkdownText(markdown: turn.answer, isStreaming: turn.phase == .writing)
+                MarkdownText(markdown: turn.answer, isStreaming: turn.phase == .writing,
+                             sources: turn.sources.map(\.url), openSource: open, jump: jump,
+                             anchor: "turn-\(ObjectIdentifier(turn).hashValue)")
                     .transition(Self.reveal(2))
                 if !credit.isEmpty {
                     // Signed, so a screenshot of the answer says where it's from,

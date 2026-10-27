@@ -29,7 +29,7 @@ final class BrowseSession: Identifiable {
     /// Asks a follow-up: a new section at the end, with every finished answer
     /// before it as context.
     func ask(_ question: String) {
-        let context = turns.compactMap { turn in turn.phase == .done ? (question: turn.query, answer: turn.answer) : nil }
+        let context = turns.compactMap { turn in turn.phase == .done ? (question: turn.query, answer: turn.plainAnswer) : nil }
         let turn = BrowseForMeModel(query: question, context: context)
         turns.append(turn)
         turn.start()

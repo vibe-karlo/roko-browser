@@ -10,6 +10,10 @@ enum Theme {
     static let raised = Color(light: 0xFCFCFB, dark: 0x252527)
     static let ink = Color(light: 0x0E0E0F, dark: 0xE7E7E4)
     static let secondaryInk = Color(light: 0x5C5C59, dark: 0x8C8C88)
+    /// Text read at length (summaries, answers): a step brighter than
+    /// secondaryInk, which made long answers a grey wall, and a step under
+    /// ink, so the bold terms and numbers in it still stand out.
+    static let bodyInk = Color(light: 0x34342F, dark: 0xB8B8B3)
     // Quiet but still readable: about 4:1 against the panel in both modes.
     static let faintInk = Color(light: 0x737370, dark: 0x7E7E7A)
     /// The mark's orange. In light mode a shade deeper, so it holds on white.
