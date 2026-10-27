@@ -120,7 +120,9 @@ struct ClaudeClient {
             body["fallbacks"] = "default"
         }
         if searches > 0 {
-            body["tools"] = [["type": model.webSearchTool, "name": "web_search", "max_uses": searches]]
+            // Content farms never come back from the search (JunkSites).
+            body["tools"] = [["type": model.webSearchTool, "name": "web_search", "max_uses": searches,
+                              "blocked_domains": JunkSites.domains]]
         }
 
         var request = URLRequest(url: endpoint)

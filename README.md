@@ -146,6 +146,8 @@ search tool: the newer one filters results by running code and was two to three 
 on a phone. Our own search uses DuckDuckGo's HTML results and reads the pages in parallel
 (plain HTTP, no web views).
 It asks for the phone's region (`kl`, `Audience.duckDuckGoRegion`) and keeps one page per site.
+Content farms in `AI/JunkSites.swift` are never read or cited: Claude's search gets them as
+`blocked_domains`, and both engines drop them from the sources. Add a farm by its host when one shows up.
 Apple's models get 30 seconds of quiet before a request counts as failed
 (`AppleModels.quietLimit`; `-quietLimit 1` in a Debug build shows the failure).
 

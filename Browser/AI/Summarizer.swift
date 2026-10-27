@@ -475,7 +475,11 @@ final class BrowseForMeModel: Identifiable {
         answering, even when you already know the answer: the person wants current facts with \
         sources they can open. Write every sentence \(writeIn), including facts from sources in \
         other languages: put them in your own words, never copy a source's sentences. \
-        Don't list the sources (the app shows them).
+        Don't list the sources (the app shows them). Prefer the maker's own site, \
+        established reviewers and major publications. Skip pages that only rank products to \
+        earn affiliate commissions, especially on sites whose name has nothing to do with the \
+        subject (an old blog or a film's fan site listing "best headphones"): don't read or \
+        cite them.
 
         """ + task + """
 
@@ -659,13 +663,13 @@ final class BrowseForMeModel: Identifiable {
             case .result(let page):
                 // Search hits: a few on the live list while it works, the rest
                 // kept in case the answer cites nothing.
-                guard !found.contains(where: { $0.url.displayHost == page.url.displayHost }) else { break }
+                guard !JunkSites.contains(page.url), !found.contains(where: { $0.url.displayHost == page.url.displayHost }) else { break }
                 found.append(page)
                 if steps.count < 8 { steps.append(Step(url: page.url, state: .read)) }
                 lookForPicture(on: page.url)
             case .source(let page):
                 // Cited by the answer: these are its sources.
-                if !sources.contains(where: { $0.url.displayHost == page.url.displayHost }) { sources.append(page) }
+                if !JunkSites.contains(page.url), !sources.contains(where: { $0.url.displayHost == page.url.displayHost }) { sources.append(page) }
             case .text(let chunk):
                 text += chunk
                 phase = .writing

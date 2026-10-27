@@ -36,6 +36,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Five app icons: the blue, green, yellow and grey stars, and the orange chevrons.
 
 ### Fixed
+- Browse for Me no longer cites affiliate content farms: expired domains reused for "15 best headphones" pages (requiemforadream.com and the like). Claude's search is told never to return them (`blocked_domains`), both engines drop them from the sources if one slips through, and Claude is asked to prefer makers, established reviewers and major publications and skip pages that only exist to earn commissions. The same question now answers from Android Authority, RTINGS and recordingnow.
 - Browse for Me no longer waits for ever. Apple's on-device model sometimes went quiet without failing (seen in the simulator after other requests): no words, no error, "Writing your answer" for minutes. Now 30 seconds without a word ends it, and it says so, with Try again under it. Summaries get the same limit.
 - When Apple's model fails, Browse for Me and summaries say how ("declined to summarize this page", "too much to read at once", "busy") instead of "needs Apple Intelligence" or "The model refused to answer."; without a Claude key, they say a key would take over.
 - Browse for Me's own search asks DuckDuckGo for the phone's region, and keeps one page per site, so one site no longer fills most of the sources.

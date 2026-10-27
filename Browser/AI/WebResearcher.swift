@@ -40,7 +40,8 @@ nonisolated enum WebResearcher {
         var hosts = Set<String>()
         for (index, link) in links.enumerated() {
             guard let url = URL(string: decodeEntities(link[0])), let host = url.host(),
-                  !host.contains("duckduckgo.com") else { continue }  // ads route through DDG
+                  !host.contains("duckduckgo.com"),  // ads route through DDG
+                  !JunkSites.contains(url) else { continue }
             // One page per site, so a site with several hits doesn't crowd out the others.
             guard hosts.insert(url.displayHost).inserted else { continue }
             let snippet = index < snippets.count ? plain(snippets[index]) : ""
