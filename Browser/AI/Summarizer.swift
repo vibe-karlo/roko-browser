@@ -143,8 +143,11 @@ final class SummaryModel: Identifiable {
                 // A cancelled request fails as URLError.cancelled: closed, not failed.
                 if Task.isCancelled { return }
                 // Quota reached, offline, refused, or out of its depth: try the next engine.
+                // What was written stays on screen until the next one's first words
+                // replace it, rather than the page going blank and starting over.
+                AITrace.log("summary: \(self.engine) failed: \(error)")
                 lastError = error
-                text = ""
+                replacing = !text.isEmpty
                 note = nil
             }
         }
@@ -215,9 +218,19 @@ final class SummaryModel: Identifiable {
         let instructions = summaryGuidance(language) + "\n\n" + answerShape()
         for try await event in client.stream(system: instructions, prompt: prompt, model: model,
                                              effort: "low", maxTokens: 4_096) {
-            if case .text(let chunk) = event { text += chunk }
+            if case .text(let chunk) = event {
+                if replacing {
+                    text = chunk
+                    replacing = false
+                } else {
+                    text += chunk
+                }
+            }
         }
     }
+
+    /// The last engine failed partway: its words stay up until these replace them.
+    @ObservationIgnored private var replacing = false
 }
 
 /// Apple's on-device model: free, private and instant, with a small context

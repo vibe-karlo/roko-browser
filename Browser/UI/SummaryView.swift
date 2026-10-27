@@ -175,12 +175,26 @@ struct SummaryView: View {
                         .transition(.asymmetric(insertion: .opacity,
                                                 removal: .opacity.animation(.easeOut(duration: 0.12))))
                 } else {
-                    MarkdownText(markdown: model.text, isStreaming: model.phase == .writing)
-                        // Then the summary comes into focus: blurred at first, sharpening as it settles.
-                        .transition(.asymmetric(
-                            insertion: AnyTransition(.blurReplace(.downUp)).combined(with: .offset(y: 10))
-                                .animation(.smooth(duration: 0.75).delay(0.1)),
-                            removal: .opacity))
+                    VStack(alignment: .leading, spacing: 24) {
+                        MarkdownText(markdown: model.text, isStreaming: model.phase == .writing)
+                        // Signed at the end, so a screenshot says where it came from,
+                        // and it never floats over the text above the bar.
+                        if model.phase == .done {
+                            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                RokoSignature()
+                                Text(Self.credit(model.engine) + (model.note.map { " · \($0)" } ?? ""))
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(Theme.faintInk)
+                                    .lineLimit(2)
+                            }
+                            .transition(.opacity)
+                        }
+                    }
+                    // Then the summary comes into focus: blurred at first, sharpening as it settles.
+                    .transition(.asymmetric(
+                        insertion: AnyTransition(.blurReplace(.downUp)).combined(with: .offset(y: 10))
+                            .animation(.smooth(duration: 0.75).delay(0.1)),
+                        removal: .opacity))
                 }
             }
         }
@@ -189,29 +203,16 @@ struct SummaryView: View {
         .animation(.smooth(duration: 0.5), value: model.text.isEmpty)
     }
 
-    /// Who wrote it, then the app's bar: back to the page, and a question
-    /// about it from the middle.
+    /// The app's bar: back to the page, and a question about it from the middle.
     private var footer: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 12) {
-                // Signed, so a screenshot says where it came from; who wrote it beside.
-                RokoSignature()
-                Text(model.phase == .done ? Self.credit(model.engine) + (model.note.map { " · \($0)" } ?? "") : "")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.faintInk)
-                    .lineLimit(2)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 22)
-            ContextBar(leading: .init(glyph: .close, label: "Back to the page", action: close),
-                       glyph: .browse, title: "Ask about this page",
-                       launch: { browser.showCommandBar(context: .aboutPage) }, fades: false)
-        }
-        .padding(.top, 6)
-        // See-through while the light is up, so its brightest part shows.
-        // At the light's own pace, so no dark band crosses it as it sinks or floods.
-        .background(Theme.canvas.opacity(edgesClear ? 0 : 1))
-        .background(alignment: .top) { FadeEdge(color: Theme.canvas).opacity(edgesClear ? 0 : 1) }
+        ContextBar(leading: .init(glyph: .close, label: "Back to the page", action: close),
+                   glyph: .browse, title: "Ask about this page",
+                   launch: { browser.showCommandBar(context: .aboutPage) }, fades: false)
+            .padding(.top, 6)
+            // See-through while the light is up, so its brightest part shows.
+            // At the light's own pace, so no dark band crosses it as it sinks or floods.
+            .background(Theme.canvas.opacity(edgesClear ? 0 : 1))
+            .background(alignment: .top) { FadeEdge(color: Theme.canvas).opacity(edgesClear ? 0 : 1) }
     }
 
     /// The card grows back to exactly the page's size and place; only then is

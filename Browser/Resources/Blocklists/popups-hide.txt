@@ -12101,6 +12101,8 @@ independent.co.uk	.tp-active
 independent.co.uk	.tp-backdrop
 independent.co.uk	.tp-modal
 independent.co.uk	.tw-link
+independent.co.uk	.mos-modal-overlay
+independent.co.uk	div:has(> a > #skyline-header)
 publishersweekly.com	#bbstar-popin
 publishersweekly.com	.home-promo-center-right-bottom
 slideme.org	#block-block-10

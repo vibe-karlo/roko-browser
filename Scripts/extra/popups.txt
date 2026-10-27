@@ -12,3 +12,7 @@
 ###piano_wrapper
 ! Index.hr's own "Index bez reklama" subscription banner, pinned to the bottom.
 index.hr###premium-sticky
+! The Independent's membership offer over its front page (Piano's "mos" modal),
+! and the newsletter banner above its masthead.
+independent.co.uk##.mos-modal-overlay
+independent.co.uk##div:has(> a > #skyline-header)

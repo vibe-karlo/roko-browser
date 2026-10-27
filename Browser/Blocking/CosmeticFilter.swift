@@ -106,7 +106,12 @@ final class CosmeticFilter: NSObject, WKScriptMessageHandlerWithReply {
             if category == .cookies || category == .popups { overlays += found }
         }
         // One rule per selector, so a selector WebKit can't parse only drops itself.
-        let css = selectors.map { $0 + "{display:none!important}" }.joined(separator: "\n")
+        // Under :root, one step more specific than the page's own rules: a site
+        // whose stylesheet loads later and shows the same element with
+        // !important (The Independent's membership offer) can't undo it.
+        // Not for pseudo-elements, which :is() can't hold.
+        let css = selectors.map { ($0.contains("::") ? String($0) : ":root :is(\($0))") + "{display:none!important}" }
+            .joined(separator: "\n")
         if LaunchClock.isEnabled {
             print("HIDE \(host) keys=\(keys.count) first=\(isFirst) selectors=\(selectors.count) faded=\(faded.count)")
         }

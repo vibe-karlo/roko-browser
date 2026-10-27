@@ -36,6 +36,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Five app icons: the blue, green, yellow and grey stars, and the orange chevrons.
 
 ### Fixed
+- Hiding rules now win over a site's own styles: each is scoped one step tighter, so a site that shows its pop-up with !important (The Independent's membership offer) can't undo it. The Independent's membership pop-up and newsletter banner are hidden.
+- A summary that one engine starts and another finishes keeps its words on screen until the new ones arrive, instead of going blank. The summary's roko signature now ends the summary, as on Browse for Me's answers.
 - Searches open in the phone's language and region: Google got `hl` and `gl`, so an English phone on a Croatian network no longer sees Google in Croatian.
 - Browse for Me no longer cites affiliate content farms: expired domains reused for "15 best headphones" pages (requiemforadream.com and the like). Claude's search is told never to return them (`blocked_domains`), both engines drop them from the sources if one slips through, and Claude is asked to prefer makers, established reviewers and major publications and skip pages that only exist to earn commissions. The same question now answers from Android Authority, RTINGS and recordingnow.
 - Browse for Me no longer waits for ever. Apple's on-device model sometimes went quiet without failing (seen in the simulator after other requests): no words, no error, "Writing your answer" for minutes. Now 30 seconds without a word ends it, and it says so, with Try again under it. Summaries get the same limit.
