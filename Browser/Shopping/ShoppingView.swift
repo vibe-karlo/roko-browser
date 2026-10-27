@@ -77,7 +77,7 @@ struct ShoppingView: View {
                     }
                     ForEach(aisles, id: \.0) { aisle, items in
                         aisleView(aisle, items)
-                            .padding(.bottom, 30)
+                            .padding(.bottom, 24)
                     }
                     if !suggested.isEmpty { suggestions }
                     if !bought.isEmpty { boughtSection }
@@ -171,12 +171,15 @@ struct ShoppingView: View {
 
     // MARK: Aisles
 
+    /// How tall an item's row is.
+    static let rowHeight: CGFloat = 38
+
     private func aisleView(_ aisle: Aisle, _ items: [ShoppingItem]) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 0) {
             Text(aisle.title)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.secondaryInk)
-                .padding(.bottom, 8)
+                .padding(.bottom, 4)
             ForEach(items) { item in
                 row(item)
                     .transition(.opacity.combined(with: .offset(y: -6)))
@@ -187,8 +190,10 @@ struct ShoppingView: View {
     private func row(_ item: ShoppingItem) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 14) {
             Button { toggle(item) } label: {
+                // 38 points tall: a list to read at a glance in the shop, the
+                // circle still as wide as a thumb (it was 48, Notes is 32).
                 TodoCircle(done: item.done)
-                    .frame(width: 44, height: 44)
+                    .frame(width: 44, height: Self.rowHeight)
                     .contentShape(.rect)
             }
             .buttonStyle(.plain)
@@ -218,7 +223,6 @@ struct ShoppingView: View {
                     .onTapGesture { if !item.done { editing = item.persistentModelID } }
             }
         }
-        .padding(.vertical, 1)
         .contentShape(.rect)
         .contextMenu { menu(for: item) }
     }
@@ -357,7 +361,7 @@ struct ShoppingView: View {
                     HStack(alignment: .firstTextBaseline, spacing: 14) {
                         Button { toggle(item) } label: {
                             TodoCircle(done: true)
-                                .frame(width: 44, height: 44)
+                                .frame(width: 44, height: Self.rowHeight)
                                 .contentShape(.rect)
                         }
                         .buttonStyle(.plain)
@@ -370,7 +374,6 @@ struct ShoppingView: View {
                             .strikethrough(true, color: Theme.secondaryInk)
                         Spacer(minLength: 0)
                     }
-                    .padding(.vertical, 1)
                     .contextMenu {
                         Button(role: .destructive) { delete(item) } label: { Label(ListLanguage.say("Delete", "Obriši"), systemImage: "trash") }
                     }
