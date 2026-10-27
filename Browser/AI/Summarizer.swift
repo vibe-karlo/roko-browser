@@ -415,6 +415,8 @@ final class BrowseForMeModel: Identifiable {
     private(set) var steps: [Step] = []
     /// Pictures from the sources, shown above the answer.
     private(set) var images: [URL] = []
+    /// YouTube videos on the question, shown under the answer.
+    private(set) var videos: [YouTube.Video] = []
     private(set) var phase: Phase = .searching("")
     private(set) var engine = ""
     /// Earlier questions and answers on the same page, for a follow-up.
@@ -462,6 +464,7 @@ final class BrowseForMeModel: Identifiable {
         sources = []
         steps = []
         images = []
+        videos = []
         phase = .searching(query)
         start()
     }
@@ -469,6 +472,7 @@ final class BrowseForMeModel: Identifiable {
     /// Stops searching and writing: the answer was closed or replaced.
     func cancel() {
         task?.cancel()
+        videoSearch?.cancel()
         stopLookingForPictures()
     }
 
@@ -578,6 +582,7 @@ final class BrowseForMeModel: Identifiable {
         // (a follow-up like "i zimi?" is too short to tell, so the page's first
         // question counts too).
         let language = AnswerLanguage.target(for: ([query] + context.map(\.question)).joined(separator: "\n"))
+        lookForVideos(language: language)
         // Apple's cloud model, fed by our own search, is the default; Claude
         // (which searches by itself) is the fallback; the small on-device model
         // is the last resort, working from search snippets and short excerpts.
@@ -632,6 +637,13 @@ final class BrowseForMeModel: Identifiable {
             images = Array(WebResearcher.distinctImages(pages.compactMap(\.image)).prefix(4))
             // Pages that wouldn't load still contribute their search snippet.
             if pages.count < 2 { pages = candidates.map { var page = $0; page.text = $0.snippet; return page } }
+            // Videos that say enough about themselves (a recipe, the steps, the
+            // chapters) are read like pages, after the pages.
+            for video in await videosFound(within: .seconds(2)).filter({ $0.notes.count > 250 }).prefix(2) {
+                pages.append(WebResearcher.Page(url: video.url, title: video.title, snippet: "",
+                                                text: "A YouTube video by \(video.channel), \(video.length) long. Its description:\n"
+                                                    + String(video.notes.prefix(perPage))))
+            }
             sources = pages.map { Source(url: $0.url, title: $0.title) }
 
             // A follow-up carries the page so far, briefly, so "and in winter?" makes sense.
@@ -708,7 +720,21 @@ final class BrowseForMeModel: Identifiable {
     }
 
     private func streamClaude(_ client: ClaudeClient, model: ClaudeClient.Model, language: WritingLanguage?) async throws {
-        for try await event in client.stream(system: Self.claudeInstructions(depth, language: language), prompt: query, history: context,
+        // Claude searches the web itself, but not YouTube: what the top videos
+        // say about themselves goes along with the question, if they're found
+        // in time (the search started with the page; this waits at most a moment).
+        var prompt = query
+        let described = await videosFound(within: .milliseconds(1_500)).filter { $0.notes.count > 250 }.prefix(3)
+        if !described.isEmpty {
+            prompt += "\n\n<youtube_videos>\nThe top YouTube videos on this, with their own descriptions. Use what "
+                + "they say like any source; where watching one would genuinely help (a technique, a repair), "
+                + "name it in passing by its title. The app shows them under the answer.\n"
+            for video in described {
+                prompt += "\n\"\(video.title)\" by \(video.channel) (\(video.length), \(video.views)):\n\(video.notes.prefix(1_500))\n"
+            }
+            prompt += "</youtube_videos>"
+        }
+        for try await event in client.stream(system: Self.claudeInstructions(depth, language: language), prompt: prompt, history: context,
                                              model: model, effort: depth.effort, searches: depth.searches) {
             switch event {
             case .searching(let query):
@@ -742,6 +768,37 @@ final class BrowseForMeModel: Identifiable {
                 text += chunk
                 phase = .writing
             }
+        }
+    }
+
+    // MARK: Videos
+
+    @ObservationIgnored private var videoSearch: Task<[YouTube.Video], Never>?
+
+    /// Starts looking on YouTube alongside the web search, for questions with
+    /// room for it: a quick fact gets no videos. The row shows them as soon as
+    /// they're found; their descriptions follow for the model to read.
+    private func lookForVideos(language: WritingLanguage?) {
+        guard depth != .quick else { return }
+        let hl = language?.code ?? Audience.languages.first ?? "en"
+        let searchFor = context.first.map { "\($0.question.prefix(100)) \(query)" } ?? query
+        videoSearch = Task { [weak self] in
+            let found = await YouTube.search(searchFor, language: hl)
+            guard !Task.isCancelled else { return [] }
+            await MainActor.run { self?.videos = found }
+            return await YouTube.describe(Array(found.prefix(3)), language: hl)
+        }
+    }
+
+    /// The videos with their descriptions, or none if they take longer than `limit`.
+    private func videosFound(within limit: Duration) async -> [YouTube.Video] {
+        guard let videoSearch else { return [] }
+        return await withTaskGroup(of: [YouTube.Video]?.self) { group in
+            group.addTask { await videoSearch.value }
+            group.addTask { try? await Task.sleep(for: limit); return nil }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first ?? []
         }
     }
 

@@ -282,6 +282,8 @@ private struct TurnSection: View {
                              sources: turn.sources.map(\.url), openSource: open, jump: jump,
                              anchor: "turn-\(ObjectIdentifier(turn).hashValue)")
                     .transition(Self.reveal(2))
+                // Under the answer, once it's written: for seeing it done.
+                if turn.phase == .done, !turn.videos.isEmpty { videos.transition(Self.reveal(0)) }
                 if !credit.isEmpty {
                     // Signed, so a screenshot of the answer says where it's from,
                     // with Share on the same line once the last answer is in.
@@ -531,6 +533,31 @@ private struct TurnSection: View {
         .scrollClipDisabled()
     }
 
+    // MARK: Videos
+
+    /// The top videos on the question, each opening on YouTube in a new tab.
+    private var videos: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                SiteIcon(host: "youtube.com", size: 18, remote: true)
+                Text("On YouTube")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.secondaryInk)
+            }
+            ScrollView(.horizontal) {
+                HStack(alignment: .top, spacing: 12) {
+                    ForEach(turn.videos) { video in
+                        Button { open(video.url) } label: { VideoCard(video: video) }
+                            .buttonStyle(RowButtonStyle())
+                            .accessibilityLabel("\(video.title), \(video.channel), \(video.length)")
+                    }
+                }
+            }
+            .scrollIndicators(.hidden)
+            .scrollClipDisabled()
+        }
+    }
+
     // MARK: Follow-ups
 
     /// What to ask next, when the answer suggests it. Each adds a section below.
@@ -568,6 +595,45 @@ private struct TurnSection: View {
         case "Apple Intelligence": return "By Apple Intelligence"
         default: return "Written on this iPhone"
         }
+    }
+}
+
+/// A video's frame with its length on it, then its title and who made it.
+private struct VideoCard: View {
+    let video: YouTube.Video
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            AsyncImage(url: video.thumbnail, transaction: Transaction(animation: .easeOut(duration: 0.25))) { phase in
+                if let image = phase.image {
+                    image.resizable().scaledToFill()
+                } else {
+                    Theme.raised
+                }
+            }
+            .frame(width: 224, height: 126)
+            .clipShape(.rect(cornerRadius: 14))
+            .overlay(alignment: .bottomTrailing) {
+                Text(video.length)
+                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(.black.opacity(0.72), in: .rect(cornerRadius: 6))
+                    .padding(8)
+            }
+            Text(video.title)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Theme.ink)
+                .lineLimit(2, reservesSpace: true)
+                .multilineTextAlignment(.leading)
+            Text([video.channel, video.views].filter { !$0.isEmpty }.joined(separator: " · "))
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.secondaryInk)
+                .lineLimit(1)
+        }
+        .frame(width: 224, alignment: .leading)
+        .contentShape(.rect)
     }
 }
 

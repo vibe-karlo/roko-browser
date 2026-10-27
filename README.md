@@ -35,6 +35,7 @@ Keychain.
 | Pop-ups | `Scripts/extra/popups.txt` | Fanboy's Annoyances (minus its cookie rules) plus our own additions such as Piano subscription modals. Allowed per site in page tools; hidden overlays that froze scrolling get scrolling back. |
 | Summarize | `AI/Summarizer.swift`, `AI/PageReader.swift` | Mozilla Readability extracts the article; Apple's on-device model summarizes; Claude is the fallback. |
 | Browse for Me | `AI/ClaudeClient.swift` | Claude Messages API with server-side web search, streamed. Swap `endpoint` for your own proxy before an App Store release. |
+| YouTube for answers | `AI/YouTube.swift` | Top videos for a question and their descriptions, via the request YouTube's search box makes (no key). Shown under the answer and read as sources. |
 | Look | `UI/Theme.swift`, `UI/Glyph.swift` | One warm palette, one clay accent, a hand-drawn icon set whose boxes share a chamfered corner. |
 
 ## Updating the filter lists
