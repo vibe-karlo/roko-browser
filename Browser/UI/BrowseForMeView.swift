@@ -117,16 +117,15 @@ struct BrowseForMeView: View {
     // MARK: Footer
 
     private var footer: some View {
-        // One bar: close, a follow-up from its middle, and where the page
+        // One bar: close, Follow up in its middle, and where the page
         // comes from (the AI answer or the search engine's results) on the
         // right. The roko signature and Share sit at the end of the answer.
         ContextBar(leading: .init(glyph: .close, label: "Close", action: close),
-                   glyph: .browse, title: "Ask a follow-up",
+                   glyph: .browse, title: "Follow up",
                    launch: { browser.showCommandBar(context: .followUp) },
                    fades: false,
                    accessory: AnyView(AnswerOrSearch(showsSearch: $session.showsSearch)),
-                   accessoryWidth: AnswerOrSearch.width,
-                   shortTitle: "Follow up")
+                   accessoryWidth: AnswerOrSearch.width)
             .padding(.top, 6)
             // See-through while the light is up, so its brightest part shows.
             // It turns solid at the light's own pace, so no dark band crosses the light as it sinks.
