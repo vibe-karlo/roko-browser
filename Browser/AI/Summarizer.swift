@@ -6,30 +6,43 @@ import WebKit
 /// The shape every AI answer takes, so the app can lay it out as a page:
 /// a lead line, then a few sections each tagged with a topic the app draws as an icon.
 private func answerShape(sections: String = "three to five", picks: Bool = false, keyPoints: Bool = false) -> String {
-    let opening = keyPoints ? "\n> - <one of the three things most worth knowing>" : ""
+    let opening = keyPoints ? "\n> - <one of the three things most worth knowing beyond the gist>" : ""
     let choice = picks ? "\n=> <option> | <its price or deciding number> | <who it suits, a few words>" : ""
     let openingRule = keyPoints ? " Then three \"> - \" lines, the three things most worth knowing beyond the gist, each at most 15 words." : ""
     let choiceRule = picks ? """
          If the question asks which to choose or what is best, then two to four "=> " lines, best \
         first: the option's name, its price or deciding number as short as "$299" or "40 hours" (nothing \
-        at all if the sources give none), and \
-        who it suits, separated by " | ". Otherwise no "=> " lines.
+        at all if the sources give none), and who it suits, separated by " | ". Otherwise no "=> " lines.
         """ : ""
     return """
     Format, in Markdown (angle brackets mark what you write):
 
+    @ <recipe, howto, compare, article or general>
+    %% <a number that matters most, as short as "25 min" or "$600"> | <what it is, one or two words>
     > <the gist, one or two sentences>\(opening)\(choice)
     ## [<topic>] <heading, two to five words>
-    <one or two short sentences>
-    ## [<topic>] <heading, two to five words>
-    - **<key term>:** <detail>
     - **<key term>:** <detail>
 
-    Rules: one "> " line with the gist.\(openingRule)\(choiceRule) Then \(sections) "## " sections with \
-    headings of two to five words, written for this answer. The word in brackets only chooses the \
-    section's icon: pick the closest from [\(AnswerTopic.vocabulary)], or leave the brackets empty \
-    if none fits, and use each at most once. Under each heading, one or two short sentences or two \
-    to four "- " lines; each line is one sentence of at most 20 words. No emoji. No preamble, no sign-off.
+    Rules: the first line names what this is: recipe for cooking and baking, howto for \
+    instructions and tutorials, compare for reviews and choosing, article for news and essays, \
+    general for anything else. Then up to three "%% " lines with the numbers someone wants first \
+    (a recipe's time, servings and difficulty; a price; a distance), or none if no number \
+    matters. One "> " line with the gist.\(openingRule)\(choiceRule) Then \(sections) "## " \
+    sections with headings of two to five words, written for this answer. The word in brackets \
+    only chooses the section's icon: pick the closest from [\(AnswerTopic.vocabulary)], or leave \
+    the brackets empty if none fits, and use each at most once.
+
+    Under each heading, write in the form that fits what it holds, not always bullets:
+    - "- " lines for points, each one sentence of at most 20 words, or one or two short sentences.
+    - "[] <thing> | <amount>" lines for what to have: a recipe's ingredients, a how-to's tools.
+    - "1. ", "2. " lines for steps in order: one sentence each, at most 20 words, starting \
+    with what to do. Split a long step into two rather than writing two sentences.
+    - "<> | <first option> | <second option>" and then "<> <point> | <value> | <value>" lines \
+    for two options side by side, values as short as "98%" or "yes".
+    - "@@ <name> | <role> | <their point, one sentence>" lines for who says what in an article.
+    - one "!! <sentence>" line, anywhere, for the one thing to watch out for, if there is one.
+    A recipe has an ingredients section and a method section; a how-to a "you need" section if \
+    anything is needed, then its steps. No emoji. No preamble, no sign-off.
     """
 }
 
@@ -460,6 +473,7 @@ final class BrowseForMeModel: Identifiable {
     /// The answer without its source marks, for sharing and for follow-ups.
     var plainAnswer: String {
         answer.replacingOccurrences(of: #"\[\[[\d,]+\]\]"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"(?m)^@ \w+\n?"#, with: "", options: .regularExpression)
     }
 
     /// The answer without its follow-up lines (nor the lone "?" a follow-up

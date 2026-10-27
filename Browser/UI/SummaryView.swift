@@ -21,10 +21,12 @@ struct SummaryView: View {
     /// on through its flood. Set here, so it never flickers solid for the frame
     /// between the light going and the flood starting.
     @State private var edgesClear = false
+    /// How far down the summary the reader is, for the line above the bar.
+    @State private var readProgress = 0.0
     private let fullCardHeight: CGFloat = 210
     /// Once the summary is there, the card makes room for it: the page is a
     /// reminder by then, not something to read.
-    private var cardHeight: CGFloat { model.text.isEmpty || model.isClosing ? fullCardHeight : 120 }
+    private var cardHeight: CGFloat { model.text.isEmpty || model.isClosing ? fullCardHeight : 72 }
 
     init(model: SummaryModel) {
         self.model = model
@@ -68,6 +70,9 @@ struct SummaryView: View {
                     }
                     .scrollDisabled(!settled)
                     .scrollIndicators(.hidden)
+                    .onScrollGeometryChange(for: Double.self) { ReadingLine.progress($0) } action: { _, progress in
+                        readProgress = progress
+                    }
                     .onChange(of: model.isClosing) { _, closing in
                         // Closing from further down: the card returns to the top as it grows.
                         if closing { scroller.scrollTo("card", anchor: .top) }
@@ -143,14 +148,17 @@ struct SummaryView: View {
                 RoundedRectangle(cornerRadius: 24 * settle, style: .continuous).strokeBorder(Theme.edge.opacity(settle))
             }
 
+            // Once the summary is there, the page is a reference: one quiet
+            // line, so the summary below is what the eye lands on.
+            let compact = !model.text.isEmpty && !model.isClosing
             VStack(alignment: .leading, spacing: 3) {
                 Text(model.title)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.ink)
-                    .lineLimit(2)
+                    .font(.system(size: compact ? 14 : 15, weight: compact ? .medium : .semibold))
+                    .foregroundStyle(compact ? Theme.secondaryInk : Theme.ink)
+                    .lineLimit(compact ? 1 : 2)
                 Text(model.host)
                     .font(.system(size: 13))
-                    .foregroundStyle(Theme.secondaryInk)
+                    .foregroundStyle(compact ? Theme.faintInk : Theme.secondaryInk)
             }
             // Appears only once the card has reached its size, never across it.
             .opacity(textShown ? 1 : 0)
@@ -180,13 +188,9 @@ struct SummaryView: View {
                                                 removal: .opacity.animation(.easeOut(duration: 0.12))))
                 } else {
                     VStack(alignment: .leading, spacing: 24) {
-                        MarkdownText(markdown: model.text, isStreaming: model.phase == .writing,
-                                     jump: { id in
-                                         withAnimation(.snappy(duration: 0.45)) {
-                                             scroller.scrollTo(id, anchor: UnitPoint(x: 0.5, y: 0.06))
-                                         }
-                                     },
-                                     anchor: "summary")
+                        // No section chips: a summary is short enough to scroll,
+                        // and they competed with the gist for the top.
+                        MarkdownText(markdown: model.text, isStreaming: model.phase == .writing, anchor: "summary")
                         // Signed at the end, so a screenshot says where it came from,
                         // and it never floats over the text above the bar.
                         if model.phase == .done {
@@ -218,7 +222,8 @@ struct SummaryView: View {
         ContextBar(leading: .init(glyph: .close, label: "Back to the page", action: close),
                    glyph: .browse, title: "Ask",
                    launch: { browser.showCommandBar(context: .aboutPage) }, fades: false)
-            .padding(.top, 6)
+            .padding(.top, 10)
+            .overlay(alignment: .top) { ReadingLine(progress: readProgress, tint: PageKind.of(model.text).tint) }
             // See-through while the light is up, so its brightest part shows.
             // At the light's own pace, so no dark band crosses it as it sinks or floods.
             .background(Theme.canvas.opacity(edgesClear ? 0 : 1))

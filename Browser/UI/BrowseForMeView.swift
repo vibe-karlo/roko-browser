@@ -15,6 +15,8 @@ struct BrowseForMeView: View {
     /// Pairs each site's icon in a reading list with the same icon in its source row.
     @Namespace private var icons
     @State private var viewportHeight: CGFloat = 0
+    /// How far down the answers the reader is, for the line above the bar.
+    @State private var readProgress = 0.0
     /// No canvas under the footer or the status bar: while the light is up,
     /// and on through its flood when an answer arrives. Set here, not worked
     /// out from the answer's state, so it never flickers solid for the frame
@@ -116,6 +118,9 @@ struct BrowseForMeView: View {
             .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.height } action: { _, height in
                 viewportHeight = height
             }
+            .onScrollGeometryChange(for: Double.self) { ReadingLine.progress($0) } action: { _, progress in
+                readProgress = progress
+            }
         }
     }
 
@@ -131,7 +136,10 @@ struct BrowseForMeView: View {
                    fades: false,
                    accessory: AnyView(AnswerOrSearch(showsSearch: $session.showsSearch)),
                    accessoryWidth: AnswerOrSearch.width)
-            .padding(.top, 6)
+            .padding(.top, 10)
+            .overlay(alignment: .top) {
+                ReadingLine(progress: session.showsSearch ? 0 : readProgress, tint: PageKind.of(latest.answer).tint)
+            }
             // See-through while the light is up, so its brightest part shows.
             // It turns solid at the light's own pace, so no dark band crosses the light as it sinks.
             .background(Theme.canvas.opacity(edgesClear && !session.showsSearch ? 0 : 1))

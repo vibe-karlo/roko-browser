@@ -132,15 +132,55 @@ enum AppleModels {
 /// which the small on-device model doesn't reliably do.
 @Generable
 nonisolated struct GeneratedAnswer {
+    @Guide(description: kindGuide, .anyOf(PageKind.names))
+    var kind: String
     @Guide(description: "A specific title for the answer, a few words")
     var title: String
+    @Guide(description: statsGuide, .count(0...3))
+    var stats: [GeneratedStat]
     @Guide(description: "The gist in one or two plain sentences")
     var gist: String
-    @Guide(description: "Three more facts most worth knowing, not the gist again, one short sentence each, at most 15 words", .count(3))
+    @Guide(description: "Three more facts most worth knowing, not the gist again and not steps, one short sentence each, at most 15 words", .count(3))
     var keyPoints: [String]
+    @Guide(description: checklistHeadingGuide)
+    var checklistHeading: String
+    @Guide(description: checklistGuide, .count(0...15))
+    var checklist: [GeneratedItem]
+    @Guide(description: stepsHeadingGuide)
+    var stepsHeading: String
+    @Guide(description: stepsGuide, .count(0...12))
+    var steps: [String]
     @Guide(description: "Two to four sections with the details, each about a different aspect", .count(2...4))
     var sections: [GeneratedSection]
+    @Guide(description: cautionGuide)
+    var caution: String
 }
+
+/// A number worth seeing first: "25 min" total, "$600", "16 km".
+@Generable
+nonisolated struct GeneratedStat {
+    @Guide(description: "The number with its unit, as short as 25 min, 4, $600 or Easy")
+    var value: String
+    @Guide(description: "What it is, one or two words: total, servings, price")
+    var label: String
+}
+
+/// Something to have or tick off: an ingredient and its amount, a tool.
+@Generable
+nonisolated struct GeneratedItem {
+    @Guide(description: "Its name only, without the amount: spaghetti, not 350g spaghetti")
+    var item: String
+    @Guide(description: "Its amount or size, short; an empty string if none")
+    var amount: String
+}
+
+nonisolated let kindGuide = "What the page or question is: recipe for cooking and baking, howto for instructions and tutorials, compare for reviews and choosing between things, article for news and essays, general for anything else"
+nonisolated let statsGuide = "Up to three numbers someone wants before anything else: for a recipe only its total time, servings and difficulty, never an ingredient's amount; for a price or a distance, that figure. None if no such number matters"
+nonisolated let checklistHeadingGuide = "For a recipe or a how-to, the heading of what's needed, two words such as Ingredients or You need, in the answer's language; otherwise an empty string"
+nonisolated let checklistGuide = "For a recipe, every ingredient with its amount; for a how-to, what's needed first. Otherwise none"
+nonisolated let stepsHeadingGuide = "For a recipe or a how-to, the heading of the steps, one word such as Method or Steps, in the answer's language; otherwise an empty string"
+nonisolated let stepsGuide = "For a recipe or a how-to, the steps in order, each one sentence of at most 20 words that starts with what to do. Otherwise none"
+nonisolated let cautionGuide = "One sentence on the one thing to watch out for, if the source warns of one; otherwise an empty string"
 
 @Generable
 nonisolated struct GeneratedSection {
@@ -183,17 +223,31 @@ nonisolated struct BriefAnswer {
 /// page a follow-up.)
 @Generable
 nonisolated struct ResearchedAnswer {
+    @Guide(description: kindGuide, .anyOf(PageKind.names))
+    var kind: String
     @Guide(description: "A specific title for the answer, a few words")
     var title: String
+    @Guide(description: statsGuide, .count(0...3))
+    var stats: [GeneratedStat]
     @Guide(description: "The gist in one or two plain sentences")
     var gist: String
     // First, so the verdict is the first thing written and read.
     @Guide(description: "Only when the question asks which to choose or what is best: the two to four top options, best first. Otherwise none", .count(0...4))
     var picks: [GeneratedPick]
+    @Guide(description: checklistHeadingGuide)
+    var checklistHeading: String
+    @Guide(description: checklistGuide, .count(0...15))
+    var checklist: [GeneratedItem]
+    @Guide(description: stepsHeadingGuide)
+    var stepsHeading: String
+    @Guide(description: stepsGuide, .count(0...12))
+    var steps: [String]
     // Made to write at least three, the small model padded thin sources with
     // sections on what they don't say ("prices are not specified").
     @Guide(description: "Two to five sections, each about a different aspect the sources cover", .count(2...5))
     var sections: [GeneratedSection]
+    @Guide(description: cautionGuide)
+    var caution: String
     @Guide(description: followUpsGuide, .count(0...3))
     var followUps: [String]
 }
@@ -229,8 +283,10 @@ extension GeneratedAnswer.PartiallyGenerated: AnswerDraft {
     var isUseful: Bool { sections?.isEmpty == false }
 
     func markdown(titled: Bool, droppingUnfinished: Bool) -> String {
-        sectionedMarkdown(title: titled ? title : nil, gist: gist, keyPoints: keyPoints ?? [], sections: sections ?? [],
-                          followUps: [], droppingUnfinished: droppingUnfinished)
+        sectionedMarkdown(kind: kind, title: titled ? title : nil, stats: stats ?? [], gist: gist, keyPoints: keyPoints ?? [],
+                          practical: Practical(checklistHeading: checklistHeading, checklist: checklist ?? [],
+                                               stepsHeading: stepsHeading, steps: steps ?? []),
+                          sections: sections ?? [], caution: caution, followUps: [], droppingUnfinished: droppingUnfinished)
     }
 }
 
@@ -238,17 +294,31 @@ extension ResearchedAnswer.PartiallyGenerated: AnswerDraft {
     var isUseful: Bool { sections?.isEmpty == false }
 
     func markdown(titled: Bool, droppingUnfinished: Bool) -> String {
-        sectionedMarkdown(title: titled ? title : nil, gist: gist, picks: picks ?? [], sections: sections ?? [],
-                          followUps: followUps ?? [], droppingUnfinished: droppingUnfinished)
+        sectionedMarkdown(kind: kind, title: titled ? title : nil, stats: stats ?? [], gist: gist, picks: picks ?? [],
+                          practical: Practical(checklistHeading: checklistHeading, checklist: checklist ?? [],
+                                               stepsHeading: stepsHeading, steps: steps ?? []),
+                          sections: sections ?? [], caution: caution, followUps: followUps ?? [],
+                          droppingUnfinished: droppingUnfinished)
     }
 }
 
 /// Title, gist and sections, then any follow-ups as "?? " lines (Browse for Me
 /// lifts those out of the answer). Cut off mid-way, the last item is dropped:
 /// a follow-up if they had begun, otherwise a point.
-private nonisolated func sectionedMarkdown(title: String?, gist: String?, keyPoints: [String] = [],
+/// A recipe's or a how-to's checklist and steps, as written so far.
+private nonisolated struct Practical {
+    var checklistHeading: String?
+    var checklist: [GeneratedItem.PartiallyGenerated]
+    var stepsHeading: String?
+    var steps: [String]
+}
+
+private nonisolated func sectionedMarkdown(kind: String? = nil, title: String?, stats: [GeneratedStat.PartiallyGenerated] = [],
+                                           gist: String?, keyPoints: [String] = [],
                                            picks: [GeneratedPick.PartiallyGenerated] = [],
+                                           practical: Practical? = nil,
                                            sections: [GeneratedSection.PartiallyGenerated],
+                                           caution: String? = nil,
                                            followUps: [String], droppingUnfinished: Bool) -> String {
     var sections = sections, followUps = followUps
     if droppingUnfinished {
@@ -260,18 +330,36 @@ private nonisolated func sectionedMarkdown(title: String?, gist: String?, keyPoi
         }
     }
     var lines: [String] = []
+    if let kind, !kind.isEmpty { lines.append("@ \(kind)") }
     if let title, !title.isEmpty { lines.append("# \(title)") }
+    for stat in stats {
+        guard let value = stat.value, !value.isEmpty else { continue }
+        lines.append("%% \(value) | \(stat.label ?? "")")
+    }
     if let gist, !gist.isEmpty { lines.append("> \(gist)") }
     for point in keyPoints where !point.isEmpty { lines.append("> - \(point)") }
     for pick in picks {
         guard let name = pick.name, !name.isEmpty else { continue }
         lines.append("=> \(name) | \(pick.figure ?? "") | \(pick.suits ?? "")")
     }
+    if let practical {
+        let items = practical.checklist.filter { !($0.item ?? "").isEmpty }
+        if !items.isEmpty {
+            lines.append("## [food] \(practical.checklistHeading.flatMap { $0.isEmpty ? nil : $0 } ?? "You need")")
+            for item in items { lines.append("[] \(item.item ?? "") | \(item.amount ?? "")") }
+        }
+        let steps = practical.steps.filter { !$0.isEmpty }
+        if !steps.isEmpty {
+            lines.append("## [check] \(practical.stepsHeading.flatMap { $0.isEmpty ? nil : $0 } ?? "Steps")")
+            for (index, step) in steps.enumerated() { lines.append("\(index + 1). \(step)") }
+        }
+    }
     for section in sections {
         guard let heading = section.heading, !heading.isEmpty else { continue }
         lines.append("## [\(section.topic ?? "")] \(heading)")
         for point in section.points ?? [] where !point.isEmpty { lines.append("- \(point)") }
     }
+    if let caution, !caution.isEmpty { lines.append("!! \(caution)") }
     for question in followUps where !question.isEmpty { lines.append("?? \(question)") }
     return lines.joined(separator: "\n")
 }

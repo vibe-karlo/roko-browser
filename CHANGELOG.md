@@ -170,6 +170,17 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Notify Me, as in Safari: in a page's menu, say what to look for ("size M in stock", or nothing for anything new) and check hourly, daily or weekly. roko reads the page in the background, Apple's on-device model decides whether it's what you asked for, and a notification opens the page. Settings lists the watched pages.
 
 ### Changed
+- Summaries and answers take the shape of what they're about, with one quiet colour each: apricot for recipes, sage for how-tos, sea glass for comparisons, stone for articles.
+  - **Big numbers first:** a recipe opens with "30 min · 4 servings · Easy", a price question with the price.
+  - **Recipes:** ingredients as a checklist to tick, amounts on the right, then numbered steps. Tap a number to mark it done; the next one lights up.
+  - **How-tos:** "What you need" as a checklist, then the steps the same way.
+  - **Comparisons:** trade-offs as a side-by-side table.
+  - **Articles:** "who says what", each person with their role.
+  - **Warnings:** the one thing to watch out for sits in its own warm box.
+  - **Section bands:** every other section of a typed page has a faint band of the page's colour; every box shares one width and corner.
+  - **Reading line:** a line above the bar fills in the page's colour as you scroll.
+  - **Settling in:** blocks settle in as they're written.
+  - **Quieter summary top:** the page shrinks to a thin strip and one quiet line once the summary arrives, summaries no longer show section chips, and chips elsewhere are quieter.
 - Summaries and Browse for Me answers are easier to read and to search for the part you need:
   - **Verdict first.** For "which" and "best" questions, the top two to four options come right under the gist: name, who it suits, and its price on the right. Details follow.
   - **Key points.** A summary opens with three things worth knowing beyond the gist.
