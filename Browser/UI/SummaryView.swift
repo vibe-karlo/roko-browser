@@ -23,10 +23,10 @@ struct SummaryView: View {
     @State private var edgesClear = false
     /// How far down the summary the reader is, for the line above the bar.
     @State private var readProgress = 0.0
-    private let fullCardHeight: CGFloat = 210
-    /// Once the summary is there, the card makes room for it: the page is a
-    /// reminder by then, not something to read.
-    private var cardHeight: CGFloat { model.text.isEmpty || model.isClosing ? fullCardHeight : 72 }
+    private let cardHeight: CGFloat = 210
+    /// Once the summary is there, the page shrinks whole into a miniature
+    /// beside its title: a reminder of where it came from, and the way back.
+    private let miniature = CGSize(width: 64, height: 104)
 
     init(model: SummaryModel) {
         self.model = model
@@ -128,44 +128,61 @@ struct SummaryView: View {
         let image = model.snapshot
         let fullHeight = image.map { width * $0.size.height / max($0.size.width, 1) } ?? cardHeight
         let inset: CGFloat = 22 * settle
-        return VStack(alignment: .leading, spacing: 12) {
+        // Once the summary is there, the page is a reference: shrunk whole,
+        // not cropped to a strip of its header, beside its title, so the
+        // summary below is what the eye lands on. The card goes back to its
+        // full size before closing grows it into the page.
+        let compact = settled && !model.text.isEmpty && !model.isClosing
+        let size = compact ? miniature
+            : CGSize(width: width - inset * 2, height: fullHeight + (cardHeight - fullHeight) * settle)
+        let radius = compact ? 12 : 24 * settle
+        let layout = compact ? AnyLayout(HStackLayout(alignment: .center, spacing: 16))
+            : AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+        return layout {
             ZStack(alignment: .top) {
                 if let image {
+                    // Filled to the width and pinned to the top: at miniature
+                    // size that's the page's whole width, its top half showing.
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
-                        .frame(width: width - inset * 2, height: fullHeight + (cardHeight - fullHeight) * settle, alignment: .top)
+                        .frame(width: size.width, height: size.height, alignment: .top)
                         .clipped()
                 } else {
-                    Theme.raised.frame(height: cardHeight)
+                    Theme.raised.frame(width: size.width, height: size.height)
                 }
                 if settled, model.phase == .reading || (model.phase == .writing && model.text.isEmpty) {
                     ScanLight()
                 }
             }
-            .clipShape(.rect(cornerRadius: 24 * settle, style: .continuous))
+            .clipShape(.rect(cornerRadius: radius, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 24 * settle, style: .continuous).strokeBorder(Theme.edge.opacity(settle))
+                RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Theme.edge.opacity(settle))
             }
 
-            // Once the summary is there, the page is a reference: one quiet
-            // line, so the summary below is what the eye lands on.
-            let compact = !model.text.isEmpty && !model.isClosing
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(model.title)
-                    .font(.system(size: compact ? 14 : 15, weight: compact ? .medium : .semibold))
+                    .font(.system(size: 15, weight: compact ? .medium : .semibold))
                     .foregroundStyle(compact ? Theme.secondaryInk : Theme.ink)
-                    .lineLimit(compact ? 1 : 2)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
                 Text(model.host)
                     .font(.system(size: 13))
                     .foregroundStyle(compact ? Theme.faintInk : Theme.secondaryInk)
             }
+            .frame(maxWidth: compact ? .infinity : nil, alignment: .leading)
             // Appears only once the card has reached its size, never across it.
             .opacity(textShown ? 1 : 0)
             .offset(y: textShown || model.isClosing ? 0 : 8)
         }
         .padding(.horizontal, inset)
         .padding(.top, 12 * settle)
+        // The miniature and its title are the way back to the page.
+        .contentShape(.rect)
+        .onTapGesture { if compact { close() } }
+        .accessibilityElement(children: compact ? .combine : .contain)
+        .accessibilityAddTraits(compact ? .isButton : [])
+        .accessibilityHint(compact ? "Back to the page" : "")
     }
 
     // MARK: The summary
