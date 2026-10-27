@@ -98,6 +98,10 @@ nonisolated enum WebResearcher {
     static func distinctImages(_ images: [URL]) -> [URL] {
         var seen: Set<String> = []
         return images.filter { url in
+            // A site's logo or stock banner says nothing about the answer.
+            let path = url.absoluteString.lowercased()
+            if ["logo", "default", "placeholder", "fallback", "brand", "favicon", "sprite", "avatar", "/icons/", "share-image"]
+                .contains(where: path.contains) { return false }
             let name = url.lastPathComponent.lowercased()
                 .replacingOccurrences(of: #"^\d+px-"#, with: "", options: .regularExpression)
             return seen.insert(name.isEmpty ? url.absoluteString : name).inserted

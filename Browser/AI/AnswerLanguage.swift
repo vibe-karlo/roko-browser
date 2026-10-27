@@ -85,8 +85,20 @@ nonisolated struct WritingLanguage: Hashable, Identifiable {
     /// Wikipedia article opening on a town's names in five languages read as Catalan.
     static func detected(in text: String, host: String = "", declared: String? = nil) -> WritingLanguage? {
         let recognizer = NLLanguageRecognizer()
+        // A question is a few words, too few to tell a language by: "cast iron
+        // vs nonstick pan" read as Vietnamese. So short text leans on the
+        // phone's own languages, and only a confident guess overrides them.
+        let phone = Audience.languages
+        let isShort = text.count < 120
+        if isShort, !phone.isEmpty {
+            recognizer.languageHints = Dictionary(phone.prefix(3).map { (NLLanguage(rawValue: $0), 0.3) },
+                                                  uniquingKeysWith: { a, _ in a })
+        }
         recognizer.processString(String(text.prefix(4_000)))
-        let best = recognizer.languageHypotheses(withMaximum: 1).first
+        var best = recognizer.languageHypotheses(withMaximum: 1).first
+        if isShort, let guess = best, !phone.contains(guess.key.rawValue), guess.value < 0.9, let first = phone.first {
+            best = (key: NLLanguage(rawValue: first), value: 1)
+        }
         if (best?.value ?? 0) < 0.8, let declared, let stated = stated(declared) { return stated }
         guard let code = best?.key.rawValue else { return nil }
         // Croatian, Serbian and Bosnian in Latin script read so alike that the

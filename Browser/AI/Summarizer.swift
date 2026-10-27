@@ -41,6 +41,8 @@ private func answerShape(sections: String = "three to five", picks: Bool = false
     for two options side by side, values as short as "98%" or "yes".
     - "@@ <name> | <role> | <their point, one sentence>" lines for who says what in an article.
     - one "!! <sentence>" line, anywhere, for the one thing to watch out for, if there is one.
+    Say each fact once, in your own words: never follow a sentence with another that repeats \
+    it closer to the source's wording, and put the source's words nowhere else.
     A recipe has an ingredients section and a method section; a how-to a "you need" section if \
     anything is needed, then its steps. No emoji. No preamble, no sign-off.
     """

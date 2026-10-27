@@ -124,7 +124,20 @@ struct MarkdownText: View {
             page.sections[page.sections.count - 1].lines.append(item)
         }
         for raw in markdown.split(separator: "\n", omittingEmptySubsequences: true) {
-            let line = raw.trimmingCharacters(in: .whitespaces)
+            var line = raw.trimmingCharacters(in: .whitespaces)
+            // The page's kind run into the next line ("@ howto > Squeaky
+            // doors...", or "> howto Squeaky..."): taken off, the rest read on.
+            if let match = line.firstMatch(of: Self.kindPrefix), let kind = PageKind(rawValue: match.output.2.lowercased()),
+               !match.output.3.isEmpty {
+                page.kind = kind
+                line = String(match.output.1 ?? "") + match.output.3
+            }
+            // The page's kind on a line of its own, without its "@".
+            let bare = line.trimmingCharacters(in: CharacterSet(charactersIn: ">@ ")).lowercased()
+            if let kind = PageKind(rawValue: bare), bare.count == line.count || line.count - bare.count <= 3 {
+                page.kind = kind
+                continue
+            }
             // A line still being written ("#", "=>"): wait for its words.
             if ["#", "##", ">", "=>", "> -", "%%", "[]", "<>", "@@", "!!", "@"].contains(line) { continue }
             if line.hasPrefix("@"), !line.hasPrefix("@@"), line.count < 14 {
@@ -273,7 +286,8 @@ struct MarkdownText: View {
         .animation(.smooth(duration: 0.4), value: page.stats.count)
         .animation(.snappy(duration: 0.3), value: done)
         .sensoryFeedback(.selection, trigger: done)
-        .tint(Theme.accent)
+        // Links and source marks in the page's colour, or quiet grey on an untyped page.
+        .tint(page.kind == .general ? Theme.secondaryInk : tint)
         .environment(\.openURL, OpenURLAction { url in
             guard url.scheme == "roko-source", let number = Int(url.host() ?? ""), sources.indices.contains(number - 1) else {
                 return .systemAction
@@ -516,7 +530,7 @@ struct MarkdownText: View {
                     Button {
                         if ticked { done.remove(key) } else { done.insert(key) }
                     } label: {
-                        HStack(alignment: .center, spacing: 12) {
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
                             ZStack {
                                 Circle().strokeBorder(ticked ? tint : Theme.faintInk, lineWidth: 1.6)
                                 if ticked {
@@ -528,12 +542,23 @@ struct MarkdownText: View {
                                 }
                             }
                             .frame(width: 22, height: 22)
-                            Text(item)
-                                .font(.body)
-                                .foregroundStyle(ticked ? Theme.secondaryInk : Theme.ink)
-                                .strikethrough(ticked, color: Theme.secondaryInk)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            if !amount.isEmpty {
+                            .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 6 }
+                            // A note ("sized to your tire") reads under the item, on
+                            // its edge; only a short amount ("100g") sits on the right.
+                            let isNote = Self.isNote(amount)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item)
+                                    .font(.body)
+                                    .foregroundStyle(ticked ? Theme.secondaryInk : Theme.ink)
+                                    .strikethrough(ticked, color: Theme.secondaryInk)
+                                if isNote {
+                                    Text(amount)
+                                        .font(.system(size: 15))
+                                        .foregroundStyle(Theme.secondaryInk)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            if !amount.isEmpty, !isNote {
                                 Text(amount)
                                     .font(.system(size: 16, weight: .medium).monospacedDigit())
                                     .foregroundStyle(ticked ? Theme.secondaryInk : Theme.ink)
@@ -549,6 +574,13 @@ struct MarkdownText: View {
             }
         }
         .modifier(Panel(padding: 4))
+    }
+
+    /// Words rather than an amount: more than two words, or no digit in a
+    /// phrase longer than "a pinch".
+    private static func isNote(_ amount: String) -> Bool {
+        let words = amount.split(separator: " ").count
+        return words > 2 || (!amount.contains(where: \.isNumber) && amount.count > 8)
     }
 
     /// Steps in order: tap a number to mark it done. The first one not done is
@@ -616,20 +648,23 @@ struct MarkdownText: View {
         .textSelection(.enabled)
     }
 
+    /// Three columns on one grid: the point, then each option's value, every
+    /// cell on its column's left edge so wrapped words stay lined up.
     private func row(_ label: String, _ a: String, _ b: String, isHeader: Bool, tint: Color) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
+        HStack(alignment: isHeader ? .bottom : .firstTextBaseline, spacing: 14) {
             Text(label)
                 .font(.system(size: 15))
                 .foregroundStyle(Theme.secondaryInk)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text(a)
-                .frame(width: 86, alignment: .trailing)
+                .frame(width: 104, alignment: .leading)
             Text(b)
-                .frame(width: 86, alignment: .trailing)
+                .frame(width: 104, alignment: .leading)
         }
         .font(.system(size: isHeader ? 13 : 16, weight: isHeader ? .semibold : .medium).monospacedDigit())
         .foregroundStyle(isHeader ? tint : Theme.ink)
-        .lineLimit(2)
+        .multilineTextAlignment(.leading)
+        .lineLimit(3)
         .padding(.vertical, isHeader ? 8 : 9)
         .modifier(BandInset(amount: 16))
     }
@@ -712,7 +747,7 @@ struct MarkdownText: View {
     /// ink, so they can be found at a glance. The last piece of text carries
     /// the caret while streaming.
     private func inline(_ text: String, last: Bool) -> AttributedString {
-        var text = text
+        var text = Self.withoutEchoes(text)
         if last && isStreaming {
             // A bold term still arriving: closed for now, so it reads bold as it
             // grows instead of showing its asterisks until the closing pair comes.
@@ -747,9 +782,13 @@ struct MarkdownText: View {
             result[lower..<upper].foregroundColor = Theme.ink
         }
         // Source marks: small and raised, after the words they back.
+        // In the page's own colour (orange clashed with a sage or sea-glass
+        // band); on an untyped page, quiet grey, with the orange kept for the caret.
+        let markColor = kind == .general ? Theme.secondaryInk : kind.tint
         for run in result.runs where run.link?.scheme == "roko-source" {
             result[run.range].font = .system(size: 11, weight: .semibold)
             result[run.range].baselineOffset = 6
+            result[run.range].foregroundColor = markColor
         }
         if last && isStreaming {
             var caret = AttributedString(" ▍")
@@ -757,6 +796,49 @@ struct MarkdownText: View {
             result += caret
         }
         return result
+    }
+
+    /// A sentence that only says the one before it again ("Rinse, then boil
+    /// a kettle of water. Pour away, rinse, then boil and discard a kettle of
+    /// water."), dropped; its source mark goes to the one kept.
+    private static func withoutEchoes(_ text: String) -> String {
+        // Sentences end at ". " (after any source mark) before a capital or a digit.
+        var sentences: [String] = []
+        var current = ""
+        let characters = Array(text)
+        for (index, character) in characters.enumerated() {
+            current.append(character)
+            guard character == " ", index + 1 < characters.count,
+                  let next = characters[index + 1].unicodeScalars.first,
+                  CharacterSet.uppercaseLetters.contains(next) || CharacterSet.decimalDigits.contains(next) || next == "*" else { continue }
+            let ended = current.dropLast().replacing(mark, with: "")
+            if let end = ended.last, ".!?".contains(end) {
+                sentences.append(current.trimmingCharacters(in: .whitespaces))
+                current = ""
+            }
+        }
+        if !current.isEmpty { sentences.append(current) }
+        guard sentences.count > 1 else { return text }
+        func words(_ sentence: String) -> Set<String> {
+            Set(sentence.lowercased().replacing(mark, with: "").split { !$0.isLetter && !$0.isNumber }
+                .map(String.init).filter { $0.count > 3 })
+        }
+        var kept: [String] = []
+        for sentence in sentences {
+            if let previous = kept.last {
+                let a = words(previous), b = words(sentence)
+                let shared = Double(a.intersection(b).count) / Double(max(min(a.count, b.count), 1))
+                if shared >= 0.6, min(a.count, b.count) >= 3 {
+                    // Keep the first wording, with the second's source mark.
+                    if let mark = sentence.firstMatch(of: mark), !previous.contains("[[") {
+                        kept[kept.count - 1] = previous + String(sentence[mark.range])
+                    }
+                    continue
+                }
+            }
+            kept.append(sentence)
+        }
+        return kept.joined(separator: " ")
     }
 
     /// "[[2,5]]" as tappable numbers for the source cards, or nothing when
@@ -771,6 +853,9 @@ struct MarkdownText: View {
     }
 
     nonisolated(unsafe) private static let mark = /\[\[([\d,]+)\]\]/
+    /// A kind at a line's start, with more after it: ("> ", "howto", "Squeaky...").
+    nonisolated(unsafe) private static let kindPrefix =
+        /^(>\s*)?@?\s*(recipe|howto|compare|article|general)\s+(\S.*)$/
     /// A price, percentage or measure: "$499", "€1,299", "45%", "30 hours", "1.1 L".
     nonisolated(unsafe) private static let figure =
         /(?:[$€£¥]\s?\d[\d,.]*(?:\s?(?:k|m|bn|million|billion))?|\d[\d,.]*\s?(?:%|€|\$|USD|EUR|GBP|kn|kg|g|km|m|mph|km\/h|hours?|hrs?|minutes?|min|days?|years?|GB|TB|MB|mAh|W|Hz|L|ml|°C|°F|inches|in|cm|mm|bar))(?![\w])/

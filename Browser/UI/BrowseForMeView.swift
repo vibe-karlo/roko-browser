@@ -127,11 +127,11 @@ struct BrowseForMeView: View {
     // MARK: Footer
 
     private var footer: some View {
-        // One bar: close on the left as on every screen, Follow up in its
+        // One bar: close on the left as on every screen, Ask in its
         // middle, and where the page comes from (the AI answer or the search
         // engine's results) on the right. The roko signature and Share sit at the end of the answer.
         ContextBar(leading: .init(glyph: .close, label: "Close", action: close),
-                   glyph: .browse, title: "Follow up",
+                   glyph: .browse, title: "Ask",
                    launch: { browser.showCommandBar(context: .followUp) },
                    fades: false,
                    accessory: AnyView(AnswerOrSearch(showsSearch: $session.showsSearch)),
@@ -246,6 +246,9 @@ private struct TurnSection: View {
     @FocusState private var fieldFocused: Bool
     /// Pictures that wouldn't load.
     @State private var brokenImages: Set<URL> = []
+    /// Pictures that loaded and look like photos, and their images.
+    @State private var goodImages: Set<URL> = []
+    @State private var loadedImages: [URL: UIImage] = [:]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
@@ -269,7 +272,9 @@ private struct TurnSection: View {
                 // Pictures first, then the sources: the faces of the answer
                 // up top, its footnotes compact beneath them. They arrive in
                 // that order, a beat apart, each easing up into place.
-                if turn.pendingPictures > 0 || !turn.images.allSatisfy(brokenImages.contains) {
+                // Only once a real photo is in: no empty tiles while they're
+                // looked for, and no row at all when none fits.
+                if turn.images.contains(where: goodImages.contains) {
                     pictures.transition(Self.reveal(0))
                 }
                 if !turn.sources.isEmpty { sources.transition(Self.reveal(1)) }
@@ -307,6 +312,7 @@ private struct TurnSection: View {
         }
         .animation(.smooth(duration: 0.5), value: turn.isWorking)
         .animation(.smooth(duration: 0.4), value: turn.phase == .done)
+        .task(id: turn.images) { await loadPictures() }
     }
 
     /// The answer's parts coming in: up from a little below and out of nothing,
@@ -466,36 +472,61 @@ private struct TurnSection: View {
     }
 
     /// Pictures from the sources, so the answer has a face.
+    /// Fetches the pictures and keeps only photos: not a thin banner, not a
+    /// small icon. Nothing shows until one has passed.
+    private func loadPictures() async {
+        for url in turn.images where loadedImages[url] == nil && !brokenImages.contains(url) {
+            guard let (data, _) = try? await URLSession.quick.data(from: url),
+                  let image = await UIImage(data: data)?.byPreparingForDisplay() else {
+                brokenImages.insert(url)
+                continue
+            }
+            let ratio = image.size.width / max(image.size.height, 1)
+            guard image.size.width >= 320, image.size.height >= 200, (0.6...2.1).contains(ratio),
+                  Self.looksLikePhoto(image) else {
+                brokenImages.insert(url)
+                continue
+            }
+            loadedImages[url] = image
+            goodImages.insert(url)
+        }
+    }
+
+    /// A photo has many colours; a logo, a wordmark or a text banner few.
+    /// Read from a 24 × 24 thumbnail, in well under a millisecond.
+    private static func looksLikePhoto(_ image: UIImage) -> Bool {
+        guard let cg = image.cgImage else { return true }
+        let side = 24
+        var pixels = [UInt8](repeating: 0, count: side * side * 4)
+        guard let context = CGContext(data: &pixels, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return true }
+        context.draw(cg, in: CGRect(x: 0, y: 0, width: side, height: side))
+        var colours = Set<Int>()
+        for index in stride(from: 0, to: pixels.count, by: 4) {
+            // Coarse buckets, so a gradient's near-identical shades count once.
+            colours.insert(Int(pixels[index] >> 4) << 8 | Int(pixels[index + 1] >> 4) << 4 | Int(pixels[index + 2] >> 4))
+        }
+        return colours.count >= 60
+    }
+
     private var pictures: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 8) {
-                ForEach(turn.images.filter { !brokenImages.contains($0) }, id: \.self) { url in
-                    AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.3))) { phase in
-                        if let image = phase.image {
-                            image.resizable().scaledToFill()
-                        } else if case .failure = phase {
-                            // Gone, rather than an empty tile for good.
-                            Theme.raised.onAppear { brokenImages.insert(url) }
-                        } else {
-                            Theme.raised
-                        }
+                ForEach(turn.images.filter(goodImages.contains), id: \.self) { url in
+                    if let image = loadedImages[url] {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 240, height: 160)
+                            .clipShape(.rect(cornerRadius: 18))
+                            .transition(.opacity)
                     }
-                    .frame(width: 240, height: 160)
-                    .clipShape(.rect(cornerRadius: 18))
-                    .transition(.opacity)
-                }
-                // Still being looked for: their places, kept so the text below stays put.
-                ForEach(0..<turn.pendingPictures, id: \.self) { _ in
-                    Theme.raised
-                        .frame(width: 240, height: 160)
-                        .clipShape(.rect(cornerRadius: 18))
-                        .transition(.opacity)
                 }
             }
-            .animation(.easeOut(duration: 0.3), value: brokenImages)
-            .animation(.easeOut(duration: 0.3), value: turn.images)
-            .animation(.easeOut(duration: 0.3), value: turn.pendingPictures)
+            .animation(.easeOut(duration: 0.3), value: goodImages)
         }
+
         .scrollIndicators(.hidden)
         .scrollClipDisabled()
     }
