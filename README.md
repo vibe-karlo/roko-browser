@@ -432,6 +432,10 @@ your Mac, shown only when the build has `SHARE_SERVER`.
 
 Deploying is the same as for sharing (the `sync_` tables come with `npm run deploy`).
 
+It runs at `https://roko-share.roko-browser.workers.dev`, on Cloudflare's free plan
+(100,000 requests and 5 million rows read a day). One iPhone with roko open asks about 900
+times an hour; each ask reads a few rows.
+
 ## Credits
 
 Icons: [Phosphor Icons](https://phosphoricons.com) (regular and bold), MIT License,

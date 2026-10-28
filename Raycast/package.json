@@ -95,7 +95,7 @@
       "description": "roko's server.",
       "type": "textfield",
       "required": true,
-      "default": "http://127.0.0.1:8787"
+      "default": "https://roko-share.roko-browser.workers.dev"
     },
     {
       "name": "language",

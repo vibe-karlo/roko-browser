@@ -10,7 +10,7 @@
       "binding": "DB",
       "database_name": "roko-shares",
       // Replaced with the real id by `wrangler d1 create roko-shares` at deploy.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "932f2a2a-2725-45e0-8fd7-60f269c5602c",
       "migrations_dir": "migrations"
     }
   ],

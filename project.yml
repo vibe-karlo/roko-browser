@@ -77,9 +77,9 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.growthstudio.roko
-        # The share server's address, e.g. https://roko.app, once it's deployed
-        # (README, "Sharing answers"). Empty: Share isn't offered.
-        SHARE_SERVER: ""
+        # roko's server (Server/share): shared answers and Sync with your Mac
+        # (README, "Sharing answers"). Empty: neither is offered.
+        SHARE_SERVER: "https://roko-share.roko-browser.workers.dev"
         TARGETED_DEVICE_FAMILY: "1"
         # Drawn by Scripts/make_app_icon.swift from the roko logo design.
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
