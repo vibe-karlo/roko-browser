@@ -403,6 +403,35 @@ Deploying, once there's a domain:
 To take a page down by hand: `npx wrangler d1 execute roko-shares --remote --command
 "DELETE FROM shares WHERE id='<id>'"`.
 
+## Sync with the Mac (Raycast)
+
+To-dos and the three shopping lists are kept the same on the iPhone and on the Mac, through
+the same Worker (`src/sync.js`, tables in `migrations/0002_sync.sql`), and links sent from
+the Mac open in roko as tabs. On the Mac it's the Raycast extension in `Raycast/` (its README
+has the commands). In the app it's `Today/RokoSync.swift`, turned on in Settings → Sync with
+your Mac, shown only when the build has `SHARE_SERVER`.
+
+- **Pairing**: Turn On makes a space on the server and keeps its key in the Keychain. Copy Key
+  hands it to Raycast; pasted on another iPhone, it joins the same space. The server keeps a
+  hash of the key's secret, never the secret.
+- **How it syncs**: every write gets the next number in its space; each device keeps the last
+  number it has seen and asks for what came after. The app keeps how each thing looked at the
+  last round (`sync-snapshot.json`): anything that looks different changed here and goes up,
+  anything missing was deleted here. When two devices change one thing, the later change wins.
+  A deleted thing stays on the server as a marker, so a device that was away hears of it.
+- **Live**: while roko is open it asks every 4 s (one small read), and a change here goes up
+  within a second. Closed, it catches up on opening. With the paid Developer Program, a push
+  from the Worker can wake it instead.
+- **From the Mac**: a thing to buy goes up without an aisle; roko works the aisle out as for
+  typing and sends it back. A to-do is a day ("2026-10-28"), "week", and a time ("15:30").
+  A link is opened once, then cleared on the server.
+- **Limits**: 5,000 things a space, 500 changes a write, 4 KB a thing, three new spaces a
+  minute and twenty a day per address.
+- **Tests**: with `npm run dev` running, `node test/sync.e2e.mjs`. To try the app against it,
+  build with `SHARE_SERVER=http://127.0.0.1:8787` (xcodebuild takes it as a setting).
+
+Deploying is the same as for sharing (the `sync_` tables come with `npm run deploy`).
+
 ## Credits
 
 Icons: [Phosphor Icons](https://phosphoricons.com) (regular and bold), MIT License,

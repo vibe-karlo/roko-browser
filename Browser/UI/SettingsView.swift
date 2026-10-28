@@ -21,6 +21,7 @@ struct SettingsView: View {
     @State private var notifications = "On"
     @State private var changedSites = 0
     @State private var translateLanguages = TranslationTarget.chosen
+    @State private var macSync = Keychain.syncKey != nil
 
     var body: some View {
         NavigationStack {
@@ -46,6 +47,9 @@ struct SettingsView: View {
                     link(.today, "Today") { TodaySettings() }
                     link(.todo, "To-dos", remindersOn ? "Reminders on" : nil) { TodoSettings() }
                     link(.basket, "Shopping", shoppingLanguage.title) { ShoppingSettings() }
+                    if RokoSync.server != nil {
+                        link(.desktop, "Sync with your Mac", macSync ? "On" : "Off") { MacSyncSettings() }
+                    }
                     link(.summarize, "Summaries and answers", WritingLanguage.with(code: answerLanguage)?.name ?? "Automatic") {
                         AnswersSettings(apiKey: $apiKey)
                     }
@@ -90,6 +94,7 @@ struct SettingsView: View {
                 plates = Parking.shared.plates
                 changedSites = SitesSettings.sites().count
                 translateLanguages = TranslationTarget.chosen
+                macSync = Keychain.syncKey != nil
                 Task { notifications = await NotificationSettings.summary() }
             }
         }
@@ -382,6 +387,112 @@ private struct TodoSettings: View {
             }
         }
         .settingsPage("To-dos")
+    }
+}
+
+/// To-dos and the shopping lists kept the same here and on the Mac, through
+/// roko's server, with roko's Raycast extension; links sent from the Mac open here.
+private struct MacSyncSettings: View {
+    @State private var key = Keychain.syncKey
+    @State private var working = false
+    @State private var problem: String?
+    @State private var joining = ""
+    @State private var copied = false
+    @State private var confirmDelete = false
+
+    var body: some View {
+        Form {
+            if let key {
+                Section {
+                    // Read again every few seconds: a round runs every four while roko is open.
+                    TimelineView(.periodic(from: .now, by: 2)) { _ in
+                        LabeledContent("Status", value: status)
+                    }
+                    Button(copied ? "Key Copied" : "Copy Key") {
+                        UIPasteboard.general.string = key
+                        copied = true
+                    }
+                    .foregroundStyle(Theme.ink)
+                } footer: {
+                    Text("In Raycast, paste this key into roko's extension. Anyone with it can see and change your to-dos and shopping lists, so keep it to yourself.")
+                }
+                Section {
+                    Button("Turn Off") {
+                        RokoSync.turnOff()
+                        self.key = nil
+                    }
+                    .foregroundStyle(Theme.ink)
+                    Button("Delete from roko's Server", role: .destructive) { confirmDelete = true }
+                        .disabled(working)
+                } footer: {
+                    Text("Turning off keeps everything, here and on the server. Deleting takes your to-dos, shopping lists and sent links off the server; this iPhone keeps them.")
+                }
+            } else {
+                Section {
+                    Button(working ? "Turning On…" : "Turn On") {
+                        working = true
+                        Task {
+                            do {
+                                try await RokoSync.turnOn()
+                                key = Keychain.syncKey
+                                problem = nil
+                            } catch let error as RokoSync.SyncError {
+                                problem = error.message
+                            } catch {
+                                problem = "Couldn't reach roko's server. Try again in a moment."
+                            }
+                            working = false
+                        }
+                    }
+                    .disabled(working)
+                    .foregroundStyle(Theme.ink)
+                } footer: {
+                    Text(problem ?? "Your to-dos and shopping lists, the same on this iPhone and on your Mac with roko's Raycast extension. Links you send from the Mac open here as tabs. They go through roko's server.")
+                }
+                Section {
+                    TextField("Paste a key", text: $joining)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .submitLabel(.join)
+                        .onSubmit {
+                            guard joining.wholeMatch(of: /\s*[A-Za-z0-9]{10}\.[A-Za-z0-9_-]{20,100}\s*/) != nil else {
+                                problem = "That isn't a roko sync key."
+                                return
+                            }
+                            RokoSync.join(joining)
+                            key = Keychain.syncKey
+                            joining = ""
+                        }
+                } header: {
+                    Text("Already on elsewhere")
+                } footer: {
+                    Text("A key from another iPhone joins its sync: what's here is added to what's there.")
+                }
+            }
+        }
+        .settingsPage("Sync with your Mac")
+        .confirmationDialog("Delete from roko's server?", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                working = true
+                Task {
+                    do {
+                        try await RokoSync.deleteFromServer()
+                        key = nil
+                    } catch {
+                        problem = "Couldn't reach roko's server. Try again in a moment."
+                    }
+                    working = false
+                }
+            }
+        } message: {
+            Text("Raycast and any other device using this key stop syncing. Everything stays on this iPhone.")
+        }
+    }
+
+    private var status: String {
+        if let problem = RokoSync.problem { return problem }
+        guard let synced = RokoSync.lastSynced else { return "Syncing…" }
+        return Date.now.timeIntervalSince(synced) < 10 ? "Synced just now" : "Synced \(synced.formatted(.relative(presentation: .named)))"
     }
 }
 

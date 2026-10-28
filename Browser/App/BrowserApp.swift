@@ -17,6 +17,7 @@ struct BrowserApp: App {
         TodoAlerts.watch(container)
         WidgetBridge.start(container)
         RemindersSync.start(container)
+        RokoSync.start(container)
         CopiedLink.arrived()
         SettingsSync.shared.start()
         // iCloud tells roko about changes from other devices with silent
@@ -30,7 +31,11 @@ struct BrowserApp: App {
                 .environment(browser)
                 .tint(Theme.accent)
                 .onOpenURL { browser.handleLink($0) }
-                .task { Appearance.apply() }
+                .task {
+                    Appearance.apply()
+                    // Links sent from the Mac open as tabs.
+                    RokoSync.openLink = { [browser] url in browser.open(url, inNewTab: true) }
+                }
         }
         .modelContainer(container)
         // Notify Me while roko isn't open: iOS wakes it for a few seconds.

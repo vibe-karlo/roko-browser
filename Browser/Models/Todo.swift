@@ -22,6 +22,8 @@ final class Todo {
     /// Its place in its section, dragged there; 0 until it's been moved, then
     /// the order it was added in decides.
     var order: Double = 0
+    /// Its id in roko's own sync (Raycast on the Mac); empty until first synced.
+    var syncID: String = ""
 
     init(title: String, when: TodoWhen, at time: DateComponents? = nil, now: Date = .now) {
         self.title = title

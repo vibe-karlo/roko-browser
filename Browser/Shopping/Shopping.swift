@@ -15,6 +15,8 @@ final class ShoppingItem {
     var order: Double = 0
     /// A `Shop`, when it was put in one; empty: where its aisle is bought.
     var shopName: String = ""
+    /// Its id in roko's own sync (Raycast on the Mac); empty until first synced.
+    var syncID: String = ""
 
     init(title: String, aisle: Aisle) {
         self.title = title

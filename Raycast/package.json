@@ -1,0 +1,122 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "roko",
+  "title": "roko",
+  "description": "Your roko to-dos and shopping lists, and links sent to roko on your iPhone.",
+  "icon": "icon.png",
+  "author": "karlo_konig",
+  "license": "MIT",
+  "private": true,
+  "commands": [
+    {
+      "name": "shopping",
+      "title": "Shopping List",
+      "subtitle": "roko",
+      "description": "The three shopping lists: tick things off, add, move between shops.",
+      "mode": "view"
+    },
+    {
+      "name": "add-shopping",
+      "title": "Add to Shopping",
+      "subtitle": "roko",
+      "description": "Add things to buy: \"milk, eggs and bread\" is three.",
+      "mode": "no-view",
+      "arguments": [
+        {
+          "name": "items",
+          "placeholder": "milk, eggs, bread",
+          "type": "text",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "todos",
+      "title": "To-dos",
+      "subtitle": "roko",
+      "description": "Your roko to-dos: today first, tick them off, add new ones.",
+      "mode": "view"
+    },
+    {
+      "name": "add-todo",
+      "title": "Add To-do",
+      "subtitle": "roko",
+      "description": "A to-do for today, or for tomorrow when it says so.",
+      "mode": "no-view",
+      "arguments": [
+        {
+          "name": "title",
+          "placeholder": "Call the dentist",
+          "type": "text",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "send-to-roko",
+      "title": "Send to roko",
+      "subtitle": "roko",
+      "description": "Opens the tab you're on (or a link you give) in roko on your iPhone, next time you open it.",
+      "mode": "no-view",
+      "arguments": [
+        {
+          "name": "link",
+          "placeholder": "Link (the front tab if empty)",
+          "type": "text",
+          "required": false
+        }
+      ]
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "2.10.0",
+    "@raycast/utils": "2.3.3"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "typescript": "5.8.3"
+  },
+  "scripts": {
+    "build": "ray build -e dist",
+    "dev": "ray develop"
+  },
+  "preferences": [
+    {
+      "name": "key",
+      "title": "Sync Key",
+      "description": "From roko on your iPhone: Settings, Sync with your Mac, Copy Key.",
+      "type": "password",
+      "required": true
+    },
+    {
+      "name": "server",
+      "title": "Server",
+      "description": "roko's server.",
+      "type": "textfield",
+      "required": true,
+      "default": "http://127.0.0.1:8787"
+    },
+    {
+      "name": "language",
+      "title": "List Language",
+      "description": "Shop and aisle names.",
+      "type": "dropdown",
+      "required": false,
+      "default": "en",
+      "data": [
+        {
+          "title": "English",
+          "value": "en"
+        },
+        {
+          "title": "Hrvatski",
+          "value": "hr"
+        }
+      ]
+    }
+  ],
+  "categories": [
+    "Productivity"
+  ]
+}

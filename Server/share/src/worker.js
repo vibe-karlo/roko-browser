@@ -6,12 +6,14 @@
 //   DELETE /api/share/:id    unshare  (Authorization: Bearer <token>)
 //   GET    /a/:id            the page
 //   GET    /i/:host          a site's icon, proxied so readers' browsers only talk to us
+//   /api/sync…               roko's own sync of to-dos, shopping and links (src/sync.js)
 //
 // Answers live in D1. Only a hash of each edit token and of each sharer's IP
 // address is kept: the token to prove an edit, the IP to cap how many pages
 // one address can make in a day.
 
 import { answerPage, FAVICON, homePage, letterIcon, notFoundPage, PICTURE_SCRIPT } from "./page.js";
+import { handleSync } from "./sync.js";
 
 /** The hash the security policy allows the page's one script by, worked out once. */
 let pictureScriptHash;
@@ -32,6 +34,9 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     try {
+      if (url.pathname === "/api/sync" || url.pathname === "/api/sync/space") {
+        return await handleSync(request, env, url, { json, randomID, randomToken, sha256 });
+      }
       if (url.pathname === "/api/share") {
         return request.method === "POST" ? await create(request, env, url) : json({ error: "Not allowed" }, 405);
       }
