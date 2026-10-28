@@ -199,6 +199,19 @@ struct MarkdownText: View {
         // News and essays lead with their gist: a big number over them was
         // always one the model reached for, never one the reader came for.
         if page.kind == .article { page.stats = [] }
+        // Nor an ingredient's amount: "350g pasta" or "3 eggs" up top only
+        // repeats a line of the list below, and pushes the time out of view.
+        let items = page.sections.flatMap(\.lines).compactMap { line -> (name: String, amount: String)? in
+            if case .check(let item, let amount) = line { (item.lowercased(), amount.lowercased()) } else { nil }
+        }
+        page.stats.removeAll { stat in
+            let label = stat.label.lowercased().trimmingCharacters(in: .whitespaces)
+            let value = stat.value.lowercased().replacingOccurrences(of: " ", with: "")
+            return items.contains { item in
+                !label.isEmpty && (item.name.contains(label) || label.contains(item.name))
+                    || !item.amount.isEmpty && item.amount.replacingOccurrences(of: " ", with: "") == value
+            }
+        }
         return page
     }
 

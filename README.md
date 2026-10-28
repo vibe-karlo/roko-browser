@@ -8,6 +8,40 @@ Browser/Resources/Assets.xcassets`: marks drawn in the script, and whole designe
 `Scripts/icons/*.svg` (named for their icon set) rendered as they are.
 SwiftUI shell around WebKit, no third-party dependencies.
 
+<p>
+  <img src="docs/screens/one-bar.jpg" width="250" alt="The bar answering 250 usd in eur with €223.77">
+  <img src="docs/screens/browse.jpg" width="250" alt="Browse for Me answering best espresso machine for beginners">
+  <img src="docs/screens/summary.jpg" width="250" alt="A recipe summary: total time, key points and ingredients">
+</p>
+
+## What it does
+
+**One bar for everything.** Type or hold + to speak. An address opens the site, a question goes
+to Browse for Me, "call Petra tomorrow" becomes a to-do, and sums, units, currencies and times in
+other cities are answered right in the bar.
+
+**Summarize.** Pull down on any page. The summary is shaped by what the page is: a recipe gets
+its time, a tickable ingredient list and numbered steps; a review gets the picks side by side; a
+news story leads with its gist. The page stays as a miniature beside the title, a tap away.
+
+**Browse for Me.** Ask a question and roko reads the web for you: an answer with numbered sources,
+the best options with their prices, what to watch out for, follow-up questions, and the top
+YouTube videos on it. Apple Intelligence writes it privately; Claude takes over where Apple's
+models fall short.
+
+**Clean pages.** Ads, trackers and cookie banners are gone before the page draws: consent pop-ups
+are answered with "reject", and subscription walls that freeze scrolling get it back.
+
+**And the rest.** Today's weather, news and to-dos on a new tab, to-dos synced with Apple
+Reminders, Home Screen widgets, pages translated into the languages you choose, and a count of
+the time all this has saved you.
+
+<p>
+  <img src="docs/screens/browse-picks.jpg" width="250" alt="The best options side by side with prices and who each suits">
+  <img src="docs/screens/browse-videos.jpg" width="250" alt="YouTube videos under an answer">
+  <img src="docs/screens/clean-page.jpg" width="250" alt="A recipe page with no ads or cookie banner">
+</p>
+
 ## Run it
 
 ```bash
