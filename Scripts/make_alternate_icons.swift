@@ -67,8 +67,8 @@ func svg(_ mark: Mark, tile: String?, color: String, size: Double) -> String {
     """
 }
 
-/// `inset`: the share of the canvas left clear around the tile, as macOS icons
-/// sit on their grid (824 of 1024), so the icon matches its neighbours' size.
+/// `inset`: the share of the canvas left clear around the tile. Raycast's own
+/// icons fill theirs, so the extension's is drawn with none.
 func png(_ svgText: String, pixels: Int, to url: URL, rounded: Bool = false, inset: Double = 0) {
     let image = NSImage(data: Data(svgText.utf8))!
     let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels, bitsPerSample: 8,
@@ -115,7 +115,7 @@ png(svg(defaultIcon.mark, tile: nil, color: "#FFFFFF", size: 1024), pixels: 1024
     to: defaultSet.appendingPathComponent("AppIcon-Tinted.png"))
 if CommandLine.arguments.count > 2 {
     png(svg(defaultIcon.mark, tile: defaultIcon.tile, color: defaultIcon.color, size: 512), pixels: 512,
-        to: URL(fileURLWithPath: CommandLine.arguments[2]), rounded: true, inset: 100.0 / 1024)
+        to: URL(fileURLWithPath: CommandLine.arguments[2]), rounded: true)
 }
 
 for (name, mark, tile, color) in icons + [("AppIcon", defaultIcon.mark, defaultIcon.tile, defaultIcon.color)] {
