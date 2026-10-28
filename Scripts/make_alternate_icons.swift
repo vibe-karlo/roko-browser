@@ -1,8 +1,10 @@
-// Draws roko's alternate app icons from the logo design file (marks J, K, T3, F),
-// as 1024 px app icon sets plus small previews for the Settings picker. Icons
-// designed as whole tiles (Scripts/icons/*.svg, named for their icon set) are
-// drawn as they are.
-// Run: swift Scripts/make_alternate_icons.swift Browser/Resources/Assets.xcassets
+// Draws roko's app icons from the logo design file (marks J, K, T3, F): the
+// default, the Eclipse in the app's colours, with its dark and tinted versions,
+// and the alternates, as 1024 px app icon sets plus small previews for the
+// Settings picker. Icons designed as whole tiles (Scripts/icons/*.svg, named for
+// their icon set) are drawn as they are. Given a third path, the Raycast
+// extension's icon goes there too: the default, rounded.
+// Run: swift Scripts/make_alternate_icons.swift Browser/Resources/Assets.xcassets [Raycast/assets/icon.png]
 import AppKit
 
 struct Mark {
@@ -34,19 +36,24 @@ let eclipse = Mark(viewBox: (0, 0, 600, 600), widthShare: 600.0 / 1024) {
 
 /// Icon set name, mark, tile colour, mark colour.
 let icons: [(String, Mark, String, String)] = [
+    ("AppIcon-Star", star, "#1A1A1B", "#A9A9A9"),
     ("AppIcon-StarOrange", star, "#050506", "#FF5B1F"),
     ("AppIcon-StarFlame", star, "#FF5B1F", "#0E0E0F"),
     ("AppIcon-ChevronsGraphite", chevrons, "#1A1A1B", "#A9A9A9"),
     ("AppIcon-Plus", forwardPlus, "#050506", "#FF5B1F"),
     ("AppIcon-RollingO", rollingO, "#15171B", "#FF5B1F"),
-    // In the app's own colours: the dark canvas (Theme.canvas), the accent,
-    // and the light ink text is set in (Theme.ink), all as in dark mode.
-    ("AppIcon-EclipseCream", eclipse, "#0E0E0F", "#E7E7E4"),
+    // In the app's own colours: the dark canvas (Theme.canvas) and the accent.
+    // (The cream one, Theme.ink on the canvas, is the default now.)
     ("AppIcon-EclipseOnOrange", eclipse, "#FF5B1F", "#0E0E0F"),
     ("AppIcon-EclipseOrange", eclipse, "#0E0E0F", "#FF5B1F"),
 ]
 
-func svg(_ mark: Mark, tile: String, color: String, size: Double) -> String {
+/// The default: the Eclipse in the light ink text is set in (Theme.ink) on the
+/// dark canvas (Theme.canvas), as in dark mode.
+let defaultIcon = (mark: eclipse, tile: "#0E0E0F", color: "#E7E7E4")
+
+/// `tile` nil: the mark alone on transparent, for the dark and tinted icons iOS draws its own tile under.
+func svg(_ mark: Mark, tile: String?, color: String, size: Double) -> String {
     let width = size * mark.widthShare
     let scale = width / mark.viewBox.w
     let height = mark.viewBox.h * scale
@@ -54,21 +61,24 @@ func svg(_ mark: Mark, tile: String, color: String, size: Double) -> String {
     let y = (size - height) / 2 - mark.viewBox.y * scale
     return """
     <svg xmlns="http://www.w3.org/2000/svg" width="\(size)" height="\(size)" viewBox="0 0 \(size) \(size)">
-    <rect width="\(size)" height="\(size)" fill="\(tile)"/>
+    \(tile.map { "<rect width=\"\(size)\" height=\"\(size)\" fill=\"\($0)\"/>" } ?? "")
     <g transform="translate(\(x) \(y)) scale(\(scale))">\(mark.body(color))</g>
     </svg>
     """
 }
 
-func png(_ svgText: String, pixels: Int, to url: URL, rounded: Bool = false) {
+/// `inset`: the share of the canvas left clear around the tile, as macOS icons
+/// sit on their grid (824 of 1024), so the icon matches its neighbours' size.
+func png(_ svgText: String, pixels: Int, to url: URL, rounded: Bool = false, inset: Double = 0) {
     let image = NSImage(data: Data(svgText.utf8))!
     let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels, bitsPerSample: 8,
                                samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
                                bytesPerRow: 0, bitsPerPixel: 0)!.retagging(with: .sRGB)!
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-    let rect = NSRect(x: 0, y: 0, width: pixels, height: pixels)
-    if rounded { NSBezierPath(roundedRect: rect, xRadius: Double(pixels) * 0.225, yRadius: Double(pixels) * 0.225).addClip() }
+    let margin = Double(pixels) * inset
+    let rect = NSRect(x: margin, y: margin, width: Double(pixels) - 2 * margin, height: Double(pixels) - 2 * margin)
+    if rounded { NSBezierPath(roundedRect: rect, xRadius: rect.width * 0.225, yRadius: rect.width * 0.225).addClip() }
     image.draw(in: rect)
     NSGraphicsContext.restoreGraphicsState()
     try! rep.representation(using: .png, properties: [:])!.write(to: url)
@@ -95,7 +105,20 @@ try? FileManager.default.createDirectory(at: previews, withIntermediateDirectori
 writeJSON(["info": ["author": "xcode", "version": 1], "properties": ["provides-namespace": true]],
           to: previews.appendingPathComponent("Contents.json"))
 
-for (name, mark, tile, color) in icons + [("AppIcon", star, "#1A1A1B", "#A9A9A9")] {
+// The default: light, dark (the mark alone, iOS draws the dark tile) and tinted (white, iOS tints it).
+let defaultSet = catalog.appendingPathComponent("AppIcon.appiconset")
+png(svg(defaultIcon.mark, tile: defaultIcon.tile, color: defaultIcon.color, size: 1024), pixels: 1024,
+    to: defaultSet.appendingPathComponent("AppIcon.png"))
+png(svg(defaultIcon.mark, tile: nil, color: defaultIcon.color, size: 1024), pixels: 1024,
+    to: defaultSet.appendingPathComponent("AppIcon-Dark.png"))
+png(svg(defaultIcon.mark, tile: nil, color: "#FFFFFF", size: 1024), pixels: 1024,
+    to: defaultSet.appendingPathComponent("AppIcon-Tinted.png"))
+if CommandLine.arguments.count > 2 {
+    png(svg(defaultIcon.mark, tile: defaultIcon.tile, color: defaultIcon.color, size: 512), pixels: 512,
+        to: URL(fileURLWithPath: CommandLine.arguments[2]), rounded: true, inset: 100.0 / 1024)
+}
+
+for (name, mark, tile, color) in icons + [("AppIcon", defaultIcon.mark, defaultIcon.tile, defaultIcon.color)] {
     if name != "AppIcon" {
         let set = catalog.appendingPathComponent("\(name).appiconset")
         try? FileManager.default.createDirectory(at: set, withIntermediateDirectories: true)

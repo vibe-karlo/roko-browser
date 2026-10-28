@@ -1236,9 +1236,11 @@ private struct WatchRow: View {
 /// The home screen icon: roko's marks in a few colours, from the logo design.
 private struct AppIconPicker: View {
     /// Asset names; "AppIcon" is the default.
-    private static let icons = ["AppIcon", "AppIcon-StarOrange", "AppIcon-StarFlame",
+    /// The cream Eclipse that used to be offered here is the default now; chosen
+    /// before, it still shows (its icon set stays) and the picker marks Default.
+    private static let icons = ["AppIcon", "AppIcon-EclipseOnOrange", "AppIcon-EclipseOrange",
+                                "AppIcon-Star", "AppIcon-StarOrange", "AppIcon-StarFlame",
                                 "AppIcon-ChevronsGraphite", "AppIcon-Plus", "AppIcon-RollingO",
-                                "AppIcon-EclipseCream", "AppIcon-EclipseOnOrange", "AppIcon-EclipseOrange",
                                 "AppIcon-Ro", "AppIcon-RoOnOrange", "AppIcon-Octagon", "AppIcon-OctagonOnOrange",
                                 "AppIcon-Wordmark", "AppIcon-WordmarkOnOrange"]
     /// An icon no longer offered counts as the default.

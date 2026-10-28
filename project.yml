@@ -81,7 +81,7 @@ targets:
         # (README, "Sharing answers"). Empty: neither is offered.
         SHARE_SERVER: "https://roko-share.roko-browser.workers.dev"
         TARGETED_DEVICE_FAMILY: "1"
-        # Drawn by Scripts/make_app_icon.swift from the roko logo design.
+        # The Eclipse, drawn by Scripts/make_alternate_icons.swift from the roko logo design.
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # The alternates in Settings → App Icon (Scripts/make_alternate_icons.swift).
         ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: YES

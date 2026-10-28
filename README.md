@@ -49,7 +49,7 @@ Pick an iPhone simulator (iOS 26 or later) and run. On a real iPhone, set your t
 Signing & Capabilities first.
 
 The Xcode project and code are still named `Browser`; only the name on the home screen is roko.
-The app icon is drawn by `swift Scripts/make_app_icon.swift Browser/Resources/Assets.xcassets/AppIcon.appiconset`.
+The app icons, the default Eclipse (with its dark and tinted versions) and the alternates in Settings → App icon, and the Raycast extension's icon are drawn by `swift Scripts/make_alternate_icons.swift Browser/Resources/Assets.xcassets Raycast/assets/icon.png`.
 The alternates in Settings → App icon come from `swift Scripts/make_alternate_icons.swift
 Browser/Resources/Assets.xcassets`: marks drawn in the script, and whole designed tiles from
 `Scripts/icons/*.svg` (named for their icon set) rendered as they are.
