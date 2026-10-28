@@ -1,4 +1,4 @@
-// roko's own sync: to-dos, the shopping lists and links sent to roko, the same
+// roko's own sync: to-dos, the shopping lists, Read Later and links sent to roko, the same
 // on the iPhone and the Mac (Raycast). Each device keeps the number of the last
 // change it has seen and asks for what came after; the later edit of a thing wins.
 //
@@ -7,12 +7,13 @@
 //   GET    /api/sync?since=N changes after N       → { seq, changes, more }
 //   POST   /api/sync         { changes: [...] }    → { seq }
 //
-// A change is { kind, id, data, updated, deleted }: kind "todo", "shopping" or
-// "link"; data the thing as JSON (what's in it is the apps' business); updated
-// when the device changed it, in ms. The key is "<space>.<secret>"; only a hash
+// A change is { kind, id, data, updated, deleted }: kind "todo", "shopping",
+// "later" (a page saved to Read Later, without its text) or "link"; data the
+// thing as JSON (what's in it is the apps' business); updated when the device
+// changed it, in ms. The key is "<space>.<secret>"; only a hash
 // of the secret is kept.
 
-const KINDS = new Set(["todo", "shopping", "link"]);
+const KINDS = new Set(["todo", "shopping", "later", "link"]);
 const ITEM_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const SPACE_ID = /^[A-Za-z0-9]{10}$/;
 const LIMITS = { body: 400_000, changes: 500, data: 4_000, records: 5_000, page: 500 };

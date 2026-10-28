@@ -191,7 +191,7 @@ struct BottomBar: View {
     private var isPrivate: Bool { browser.selectedTab?.isPrivate == true }
 
     private var onPage: Bool {
-        ![.today, .todos, .shopping].contains(browser.panel) && browser.browseForMe == nil && browser.summary == nil
+        ![.today, .todos, .shopping, .readLater].contains(browser.panel) && browser.browseForMe == nil && browser.summary == nil && browser.digest == nil
     }
 
     private var recentTabs: [BrowserTab] {

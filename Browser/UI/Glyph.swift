@@ -20,6 +20,8 @@ struct Glyph: View {
              car,
              // Shopping.
              basket,
+             // Read Later.
+             readLater,
              // Settings.
              palette, microphone, info, key, broom, globe, appIcon, notification
     }

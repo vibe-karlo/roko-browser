@@ -121,6 +121,7 @@ struct BrowserView: View {
                     .transition(.move(edge: .bottom))
             }
         }
+        .modifier(ReadLaterScreens(browser: browser))
         .overlay {
             if let session = browser.browseForMe {
                 // Full screen, rising from the bar where the question was asked.
@@ -324,7 +325,7 @@ struct BrowserView: View {
     private var statusBarStyle: UIStatusBarStyle {
         // The summary and Browse for Me sit on the app's own canvas.
         if browser.summary != nil || browser.browseForMe != nil || browser.panel == .todos || browser.panel == .today
-            || browser.panel == .shopping {
+            || browser.panel == .shopping || browser.panel == .readLater || browser.digest != nil {
             return .default
         }
         if browser.panel == .tabs { return .lightContent }  // the switcher is always dark
@@ -553,5 +554,29 @@ private struct CopiedLinkWatch: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
                 CopiedLink.left()
             }
+    }
+}
+
+/// Read Later and its Summarize all, over the page: kept apart so the
+/// browser's body stays small enough for the compiler.
+private struct ReadLaterScreens: ViewModifier {
+    let browser: BrowserModel
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                if browser.panel == .readLater || browser.panel == .command && browser.launcherReturn == .readLater {
+                    ReadLaterView()
+                        .transition(.move(edge: .bottom))
+                }
+            }
+            .overlay {
+                if let digest = browser.digest {
+                    // Over the list it was asked from, rising from its bar.
+                    DigestView(model: digest)
+                        .transition(.move(edge: .bottom))
+                }
+            }
+            .animation(.spring(duration: 0.42, bounce: 0.06), value: browser.digest?.id)
     }
 }

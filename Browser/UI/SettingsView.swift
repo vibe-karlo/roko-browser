@@ -414,7 +414,7 @@ private struct MacSyncSettings: View {
                     }
                     .foregroundStyle(Theme.ink)
                 } footer: {
-                    Text("In Raycast, paste this key into roko's extension. Anyone with it can see and change your to-dos and shopping lists, so keep it to yourself.")
+                    Text("In Raycast, paste this key into roko's extension. Anyone with it can see and change your to-dos, shopping lists and Read Later, so keep it to yourself.")
                 }
                 Section {
                     Button("Turn Off") {
@@ -425,7 +425,7 @@ private struct MacSyncSettings: View {
                     Button("Delete from roko's Server", role: .destructive) { confirmDelete = true }
                         .disabled(working)
                 } footer: {
-                    Text("Turning off keeps everything, here and on the server. Deleting takes your to-dos, shopping lists and sent links off the server; this iPhone keeps them.")
+                    Text("Turning off keeps everything, here and on the server. Deleting takes your to-dos, shopping lists, Read Later and sent links off the server; this iPhone keeps them.")
                 }
             } else {
                 Section {
@@ -447,7 +447,7 @@ private struct MacSyncSettings: View {
                     .disabled(working)
                     .foregroundStyle(Theme.ink)
                 } footer: {
-                    Text(problem ?? "Your to-dos and shopping lists, the same on this iPhone and on your Mac with roko's Raycast extension. Links you send from the Mac open here as tabs. They go through roko's server.")
+                    Text(problem ?? "Your to-dos, shopping lists and Read Later, the same on this iPhone and on your Mac with roko's Raycast extension. Links you send from the Mac open here as tabs. They go through roko's server.")
                 }
                 Section {
                     TextField("Paste a key", text: $joining)

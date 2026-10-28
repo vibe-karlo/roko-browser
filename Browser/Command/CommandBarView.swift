@@ -6,7 +6,8 @@ struct CommandItem: Identifiable {
         case open(URL), switchTab(BrowserTab), openPin(Pin), search(String),
              browse(String), summarize, findOnPage, privateTab, settings, copy(String),
              pasteLink, openCopied(URL), todos, today, openApp(URL), ask(String), askAboutPage(String), addTodo(String, TodoWhen, DateComponents?),
-             payParking(city: String, zone: String), extendParking, endParking, shopping, addShopping(String)
+             payParking(city: String, zone: String), extendParking, endParking, shopping, addShopping(String),
+             saveForLater, readLater, askAboutSaved(String)
     }
 
     let id: String
@@ -577,6 +578,7 @@ struct CommandBarView: View {
         case .todo: return "New to-do, e.g. Call Petra on Monday at 15"
         case .followUp: return "Ask a follow-up"
         case .aboutPage: return "Ask about this page"
+        case .aboutSaved: return "Ask about your saved pages"
         case .web:
             switch browser.commandMode {
             case .privateTab: return "Private search or address"
@@ -590,7 +592,7 @@ struct CommandBarView: View {
         switch browser.launcherContext {
         case .web: .search
         case .todo: .todo
-        case .followUp, .aboutPage: .browse
+        case .followUp, .aboutPage, .aboutSaved: .browse
         }
     }
 
@@ -696,6 +698,10 @@ struct CommandBarView: View {
             guard !text.isEmpty else { return [] }
             return [CommandItem(id: "ask", title: text, subtitle: "Ask about this page", kind: "AI",
                                 icon: .glyph(.browse), action: .askAboutPage(text))]
+        case .aboutSaved:
+            guard !text.isEmpty else { return [] }
+            return [CommandItem(id: "ask", title: text, subtitle: "Ask about your saved pages", kind: "AI",
+                                icon: .glyph(.browse), action: .askAboutSaved(text))]
         }
     }
 
@@ -926,6 +932,10 @@ struct CommandBarView: View {
         case .settings: browser.panel = .settings
         case .todos: browser.panel = .todos
         case .shopping: browser.panel = .shopping
+        case .saveForLater: browser.saveForLater()
+        case .readLater: browser.panel = .readLater
+        case .askAboutSaved(let question):
+            if let digest = browser.digest { browser.ask(question, about: digest) } else { browser.panel = .none }
         case .addShopping(let typed):
             let result = Shopping.add(typed, in: context)
             browser.panel = .none
@@ -1282,14 +1292,26 @@ enum CommandRanker {
             (["shopping", "shopping list", "groceries", "kupovina", "namirnice", "popis za kupovinu"],
              CommandItem(id: "action-shopping", title: "Shopping", subtitle: "Type \u{201C}shopping\u{201D} and what to buy to add it",
                          kind: "Action", icon: .glyph(.basket), action: .shopping)),
+            (["read later", "save for later", "reading list", "save page"],
+             CommandItem(id: "action-save-later", title: "Save to Read Later", subtitle: "This page and its text, for later",
+                         kind: "Action", icon: .glyph(.readLater), action: .saveForLater)),
+            (["read later", "reading list", "saved pages", "za kasnije", "spremljeno"],
+             CommandItem(id: "action-read-later", title: "Read Later",
+                         subtitle: ReadLater.shared.unread.isEmpty ? "Pages you saved" : "\(ReadLater.shared.unread.count) to read",
+                         kind: "Action", icon: .glyph(.readLater), action: .readLater)),
         ]
         for (words, item) in actions where words.contains(where: { $0.hasPrefix(needle) }) {
-            let needsPage = ["action-summarize", "action-find"].contains(item.id)
+            let needsPage = ["action-summarize", "action-find", "action-save-later"].contains(item.id)
             if needsPage && browser.selectedTab == nil { continue }
             // Typed in full, a place in roko (Settings, To-do) is what's meant,
             // not a web search for the word: it goes first, and Return opens it.
-            let isPlace = ["action-settings", "action-todos", "action-today", "action-shopping"].contains(item.id)
+            let isPlace = ["action-settings", "action-todos", "action-today", "action-shopping", "action-read-later"].contains(item.id)
             let exact = words.contains(needle)
+            // "save for later" typed in full means this page, not a search for the words.
+            if item.id == "action-save-later", exact, needle != "read later" {
+                ranked.append((1010, item))
+                continue
+            }
             // Above the calculator too: "today" opens Today rather than showing the date.
             ranked.append((isPlace && exact ? 1010 : needle.count >= 3 ? 880 : 500, item))
         }

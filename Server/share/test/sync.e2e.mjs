@@ -80,6 +80,19 @@ await check("passes a deletion on as a marker", () => {
   assert.equal(link.data, null);
 });
 
+// A page saved to Read Later on the Mac, then read on the iPhone.
+const savedID = "3F2504E0-4F89-11D3-9A0C-0305E82C3301";
+await call("/api/sync", { key, method: "POST", body: { changes: [
+  { kind: "later", id: savedID, updated: t0 + 5000, data: { url: "https://example.com/essay", title: "An essay", saved: t0 } },
+  { kind: "later", id: savedID, updated: t0 + 6000, data: { url: "https://example.com/essay", title: "An essay", saved: t0, read: t0 + 6000 } },
+] } });
+const saved = await (await call(`/api/sync?since=${cleared.seq}`, { key })).json();
+await check("syncs Read Later, the later change kept", () => {
+  const page = saved.changes.find((c) => c.kind === "later");
+  assert.equal(page.id, savedID);
+  assert.equal(page.data.read, t0 + 6000);
+});
+
 await check("turns away what it doesn't sync", async () => {
   for (const change of [
     { kind: "password", id: "x", updated: t0, data: {} },

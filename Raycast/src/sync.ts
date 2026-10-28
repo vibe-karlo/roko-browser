@@ -5,7 +5,7 @@
 import { getPreferenceValues } from "@raycast/api";
 import { randomUUID } from "node:crypto";
 
-export type Kind = "todo" | "shopping" | "link";
+export type Kind = "todo" | "shopping" | "later" | "link";
 
 export interface TodoData {
   title: string;
@@ -33,6 +33,18 @@ export interface ShoppingData {
   doneAt?: number | null;
   order?: number;
   created?: number;
+}
+
+/** A page saved to Read Later. Its text stays on the iPhone, which reads it when a page saved here arrives. */
+export interface LaterData {
+  url: string;
+  title: string;
+  site?: string;
+  /** Its share picture. */
+  image?: string | null;
+  saved?: number;
+  /** When it was opened; none is still to read. */
+  read?: number | null;
 }
 
 export interface LinkData {
@@ -77,7 +89,12 @@ async function call(path: string, init: RequestInit = {}) {
 
 /** Everything in the space now, by kind: deleted things left out. */
 export async function readAll() {
-  const things = { todo: new Map<string, Thing<TodoData>>(), shopping: new Map<string, Thing<ShoppingData>>(), link: new Map<string, Thing<LinkData>>() };
+  const things = {
+    todo: new Map<string, Thing<TodoData>>(),
+    shopping: new Map<string, Thing<ShoppingData>>(),
+    later: new Map<string, Thing<LaterData>>(),
+    link: new Map<string, Thing<LinkData>>(),
+  };
   let since = 0;
   let more = true;
   while (more) {
@@ -91,7 +108,12 @@ export async function readAll() {
     since = page.seq as number;
     more = page.more === true;
   }
-  return { todos: [...things.todo.values()], shopping: [...things.shopping.values()], links: [...things.link.values()] };
+  return {
+    todos: [...things.todo.values()],
+    shopping: [...things.shopping.values()],
+    later: [...things.later.values()],
+    links: [...things.link.values()],
+  };
 }
 
 export async function write(changes: Change[]) {
@@ -99,6 +121,8 @@ export async function write(changes: Change[]) {
 }
 
 export const newID = () => randomUUID();
+/** As roko on the iPhone writes a Read Later page's id (Swift's uuidString): spelled the same, it's the same page. */
+export const laterID = () => randomUUID().toUpperCase();
 export const now = () => Date.now();
 
 export function put(kind: Kind, id: string, data: object): Change {

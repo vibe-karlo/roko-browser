@@ -6,7 +6,7 @@ import WebKit
 @Observable
 final class BrowserModel {
     enum Panel: Equatable {
-        case none, command, tabs, tools, settings, notifyMe, todos, today, shopping
+        case none, command, tabs, tools, settings, notifyMe, todos, today, shopping, readLater
     }
 
     enum CommandMode {
@@ -23,6 +23,8 @@ final class BrowserModel {
         case followUp
         /// A summary: what's typed is a question about the page.
         case aboutPage
+        /// Summarize all: what's typed is a question about the saved pages.
+        case aboutSaved
     }
 
     /// Live web views kept in memory; older tabs hibernate to a snapshot.
@@ -117,6 +119,10 @@ final class BrowserModel {
         didSet { if oldValue !== browseForMe { oldValue?.cancel() } }
     }
     var reader: ReaderModel?
+    /// Summarize all, over Read Later.
+    var digest: DigestModel? {
+        didSet { if oldValue !== digest { oldValue?.cancel() } }
+    }
 
     @ObservationIgnored private var context: ModelContext?
 
@@ -322,6 +328,7 @@ final class BrowserModel {
         case "roko://today": panel = .today
         case "roko://todo": panel = .todos
         case "roko://shopping": panel = .shopping
+        case "roko://read-later": panel = .readLater
         // The parking timer: the bar, with the time left on top.
         case "roko://parking", "roko://bar": showCommandBar()
         case "roko://parking/extend": Parking.shared.extend()
@@ -515,6 +522,42 @@ final class BrowserModel {
             presentAfterPanelCloses { self.summary = model }
             model.start(webView: webView, url: tab.isPrivate ? nil : tab.url)
         }
+    }
+
+    // MARK: Read Later
+
+    /// Puts the page aside, with its text as it is now.
+    func saveForLater() {
+        guard let tab = selectedTab, tab.url != nil else { return }
+        panel = .none
+        Task { showToast(await ReadLater.shared.save(tab)) }
+    }
+
+    /// One summary across every unread saved page, or across one group of them.
+    func summarizeSaved(_ group: ReadLaterGroup? = nil) {
+        let pages = group.map(ReadLater.shared.pages(in:)) ?? ReadLater.shared.unread
+        guard !pages.isEmpty else { return }
+        let model = DigestModel(pages: pages, subject: group?.name)
+        digest = model
+        model.start()
+    }
+
+    /// A saved page, in a new tab: it counts as read.
+    func openSaved(_ page: ReadLaterPage) {
+        ReadLater.shared.markRead(page.id)
+        digest = nil
+        panel = .none
+        open(page.url, inNewTab: true)
+    }
+
+    /// A question about the saved pages: Browse for Me, with the digest as what's been said.
+    func ask(_ question: String, about digest: DigestModel) {
+        let titles = digest.pages.map(\.title).joined(separator: "; ")
+        let session = BrowseSession(question: question,
+                                    context: [(question: "Summarize my saved pages: \(titles)", answer: digest.text)])
+        self.digest = nil
+        panel = .none
+        browseForMe = session
     }
 
     func openReader() {

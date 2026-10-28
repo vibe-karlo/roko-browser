@@ -24,6 +24,11 @@ the best options with their prices, what to watch out for, follow-up questions, 
 YouTube videos on it. Apple Intelligence writes it privately; Claude takes over where Apple's
 models fall short.
 
+**Read later.** Save a page from its tools or by typing "save for later", or from the Mac. Its
+text is kept, so it can be summarized offline. Pages on one subject are gathered under its name,
+with a summary of just them a tap away; Summarize all does every unread page at once. Each point
+is marked with the page it comes from.
+
 **Clean pages.** Ads, trackers and cookie banners are gone before the page draws: consent pop-ups
 are answered with "reject", and subscription walls that freeze scrolling get it back.
 
@@ -228,6 +233,36 @@ greedily on known things, habits and `everyday.txt`, up to four words long, afte
 amounts ("dvije", "kilo") and joins ("i", "and"); a single word one edit from a known thing is
 corrected. The recognizers get the same words as `contextualStrings` (`VoiceInput.expectedWords`).
 
+## Read later
+
+`ReadLater/`. A saved page (`ReadLaterPage`) keeps its address, title, site, saved and read
+times, and its readable text, taken by `PageReader` (Readability) as it's saved, up to 200,000
+characters; its share picture (`og:image`), or a snapshot of the page, is a 480-pixel JPEG in
+`read-later/`. All of it is `read-later.json` in Application Support, beside the other stores.
+Private tabs can't be saved. In the bar, "read later" opens the list and "save for later" saves
+the page (typed in full it goes first, above the search).
+
+- **Groups** (`ReadLaterGroups`): which unread pages share a subject, judged from each page's
+  title, site and first 240 characters. Apple's model proposes groups, then each group is put
+  back to it on its own ("do these belong together?"), which drops the pairs it makes up to have
+  something to give ("Work and Wakefulness"); Claude (Haiku) does it where Apple's models aren't
+  here. Worked out again only when the unread pages change, and kept with the list. Apple's
+  sentence and contextual embeddings were tried first: they put caffeine nearer embryo
+  screening than coffee.
+- **Summarize** (`DigestModel`): one summary across a group or every unread page, by theme,
+  each point ending in `[[n]]` for the pages it comes from, which opens the page and marks it
+  read. Apple's cloud model, then Claude, then the on-device model, as for one page (a language
+  Apple's models write badly goes to Claude first). The pages share each model's character
+  budget evenly, a short page's unused share going to the long ones; when the share would be
+  under 1,800 characters, each page is first read down to its main points with the same model,
+  a page at a time, and the summary is written from those. Apple's models fill `DigestAnswer`,
+  each point naming its pages before it's written (written after, the small model left them
+  out); Claude writes the dialect directly. A summary of the same pages opens at once from the
+  last dozen kept. Debug builds take `-digestEngine onDevice`.
+- **Sync**: with Sync with your Mac on, the list (not the text: the server keeps 4 KB a thing)
+  is the same in Raycast. A page saved on the Mac is fetched here when it arrives, for its text
+  and picture.
+
 ## Notify Me
 
 Like Safari's: in a page's menu, say what to look for (or nothing, for anything new) and how
@@ -405,7 +440,7 @@ To take a page down by hand: `npx wrangler d1 execute roko-shares --remote --com
 
 ## Sync with the Mac (Raycast)
 
-To-dos and the three shopping lists are kept the same on the iPhone and on the Mac, through
+To-dos, the three shopping lists and Read Later are kept the same on the iPhone and on the Mac, through
 the same Worker (`src/sync.js`, tables in `migrations/0002_sync.sql`), and links sent from
 the Mac open in roko as tabs. On the Mac it's the Raycast extension in `Raycast/` (its README
 has the commands). In the app it's `Today/RokoSync.swift`, turned on in Settings → Sync with
@@ -424,7 +459,9 @@ your Mac, shown only when the build has `SHARE_SERVER`.
   from the Worker can wake it instead.
 - **From the Mac**: a thing to buy goes up without an aisle; roko works the aisle out as for
   typing and sends it back. A to-do is a day ("2026-10-28"), "week", and a time ("15:30").
-  A link is opened once, then cleared on the server.
+  A link is opened once, then cleared on the server. A page for Read Later ("later") is its
+  address, title, site, picture and times; the iPhone reads its text. Read Later goes up in
+  requests of its own, so a server from before it holds up nothing else.
 - **Limits**: 5,000 things a space, 500 changes a write, 4 KB a thing, three new spaces a
   minute and twenty a day per address.
 - **Tests**: with `npm run dev` running, `node test/sync.e2e.mjs`. To try the app against it,

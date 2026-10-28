@@ -2,7 +2,7 @@
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "roko",
   "title": "roko",
-  "description": "Your roko to-dos and shopping lists, and links sent to roko on your iPhone.",
+  "description": "Your roko to-dos, shopping lists and Read Later, and links sent to roko on your iPhone.",
   "icon": "icon.png",
   "author": "karlo_konig",
   "license": "MIT",
@@ -49,6 +49,28 @@
           "placeholder": "Call the dentist",
           "type": "text",
           "required": true
+        }
+      ]
+    },
+    {
+      "name": "read-later",
+      "title": "Read Later",
+      "subtitle": "roko",
+      "description": "The pages saved to roko's Read Later: open one, mark it read, remove it.",
+      "mode": "view"
+    },
+    {
+      "name": "save-for-later",
+      "title": "Save for Later",
+      "subtitle": "roko",
+      "description": "Saves the tab you're on (or a link you give) to roko's Read Later.",
+      "mode": "no-view",
+      "arguments": [
+        {
+          "name": "link",
+          "placeholder": "Link (the front tab if empty)",
+          "type": "text",
+          "required": false
         }
       ]
     },

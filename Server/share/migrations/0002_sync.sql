@@ -18,7 +18,7 @@ CREATE INDEX sync_spaces_by_address ON sync_spaces (address_hash, created);
 -- A deleted thing stays as a marker, so a device that was away hears of it.
 CREATE TABLE sync_records (
   space TEXT NOT NULL,
-  -- "todo", "shopping" or "link".
+  -- "todo", "shopping", "later" or "link".
   kind TEXT NOT NULL,
   id TEXT NOT NULL,
   -- The thing as JSON; null once deleted.

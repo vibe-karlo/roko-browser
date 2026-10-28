@@ -2,9 +2,9 @@ import Foundation
 import SwiftData
 import UIKit
 
-/// roko's own sync, through roko's server (Server/share, /api/sync): to-dos and
-/// the shopping lists kept the same here and on the Mac (the Raycast extension),
-/// and links sent from the Mac opened here as tabs.
+/// roko's own sync, through roko's server (Server/share, /api/sync): to-dos,
+/// the shopping lists and Read Later kept the same here and on the Mac (the
+/// Raycast extension), and links sent from the Mac opened here as tabs.
 ///
 /// How things looked at the last sync is kept on this device (`snapshot`): a
 /// to-do that no longer looks like that changed here, and goes up with the time
@@ -131,6 +131,12 @@ enum RokoSync {
         startPolling()
     }
 
+    /// Read Later changed here (it keeps its own file, not the model store).
+    static func readLaterChanged() {
+        guard !applying else { return }
+        schedule(after: .milliseconds(600))
+    }
+
     /// A round soon; several changes in a row make one.
     static func schedule(after delay: Duration) {
         guard isOn else { return }
@@ -183,7 +189,7 @@ enum RokoSync {
             // open than deletions: nothing of that kind is deleted then.
             // (Deleting the last one or three by hand still goes through.)
             let present = Set(local.keys.map(\.kind))
-            let protected = Set(["todo", "shopping"].filter { kind in
+            let protected = Set(["todo", "shopping", "later"].filter { kind in
                 !present.contains(kind) && snapshot.keys.filter { $0.kind == kind }.count > 3
             })
             let gone = snapshot.keys.filter { $0.kind != "link" && local[$0] == nil && !protected.contains($0.kind) }
@@ -194,11 +200,23 @@ enum RokoSync {
             for id in clearedLinks() {
                 outgoing.append(["kind": "link", "id": id, "updated": now, "deleted": true])
             }
-            for batch in stride(from: 0, to: outgoing.count, by: 400).map({ Array(outgoing[$0..<min($0 + 400, outgoing.count)]) }) {
+            // Read Later goes in requests of its own: a server from before it
+            // turns the kind down, and that mustn't hold up the to-dos.
+            let later = outgoing.filter { $0["kind"] as? String == "later" }
+            let rest = outgoing.filter { $0["kind"] as? String != "later" }
+            for batch in stride(from: 0, to: rest.count, by: 400).map({ Array(rest[$0..<min($0 + 400, rest.count)]) }) {
                 _ = try await call(server, key, method: "POST", body: ["changes": batch])
             }
-            for (id, record) in local where snapshot[id] != record { snapshot[id] = record }
-            for id in gone { snapshot[id] = nil }
+            var laterSent = true
+            do {
+                for batch in stride(from: 0, to: later.count, by: 400).map({ Array(later[$0..<min($0 + 400, later.count)]) }) {
+                    _ = try await call(server, key, method: "POST", body: ["changes": batch])
+                }
+            } catch {
+                laterSent = false
+            }
+            for (id, record) in local where snapshot[id] != record && (laterSent || id.kind != "later") { snapshot[id] = record }
+            for id in gone where laterSent || id.kind != "later" { snapshot[id] = nil }
             if !outgoing.isEmpty { forgetClearedLinks() }
 
             // Down: what changed on the server since the last round, this
@@ -254,6 +272,7 @@ enum RokoSync {
         var records: [RecordID: Record] = [:]
         for todo in todos { records[RecordID(kind: "todo", id: todo.syncID)] = .todo(TodoRecord(todo)) }
         for item in items { records[RecordID(kind: "shopping", id: item.syncID)] = .shopping(ShoppingRecord(item)) }
+        for page in ReadLater.shared.pages { records[RecordID(kind: "later", id: page.id.uuidString)] = .later(LaterRecord(page)) }
         return records
     }
 
@@ -309,6 +328,15 @@ enum RokoSync {
                     // Added on the Mac: learned like anything typed here.
                     if isNew { Shopping.learn(record.title, in: context) }
                     snapshot[recordID] = .shopping(record)
+                }
+            case "later":
+                guard let uuid = UUID(uuidString: id) else { continue }
+                if deleted || data == nil {
+                    ReadLater.shared.removeSynced(uuid)
+                    snapshot[recordID] = nil
+                } else if let record = LaterRecord(data!), snapshot[recordID] != .later(record) {
+                    ReadLater.shared.applySynced(record, id: uuid)
+                    snapshot[recordID] = .later(record)
                 }
             case "link":
                 guard !deleted, let data, let string = data["url"] as? String, let url = URL(string: string),
@@ -411,15 +439,17 @@ enum RokoSync {
 
 // MARK: What's sent
 
-/// A synced thing as it travels: a to-do or a thing to buy.
+/// A synced thing as it travels: a to-do, a thing to buy or a page to read later.
 enum Record: Codable, Equatable {
     case todo(TodoRecord)
     case shopping(ShoppingRecord)
+    case later(LaterRecord)
 
     var object: [String: Any] {
         let data: Data? = switch self {
         case .todo(let record): try? JSONEncoder().encode(record)
         case .shopping(let record): try? JSONEncoder().encode(record)
+        case .later(let record): try? JSONEncoder().encode(record)
         }
         return data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
     }
@@ -545,4 +575,35 @@ struct ShoppingRecord: Codable, Equatable {
         if let order { item.order = order }
         if let created = date(created) { item.createdAt = created }
     }
+}
+
+/// A page saved to Read Later, without its text: the server keeps a few
+/// kilobytes a thing. Saved on the Mac, its text is read here when it arrives.
+struct LaterRecord: Codable, Equatable {
+    var url: String
+    var title: String
+    var site: String?
+    /// The page's share picture, for the Mac's list.
+    var image: String?
+    var saved: Int64?
+    var read: Int64?
+
+    init(_ page: ReadLaterPage) {
+        url = page.url.absoluteString
+        title = page.title
+        site = page.site
+        image = page.imageURL?.absoluteString
+        saved = milliseconds(page.savedAt)
+        read = milliseconds(page.readAt)
+    }
+
+    init?(_ object: [String: Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: object),
+              let record = try? JSONDecoder().decode(LaterRecord.self, from: data),
+              let url = URL(string: record.url), url.scheme == "https" || url.scheme == "http" else { return nil }
+        self = record
+    }
+
+    var savedAt: Date? { date(saved) }
+    var readAt: Date? { date(read) }
 }

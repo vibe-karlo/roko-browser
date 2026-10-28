@@ -126,6 +126,13 @@ struct ToolsSheet: View {
         VStack(spacing: 0) {
             ToolRow(glyph: .reader, title: "Reader Mode") { browser.openReader() }
 
+            // Not for private tabs: the list keeps the page and its text.
+            if !tab.isPrivate {
+                ToolRow(glyph: .readLater, title: "Read Later", detail: ReadLater.shared.contains(tab.url) ? "Saved" : "") {
+                    ReadLater.shared.contains(tab.url) ? (browser.panel = .readLater) : browser.saveForLater()
+                }
+            }
+
             // Not for private tabs: watching keeps the page's address.
             if !tab.isPrivate {
                 ToolRow(glyph: .bell, title: "Notify Me", detail: isWatched(tab) ? "On" : "") { browser.panel = .notifyMe }
