@@ -25,6 +25,11 @@ enum WebViewFactory {
     static func make(isPrivate: Bool) -> WKWebView {
         if !isPrivate, let webView = prewarmed {
             prewarmed = nil
+            // The next tab gets one too, built once this one's page is under way.
+            Task {
+                try? await Task.sleep(for: .seconds(1))
+                prewarm()
+            }
             return webView
         }
         return build(isPrivate: isPrivate)

@@ -278,6 +278,21 @@ final class BrowserModel {
     func open(_ url: URL, inNewTab: Bool = false, isPrivate: Bool = false) {
         if !inNewTab, let tab = selectedTab, tab.isPrivate == isPrivate {
             tab.load(url)
+        } else if !isPrivate, let tab = takePreloaded(url) {
+            tab.delegate = self
+            tabs.append(tab)
+            select(tab)
+            // Finished before it was taken: its visit wasn't recorded yet.
+            if !tab.isLoading, let shown = tab.url { self.tab(tab, didFinishLoading: shown, title: tab.title) }
+            // Moved from behind everything into its place: until it scrolls,
+            // WebKit keeps a fixed header where the old layout had it.
+            Task {
+                await Task.yield()
+                guard let scrollView = tab.webView?.scrollView else { return }
+                let top = CGPoint(x: 0, y: -scrollView.adjustedContentInset.top)
+                scrollView.setContentOffset(CGPoint(x: 0, y: top.y + 1), animated: false)
+                scrollView.setContentOffset(top, animated: false)
+            }
         } else {
             let tab = BrowserTab(url: url, isPrivate: isPrivate)
             tab.delegate = self
@@ -285,6 +300,58 @@ final class BrowserModel {
             select(tab)
         }
         panel = .none
+    }
+
+    // MARK: Preloading
+
+    /// The page Go would open in a new tab, already loading out of sight while
+    /// you finish typing, as Safari's Preload Top Hit does. Most of a page's
+    /// wait (the connection, the HTML, its scripts) is over before Go.
+    @ObservationIgnored private var preloaded: (url: URL, tab: BrowserTab)?
+    @ObservationIgnored private var preloadWait: Task<Void, Never>?
+
+    /// The command bar's top row, each time it changes: a site to open, or nil.
+    /// Waits for typing to pause, so every letter doesn't start a page.
+    func preloadTopHit(_ url: URL?) {
+        preloadWait?.cancel()
+        let opensNewTab = commandMode == .newTab || (commandMode == .currentTab && selectedTab == nil)
+        guard let url, opensNewTab, launcherContext == .web, !isCurrentPage(url) else {
+            dropPreload()
+            return
+        }
+        if preloaded?.url == url { return }
+        preloadWait = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled, let self, self.panel == .command else { return }
+            self.dropPreload()
+            let tab = BrowserTab(url: url)
+            tab.wake()
+            // In the window, behind everything: WebKit only lays out and paints
+            // a page that's on screen, and one at the screen's size doesn't
+            // reflow when it's shown. The page is drawn before Go, not after.
+            if let window = UIApplication.shared.connectedScenes
+                .compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first, let webView = tab.webView {
+                webView.frame = window.bounds
+                window.insertSubview(webView, at: 0)
+            }
+            self.preloaded = (url, tab)
+        }
+    }
+
+    func dropPreload() {
+        preloadWait?.cancel()
+        preloaded?.tab.close()
+        preloaded = nil
+    }
+
+    private func takePreloaded(_ url: URL) -> BrowserTab? {
+        preloadWait?.cancel()
+        guard let preloaded, preloaded.url == url else {
+            dropPreload()
+            return nil
+        }
+        self.preloaded = nil
+        return preloaded.tab
     }
 
     func close(_ tab: BrowserTab) {

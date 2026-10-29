@@ -5,6 +5,7 @@
 // (ConsentHandler.swift), and accepts only where a site doesn't work without:
 //
 // - a wall: rejecting failed and the pop-up is still in the way;
+// - a price on no: the pop-up's reject button is "Reject and Pay";
 // - blocked content: the page shows a consent platform's "accept cookies to
 //   see this video" placeholder, after roko rejected, or because the platform
 //   itself was blocked (roko's cookie list blocks many of them) and never asked.
@@ -33,8 +34,20 @@ const BLOCKED = [
 // Croatian and the larger European languages; whole button labels only, so a
 // "Reject" somewhere in a sentence is never pressed.
 const REJECT = /^(reject|reject all|reject cookies|decline|decline all|deny|deny all|refuse|refuse all|no,? thanks|only necessary|necessary only|only essential|essential only|use necessary cookies only|continue without accepting|odbij|odbij sve|odbaci|ne prihvaćam|ne prihvacam|samo nužni|samo nuzni|samo neophodni|ablehnen|alle ablehnen|nur notwendige|refuser|tout refuser|rifiuta|rifiuta tutto|rechazar|rechazar todo|weigeren|alles weigeren|odmítnout|odrzuć|odrzuc wszystko|avvisa|afvis|hylkää)$/i;
-const ACCEPT = /^(accept|accept all|accept cookies|allow|allow all|agree|i agree|ok|okay|got it|prihvati|prihvati sve|prihvaćam|prihvacam|slažem se|slazem se|akzeptieren|alle akzeptieren|accepter|tout accepter|accetta|accetta tutto|aceptar|aceptar todo|accepteren|přijmout|akceptuję)$/i;
+const ACCEPT = /^(accept|accept all|accept cookies|i accept|allow|allow all|agree|i agree|ok|okay|got it|prihvati|prihvati sve|prihvaćam|prihvacam|slažem se|slazem se|akzeptieren|alle akzeptieren|accepter|tout accepter|accetta|accetta tutto|aceptar|aceptar todo|accepteren|přijmout|akceptuję)$/i;
 const COOKIE_WORDS = /cookie|kolačić|kolacic|kolačiće|keks|galleta|biscott/i;
+
+// A pop-up whose only no costs money ("Reject and Pay", "Pay to Reject",
+// "Reject and Purchase ..."): rejecting means paying, so it's a wall, and
+// pressing reject would only lead to the payment page.
+const PAY_TO_REJECT = /\b(reject|refuse|decline)\b.{0,12}\b(pay|purchase|subscribe)|\bpay to (reject|refuse|decline)\b/i;
+const shown = (el) => typeof el.checkVisibility !== 'function' || el.checkVisibility({ checkVisibilityCSS: true });
+const buttonsOnPage = () => [...document.querySelectorAll('button, a, [role="button"], input[type="button"]')]
+    .filter((b) => label(b).length <= 60 && shown(b));
+const payToReject = () => buttonsOnPage().some((b) => PAY_TO_REJECT.test(label(b)));
+// Its accept button, pressed directly: a platform's rule can miss a site's
+// own variant of the pop-up ("I Accept" beside "Reject and Pay").
+const acceptBeside = () => buttonsOnPage().find((b) => ACCEPT.test(label(b)));
 
 const label = (el) => (el.innerText || el.value || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim();
 
@@ -96,7 +109,17 @@ export function start(AutoConsent, filterCompactRules, compactRules) {
     };
 
     const send = async (message) => {
-        const reply = await post(message);
+        let reply = await post(message);
+        if (message.type === 'popupFound' && reply && payToReject()) {
+            if (reply.type === 'optOut') reply = await post({ type: 'rokoWall', cmp: message.cmp });
+            const button = acceptBeside();
+            if (button) {
+                button.click();
+                accepted = true;
+                countSaved(1);
+                return;
+            }
+        }
         if (message.type === 'optInResult' && message.result) accepted = true;
         if ((message.type === 'optOutResult' || message.type === 'optInResult') && message.result) {
             countSaved(consent && consent.state && consent.state.clicks);

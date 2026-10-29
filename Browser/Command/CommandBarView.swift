@@ -142,6 +142,8 @@ struct CommandBarView: View {
         .onDisappear {
             browser.launcherShown = false
             browser.launcherRows = false
+            // Closed without opening it: the preloaded page goes.
+            browser.dropPreload()
         }
         .task {
             guard browser.launcherContext == .web, await CopiedLink.isWaiting() else { return }
@@ -887,6 +889,13 @@ struct CommandBarView: View {
         case .openPin(let pin): DNSPrefetcher.warm(URL(string: pin.url)?.host())
         case .search(let text): DNSPrefetcher.warm(SearchEngine.current.searchURL(for: text).host())
         default: break
+        }
+        // A site you're typing toward starts loading before Go; a search or an
+        // answer doesn't (a search would be one page per letter).
+        if case .open(let url) = items.first?.action, !query.isEmpty {
+            browser.preloadTopHit(url)
+        } else {
+            browser.preloadTopHit(nil)
         }
     }
 

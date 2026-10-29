@@ -500,7 +500,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ## Speed and battery, measured
 
 On the iPhone 17 Pro, Release build (24 October 2026): first screen 160 ms after launch warm, 460 ms
-cold; the content blocker ready 0.4 to 1.2 s. In the simulator: every screen (a page, the address
+cold; the content blocker ready 0.4 to 1.2 s. From Go to a page you can see: under 0.1 s when the bar's top row
+was preloaded while typing (about 1.3 s before preloading, measured in the simulator on 29 October 2026). In the simulator: every screen (a page, the address
 bar, Today, To-do, an answer) at 0% CPU when nothing is happening, about 80 MB; ranking the
 address bar 1 to 2.5 ms a keystroke, 3.5 ms to open. Nothing polls: waits are one-off pauses or
 debounces, the light's breathing and the reading shimmer run only while something is being worked

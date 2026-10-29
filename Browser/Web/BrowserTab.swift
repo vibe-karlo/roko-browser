@@ -463,6 +463,14 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         perf("finish", webView.url)
+        if LaunchClock.isEnabled {
+            let host = webView.url?.host() ?? "-"
+            webView.evaluateJavaScript("""
+                (() => { const n = performance.getEntriesByType('navigation')[0] || {};
+                  const p = performance.getEntriesByType('paint').find(e => e.name == 'first-contentful-paint');
+                  return [Math.round(n.responseStart || 0), Math.round(p ? p.startTime : 0)].join(' '); })()
+                """) { result, _ in print("NAV page \(host) firstByte/firstPaint \(result ?? "-") ms") }
+        }
         samplePageColors()
         if let translation {
             Task { await PageTranslator.shared.translate(webView, to: translation) }
