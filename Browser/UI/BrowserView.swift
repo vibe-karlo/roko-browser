@@ -72,7 +72,8 @@ struct BrowserView: View {
         .overlay(alignment: .bottom) {
             // The command bar takes the bar's place rather than stacking on top of it.
             BottomBar()
-                .opacity(browser.launcherShown || browser.panel == .tabs || browser.pageBecomingSummary ? 0 : 1)
+                .opacity(browser.launcherShown || browser.panel == .tabs || browser.pageBecomingSummary || browser.hidingItems != nil ? 0 : 1)
+                .allowsHitTesting(browser.hidingItems == nil)
                 // Faded, not folded: folding changes the page's insets, which stops a pull dead.
                 .animation(.easeOut(duration: 0.2), value: browser.pageBecomingSummary)
                 // Out as the launcher opens out of it, back as it closes, at its pace.
@@ -184,6 +185,13 @@ struct BrowserView: View {
             }
         }
         .animation(.snappy(duration: 0.3), value: browser.cookieOffer)
+        .overlay(alignment: .bottom) {
+            if let hidden = browser.hidingItems {
+                HideItemsBar(hidden: hidden)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy(duration: 0.3), value: browser.hidingItems != nil)
         .overlay(alignment: .bottom) {
             // Never over the page menu or another panel opened while it showed.
             if browser.copiedLinkOffer, browser.cookieOffer == nil, browser.panel == .none, let url = browser.copiedLinkURL {
@@ -578,5 +586,50 @@ private struct ReadLaterScreens: ViewModifier {
                 }
             }
             .animation(.spring(duration: 0.42, bounce: 0.06), value: browser.digest?.id)
+    }
+}
+
+/// In place of the bar while Hide Distracting Items is on.
+private struct HideItemsBar: View {
+    @Environment(BrowserModel.self) private var browser
+    let hidden: Int
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button { browser.undoHiddenItem() } label: {
+                Glyph(.back)
+                    .frame(width: 44, height: 44)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(GlyphButtonStyle())
+            .disabled(hidden == 0)
+            .opacity(hidden == 0 ? 0.35 : 1)
+            .accessibilityLabel("Undo")
+
+            VStack(spacing: 1) {
+                Text(hidden == 0 ? "Tap something to hide" : hidden == 1 ? "1 thing hidden" : "\(hidden) things hidden")
+                    .font(.system(size: 15, weight: .medium))
+                    .contentTransition(.numericText())
+                Text("Tap it again to hide it")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.secondaryInk)
+            }
+            .frame(maxWidth: .infinity)
+            .lineLimit(1)
+
+            Button("Done") { browser.finishHidingItems() }
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.accentText)
+                .frame(minWidth: 56, minHeight: 44)
+                .contentShape(.rect)
+        }
+        .padding(.horizontal, 8)
+        .frame(height: Theme.barHeight + 8)
+        .barSurface(cornerRadius: Theme.barRadius)
+        .compositingGroup()
+        .padding(.horizontal, Theme.gutter)
+        .padding(.bottom, 4)
+        .animation(.snappy(duration: 0.2), value: hidden)
+        .sensoryFeedback(.impact(weight: .light), trigger: hidden)
     }
 }

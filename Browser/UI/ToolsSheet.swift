@@ -138,6 +138,10 @@ struct ToolsSheet: View {
                 ToolRow(glyph: .bell, title: "Notify Me", detail: isWatched(tab) ? "On" : "") { browser.panel = .notifyMe }
             }
 
+            ToolRow(glyph: .hideItems, title: "Hide Distracting Items", detail: hiddenDetail(tab)) {
+                browser.startHidingItems()
+            }
+
             translateRow(tab)
 
             HStack(spacing: 14) {
@@ -221,6 +225,11 @@ struct ToolsSheet: View {
         browser.showToast("Translating to \(target.name)")
     }
 
+    private func hiddenDetail(_ tab: BrowserTab) -> String {
+        let count = tab.url?.host().map { HiddenItems.shared.selectors(for: $0).count } ?? 0
+        return count == 0 ? "" : "\(count) hidden"
+    }
+
     private func isWatched(_ tab: BrowserTab) -> Bool {
         guard let url = tab.url?.absoluteString else { return false }
         return watches.contains { $0.url == url }
@@ -284,6 +293,9 @@ struct ToolsSheet: View {
                         cookieReason = on ? nil : .chosen
                     }))
                     .disabled(!blockingOn || !ContentBlocker.shared.isEnabled(.cookies))
+                if !HiddenItems.shared.selectors(for: host).isEmpty {
+                    ToolRow(glyph: .hideItems, title: "Show Hidden Items") { browser.showHiddenItems() }
+                }
                 ToolRow(glyph: .settings, title: "All settings") { browser.panel = .settings }
             }
         }

@@ -6,6 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Hide Distracting Items, as in Safari: in the page menu, tap something on the page to mark it, tap it again and it fades away, and it stays hidden on that site from then on, from the first paint. The bar shows how many are hidden, with Undo for the last one and Done. A tap picks the smallest real block under your finger (a button, not the row it sits in), and an empty wrapper around it goes with it. The page menu shows how many are hidden on a site; Site Settings has Show Hidden Items, and Settings → Sites lists and resets them. It costs nothing on pages: what you hid travels with the hiding answer every page already gets, and the picker is put into a page only while you're using it. Names a site generates afresh (hashed classes) aren't relied on, so a hidden thing stays hidden after the site updates.
 - Pages open the moment you press Go. While you type in the bar, the site its top row would open starts loading out of sight (as Safari's Preload Top Hit does), drawn in place behind everything, so Go shows a page already laid out instead of a black and then a white screen. Measured in the simulator: about 1.3 seconds from Go to the first picture before, under 0.1 seconds now. It waits for a quarter-second pause in typing, only for a site (never a search), only for a new tab, and the page is dropped if you close the bar or type something else. The spare web view new tabs start from is built again after each one is taken, not only at launch.
 
 ### Fixed

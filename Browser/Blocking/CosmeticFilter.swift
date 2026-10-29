@@ -105,6 +105,13 @@ final class CosmeticFilter: NSObject, WKScriptMessageHandlerWithReply {
             if category == .cookies { faded += found } else { selectors += found }
             if category == .cookies || category == .popups { overlays += found }
         }
+        // What you hid on this site yourself: with the first answer, as the
+        // site's own rules are. Overlays among them may have locked scrolling.
+        if isFirst {
+            let mine = HiddenItems.shared.selectors(for: host).map { Substring($0) }
+            selectors += mine
+            overlays += mine
+        }
         // One rule per selector, so a selector WebKit can't parse only drops itself.
         // Under :root, one step more specific than the page's own rules: a site
         // whose stylesheet loads later and shows the same element with

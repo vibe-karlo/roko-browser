@@ -606,6 +606,7 @@ struct SitesSettings: View {
         }
         for (host, what) in ContentBlocker.shared.allowances() { changes[host, default: []] += what }
         for (host, level) in PageZoom.all() { changes[host, default: []].append("Zoom \(Int((level * 100).rounded()))%") }
+        for (host, count) in HiddenItems.shared.all() { changes[host, default: []].append(count == 1 ? "1 item hidden" : "\(count) items hidden") }
         return changes.map { Site(host: $0.key, changes: $0.value) }.sorted { $0.host < $1.host }
     }
 
@@ -633,7 +634,7 @@ struct SitesSettings: View {
                     }
                 }
             } footer: {
-                if !sites.isEmpty { Text("Swipe a site to treat it like every other: cookies rejected, everything blocked, 100% zoom.") }
+                if !sites.isEmpty { Text("Swipe a site to treat it like every other: cookies rejected, everything blocked, nothing you hid, 100% zoom.") }
             }
         }
         .settingsPage("Sites")
@@ -647,6 +648,7 @@ struct SitesSettings: View {
         // Open tabs on it, too: their next page loads with everything blocked.
         ContentBlocker.shared.settingsChanged()
         PageZoom.forget(site.host)
+        HiddenItems.shared.forget(site.host)
         withAnimation(.snappy) { sites = Self.sites() }
     }
 }

@@ -49,6 +49,9 @@ final class BrowserModel {
     /// What was said, once + is let go, for the launcher to take as typed.
     var voiceResult: String?
     var isBarCollapsed = false
+    /// Hide Distracting Items is on: how many things were hidden so far, or nil.
+    private(set) var hidingItems: Int?
+    @ObservationIgnored private let picker = HiddenItemsPicker()
     var summary: SummaryModel? {
         // Closed before it's finished: stop there, as Browse for Me does.
         didSet { if oldValue !== summary { oldValue?.cancel() } }
@@ -264,6 +267,7 @@ final class BrowserModel {
 
     func select(_ tab: BrowserTab) {
         HitchWatch.start("select tab")
+        finishHidingItems()
         let previous = selectedTab
         selectedID = tab.id
         tab.lastActive = .now
@@ -352,6 +356,37 @@ final class BrowserModel {
         }
         self.preloaded = nil
         return preloaded.tab
+    }
+
+    // MARK: Hide Distracting Items
+
+    func startHidingItems() {
+        guard let webView = selectedTab?.webView, webView.url?.host() != nil else { return }
+        panel = .none
+        picker.changed = { [weak self] count in self?.hidingItems = count }
+        picker.start(in: webView)
+        hidingItems = 0
+    }
+
+    func undoHiddenItem() {
+        picker.undo()
+    }
+
+    func finishHidingItems() {
+        guard hidingItems != nil else { return }
+        let count = picker.finish()
+        hidingItems = nil
+        if count > 0, let host = selectedTab?.url?.displayHost {
+            showToast(count == 1 ? "Hidden on \(host) from now on" : "\(count) things hidden on \(host) from now on")
+        }
+    }
+
+    /// Everything you hid on this site shows again.
+    func showHiddenItems() {
+        guard let tab = selectedTab, let host = tab.url?.host() else { return }
+        HiddenItems.shared.forget(host)
+        panel = .none
+        tab.webView?.reload()
     }
 
     func close(_ tab: BrowserTab) {
@@ -753,6 +788,8 @@ final class BrowserModel {
 
 extension BrowserModel: BrowserTabDelegate {
     func tab(_ tab: BrowserTab, didFinishLoading url: URL, title: String) {
+        // Went to another page while hiding (a swipe back): the mode was for that one.
+        if tab.id == selectedID, hidingItems != nil { finishHidingItems() }
         // Private pages leave nothing on disk, icons included.
         guard !tab.isPrivate else { return }
         if let webView = tab.webView {

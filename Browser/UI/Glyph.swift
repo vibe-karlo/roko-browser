@@ -22,6 +22,8 @@ struct Glyph: View {
              basket,
              // Read Later.
              readLater,
+             // Hide Distracting Items.
+             hideItems,
              // Settings.
              palette, microphone, info, key, broom, globe, appIcon, notification
     }

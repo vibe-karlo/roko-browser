@@ -30,7 +30,9 @@ with a summary of just them a tap away; Summarize all does every unread page at 
 is marked with the page it comes from.
 
 **Clean pages.** Ads, trackers and cookie banners are gone before the page draws: consent pop-ups
-are answered with "reject", and subscription walls that freeze scrolling get it back.
+are answered with "reject", and subscription walls that freeze scrolling get it back. What's left
+that you don't want (a sticky bar, a "Join" button, a promo row) goes with Hide Distracting Items in
+the page menu: tap it, tap it again, and it stays gone on that site.
 
 **And the rest.** Today's weather, news and to-dos on a new tab, to-dos synced with Apple
 Reminders, Home Screen widgets, pages translated into the languages you choose, and a count of
@@ -68,7 +70,7 @@ Keychain.
 | Area | Where | Notes |
 | --- | --- | --- |
 | Tabs | `Web/BrowserTab.swift`, `App/BrowserModel.swift` | At most 3 live web views; older tabs hibernate to a snapshot plus their back/forward state. Saved after every page load. |
-| Ad, tracker, cookie blocking | `Blocking/`, `Resources/Blocklists/` | Request blocking uses WebKit content rule lists (native, compiled once). Element hiding is served per page by `CosmeticFilter`: a page gets only the selectors whose id or class it contains, instead of WebKit testing ~45k selectors on every page. |
+| Ad, tracker, cookie blocking | `Blocking/`, `Resources/Blocklists/` | Request blocking uses WebKit content rule lists (native, compiled once). Element hiding is served per page by `CosmeticFilter`: a page gets only the selectors whose id or class it contains, instead of WebKit testing ~45k selectors on every page. What you hid yourself (`HiddenItems`) rides on the same first answer, so it costs nothing extra; the picker script (`hide-items.js`) is only put into a page while you're hiding. |
 | Cookie banners | `Resources/Scripts/cookie-consent.js` | Clicks "reject" on the common consent platforms, in an isolated script world; the cookie filter list hides the rest. |
 | Command bar | `Command/` | One ranked list: address, search, Browse for Me, pins, tabs, history, suggestions, actions. Best match sits above the field. |
 | Calculator | `Calculator/` | Raycast-style answers in the command bar: arithmetic and percentages, unit conversion (Foundation's units), currency (ECB rates via frankfurter.dev, cached 12 h), time in other cities. Go copies the answer. Non-maths text is rejected in about 9 µs. |
