@@ -66,6 +66,10 @@ targets:
         NSSupportsLiveActivities: true
         NSCalendarsFullAccessUsageDescription: Today shows what's left on your calendar for the day. It stays on this iPhone.
         NSRemindersFullAccessUsageDescription: Your to-dos and a list in Reminders are kept the same, so they're on your Mac and Watch too.
+        # Pages: Save to Photos, and file fields that take a photo. Without
+        # these iOS ends roko the moment a page reaches for them.
+        NSPhotoLibraryAddUsageDescription: Images you save from a page go into your Photos.
+        NSCameraUsageDescription: A page asked to take a photo or video, for example to upload it.
         # Required before Apple will grant the browser entitlements (default
         # browser, passkeys): the app must declare it opens http and https.
         CFBundleURLTypes:
