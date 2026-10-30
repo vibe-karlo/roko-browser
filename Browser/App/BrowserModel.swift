@@ -589,7 +589,8 @@ final class BrowserModel {
         var items: [LiveItem] = []
         if let tab = playerTab { items.append(.media(tab)) }
         if let session = Parking.shared.active, hiddenParking != session.startedAt { items.append(.parking(session)) }
-        if let todo = dueTodo, !todo.done { items.append(.todo(todo)) }
+        // Each to-do due is a page of its own, soonest first.
+        items += dueTodos.filter { !$0.done }.map { .todo($0) }
         return items
     }
 
@@ -599,24 +600,24 @@ final class BrowserModel {
     var bandMinimized = false
     /// Moves on twice a minute, so what's due comes and goes by itself.
     private(set) var liveClock = Date.now
-    private(set) var dueTodo: Todo?
+    private(set) var dueTodos: [Todo] = []
     /// Parking put away from the band (by when it started); a new session shows again.
     private var hiddenParking: Date?
     @ObservationIgnored private var dismissedTodos = Set<PersistentIdentifier>()
     @ObservationIgnored private var liveTicker: Task<Void, Never>?
 
-    /// The to-do with a time from half an hour ago to an hour from now, soonest first.
+    /// The to-dos with a time from half an hour ago to an hour from now, soonest first.
     func refreshLive() {
         liveClock = .now
         guard let context else { return }
         let now = Date.now
         let todos = (try? context.fetch(FetchDescriptor<Todo>(predicate: #Predicate { !$0.done && $0.time != nil }))) ?? []
-        dueTodo = todos
+        dueTodos = todos
             .filter { todo in
                 guard let time = todo.time, !dismissedTodos.contains(todo.persistentModelID) else { return false }
                 return time > now.addingTimeInterval(-30 * 60) && time < now.addingTimeInterval(60 * 60)
             }
-            .min { ($0.time ?? .distantFuture) < ($1.time ?? .distantFuture) }
+            .sorted { ($0.time ?? .distantFuture) < ($1.time ?? .distantFuture) }
     }
 
     func startLiveTicker() {
