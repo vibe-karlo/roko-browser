@@ -8,6 +8,9 @@ enum Preferences {
     static let launcherTicksKey = "launcher.ticks"
     static let pullToSummarizeKey = "pull.summarize"
     static let todoAlertsKey = "todo.alerts"
+    static let linkPeekKey = "links.peek"
+    static let swipeAnywhereKey = "gesture.swipeAnywhere"
+    static let pinchForTabsKey = "gesture.pinchForTabs"
 
     private static func on(_ key: String) -> Bool {
         UserDefaults.standard.object(forKey: key) as? Bool ?? true
@@ -19,6 +22,12 @@ enum Preferences {
     static var launcherTicks: Bool { on(launcherTicksKey) }
     /// Pulling a page well past the reload point summarizes it.
     static var pullToSummarize: Bool { on(pullToSummarizeKey) }
+    /// Touching and holding a link opens a scrollable preview of its page.
+    static var linkPeek: Bool { on(linkPeekKey) }
+    /// A sideways swipe anywhere on a page goes back or forward.
+    static var swipeAnywhere: Bool { on(swipeAnywhereKey) }
+    /// Pinching a page in shows the tab switcher.
+    static var pinchForTabs: Bool { on(pinchForTabsKey) }
     /// A notification 15 minutes before a to-do's time.
     static var todoAlerts: Bool { on(todoAlertsKey) }
 

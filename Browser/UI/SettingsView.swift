@@ -70,8 +70,25 @@ struct SettingsView: View {
                     }
                     link(.broom, "Clear browsing data") { ClearDataSettings() }
                     link(.key, "Passkeys and sync") { PrivacySettings() }
+                    if PrivacyLock.isAvailable {
+                        Toggle(isOn: Binding(get: { PrivacyLock.shared.isEnabled }, set: { on in
+                            if on { Task { await PrivacyLock.shared.turnOn() } } else { PrivacyLock.shared.isEnabled = false }
+                        })) {
+                            HStack(spacing: 14) {
+                                Glyph(.lock, size: 21)
+                                    .foregroundStyle(Theme.secondaryInk)
+                                    .frame(width: 24)
+                                Text("Lock private tabs and history")
+                                    .foregroundStyle(Theme.ink)
+                            }
+                        }
+                    }
                 } header: {
                     Text("Privacy")
+                } footer: {
+                    if PrivacyLock.isAvailable {
+                        Text("Private tabs and the pages you've visited show only after \(PrivacyLock.method), from each time roko opens.")
+                    }
                 }
 
                 Section {
@@ -317,6 +334,9 @@ private struct TabsSettings: View {
     @AppStorage("archivePolicy") private var archive: ArchivePolicy = .day
     @AppStorage(Preferences.pullToSummarizeKey) private var pullToSummarize = true
     @AppStorage(AppLinks.Mode.key) private var appLinks: AppLinks.Mode = .offer
+    @AppStorage(Preferences.linkPeekKey) private var linkPeek = true
+    @AppStorage(Preferences.swipeAnywhereKey) private var swipeAnywhere = true
+    @AppStorage(Preferences.pinchForTabsKey) private var pinchForTabs = true
 
     var body: some View {
         Form {
@@ -338,6 +358,13 @@ private struct TabsSettings: View {
                 Text(pullToSummarize
                      ? "Pull a page down to reload it; keep pulling and let go to summarize it."
                      : "Pulling a page down only reloads it.")
+            }
+            Section {
+                Toggle("Peek at links", isOn: $linkPeek)
+                Toggle("Swipe anywhere to go back", isOn: $swipeAnywhere)
+                Toggle("Pinch a page to see your tabs", isOn: $pinchForTabs)
+            } footer: {
+                Text("Peek: touch and hold a link to read and scroll the page before opening it. Swipe: back or forward from anywhere on a page, not just its edge.")
             }
         }
         .settingsPage("Tabs")

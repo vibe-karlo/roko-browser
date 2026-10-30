@@ -12,6 +12,11 @@ struct WebViewHost: UIViewRepresentable {
     /// The page is (or stops) turning into the summary's card.
     var onPreview: (Bool) -> Void = { _ in }
     var onScrollDirection: (_ down: Bool) -> Void
+    /// A page pinched in, as if to step back from it: the tab switcher.
+    var onPinchTabs: () -> Void = {}
+    /// Any touch on a page, with the page touched (Split View: its half
+    /// becomes the one in use).
+    var onTouch: (WKWebView) -> Void = { _ in }
 
     func makeUIView(context: Context) -> UIView {
         let container = UIView()
@@ -52,7 +57,7 @@ struct WebViewHost: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
 
-    final class Coordinator: NSObject {
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var parent: WebViewHost
         private var offsetObservation: NSKeyValueObservation?
         private var lastOffset: CGFloat = 0
@@ -64,6 +69,7 @@ struct WebViewHost: UIViewRepresentable {
         func track(_ webView: WKWebView, in container: UIView) {
             let scrollView = webView.scrollView
             addPullToRefresh(to: webView, in: container)
+            addPageGestures(to: webView, in: container)
             lastOffset = scrollView.contentOffset.y
             offsetObservation = scrollView.observe(\.contentOffset, options: [.new]) { [weak self] scrollView, _ in
                 MainActor.assumeIsolated { self?.scrolled(scrollView) }
@@ -259,6 +265,89 @@ struct WebViewHost: UIViewRepresentable {
             indicator.hide()
         }
 
+        // MARK: Swipe anywhere, pinch for tabs
+
+        private let swipeArrow = SwipeArrow()
+        /// How far a swipe has to travel to go back or forward.
+        private let swipeDistance: CGFloat = 110
+        private var swipeArmed = false
+        private var pinchFired = false
+
+        private func addPageGestures(to webView: WKWebView, in container: UIView) {
+            container.addSubview(swipeArrow)
+            // A page moved here (a split, a split ended) brings recognizers aimed at
+            // where it was shown before: they're replaced with this host's own.
+            for old in webView.gestureRecognizers ?? [] where old.name?.hasPrefix("roko.") == true {
+                webView.removeGestureRecognizer(old)
+            }
+            let swipe = UIPanGestureRecognizer(target: self, action: #selector(swiped(_:)))
+            swipe.name = "roko.swipe"
+            swipe.delegate = self
+            webView.addGestureRecognizer(swipe)
+            let touch = UITapGestureRecognizer(target: self, action: #selector(touched(_:)))
+            touch.name = "roko.touch"
+            touch.cancelsTouchesInView = false
+            touch.delegate = self
+            webView.addGestureRecognizer(touch)
+            let pinch = UIPinchGestureRecognizer(target: self, action: #selector(pinched(_:)))
+            pinch.name = "roko.pinch"
+            pinch.delegate = self
+            webView.addGestureRecognizer(pinch)
+        }
+
+        @objc private func swiped(_ pan: UIPanGestureRecognizer) {
+            guard let webView = pan.view as? WKWebView, let container = swipeArrow.superview else { return }
+            let dx = pan.translation(in: webView).x
+            let back = dx > 0
+            switch pan.state {
+            case .began:
+                swipeArmed = false
+                swipeArrow.begin(back: back, at: pan.location(in: container).y, in: container.bounds)
+            case .changed:
+                let possible = back ? webView.canGoBack : webView.canGoForward
+                swipeArrow.follow(abs(dx) / swipeDistance, back: back, possible: possible)
+                let armed = possible && abs(dx) >= swipeDistance
+                if armed != swipeArmed {
+                    swipeArmed = armed
+                    if armed { haptic.impactOccurred() }
+                }
+            case .ended:
+                let fast = abs(pan.velocity(in: webView).x) > 900 && abs(dx) > 50
+                let possible = back ? webView.canGoBack : webView.canGoForward
+                swipeArrow.end(went: possible && (swipeArmed || fast))
+                guard possible, swipeArmed || fast else { return }
+                // Only if the swipe didn't start on something that scrolls sideways itself.
+                Task { [weak webView] in
+                    guard let webView, await PageWatch.call(webView, "ownsSideways") as? Bool != true else { return }
+                    if back { webView.goBack() } else { webView.goForward() }
+                }
+            default:
+                swipeArrow.end(went: false)
+            }
+        }
+
+        @objc private func touched(_ touch: UITapGestureRecognizer) {
+            // The page touched, not this host's tab: a page moved between hosts keeps its recognizers' aim.
+            guard let webView = touch.view as? WKWebView else { return }
+            parent.onTouch(webView)
+        }
+
+        @objc private func pinched(_ pinch: UIPinchGestureRecognizer) {
+            switch pinch.state {
+            case .began:
+                pinchFired = false
+            case .changed:
+                // Only from the page at its smallest: pinching a zoomed-in page zooms it out first.
+                guard !pinchFired, pinch.scale < 0.7, let scrollView = (pinch.view as? WKWebView)?.scrollView,
+                      scrollView.zoomScale <= scrollView.minimumZoomScale + 0.01 else { return }
+                pinchFired = true
+                firmHaptic.impactOccurred()
+                parent.onPinchTabs()
+            default:
+                break
+            }
+        }
+
         // MARK: Scrolling
 
         /// Pinned headers often appear or change colour once you scroll, so the
@@ -315,5 +404,83 @@ struct WebViewHost: UIViewRepresentable {
             }
         }
 
+        // MARK: Gesture rules
+
+        func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
+            guard let webView = recognizer.view as? WKWebView else { return false }
+            if recognizer.name == "roko.pinch" { return Preferences.pinchForTabs }
+            guard recognizer.name == "roko.swipe", let pan = recognizer as? UIPanGestureRecognizer else { return true }
+            guard Preferences.swipeAnywhere else { return false }
+            let velocity = pan.velocity(in: webView)
+            let start = pan.location(in: webView).x
+            // Clearly sideways; not from the edges, where WebKit's own swipe
+            // already goes back; not on a page zoomed wider than the screen.
+            let scrollView = webView.scrollView
+            return abs(velocity.x) > abs(velocity.y) * 2.2
+                && start > 24 && start < webView.bounds.width - 24
+                && scrollView.contentSize.width <= scrollView.bounds.width + 1
+        }
+
+        func gestureRecognizer(_ recognizer: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+            true
+        }
+
     }
 }
+
+/// The arrow at the edge while a swipe goes back or forward: it slides in with
+/// the finger and fills once letting go would go.
+private final class SwipeArrow: UIView {
+    private let glyph = UIImageView()
+    private var back = true
+    private var bounds_ = CGRect.zero
+    private let size: CGFloat = 44
+
+    init() {
+        super.init(frame: CGRect(x: 0, y: 0, width: 44, height: 44))
+        layer.cornerRadius = size / 2
+        backgroundColor = UIColor(Theme.raised)
+        layer.borderColor = UIColor(Theme.edge).cgColor
+        layer.borderWidth = 1
+        glyph.contentMode = .scaleAspectFit
+        glyph.tintColor = UIColor(Theme.ink)
+        glyph.frame = CGRect(x: 12, y: 12, width: 20, height: 20)
+        addSubview(glyph)
+        alpha = 0
+        isUserInteractionEnabled = false
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func begin(back: Bool, at y: CGFloat, in area: CGRect) {
+        self.back = back
+        bounds_ = area
+        glyph.image = UIImage(named: back ? "phosphor/back" : "phosphor/forward")?.withRenderingMode(.alwaysTemplate)
+        center.y = min(max(y, area.minY + 120), area.maxY - 160)
+        place(0)
+    }
+
+    func follow(_ progress: CGFloat, back: Bool, possible: Bool) {
+        if back != self.back { begin(back: back, at: center.y, in: bounds_) }
+        place(possible ? min(progress, 1.15) : min(progress, 0.4))
+        let armed = possible && progress >= 1
+        backgroundColor = armed ? UIColor(Theme.ink) : UIColor(Theme.raised)
+        glyph.tintColor = armed ? UIColor(Theme.canvas) : UIColor(Theme.ink)
+    }
+
+    func end(went: Bool) {
+        UIView.animate(withDuration: went ? 0.25 : 0.2, delay: 0, options: .curveEaseOut) {
+            self.alpha = 0
+            self.place(went ? 1.3 : 0, keepAlpha: true)
+        }
+    }
+
+    private func place(_ progress: CGFloat, keepAlpha: Bool = false) {
+        let travel = size + 18
+        let x = -size / 2 + travel * progress
+        center.x = back ? x : bounds_.width - x
+        if !keepAlpha { alpha = min(1, progress * 1.6) }
+    }
+}
+

@@ -17,47 +17,18 @@ struct BrowserView: View {
             // colour ever shows at the bottom of the screen.
             GeometryReader { proxy in
                 VStack(spacing: 0) {
-                    (browser.summaryCoversPage && browser.summary?.isClosing != true ? Theme.canvas : browser.selectedTab?.topColor.map(Color.init) ?? Theme.canvas)
+                    (browser.summaryCoversPage && browser.summary?.isClosing != true ? Theme.canvas : browser.topTab?.topColor.map(Color.init) ?? Theme.canvas)
                         .frame(height: proxy.safeAreaInsets.top)
                     (browser.summaryCoversPage && browser.summary?.isClosing != true ? Theme.canvas : browser.selectedTab?.bottomColor.map(Color.init) ?? Theme.canvas)
                 }
                 .ignoresSafeArea()
             }
-            .animation(.easeOut(duration: 0.2), value: browser.selectedTab?.topColor)
+            .animation(.easeOut(duration: 0.2), value: browser.topTab?.topColor)
 
-            if let tab = browser.selectedTab {
-                WebViewHost(
-                    tab: tab,
-                    barTop: barTop,
-                    onSummarize: { browser.summarize(from: $0) },
-                    onPreview: { showing in
-                        if browser.pageBecomingSummary != showing { browser.pageBecomingSummary = showing }
-                    },
-                    onScrollDirection: { down in
-                        if browser.isBarCollapsed != down { browser.isBarCollapsed = down }
-                    })
-                    .opacity(browser.summaryCoversPage ? 0 : 1)
-                    // Down to the bottom edge, under the floating bar. The
-                    // keyboard too: WebKit makes room for it on its own, and
-                    // shrunk by SwiftUI as well, the page stopped short of the
-                    // keyboard while typing into a form.
-                    .ignoresSafeArea(edges: .bottom)
-
-                // A restored tab shows its last snapshot until its page is live.
-                if !tab.isLive, let snapshot = tab.snapshot {
-                    Image(uiImage: snapshot)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                        .ignoresSafeArea(.container, edges: .bottom)
-                        .allowsHitTesting(false)
-                }
-
-                if let error = tab.loadError {
-                    LoadErrorView(error: error,
-                                  retry: { if let url = tab.url { tab.load(url) } },
-                                  search: { browser.open(SearchEngine.current.searchURL(for: $0), inNewTab: false) })
-                }
+            if let split = browser.split, let top = browser.tab(split.top), let bottom = browser.tab(split.bottom) {
+                SplitPages(top: top, bottom: bottom, barTop: barTop)
+            } else if let tab = browser.selectedTab {
+                PagePane(tab: tab, barTop: barTop)
             } else {
                 StartView()
                     // The bar floats over the page; the start page keeps clear of it.
@@ -96,6 +67,11 @@ struct BrowserView: View {
         .overlay {
             if browser.panel == .tools {
                 BottomPanel { browser.panel = .none } content: { ToolsSheet() }
+            }
+        }
+        .overlay {
+            if browser.panel == .downloads {
+                BottomPanel { browser.panel = .none } content: { DownloadsSheet() }
             }
         }
         .overlay {
@@ -155,7 +131,7 @@ struct BrowserView: View {
                     .padding(.vertical, 11)
                     .barSurface(cornerRadius: 14)
                     .compositingGroup()
-                    .padding(.bottom, Theme.barHeight + 20)
+                    .padding(.bottom, Theme.barHeight + 20 + playerLift)
                     .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
                                             removal: .opacity.animation(.easeOut(duration: 0.12))))
                     .allowsHitTesting(false)
@@ -179,7 +155,7 @@ struct BrowserView: View {
                 .barSurface(cornerRadius: 14)
                 // One piece: text and box arrive and leave together.
                 .compositingGroup()
-                .padding(.bottom, Theme.barHeight + 20)
+                .padding(.bottom, Theme.barHeight + 20 + playerLift)
                 .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
                                         removal: .opacity.animation(.easeOut(duration: 0.12))))
             }
@@ -215,7 +191,7 @@ struct BrowserView: View {
                 .barSurface(cornerRadius: 14)
                 .compositingGroup()
                 .padding(.horizontal, Theme.gutter)
-                .padding(.bottom, Theme.barHeight + 20)
+                .padding(.bottom, Theme.barHeight + 20 + playerLift)
                 .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
                                         removal: .opacity.animation(.easeOut(duration: 0.12))))
             }
@@ -242,12 +218,13 @@ struct BrowserView: View {
                 .barSurface(cornerRadius: 14)
                 .compositingGroup()
                 .padding(.horizontal, Theme.gutter)
-                .padding(.bottom, Theme.barHeight + 20)
+                .padding(.bottom, Theme.barHeight + 20 + playerLift)
                 .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
                                         removal: .opacity.animation(.easeOut(duration: 0.12))))
             }
         }
         .animation(.snappy(duration: 0.3), value: browser.appOffer?.url)
+        .modifier(PageExtras(browser: browser, showsPlayer: showsPlayer, playerLift: playerLift))
         .modifier(CopiedLinkWatch(browser: browser))
         // Handoff: continue this page on a Mac or iPad.
         .userActivity(NSUserActivityTypeBrowsingWeb, element: browser.handoffPage) { page, activity in
@@ -356,6 +333,15 @@ struct BrowserView: View {
         }
     }
 
+    /// The mini player shows over the page and the bar, not over a panel or a screen of roko's own.
+    private var showsPlayer: Bool {
+        browser.playerTab != nil && browser.panel == .none && !browser.launcherShown && browser.summary == nil
+            && browser.browseForMe == nil && browser.hidingItems == nil
+    }
+
+    /// Offers and toasts sit above the mini player while it shows.
+    private var playerLift: CGFloat { showsPlayer ? 66 : 0 }
+
     /// Text that reads on whatever is behind the status bar.
     private var statusBarStyle: UIStatusBarStyle {
         // The summary and Browse for Me sit on the app's own canvas.
@@ -364,7 +350,7 @@ struct BrowserView: View {
             return .default
         }
         if browser.panel == .tabs { return .lightContent }  // the switcher is always dark
-        guard let color = browser.selectedTab?.topColor else { return .default }
+        guard let color = browser.topTab?.topColor else { return .default }
         return color.isLight ? .darkContent : .lightContent
     }
 
@@ -660,3 +646,204 @@ private struct HideItemsBar: View {
         .sensoryFeedback(.impact(weight: .light), trigger: hidden)
     }
 }
+
+/// Over the page: a file that just finished, and the mini player. Kept apart so the browser's body stays small enough for
+/// the compiler.
+private struct PageExtras: ViewModifier {
+    let browser: BrowserModel
+    let showsPlayer: Bool
+    let playerLift: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .bottom) {
+                // A file that just finished: built like the other offers.
+                if let item = Downloads.shared.finished, browser.panel == .none, browser.cookieOffer == nil,
+                   !browser.copiedLinkOffer, browser.appOffer == nil {
+                    HStack(spacing: 14) {
+                        HStack(spacing: 10) {
+                            Glyph(.download, size: 18)
+                            Text(item.name)
+                                .font(.system(size: 15, weight: .medium))
+                                .truncationMode(.middle)
+                        }
+                        Button("Open") { Downloads.shared.open(item) }
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Theme.accentText)
+                            .frame(minHeight: 44)
+                            .contentShape(.rect)
+                    }
+                    .lineLimit(1)
+                    .padding(.leading, 14)
+                    .padding(.trailing, 16)
+                    .barSurface(cornerRadius: 14)
+                    .compositingGroup()
+                    .padding(.horizontal, Theme.gutter)
+                    .padding(.bottom, Theme.barHeight + 20 + playerLift)
+                    .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
+                                            removal: .opacity.animation(.easeOut(duration: 0.12))))
+                }
+            }
+            .animation(.snappy(duration: 0.3), value: Downloads.shared.finished?.id)
+            .overlay(alignment: .bottom) {
+                if showsPlayer, let tab = browser.playerTab {
+                    MiniPlayer(tab: tab)
+                        .padding(.horizontal, Theme.gutter)
+                        .padding(.bottom, Theme.barHeight + 20)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.snappy(duration: 0.3), value: showsPlayer ? browser.playerTab?.id : nil)
+    }
+}
+
+/// One tab's page, as it fills the screen or one half of a split: the web
+/// view, the snapshot standing in until it's live, why it didn't load, and the
+/// lock over a private tab.
+private struct PagePane: View {
+    @Environment(BrowserModel.self) private var browser
+    @Environment(\.scenePhase) private var scenePhase
+    let tab: BrowserTab
+    let barTop: CGFloat
+
+    var body: some View {
+        ZStack {
+            WebViewHost(
+                tab: tab,
+                barTop: barTop,
+                onSummarize: { browser.summarize(from: $0) },
+                onPreview: { showing in
+                    if browser.pageBecomingSummary != showing { browser.pageBecomingSummary = showing }
+                },
+                onScrollDirection: { down in
+                    if browser.isBarCollapsed != down { browser.isBarCollapsed = down }
+                },
+                onPinchTabs: { browser.showTabs(fresh: false) },
+                onTouch: { webView in
+                    guard let touched = browser.tabs.first(where: { $0.webView === webView }),
+                          browser.split?.contains(touched.id) == true, browser.selectedID != touched.id else { return }
+                    browser.select(touched)
+                })
+                .opacity(browser.summaryCoversPage ? 0 : 1)
+                // Down to the bottom edge, under the floating bar. The
+                // keyboard too: WebKit makes room for it on its own, and
+                // shrunk by SwiftUI as well, the page stopped short of the
+                // keyboard while typing into a form.
+                .ignoresSafeArea(edges: .bottom)
+
+            // A restored tab shows its last snapshot until its page is live.
+            if !tab.isLive, let snapshot = tab.snapshot {
+                Image(uiImage: snapshot)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .ignoresSafeArea(.container, edges: .bottom)
+                    .allowsHitTesting(false)
+            }
+
+            if let error = tab.loadError {
+                LoadErrorView(error: error,
+                              retry: { if let url = tab.url { tab.load(url) } },
+                              search: { browser.open(SearchEngine.current.searchURL(for: $0), inNewTab: false) })
+            }
+
+            // Locked behind Face ID, and hidden in the app switcher too.
+            if tab.isPrivate, PrivacyLock.shared.hides(tab.id) || (PrivacyLock.shared.isEnabled && scenePhase == .background) {
+                LockCover()
+                    .ignoresSafeArea(edges: .bottom)
+            }
+        }
+    }
+}
+
+/// Split View: two tabs, one above the other, with a handle between them to
+/// drag. It settles at a third, half or two thirds; dragged nearly shut, one
+/// half closes and the other has the screen again. The bar works the half you
+/// last touched.
+private struct SplitPages: View {
+    @Environment(BrowserModel.self) private var browser
+    let top: BrowserTab
+    let bottom: BrowserTab
+    let barTop: CGFloat
+    @State private var drag: CGFloat = 0
+
+    private let handle: CGFloat = 30
+    private let stops: [CGFloat] = [1 / 3, 1 / 2, 2 / 3]
+
+    var body: some View {
+        GeometryReader { proxy in
+            let height = proxy.size.height + proxy.safeAreaInsets.bottom
+            let topHeight = min(max(height * browser.splitFraction + drag, 0), height - handle)
+            VStack(spacing: 0) {
+                PagePane(tab: top, barTop: barTop)
+                    .frame(height: topHeight)
+                    .clipped()
+                    .overlay { if browser.selectedID != top.id { Color.black.opacity(0.18).allowsHitTesting(false) } }
+                SplitHandle(top: top, bottom: bottom, drag: $drag, total: height, handle: handle, stops: stops)
+                    .frame(height: handle)
+                PagePane(tab: bottom, barTop: barTop)
+                    .frame(maxHeight: .infinity)
+                    .clipped()
+                    .overlay { if browser.selectedID != bottom.id { Color.black.opacity(0.18).allowsHitTesting(false) } }
+            }
+            .animation(.snappy(duration: 0.2), value: browser.selectedID)
+        }
+        .ignoresSafeArea(edges: .bottom)
+    }
+}
+
+/// Between the halves: the grip to drag, the two tabs' sites either side, a
+/// swap and a close.
+private struct SplitHandle: View {
+    @Environment(BrowserModel.self) private var browser
+    let top: BrowserTab
+    let bottom: BrowserTab
+    @Binding var drag: CGFloat
+    let total: CGFloat
+    let handle: CGFloat
+    let stops: [CGFloat]
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button { browser.swapSplit() } label: {
+                Glyph(.swap, size: 18).frame(width: 44, height: handle).contentShape(.rect)
+            }
+            .buttonStyle(GlyphButtonStyle())
+            .accessibilityLabel("Swap the halves")
+            Spacer()
+            Capsule()
+                .fill(Theme.faintInk)
+                .frame(width: 44, height: 5)
+            Spacer()
+            Button { browser.endSplit() } label: {
+                Glyph(.close, size: 18).frame(width: 44, height: handle).contentShape(.rect)
+            }
+            .buttonStyle(GlyphButtonStyle())
+            .accessibilityLabel("Close Split View")
+        }
+        .padding(.horizontal, 6)
+        .frame(maxWidth: .infinity)
+        .background(Theme.canvas)
+        .foregroundStyle(Theme.secondaryInk)
+        .contentShape(.rect)
+        .gesture(DragGesture(minimumDistance: 2, coordinateSpace: .global)
+            .onChanged { drag = $0.translation.height }
+            .onEnded { value in
+                let end = browser.splitFraction + value.predictedEndTranslation.height / total
+                withAnimation(.spring(duration: 0.35, bounce: 0.15)) {
+                    drag = 0
+                    if end < 0.16 {
+                        browser.endSplit(keeping: bottom)
+                    } else if end > 0.84 {
+                        browser.endSplit(keeping: top)
+                    } else {
+                        browser.splitFraction = stops.min { abs($0 - end) < abs($1 - end) } ?? 0.5
+                    }
+                }
+            })
+        .sensoryFeedback(.selection, trigger: browser.splitFraction)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Split View handle")
+    }
+}
+

@@ -76,6 +76,11 @@ targets:
         # these iOS ends roko the moment a page reaches for them.
         NSPhotoLibraryAddUsageDescription: Images you save from a page go into your Photos.
         NSCameraUsageDescription: A page asked to take a photo or video, for example to upload it.
+        # Settings → Lock private tabs and history.
+        NSFaceIDUsageDescription: Private tabs and your history open only for you.
+        # Downloads show in the Files app, under On My iPhone → roko.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
         # Required before Apple will grant the browser entitlements (default
         # browser, passkeys): the app must declare it opens http and https.
         CFBundleURLTypes:

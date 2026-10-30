@@ -81,6 +81,8 @@
 		<string>youtubemusic</string>
 		<string>zoomus</string>
 	</array>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoadsInWebContent</key>
@@ -92,6 +94,8 @@
 	<string>Today shows what's left on your calendar for the day. It stays on this iPhone.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>A page asked to take a photo or video, for example to upload it.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Private tabs and your history open only for you.</string>
 	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
 	<dict>
 		<key>Parking</key>
@@ -122,6 +126,8 @@
 		<string>fetch</string>
 		<string>remote-notification</string>
 	</array>
+	<key>UIFileSharingEnabled</key>
+	<true/>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

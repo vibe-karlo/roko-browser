@@ -127,6 +127,7 @@ struct ToolsSheet: View {
     private func pageGroup(_ tab: BrowserTab) -> some View {
         VStack(spacing: 0) {
             ToolRow(glyph: .reader, title: "Reader Mode") { browser.openReader() }
+            ToolRow(glyph: .markdown, title: "Copy as Markdown") { browser.copyAsMarkdown() }
 
             // Not for private tabs: the list keeps the page and its text.
             if !tab.isPrivate {
@@ -162,9 +163,18 @@ struct ToolsSheet: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
 
+            ToolRow(glyph: .split, title: browser.split == nil ? "Split View" : "Close Split View") {
+                browser.split == nil ? browser.startSplit() : browser.endSplit()
+                browser.panel = .none
+            }
+
             ToolRow(glyph: .desktop, title: tab.wantsDesktopSite ? "Request Mobile Site" : "Request Desktop Site") {
                 tab.setDesktopSite(!tab.wantsDesktopSite)
                 browser.panel = .none
+            }
+
+            if !Downloads.shared.items.isEmpty {
+                ToolRow(glyph: .download, title: "Downloads", detail: downloadsDetail) { browser.panel = .downloads }
             }
         }
         .padding(.vertical, 4)
@@ -225,6 +235,11 @@ struct ToolsSheet: View {
         tab.translate(to: target)
         browser.panel = .none
         browser.showToast("Translating to \(target.name)")
+    }
+
+    private var downloadsDetail: String {
+        let active = Downloads.shared.activeCount
+        return active > 0 ? "\(active) downloading" : "\(Downloads.shared.items.count)"
     }
 
     private func hiddenDetail(_ tab: BrowserTab) -> String {

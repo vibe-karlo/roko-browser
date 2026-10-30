@@ -9,6 +9,14 @@ protocol BrowserTabDelegate: AnyObject {
     func tabKeepsReloading(_ tab: BrowserTab)
     /// A short message for the person, about something that happened in the tab.
     func tab(_ tab: BrowserTab, says message: String)
+    /// A link touched and held: its menu, with the page live in the preview.
+    func tab(_ tab: BrowserTab, linkMenuFor url: URL) -> UIContextMenuConfiguration?
+    /// The preview was tapped: the page becomes a tab, where it was scrolled to.
+    func tabOpensPeek(_ tab: BrowserTab)
+    /// The menu went away.
+    func tabEndsPeek(_ tab: BrowserTab)
+    /// A new tab whose page turned out to be a file: nothing to keep it for.
+    func tabOnlyDownloaded(_ tab: BrowserTab)
 }
 
 /// One tab. Its web view exists only while the tab is "live"; a hibernated tab
@@ -48,8 +56,25 @@ final class BrowserTab: NSObject, Identifiable {
     @ObservationIgnored fileprivate var reloads: [(url: URL, at: Date)] = []
     /// When the current page was asked for, for the -perf load timings.
     @ObservationIgnored fileprivate var navigationStarted: CFTimeInterval?
-    /// Files being downloaded, and where each is going.
-    @ObservationIgnored var downloads: [ObjectIdentifier: URL] = [:]
+    /// Sound or video playing on the page, or paused there (PageWatch).
+    var media: Media? {
+        didSet { if media?.playing == true { playerDismissed = false } }
+    }
+    /// The mini player was closed for this tab; it comes back when it plays again.
+    var playerDismissed = false
+    /// What you've typed into a form here and not sent: the tab isn't put
+    /// away while it's there, and it's typed back in if the page crashes.
+    @ObservationIgnored private(set) var formDraft: FormDrafts.Draft?
+    var hasUnsentForm: Bool { formDraft != nil }
+    /// Kept live rather than hibernated: it has something a reload would lose.
+    var isBusy: Bool { hasUnsentForm || media?.playing == true }
+
+    struct Media: Equatable {
+        var playing: Bool
+        var isVideo: Bool
+        var title: String
+        var artist: String
+    }
 
     init(id: UUID = UUID(), url: URL?, title: String = "", isPrivate: Bool = false,
          lastActive: Date = .now, restoreState: Data? = nil) {
@@ -62,6 +87,7 @@ final class BrowserTab: NSObject, Identifiable {
         super.init()
         if !isPrivate {
             snapshot = UIImage(contentsOfFile: snapshotFile.path)
+            formDraft = FormDrafts.draft(for: id)
         }
     }
 
@@ -134,6 +160,7 @@ final class BrowserTab: NSObject, Identifiable {
         let webView = WebViewFactory.make(isPrivate: isPrivate)
         webView.navigationDelegate = self
         webView.uiDelegate = self
+        PageWatch.shared.register(webView, for: self)
         self.webView = webView
         isLive = true
         observe(webView)
@@ -178,6 +205,44 @@ final class BrowserTab: NSObject, Identifiable {
         webView.removeFromSuperview()
         self.webView = nil
         isLive = false
+        media = nil
+    }
+
+    // MARK: Forms
+
+    /// From the page: what's typed into its forms now. Empty once it's sent.
+    func noteForm(_ fields: [String: String], worthKeeping: Bool) {
+        guard let url = webView?.url ?? url else { return }
+        formDraft = worthKeeping && !fields.isEmpty ? FormDrafts.Draft(url: url, fields: fields, savedAt: .now) : nil
+        if !isPrivate { FormDrafts.set(formDraft, for: id) }
+    }
+
+    /// A page that loaded again (after a crash, a relaunch, a reload) gets
+    /// back what you'd typed into it, in fields that are empty again.
+    fileprivate func restoreForm(in webView: WKWebView) {
+        guard let draft = formDraft, let url = webView.url, Self.samePage(draft.url, url) else { return }
+        Task {
+            // Pages often build their forms a moment after they load.
+            try? await Task.sleep(for: .milliseconds(700))
+            let restored = await PageWatch.call(webView, "restore", ["fields": draft.fields]) as? Int ?? 0
+            if restored > 0 { delegate?.tab(self, says: "Brought back what you typed") }
+        }
+    }
+
+    /// Another page: a draft for the one before stays behind.
+    fileprivate func leaveForm(for url: URL?) {
+        guard let draft = formDraft, let url, !Self.samePage(draft.url, url) else { return }
+        formDraft = nil
+        if !isPrivate { FormDrafts.set(nil, for: id) }
+    }
+
+    private static func samePage(_ a: URL, _ b: URL) -> Bool {
+        func page(_ url: URL) -> String {
+            var parts = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            parts?.fragment = nil
+            return parts?.string ?? url.absoluteString
+        }
+        return page(a) == page(b)
     }
 
     /// Refreshes the card image used in the tab overview.
@@ -452,6 +517,8 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         perf("commit", webView.url)
+        media = nil
+        leaveForm(for: webView.url)
         // Each site keeps the zoom you last chose for it.
         let zoom = PageZoom.level(for: webView.url?.host())
         if webView.pageZoom != zoom { webView.pageZoom = zoom }
@@ -479,6 +546,7 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
                 """) { result, _ in print("NAV page \(host) firstByte/firstPaint \(result ?? "-") ms") }
         }
         samplePageColors()
+        restoreForm(in: webView)
         if let translation {
             Task { await PageTranslator.shared.translate(webView, to: translation) }
         }
@@ -514,6 +582,30 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
         }
         lastCrashReload = .now
         webView.reload()
+    }
+
+    /// Touch and hold a link: roko's menu over the page itself, live and
+    /// scrollable, as Lens does. Anything else (an image, text) gets WebKit's.
+    func webView(_ webView: WKWebView, contextMenuConfigurationForElement elementInfo: WKContextMenuElementInfo,
+                 completionHandler: @escaping @MainActor (UIContextMenuConfiguration?) -> Void) {
+        guard Preferences.linkPeek, let url = elementInfo.linkURL, url.scheme == "https" || url.scheme == "http" else {
+            return completionHandler(nil)
+        }
+        completionHandler(delegate?.tab(self, linkMenuFor: url))
+    }
+
+    func webView(_ webView: WKWebView, contextMenuForElement elementInfo: WKContextMenuElementInfo,
+                 willCommitWithAnimator animator: UIContextMenuInteractionCommitAnimating) {
+        guard elementInfo.linkURL != nil, Preferences.linkPeek else { return }
+        animator.preferredCommitStyle = .pop
+        animator.addCompletion { [weak self] in
+            guard let self else { return }
+            self.delegate?.tabOpensPeek(self)
+        }
+    }
+
+    func webView(_ webView: WKWebView, contextMenuDidEndForElement elementInfo: WKContextMenuElementInfo) {
+        delegate?.tabEndsPeek(self)
     }
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,

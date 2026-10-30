@@ -6,7 +6,7 @@ import WebKit
 @Observable
 final class BrowserModel {
     enum Panel: Equatable {
-        case none, command, tabs, tools, settings, notifyMe, todos, today, shopping, readLater
+        case none, command, tabs, tools, settings, notifyMe, todos, today, shopping, readLater, downloads
     }
 
     enum CommandMode {
@@ -137,6 +137,60 @@ final class BrowserModel {
 
     var selectedTab: BrowserTab? { tabs.first { $0.id == selectedID } }
 
+    func tab(_ id: BrowserTab.ID) -> BrowserTab? { tabs.first { $0.id == id } }
+
+    // MARK: Split View
+
+    /// Two tabs on screen at once, one above the other. The selected tab is
+    /// whichever half was touched last.
+    struct Split: Equatable {
+        var top: BrowserTab.ID
+        var bottom: BrowserTab.ID
+
+        func contains(_ id: BrowserTab.ID?) -> Bool { id == top || id == bottom }
+    }
+
+    private(set) var split: Split?
+
+    /// The tab whose page meets the status bar: the top half of a split.
+    var topTab: BrowserTab? { split.flatMap { tab($0.top) } ?? selectedTab }
+    /// How much of the screen the top half has.
+    var splitFraction: CGFloat = 0.5
+
+    /// The page on screen and another tab, split: the one used last, or a
+    /// new tab from the bar when there's no other.
+    func startSplit(with other: BrowserTab? = nil) {
+        guard let current = selectedTab else { return }
+        panel = .none
+        let partner = other ?? tabs.filter { $0.id != current.id && $0.isPrivate == current.isPrivate }
+            .max { $0.lastActive < $1.lastActive }
+        guard let partner, partner.id != current.id else {
+            // Nothing to split with yet: the bar opens one, and it goes below.
+            pendingSplitWith = current.id
+            showCommandBar(mode: current.isPrivate ? .privateTab : .newTab)
+            return
+        }
+        splitFraction = 0.5
+        split = Split(top: current.id, bottom: partner.id)
+        partner.wake()
+        select(partner)
+    }
+
+    /// Asked for with no other tab: the next tab opened from the bar joins it.
+    @ObservationIgnored private var pendingSplitWith: BrowserTab.ID?
+
+    /// Back to one tab: the one in use, or the one asked for.
+    func endSplit(keeping kept: BrowserTab? = nil) {
+        guard split != nil else { return }
+        split = nil
+        if let kept, kept.id != selectedID { select(kept) }
+    }
+
+    func swapSplit() {
+        guard let current = split else { return }
+        split = Split(top: current.bottom, bottom: current.top)
+    }
+
     /// The page on screen, offered to your other devices through Handoff
     /// (a Mac's Dock opens it in its default browser). Never a private tab.
     var handoffPage: HandoffPage? {
@@ -163,6 +217,8 @@ final class BrowserModel {
         // spare for the next new tab once launch has settled, not during it.
         WebViewFactory.prewarm()
         restoreTabs()
+        // Downloads resume in a live tab's web view.
+        Downloads.shared.liveWebViews = { [weak self] in self?.tabs.compactMap(\.webView) ?? [] }
         // Ask roko, over text selected on a page.
         EdgeToEdgeWebView.ask = { [weak self] text in self?.browse(for: text) }
         // YouTube plays on as sound when roko leaves the screen.
@@ -195,6 +251,7 @@ final class BrowserModel {
     /// and slow every address-bar search.
     private func tidyUp() async {
         await BrowserTab.pruneSnapshots(keeping: Set(tabs.map(\.id)))
+        FormDrafts.keep(only: Set(tabs.map(\.id)))
         guard let context else { return }
         let cutoff = Date.now.addingTimeInterval(-90 * 24 * 3600)
         // One by one rather than as a batch: history syncs, and the removal
@@ -219,6 +276,8 @@ final class BrowserModel {
     /// close roko. The tab on screen is never touched.
     private func relieveMemory() {
         for tab in tabs where tab.id != selectedID {
+            // A half-filled form, or sound still playing: worth the memory.
+            if tab.isLive, tab.isBusy || split?.contains(tab.id) == true { continue }
             if tab.isLive {
                 // Its fresh picture is still being written; the web view is the big saving.
                 Task { await tab.hibernate() }
@@ -235,7 +294,8 @@ final class BrowserModel {
         let saved = (try? context.fetch(FetchDescriptor<SavedTab>(sortBy: [SortDescriptor(\.order)]))) ?? []
         let cutoff = Date.now.addingTimeInterval(-ArchivePolicy.current.interval)
 
-        for record in saved where record.lastActive > cutoff {
+        // A tab with a form you hadn't sent stays, however old.
+        for record in saved where record.lastActive > cutoff || FormDrafts.draft(for: record.tabID) != nil {
             let tab = BrowserTab(id: record.tabID, url: URL(string: record.url), title: record.title,
                                  lastActive: record.lastActive, restoreState: record.interactionState)
             tab.delegate = self
@@ -278,6 +338,11 @@ final class BrowserModel {
     func select(_ tab: BrowserTab) {
         HitchWatch.start("select tab")
         finishHidingItems()
+        // In Split View, a tab from elsewhere takes the place of the half in use.
+        if var current = split, !current.contains(tab.id), let selectedID {
+            if current.top == selectedID { current.top = tab.id } else { current.bottom = tab.id }
+            split = current
+        }
         let previous = selectedTab
         selectedID = tab.id
         tab.lastActive = .now
@@ -309,8 +374,15 @@ final class BrowserModel {
             }
         } else {
             let tab = BrowserTab(url: url, isPrivate: isPrivate)
+            if isPrivate { PrivacyLock.shared.opened(tab.id) }
             tab.delegate = self
             tabs.append(tab)
+            // Split asked for with nothing to split with: this tab is the other half.
+            if let first = pendingSplitWith, inNewTab, tabs.contains(where: { $0.id == first }) {
+                pendingSplitWith = nil
+                splitFraction = 0.5
+                split = Split(top: first, bottom: tab.id)
+            }
             select(tab)
         }
         panel = .none
@@ -366,6 +438,93 @@ final class BrowserModel {
         }
         self.preloaded = nil
         return preloaded.tab
+    }
+
+    // MARK: Peek
+
+    /// A link touched and held: its page, loading live in the menu's preview
+    /// until it's opened or the menu goes.
+    @ObservationIgnored private var peek: BrowserTab?
+
+    private func closePeek() {
+        peek?.close()
+        peek = nil
+    }
+
+    /// The peeked page becomes a tab of its own, scrolled where you left it:
+    /// on screen, or next to this one for later.
+    private func openPeek(showing: Bool) {
+        guard let tab = peek else { return }
+        peek = nil
+        tab.delegate = self
+        let after = tabs.firstIndex { $0.id == selectedID }.map { $0 + 1 } ?? tabs.count
+        tabs.insert(tab, at: min(after, tabs.count))
+        if showing {
+            select(tab)
+        } else {
+            tab.lastActive = .now.addingTimeInterval(-1)
+            Task {
+                await tab.captureSnapshot()
+                await enforceLiveLimit()
+            }
+            showToast("Opened in the background")
+        }
+        if !tab.isLoading, let shown = tab.url { self.tab(tab, didFinishLoading: shown, title: tab.title) }
+        scheduleSave()
+    }
+
+    /// Read Later, once the page has loaded enough to have its text.
+    private func savePeekForLater() {
+        guard let tab = peek else { return }
+        peek = nil
+        Task {
+            for _ in 0..<40 where tab.isLoading { try? await Task.sleep(for: .milliseconds(200)) }
+            showToast(await ReadLater.shared.save(tab))
+            tab.close()
+        }
+    }
+
+    // MARK: Mini player
+
+    /// A tab out of sight with sound or video playing (or paused there): the
+    /// small player above the bar works it.
+    var playerTab: BrowserTab? {
+        let candidates = tabs.filter { $0.id != selectedID && split?.contains($0.id) != true
+            && $0.media != nil && !$0.playerDismissed && $0.isLive }
+        return candidates.first { $0.media?.playing == true } ?? candidates.first
+    }
+
+    func togglePlayback(_ tab: BrowserTab) {
+        Task { _ = await PageWatch.call(tab.webView, "toggle") }
+    }
+
+    func skip(_ tab: BrowserTab, by seconds: Double) {
+        Task { _ = await PageWatch.call(tab.webView, "skip", ["seconds": seconds]) }
+    }
+
+    /// Picture in Picture from out of sight; where the page won't, its tab
+    /// comes up and asks again from there.
+    func pictureInPicture(_ tab: BrowserTab) {
+        Task {
+            if await PageWatch.call(tab.webView, "pictureInPicture") as? Bool == true { return }
+            select(tab)
+            try? await Task.sleep(for: .milliseconds(500))
+            _ = await PageWatch.call(tab.webView, "pictureInPicture")
+        }
+    }
+
+    func fullScreen(_ tab: BrowserTab) {
+        select(tab)
+        Task {
+            try? await Task.sleep(for: .milliseconds(450))
+            _ = await PageWatch.call(tab.webView, "fullscreen")
+        }
+    }
+
+    /// Closed: paused, and gone until it plays again.
+    func closePlayer(_ tab: BrowserTab) {
+        tab.playerDismissed = true
+        Task { _ = await PageWatch.call(tab.webView, "pause") }
     }
 
     // MARK: Hide Distracting Items
@@ -431,6 +590,13 @@ final class BrowserModel {
         }
         tab.close()
         tabs.remove(at: index)
+        // Half of a split closed: the other half has the screen.
+        if let current = split, current.contains(tab.id) {
+            split = nil
+            if let other = self.tab(current.top == tab.id ? current.bottom : current.top) {
+                if selectedID == tab.id { select(other) }
+            }
+        }
         if tab.isPrivate, !tabs.contains(where: \.isPrivate) { WebViewFactory.endPrivateSession() }
         defer { scheduleSave() }
         if selectedID == tab.id {
@@ -450,7 +616,9 @@ final class BrowserModel {
     }
 
     private func enforceLiveLimit() async {
-        let live = tabs.filter { $0.isLive && $0.id != selectedID }
+        // Never one with a form half filled in, or playing, or the other half of
+        // a split: hibernating would lose it, or blank it on screen.
+        let live = tabs.filter { $0.isLive && $0.id != selectedID && !$0.isBusy && split?.contains($0.id) != true }
             .sorted { $0.lastActive > $1.lastActive }
         for tab in live.dropFirst(Self.liveTabLimit - 1) {
             await tab.hibernate()
@@ -471,6 +639,11 @@ final class BrowserModel {
         // The parking timer: the bar, with the time left on top.
         case "roko://parking", "roko://bar": showCommandBar()
         case "roko://parking/extend": Parking.shared.extend()
+        // Control Center, the Lock Screen, Siri and Shortcuts (RokoIntents).
+        case "roko://new-tab": panel = .none; showCommandBar()
+        case "roko://private-tab": panel = .none; showCommandBar(mode: .privateTab)
+        case "roko://ask": panel = .none; showCommandBar()
+        case "roko://downloads": panel = .downloads
         // From another app's share sheet (ShareExtension): a link, or words to ask about.
         case _ where url.scheme == "roko" && (url.host() == "open" || url.host() == "ask"):
             let value = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first?.value
@@ -494,10 +667,12 @@ final class BrowserModel {
         }
     }
 
-    func showTabs() {
+    /// `fresh`: a new picture of the page for its card. Not from a pinch,
+    /// which would catch the page shrunk under the fingers.
+    func showTabs(fresh: Bool = true) {
         HitchWatch.start("tabs")
         // Refresh the current tab's card while its page is still on screen.
-        Task { await selectedTab?.captureSnapshot() }
+        if fresh { Task { await selectedTab?.captureSnapshot() } }
         panel = .tabs
     }
 
@@ -707,6 +882,17 @@ final class BrowserModel {
         browseForMe = session
     }
 
+    /// The article as Markdown on the clipboard.
+    func copyAsMarkdown() {
+        guard let webView = selectedTab?.webView else { return }
+        panel = .none
+        Task {
+            guard let markdown = await PageReader.markdown(webView) else { return showToast("Nothing to copy on this page") }
+            UIPasteboard.general.string = markdown
+            showToast("Copied as Markdown")
+        }
+    }
+
     func openReader() {
         guard let tab = selectedTab, let webView = tab.webView else { return }
         let model = ReaderModel(host: tab.url?.displayHost ?? "")
@@ -810,7 +996,8 @@ final class BrowserModel {
     }
 
     func history(matching query: String, limit: Int) -> [HistoryEntry] {
-        guard let context else { return [] }
+        // Locked behind Face ID: nothing to suggest from until it's unlocked.
+        guard let context, !PrivacyLock.shared.isLocked else { return [] }
         var descriptor = FetchDescriptor<HistoryEntry>(
             predicate: query.isEmpty ? nil : #Predicate {
                 $0.title.localizedStandardContains(query) || $0.url.localizedStandardContains(query)
@@ -861,6 +1048,63 @@ extension BrowserModel: BrowserTabDelegate {
     func tab(_ tab: BrowserTab, says message: String) {
         showToast(message)
     }
+
+    func tab(_ tab: BrowserTab, linkMenuFor url: URL) -> UIContextMenuConfiguration? {
+        closePeek()
+        dismissOffers()
+        let page = BrowserTab(url: url, isPrivate: tab.isPrivate)
+        if tab.isPrivate { PrivacyLock.shared.opened(page.id) }
+        page.wake()
+        peek = page
+        let link = CleanLink.clean(url)
+        let icon = { (name: String) in UIImage(named: "phosphor/\(name)") }
+        return UIContextMenuConfiguration(identifier: nil, previewProvider: {
+            LinkPreview(tab: page)
+        }, actionProvider: { [weak self] _ in
+            var actions = [
+                UIAction(title: "Open in New Tab", image: icon("tab")) { _ in self?.openPeek(showing: true) },
+                UIAction(title: "Open in Background", image: icon("tabs")) { _ in self?.openPeek(showing: false) },
+            ]
+            if !tab.isPrivate {
+                actions.append(UIAction(title: "Open in Private Tab", image: icon("eyeClosed")) { _ in
+                    self?.closePeek()
+                    self?.open(url, inNewTab: true, isPrivate: true)
+                })
+            }
+            var more: [UIAction] = []
+            if !tab.isPrivate {
+                more.append(UIAction(title: "Add to Read Later", image: icon("readLater")) { _ in self?.savePeekForLater() })
+            }
+            more.append(UIAction(title: "Copy Link", image: icon("link")) { _ in
+                UIPasteboard.general.url = link
+                CopiedLink.copiedHere(link)
+                self?.showToast("Link copied")
+            })
+            more.append(UIAction(title: "Share", image: icon("share")) { _ in ShareSheet.present([link]) })
+            return UIMenu(children: [UIMenu(options: .displayInline, children: actions),
+                                     UIMenu(options: .displayInline, children: more)])
+        })
+    }
+
+    func tabOnlyDownloaded(_ tab: BrowserTab) {
+        guard tabs.contains(where: { $0.id == tab.id }) else { return }
+        tab.url = nil
+        close(tab)
+    }
+
+    func tabOpensPeek(_ tab: BrowserTab) {
+        openPeek(showing: true)
+    }
+
+    func tabEndsPeek(_ tab: BrowserTab) {
+        // A menu action runs just after the menu ends: give it the page first.
+        let ending = peek
+        Task {
+            try? await Task.sleep(for: .milliseconds(600))
+            if let ending, peek === ending { closePeek() }
+        }
+    }
+
 
     func tab(_ tab: BrowserTab, wantsNewTabWith url: URL) {
         open(url, inNewTab: true, isPrivate: tab.isPrivate)

@@ -57,6 +57,7 @@ enum WebViewFactory {
 
         let controller = WKUserContentController()
         ContentBlocker.shared.install(in: controller)
+        PageWatch.shared.install(in: controller)
         configuration.userContentController = controller
 
         let webView = EdgeToEdgeWebView(frame: .zero, configuration: configuration)

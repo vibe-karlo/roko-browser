@@ -39,6 +39,12 @@ Reminders, YouTube playing on as sound with roko closed, closed tabs a tap from 
 clean links when you share, roko in every share sheet, Home Screen widgets, pages translated into the languages you choose, and a count of
 the time all this has saved you.
 
+**Two at once, and more.** Two tabs at once in Split View. Touch and hold a link to see its page live, then
+open it, open it in the background or add it to Read Later. Forms you're filling in survive a crash.
+Private tabs and history behind Face ID. A mini player for sound in a tab you've left, a real
+download manager (also in Files), Copy as Markdown, swipe anywhere to go back, pinch for your tabs,
+and New Tab, Private Tab and Ask roko in Control Center, Shortcuts and Siri.
+
 <p>
   <img src="docs/screens/browse-picks.jpg" width="250" alt="The best options side by side with prices and who each suits">
   <img src="docs/screens/browse-videos.jpg" width="250" alt="YouTube videos under an answer">

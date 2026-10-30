@@ -27,7 +27,11 @@ struct Glyph: View {
              // Settings.
              palette, microphone, info, key, broom, globe, appIcon, notification,
              // A closed tab back, and a page opened in its app.
-             reopen, openApp
+             reopen, openApp,
+             // Downloads, the mini player, Face ID, Copy as Markdown.
+             download, play, pause, pip, lock, skipBack, skipForward, markdown,
+             // Split View.
+             swap, split
     }
 
     let kind: Kind

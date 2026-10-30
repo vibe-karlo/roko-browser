@@ -9,6 +9,10 @@ struct RokoWidgets: WidgetBundle {
         TodayWidget()
         AnswerWidget()
         ParkingLiveActivity()
+        // Control Center, the Lock Screen and the Action button.
+        NewTabControl()
+        PrivateTabControl()
+        AskRokoControl()
     }
 }
 

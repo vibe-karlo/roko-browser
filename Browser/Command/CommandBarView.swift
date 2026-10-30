@@ -7,7 +7,7 @@ struct CommandItem: Identifiable {
              browse(String), summarize, findOnPage, privateTab, settings, copy(String),
              pasteLink, openCopied(URL), todos, today, openApp(URL), ask(String), askAboutPage(String), addTodo(String, TodoWhen, DateComponents?),
              payParking(city: String, zone: String), extendParking, endParking, shopping, addShopping(String),
-             saveForLater, readLater, askAboutSaved(String), reopenTab
+             saveForLater, readLater, askAboutSaved(String), reopenTab, downloads, copyMarkdown, unlockHistory, split
     }
 
     let id: String
@@ -874,6 +874,12 @@ struct CommandBarView: View {
             // The same page under two addresses (with and without "www.", a
             // trailing slash) is one row: matched by site and title too.
             var seenPages = Set<String>()
+            // Locked: one row to unlock it, in place of the pages.
+            if PrivacyLock.shared.isLocked {
+                rows.append(CommandItem(id: "action-unlock-history", title: "History is locked",
+                                        subtitle: "Unlock with \(PrivacyLock.method)", kind: "",
+                                        icon: .glyph(.lock), action: .unlockHistory))
+            }
             for entry in browser.history(matching: "", limit: 30) {
                 guard rows.count - firstRecent < 8, let url = URL(string: entry.url), !browser.isCurrentPage(url),
                       seen.insert(entry.url).inserted,
@@ -944,6 +950,10 @@ struct CommandBarView: View {
         case .saveForLater: browser.saveForLater()
         case .readLater: browser.panel = .readLater
         case .reopenTab: browser.reopenClosedTab()
+        case .downloads: browser.panel = .downloads
+        case .split: browser.split == nil ? browser.startSplit() : browser.endSplit()
+        case .copyMarkdown: browser.copyAsMarkdown()
+        case .unlockHistory: Task { await PrivacyLock.shared.unlock() }
         case .askAboutSaved(let question):
             if let digest = browser.digest { browser.ask(question, about: digest) } else { browser.panel = .none }
         case .addShopping(let typed):
@@ -1197,6 +1207,8 @@ enum CommandRanker {
             && (browser.commandMode != .privateTab || tab.isPrivate) {
             // One row per page, however many tabs have it open.
             guard tabPages.insert(tab.url?.absoluteString ?? tab.id.uuidString).inserted else { continue }
+            // Locked private tabs aren't named here either.
+            if tab.isPrivate, PrivacyLock.shared.hides(tab.id) { continue }
             let onSite = tab.url.map { noteSite($0, title: tab.displayTitle, visits: 1) } ?? false
             // An article open in a tab comes after its site, as in history.
             let base = onSite && (tab.url?.path.count ?? 0) > 1 ? 560 : 760
@@ -1305,6 +1317,17 @@ enum CommandRanker {
             (["read later", "save for later", "reading list", "save page"],
              CommandItem(id: "action-save-later", title: "Save to Read Later", subtitle: "This page and its text, for later",
                          kind: "Action", icon: .glyph(.readLater), action: .saveForLater)),
+            (["downloads", "downloaded", "files", "preuzimanja"],
+             CommandItem(id: "action-downloads", title: "Downloads",
+                         subtitle: Downloads.shared.activeCount > 0 ? "\(Downloads.shared.activeCount) downloading" : "Files from pages",
+                         kind: "Action", icon: .glyph(.download), action: .downloads)),
+            (["split view", "split", "split screen", "two tabs", "podijeli"],
+             CommandItem(id: "action-split", title: browser.split == nil ? "Split View" : "Close Split View",
+                         subtitle: "Two tabs at once, one above the other",
+                         kind: "Action", icon: .glyph(.split), action: .split)),
+            (["copy as markdown", "markdown", "copy article"],
+             CommandItem(id: "action-markdown", title: "Copy as Markdown", subtitle: "This article, for notes or an AI chat",
+                         kind: "Action", icon: .glyph(.markdown), action: .copyMarkdown)),
             (["read later", "reading list", "saved pages", "za kasnije", "spremljeno"],
              CommandItem(id: "action-read-later", title: "Read Later",
                          subtitle: ReadLater.shared.unread.isEmpty ? "Pages you saved" : "\(ReadLater.shared.unread.count) to read",
@@ -1316,11 +1339,11 @@ enum CommandRanker {
                               kind: "Action", icon: .glyph(.reopen), action: .reopenTab))]
             } ?? [])
         for (words, item) in actions where words.contains(where: { $0.hasPrefix(needle) }) {
-            let needsPage = ["action-summarize", "action-find", "action-save-later"].contains(item.id)
+            let needsPage = ["action-summarize", "action-find", "action-save-later", "action-markdown", "action-split"].contains(item.id)
             if needsPage && browser.selectedTab == nil { continue }
             // Typed in full, a place in roko (Settings, To-do) is what's meant,
             // not a web search for the word: it goes first, and Return opens it.
-            let isPlace = ["action-settings", "action-todos", "action-today", "action-shopping", "action-read-later", "action-reopen"].contains(item.id)
+            let isPlace = ["action-settings", "action-todos", "action-today", "action-shopping", "action-read-later", "action-reopen", "action-downloads"].contains(item.id)
             let exact = words.contains(needle)
             // "save for later" typed in full means this page, not a search for the words.
             if item.id == "action-save-later", exact, needle != "read later" {

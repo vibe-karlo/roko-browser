@@ -114,7 +114,7 @@ final class PageAlert: UIAlertController {
     }
 }
 
-extension BrowserTab: WKDownloadDelegate {
+extension BrowserTab {
     // MARK: Dialogs
 
     @objc func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
@@ -198,34 +198,14 @@ extension BrowserTab: WKDownloadDelegate {
         return navigationResponse.isForMainFrame && (attachment || !navigationResponse.canShowMIMEType) ? .download : .allow
     }
 
+    /// Every file goes to Downloads, which keeps it going and lists it.
     @objc func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
-        download.delegate = self
+        Downloads.shared.track(download)
     }
 
     @objc func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
-        download.delegate = self
-    }
-
-    func download(_ download: WKDownload, decideDestinationUsing response: URLResponse,
-                  suggestedFilename: String) async -> URL? {
-        // A folder of its own each time, so two files of one name don't collide.
-        let folder = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Downloads", isDirectory: true)
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let name = suggestedFilename.isEmpty ? "Download" : suggestedFilename
-        let file = folder.appendingPathComponent(name)
-        downloads[ObjectIdentifier(download)] = file
-        return file
-    }
-
-    func downloadDidFinish(_ download: WKDownload) {
-        guard let file = downloads.removeValue(forKey: ObjectIdentifier(download)) else { return }
-        PageDialogs.open(downloaded: file)
-    }
-
-    func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
-        downloads.removeValue(forKey: ObjectIdentifier(download))
-        delegate?.tab(self, says: "Couldn't download it: \(error.localizedDescription)")
+        Downloads.shared.track(download)
+        // A tab opened just for the file has nothing else in it: it goes, as in Safari.
+        if webView.backForwardList.currentItem == nil { delegate?.tabOnlyDownloaded(self) }
     }
 }

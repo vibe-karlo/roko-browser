@@ -71,7 +71,8 @@ struct TabStackView: View {
                             titleWidth: stride - 16, isFocused: tab.id == focused,
                             isBehind: index < focusedIndex,
                             open: { open(tab) },
-                            close: { close(tab) })
+                            close: { close(tab) },
+                            split: canSplit(with: tab) ? { browser.panel = .none; browser.startSplit(with: tab) } : nil)
                     // As in Arc: tabs to the left sink back into a stack behind
                     // the focused card, smaller and tucked under it; the next tab
                     // on the right stays full size, laid over it. Drawn by the
@@ -96,7 +97,22 @@ struct TabStackView: View {
         .animation(.snappy(duration: 0.3), value: browser.tabs.map(\.id))
     }
 
+    /// Split with the tab on screen: another tab of the same kind, not already beside it.
+    private func canSplit(with tab: BrowserTab) -> Bool {
+        guard let current = browser.selectedTab, current.id != tab.id, current.isPrivate == tab.isPrivate else { return false }
+        return browser.split?.contains(tab.id) != true
+    }
+
     private func open(_ tab: BrowserTab) {
+        // A locked private tab opens once Face ID says so.
+        if tab.isPrivate, PrivacyLock.shared.hides(tab.id) {
+            Task {
+                guard await PrivacyLock.shared.unlock("Show your private tab") else { return }
+                browser.select(tab)
+                browser.panel = .none
+            }
+            return
+        }
         browser.select(tab)
         browser.panel = .none
     }
@@ -251,6 +267,8 @@ private struct TabCard: View {
     var isBehind = false
     let open: () -> Void
     let close: () -> Void
+    /// With the tab on screen, split; nil for the tab on screen itself.
+    var split: (() -> Void)? = nil
 
     @State private var throwOffset: CGFloat = 0
     private let closeDistance: CGFloat = 140
@@ -263,7 +281,7 @@ private struct TabCard: View {
         }
         .frame(width: width, alignment: .leading)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(tab.displayTitle)
+        .accessibilityLabel(isHidden ? "Private tab, locked" : tab.displayTitle)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(.default, open)
         .accessibilityAction(named: "Close tab", close)
@@ -271,11 +289,11 @@ private struct TabCard: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            SiteIcon(host: tab.url?.displayHost ?? "", size: 20)
+            SiteIcon(host: isHidden ? "" : tab.url?.displayHost ?? "", size: 20)
             if tab.isPrivate {
                 Glyph(.eyeClosed, size: 15).foregroundStyle(Theme.secondaryInk)
             }
-            if isFocused {
+            if isFocused, !isHidden {
                 Text(tab.displayTitle)
                     .font(.system(size: 14, weight: .medium))
                     .lineLimit(1)
@@ -301,6 +319,12 @@ private struct TabCard: View {
             .shadow(color: .black.opacity(0.35), radius: 8, x: -5, y: 0)
             .contentShape(.rect(cornerRadius: corner))
             .onTapGesture(perform: open)
+            .contextMenu {
+                if let split, !isHidden {
+                    Button(action: split) { Label("Open in Split View", image: "phosphor/split") }
+                }
+                Button(role: .destructive, action: close) { Label("Close Tab", image: "phosphor/close") }
+            }
             .offset(y: throwOffset)
             .opacity(1 + throwOffset / 700)
             .gesture(UpwardPan(
@@ -314,9 +338,16 @@ private struct TabCard: View {
                 }))
     }
 
+    /// A private tab while it's locked: no picture, no name, no site.
+    private var isHidden: Bool { tab.isPrivate && PrivacyLock.shared.hides(tab.id) }
+
     @ViewBuilder
     private var preview: some View {
-        if let snapshot = tab.snapshot {
+        if isHidden {
+            Theme.raised.overlay {
+                Glyph(.lock, size: 40).foregroundStyle(Theme.secondaryInk)
+            }
+        } else if let snapshot = tab.snapshot {
             Image(uiImage: snapshot)
                 .resizable()
                 .scaledToFill()
