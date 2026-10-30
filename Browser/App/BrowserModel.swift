@@ -489,8 +489,9 @@ final class BrowserModel {
     /// A tab out of sight with sound or video playing (or paused there): the
     /// small player above the bar works it.
     var playerTab: BrowserTab? {
+        // Not while it's in Picture in Picture: it has its own window then.
         let candidates = tabs.filter { $0.id != selectedID && split?.contains($0.id) != true
-            && $0.media != nil && !$0.playerDismissed && $0.isLive }
+            && $0.media != nil && $0.media?.isFloating != true && !$0.playerDismissed && $0.isLive }
         return candidates.first { $0.media?.playing == true } ?? candidates.first
     }
 
@@ -502,14 +503,31 @@ final class BrowserModel {
         Task { _ = await PageWatch.call(tab.webView, "skip", ["seconds": seconds]) }
     }
 
-    /// Picture in Picture from out of sight; where the page won't, its tab
-    /// comes up and asks again from there.
+    /// Picture in Picture. iOS only starts it for a video on screen, so the
+    /// video's tab comes up for a moment, the video goes into its own window,
+    /// and you're back on the page you were reading.
     func pictureInPicture(_ tab: BrowserTab) {
+        let reading = selectedTab
+        if reading?.id != tab.id { select(tab) }
         Task {
-            if await PageWatch.call(tab.webView, "pictureInPicture") as? Bool == true { return }
-            select(tab)
-            try? await Task.sleep(for: .milliseconds(500))
-            _ = await PageWatch.call(tab.webView, "pictureInPicture")
+            // On screen and laid out before asking.
+            for _ in 0..<20 where tab.webView?.window == nil { try? await Task.sleep(for: .milliseconds(50)) }
+            try? await Task.sleep(for: .milliseconds(250))
+            guard let webView = tab.webView else { return }
+            // evaluateJavaScript counts as a tap on the page, which iOS wants for this.
+            let asked = (try? await webView.evaluateJavaScript("window.__rokoPage ? window.__rokoPage.pictureInPicture() : false",
+                                                              in: nil, contentWorld: PageWatch.world)) as? Bool ?? false
+            var floating = false
+            for _ in 0..<15 where asked && !floating {
+                try? await Task.sleep(for: .milliseconds(100))
+                floating = (try? await webView.evaluateJavaScript("window.__rokoPage ? window.__rokoPage.inPictureInPicture() : false",
+                                                                  in: nil, contentWorld: PageWatch.world)) as? Bool ?? false
+            }
+            if floating {
+                if let reading, reading.id != tab.id, tabs.contains(where: { $0.id == reading.id }) { select(reading) }
+            } else {
+                showToast("This video can't play in a window")
+            }
         }
     }
 

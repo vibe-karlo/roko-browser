@@ -61,9 +61,20 @@
   // MARK: Media
 
   let current = null;
+  let lastTick = 0;
+  // The largest picture the page gives for what's playing: its media session's
+  // artwork, the video's poster, or the page's own share picture.
+  const artworkOf = (el, meta) => {
+    const art = meta && meta.artwork && meta.artwork.length
+      ? [...meta.artwork].sort((a, b) => (parseInt(b.sizes) || 0) - (parseInt(a.sizes) || 0))[0].src : "";
+    const og = document.querySelector('meta[property="og:image"]');
+    const url = art || (el instanceof HTMLVideoElement && el.poster) || (og && og.content) || "";
+    try { return url ? new URL(url, location.href).href : ""; } catch (e) { return ""; }
+  };
   const report = (el) => {
     if (!el) return;
     current = el;
+    lastTick = Date.now();
     const meta = navigator.mediaSession && navigator.mediaSession.metadata;
     post({
       kind: "media",
@@ -71,13 +82,22 @@
       video: el instanceof HTMLVideoElement && el.videoWidth > 0,
       title: (meta && meta.title) || document.title || "",
       artist: (meta && meta.artist) || "",
+      artwork: artworkOf(el, meta),
+      time: el.currentTime || 0,
+      duration: isFinite(el.duration) ? el.duration : 0,
+      floating: el.webkitPresentationMode === "picture-in-picture" || document.pictureInPictureElement === el,
     });
   };
-  for (const name of ["play", "playing", "pause", "ended"]) {
+  for (const name of ["play", "playing", "pause", "ended", "seeked", "webkitpresentationmodechanged",
+                      "enterpictureinpicture", "leavepictureinpicture"]) {
     document.addEventListener(name, (event) => {
       if (event.target instanceof HTMLMediaElement) report(event.target);
     }, true);
   }
+  // Where it's got to, for the mini player's line: once a second at most.
+  document.addEventListener("timeupdate", (event) => {
+    if (event.target === current && Date.now() - lastTick > 1000) report(current);
+  }, true);
   document.addEventListener("emptied", (event) => {
     if (event.target === current) { current = null; post({ kind: "mediaGone" }); }
   }, true);
@@ -144,11 +164,20 @@
     pictureInPicture() {
       const el = current instanceof HTMLVideoElement ? current : document.querySelector("video");
       if (!el) return false;
+      if (el.webkitPresentationMode === "picture-in-picture") return true;
       if (el.webkitSupportsPresentationMode && el.webkitSupportsPresentationMode("picture-in-picture")) {
-        el.webkitSetPresentationMode(el.webkitPresentationMode === "picture-in-picture" ? "inline" : "picture-in-picture");
+        el.webkitSetPresentationMode("picture-in-picture");
+        return true;
+      }
+      if (el.requestPictureInPicture && document.pictureInPictureEnabled) {
+        el.requestPictureInPicture().catch(() => {});
         return true;
       }
       return false;
+    },
+    inPictureInPicture() {
+      const el = current instanceof HTMLVideoElement ? current : document.querySelector("video");
+      return !!el && (el.webkitPresentationMode === "picture-in-picture" || document.pictureInPictureElement === el);
     },
     fullscreen() {
       const el = current instanceof HTMLVideoElement ? current : document.querySelector("video");

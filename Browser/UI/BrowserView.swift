@@ -340,7 +340,7 @@ struct BrowserView: View {
     }
 
     /// Offers and toasts sit above the mini player while it shows.
-    private var playerLift: CGFloat { showsPlayer ? 66 : 0 }
+    private var playerLift: CGFloat { showsPlayer ? 70 : 0 }
 
     /// Text that reads on whatever is behind the status bar.
     private var statusBarStyle: UIStatusBarStyle {
@@ -687,12 +687,14 @@ private struct PageExtras: ViewModifier {
             .animation(.snappy(duration: 0.3), value: Downloads.shared.finished?.id)
             .overlay(alignment: .bottom) {
                 if showsPlayer, let tab = browser.playerTab {
+                    // Resting on the bar; when the bar folds away, in its place.
                     MiniPlayer(tab: tab)
                         .padding(.horizontal, Theme.gutter)
-                        .padding(.bottom, Theme.barHeight + 20)
+                        .padding(.bottom, browser.isBarCollapsed ? 4 : Theme.barHeight + 8 + 4 + 8)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            .animation(.snappy(duration: 0.28), value: browser.isBarCollapsed)
             .animation(.snappy(duration: 0.3), value: showsPlayer ? browser.playerTab?.id : nil)
     }
 }

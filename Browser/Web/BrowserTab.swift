@@ -74,6 +74,21 @@ final class BrowserTab: NSObject, Identifiable {
         var isVideo: Bool
         var title: String
         var artist: String
+        var artwork: URL?
+        /// Seconds in, and how long it is (0 for a live stream or not known yet).
+        var time: Double = 0
+        var duration: Double = 0
+        /// In Picture in Picture: it has a window of its own.
+        var isFloating = false
+        /// When the page said so, to carry the time on between its reports.
+        var reportedAt = Date.now
+
+        /// How far through it is at `date`, moving on while it plays.
+        func progress(at date: Date) -> Double {
+            guard duration > 0 else { return 0 }
+            let now = time + (playing ? date.timeIntervalSince(reportedAt) : 0)
+            return min(max(now / duration, 0), 1)
+        }
     }
 
     init(id: UUID = UUID(), url: URL?, title: String = "", isPrivate: Bool = false,

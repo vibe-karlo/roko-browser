@@ -43,7 +43,11 @@ final class PageWatch: NSObject, WKScriptMessageHandler {
             tab.media = BrowserTab.Media(playing: body["playing"] as? Bool ?? false,
                                          isVideo: body["video"] as? Bool ?? false,
                                          title: body["title"] as? String ?? "",
-                                         artist: body["artist"] as? String ?? "")
+                                         artist: body["artist"] as? String ?? "",
+                                         artwork: (body["artwork"] as? String).flatMap(URL.init(string:)),
+                                         time: body["time"] as? Double ?? 0,
+                                         duration: body["duration"] as? Double ?? 0,
+                                         isFloating: body["floating"] as? Bool ?? false)
         case "mediaGone":
             tab.media = nil
         default:

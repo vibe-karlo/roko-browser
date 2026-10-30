@@ -45,6 +45,8 @@ enum WebViewFactory {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = isPrivate ? privateStore : .default()
         configuration.allowsInlineMediaPlayback = true
+        // Video in its own window while you do something else (the mini player's button).
+        configuration.allowsPictureInPictureMediaPlayback = true
         // Autoplaying video is the biggest battery and data drain on mobile.
         configuration.mediaTypesRequiringUserActionForPlayback = .all
         configuration.defaultWebpagePreferences.preferredContentMode = .mobile
