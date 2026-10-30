@@ -570,7 +570,10 @@ Copy Link and Share hand on the link without tracking parameters (`CleanLink`); 
 its own address. Ask roko sits first in the menu over selected text (`EdgeToEdgeWebView.buildMenu`)
 and runs Browse for Me on the selection.
 
-The share extension (ShareExtension/, target RokoShare) shows nothing: it turns what was shared
+Two extensions take what other apps share: RokoShare (ShareExtension/, roko among the apps at
+the top of a share sheet: links and selected text) and RokoAction (ActionExtension/, Open in roko
+in the list of actions: links only; its icon is the Eclipse alone on clear, as iOS draws an
+action from its shape). Both run ShareViewController and show nothing: it turns what was shared
 into roko://open?url= or roko://ask?q= and opens roko with it (BrowserModel.handleLink). A share
 extension has no openURL of its own, so it finds the app it runs in up the responder chain.
 

@@ -29,6 +29,7 @@ targets:
     dependencies:
       - target: RokoWidgets
       - target: RokoShare
+      - target: RokoAction
     info:
       path: Browser/Info.plist
       properties:
@@ -170,6 +171,41 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.growthstudio.roko.share
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 6ZQC2F6CF2
+        SKIP_INSTALL: YES
+
+  # Open in roko, in the list of actions under a share sheet (as Arc's
+  # Open in Arc Search). Same code as RokoShare; its icon is the Eclipse
+  # alone, on clear, as iOS draws an action from its shape.
+  RokoAction:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ActionExtension
+        excludes:
+          - "Info.plist"
+      - path: ShareExtension/ShareViewController.swift
+    info:
+      path: ActionExtension/Info.plist
+      properties:
+        CFBundleDisplayName: Open in roko
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.ui-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActionWantsFullScreenPresentation: false
+            NSExtensionServiceAllowsFinderPreviewItem: false
+            # A page's link only: words you select go to roko from its app icon above.
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.growthstudio.roko.action
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: 6ZQC2F6CF2
