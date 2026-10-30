@@ -30,22 +30,33 @@ struct BrowserView: View {
                 // two at once (a layout on its way out took its page with it).
                 // Something playing in another tab: the page lifts into a card
                 // and the player sits in the dark band under it (after Lens).
+                // Exploration: the bar lives in the band too, under the live row.
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
                         pages
-                            .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: showsPlayer ? 22 : 0,
-                                                              bottomTrailingRadius: showsPlayer ? 22 : 0))
-                        if !browser.liveItems.isEmpty {
-                            LiveBand()
-                                .padding(.bottom, proxy.safeAreaInsets.bottom)
-                                .transition(.move(edge: .bottom))
+                            .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: showsBand ? 22 : 0,
+                                                              bottomTrailingRadius: showsBand ? 22 : 0))
+                        if showsBand {
+                            VStack(spacing: 0) {
+                                if !browser.liveItems.isEmpty {
+                                    LiveBand()
+                                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                                }
+                                if !browser.isBarCollapsed {
+                                    BandBar()
+                                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                                }
+                            }
+                            .padding(.bottom, proxy.safeAreaInsets.bottom)
+                            .transition(.move(edge: .bottom))
                         }
                     }
                     // Only below: the status bar's strip keeps the page's colour.
-                    .background { (showsPlayer ? Color.black : Color.clear).ignoresSafeArea(edges: .bottom) }
+                    .background { (showsBand ? Color.black : Color.clear).ignoresSafeArea(edges: .bottom) }
                     .ignoresSafeArea(edges: .bottom)
                     .animation(.snappy(duration: 0.3), value: browser.liveItems.isEmpty)
                     .animation(.snappy(duration: 0.25), value: browser.bandShowsStrip)
+                    .animation(.snappy(duration: 0.28), value: browser.isBarCollapsed)
                 }
             } else {
                 StartView()
@@ -60,7 +71,10 @@ struct BrowserView: View {
         // The page learns which strip the bar covers from barTop (WebViewHost).
         .overlay(alignment: .bottom) {
             // The command bar takes the bar's place rather than stacking on top of it.
+            // Exploration: only on the start page; on a page the bar is in the band.
             BottomBar()
+                .opacity(browser.selectedTab != nil ? 0 : 1)
+                .allowsHitTesting(browser.selectedTab == nil)
                 .opacity(browser.launcherShown || browser.panel == .tabs || browser.pageBecomingSummary || browser.hidingItems != nil ? 0 : 1)
                 .allowsHitTesting(browser.hidingItems == nil)
                 // Faded, not folded: folding changes the page's insets, which stops a pull dead.
@@ -71,9 +85,7 @@ struct BrowserView: View {
                 // Typing into a page, the keyboard covers the bar, as in Safari;
                 // risen above it, the bar sat on top of the form being filled in.
                 .ignoresSafeArea(.keyboard, edges: .bottom)
-                // Above the player's band when there is one.
-                .padding(.bottom, showsPlayer ? LiveBand.height(minimized: browser.bandShowsStrip) : 0)
-                .animation(.snappy(duration: 0.3), value: showsPlayer)
+
         }
         .overlay {
             if browser.panel == .tabs {
@@ -360,7 +372,18 @@ struct BrowserView: View {
         !browser.liveItems.isEmpty && browser.selectedTab != nil
     }
 
-    private var playerLift: CGFloat { showsPlayer ? LiveBand.height(minimized: browser.bandShowsStrip) : 0 }
+    /// The band under the page: the bar while it isn't folded away, and what's live.
+    private var showsBand: Bool {
+        browser.selectedTab != nil && (!browser.isBarCollapsed || !browser.liveItems.isEmpty)
+    }
+
+    /// Offers and toasts sit just above the band, not where the floating bar was.
+    private var playerLift: CGFloat {
+        guard browser.selectedTab != nil else { return 0 }
+        let band = (showsPlayer ? LiveBand.height(minimized: browser.bandShowsStrip) : 0)
+            + (browser.isBarCollapsed ? 0 : BandBar.height)
+        return band - Theme.barHeight - 8
+    }
 
     private var splitHalves: (top: BrowserTab, bottom: BrowserTab?)? {
         if let split = browser.split, let top = browser.tab(split.top), let bottom = browser.tab(split.bottom) {
@@ -374,9 +397,9 @@ struct BrowserView: View {
     private var pages: some View {
         // Picking the second page and showing it are one view, for the same reason.
         if let halves = splitHalves {
-            SplitPages(top: halves.top, bottom: halves.bottom, barTop: barTop)
+            SplitPages(top: halves.top, bottom: halves.bottom, barTop: 0)
         } else if let tab = browser.selectedTab {
-            PagePane(tab: tab, barTop: barTop)
+            PagePane(tab: tab, barTop: 0)
         }
     }
 
