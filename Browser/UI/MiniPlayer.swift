@@ -82,8 +82,8 @@ struct MiniPlayer: View {
         .overlay(Circle().strokeBorder(Theme.edge))
     }
 
-    /// How far it's got, as a hairline along the bottom of the pill, inside
-    /// its curve; it moves on smoothly between the page's once-a-second reports.
+    /// How far it's got, as a hairline along the bottom of the pill under the
+    /// title; it moves on smoothly between the page's once-a-second reports.
     @ViewBuilder
     private var progressLine: some View {
         if media.duration > 0 {
@@ -99,7 +99,10 @@ struct MiniPlayer: View {
                 }
                 .frame(height: 3)
             }
-            .padding(.horizontal, Theme.barRadius)
+            // From under the title (past the cover: 8 inset, 42 cover, 12 gap)
+            // to inside the pill's right curve, so it never crosses the cover.
+            .padding(.leading, 8 + 42 + 12)
+            .padding(.trailing, Theme.barRadius)
             .padding(.bottom, 5)
             .allowsHitTesting(false)
         }
