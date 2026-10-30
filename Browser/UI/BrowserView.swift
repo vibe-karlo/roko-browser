@@ -47,7 +47,9 @@ struct BrowserView: View {
                                         .transition(.move(edge: .bottom).combined(with: .opacity))
                                 }
                             }
-                            .padding(.bottom, proxy.safeAreaInsets.bottom)
+                            // Down into the home indicator's strip: on the black band it has room,
+                            // and keeping clear of all of it left a tall empty gap.
+                            .padding(.bottom, max(proxy.safeAreaInsets.bottom - 18, 4))
                             .transition(.move(edge: .bottom))
                         }
                     }

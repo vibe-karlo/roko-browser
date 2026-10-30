@@ -156,8 +156,9 @@ private func leadButton(_ label: String, action: @escaping () -> Void, @ViewBuil
     Button(action: action) {
         content()
             .foregroundStyle(.black)
-            .frame(width: 38, height: 38)
-            .background(.white, in: .circle)
+            // The band's key shape, filled: the one main action.
+            .frame(width: 36, height: 32)
+            .background(.white, in: .rect(cornerRadius: 9))
     }
     .accessibilityLabel(label)
 }
@@ -186,8 +187,9 @@ private func roundButton(_ label: String, action: @escaping () -> Void, @ViewBui
     Button(action: action) {
         content()
             .foregroundStyle(.white)
+            // The band's key shape (a rounded square), filled softly.
             .frame(width: 32, height: 32)
-            .background(.white.opacity(0.1), in: .circle)
+            .background(.white.opacity(0.1), in: .rect(cornerRadius: 9))
     }
     .accessibilityLabel(label)
 }
@@ -231,7 +233,7 @@ private struct MediaRow: View {
             }
             AirPlayButton()
                 .frame(width: 32, height: 32)
-                .background(.white.opacity(0.1), in: .circle)
+                .background(.white.opacity(0.1), in: .rect(cornerRadius: 9))
                 .accessibilityLabel("AirPlay")
             CollapseButton()
         }
@@ -284,7 +286,7 @@ private struct ParkingRow: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 14)
                         .frame(height: 32)
-                        .background(.white.opacity(0.1), in: .capsule)
+                        .background(.white.opacity(0.1), in: .rect(cornerRadius: 9))
                 }
                 .accessibilityLabel("Add an hour")
             }

@@ -96,9 +96,9 @@ private struct BandKey<Content: View>: View {
     var body: some View {
         content()
             .foregroundStyle(.white)
-            .frame(width: wide ? 44 : 28, height: 28)
+            .frame(width: wide ? 76 : 28, height: 28)
             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.white.opacity(0.6), lineWidth: 1.6))
-            .frame(width: wide ? 72 : 52, height: BandBar.height)
+            .frame(width: wide ? 104 : 52, height: BandBar.height)
             .contentShape(.rect)
     }
 }
