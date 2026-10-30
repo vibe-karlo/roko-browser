@@ -32,10 +32,7 @@ final class BrowserModel {
 
     private(set) var tabs: [BrowserTab] = []
     private(set) var selectedID: BrowserTab.ID?
-    var panel: Panel = .none {
-        // The bar closed without a page opened from it: no split waiting for one.
-        didSet { if oldValue == .command, panel != .command { pendingSplitWith = nil } }
-    }
+    var panel: Panel = .none
     var commandPrefill = ""
     var commandMode: CommandMode = .newTab
     var launcherContext: LauncherContext = .web
@@ -161,28 +158,43 @@ final class BrowserModel {
     var splitFraction: CGFloat = 0.5
 
     /// The page on screen and another, split. With no tab given (the page
-    /// menu, the bar), the bar opens for the page that goes below.
+    /// menu, the bar), the split opens at once with the page on top and a
+    /// card below asking which page goes there.
     func startSplit(with other: BrowserTab? = nil) {
         guard let current = selectedTab else { return }
         panel = .none
         guard let partner = other, partner.id != current.id else {
-            showCommandBar(mode: current.isPrivate ? .privateTab : .newTab)
+            splitFraction = 0.5
             pendingSplitWith = current.id
             return
         }
+        pendingSplitWith = nil
         splitFraction = 0.5
         split = Split(top: current.id, bottom: partner.id)
         partner.wake()
         select(partner)
     }
 
-    /// Split View asked for from the page menu or the bar: the page the bar opens next joins it.
+    /// Split View started with its bottom half still to choose: the tab on top.
     private var pendingSplitWith: BrowserTab.ID?
-    /// The bar is open for Split View's second page.
-    var isPickingSplit: Bool { pendingSplitWith != nil }
+    /// Split View is waiting for its second page (the card below, and the bar opened from it).
+    var isPickingSplit: Bool { splitPickingTop != nil }
+
+    /// The page on top while the bottom half is being chosen.
+    var splitPickingTop: BrowserTab? {
+        guard split == nil, let id = pendingSplitWith else { return nil }
+        return tab(id)
+    }
+
+    /// The card's search field: the bar, whose page goes below.
+    func pickSplitPage() {
+        guard let top = splitPickingTop else { return }
+        showCommandBar(mode: top.isPrivate ? .privateTab : .newTab)
+    }
 
     /// Back to one tab: the one in use, or the one asked for.
     func endSplit(keeping kept: BrowserTab? = nil) {
+        pendingSplitWith = nil
         guard split != nil else { return }
         split = nil
         if let kept, kept.id != selectedID { select(kept) }
@@ -342,7 +354,7 @@ final class BrowserModel {
         finishHidingItems()
         // Split View asked for: whatever the bar opens (an address, a search, a
         // pin, a tab already open) is the half below.
-        if let first = pendingSplitWith, first != tab.id, panel == .command,
+        if split == nil, let first = pendingSplitWith, first != tab.id,
            tabs.contains(where: { $0.id == first }), tabs.contains(where: { $0.id == tab.id }) {
             pendingSplitWith = nil
             splitFraction = 0.5
@@ -543,8 +555,12 @@ final class BrowserModel {
         }
     }
 
+    /// Pulled down: a thin strip that keeps playing; a tap brings it back.
+    var playerMinimized = false
+
     /// Closed: paused, and gone until it plays again.
     func closePlayer(_ tab: BrowserTab) {
+        playerMinimized = false
         tab.playerDismissed = true
         Task { _ = await PageWatch.call(tab.webView, "pause") }
     }

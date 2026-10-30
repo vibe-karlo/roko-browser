@@ -1343,7 +1343,7 @@ enum CommandRanker {
             if needsPage && browser.selectedTab == nil { continue }
             // Typed in full, a place in roko (Settings, To-do) is what's meant,
             // not a web search for the word: it goes first, and Return opens it.
-            let isPlace = ["action-settings", "action-todos", "action-today", "action-shopping", "action-read-later", "action-reopen", "action-downloads"].contains(item.id)
+            let isPlace = ["action-settings", "action-todos", "action-today", "action-shopping", "action-read-later", "action-reopen", "action-downloads", "action-split"].contains(item.id)
             let exact = words.contains(needle)
             // "save for later" typed in full means this page, not a search for the words.
             if item.id == "action-save-later", exact, needle != "read later" {

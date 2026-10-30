@@ -25,23 +25,28 @@ struct BrowserView: View {
             }
             .animation(.easeOut(duration: 0.2), value: browser.topTab?.topColor)
 
-            if browser.selectedTab != nil, let playing = browser.playerTab {
+            if browser.selectedTab != nil {
+                // One layout whatever is on screen, so a page is never shown by
+                // two at once (a layout on its way out took its page with it).
                 // Something playing in another tab: the page lifts into a card
                 // and the player sits in the dark band under it (after Lens).
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
                         pages
-                            .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 26, bottomTrailingRadius: 26))
-                        PlayerBand(tab: playing)
-                            .padding(.bottom, proxy.safeAreaInsets.bottom)
+                            .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: showsPlayer ? 22 : 0,
+                                                              bottomTrailingRadius: showsPlayer ? 22 : 0))
+                        if let playing = browser.playerTab {
+                            PlayerBand(tab: playing)
+                                .padding(.bottom, proxy.safeAreaInsets.bottom)
+                                .transition(.move(edge: .bottom))
+                        }
                     }
                     // Only below: the status bar's strip keeps the page's colour.
-                    .background { Color.black.ignoresSafeArea(edges: .bottom) }
+                    .background { (showsPlayer ? Color.black : Color.clear).ignoresSafeArea(edges: .bottom) }
                     .ignoresSafeArea(edges: .bottom)
+                    .animation(.snappy(duration: 0.3), value: browser.playerTab?.id)
+                    .animation(.snappy(duration: 0.25), value: browser.playerMinimized)
                 }
-                .transition(.opacity)
-            } else if browser.selectedTab != nil {
-                pages
             } else {
                 StartView()
                     // The bar floats over the page; the start page keeps clear of it.
@@ -67,7 +72,7 @@ struct BrowserView: View {
                 // risen above it, the bar sat on top of the form being filled in.
                 .ignoresSafeArea(.keyboard, edges: .bottom)
                 // Above the player's band when there is one.
-                .padding(.bottom, showsPlayer ? PlayerBand.height : 0)
+                .padding(.bottom, showsPlayer ? PlayerBand.height(minimized: browser.playerMinimized) : 0)
                 .animation(.snappy(duration: 0.3), value: showsPlayer)
         }
         .overlay {
@@ -354,13 +359,21 @@ struct BrowserView: View {
         browser.playerTab != nil && browser.selectedTab != nil
     }
 
-    private var playerLift: CGFloat { showsPlayer ? PlayerBand.height : 0 }
+    private var playerLift: CGFloat { showsPlayer ? PlayerBand.height(minimized: browser.playerMinimized) : 0 }
+
+    private var splitHalves: (top: BrowserTab, bottom: BrowserTab?)? {
+        if let split = browser.split, let top = browser.tab(split.top), let bottom = browser.tab(split.bottom) {
+            return (top, bottom)
+        }
+        return browser.splitPickingTop.map { ($0, nil) }
+    }
 
     /// The tab on screen, or the two halves of a split.
     @ViewBuilder
     private var pages: some View {
-        if let split = browser.split, let top = browser.tab(split.top), let bottom = browser.tab(split.bottom) {
-            SplitPages(top: top, bottom: bottom, barTop: barTop)
+        // Picking the second page and showing it are one view, for the same reason.
+        if let halves = splitHalves {
+            SplitPages(top: halves.top, bottom: halves.bottom, barTop: barTop)
         } else if let tab = browser.selectedTab {
             PagePane(tab: tab, barTop: barTop)
         }
@@ -778,7 +791,8 @@ private struct PagePane: View {
 private struct SplitPages: View {
     @Environment(BrowserModel.self) private var browser
     let top: BrowserTab
-    let bottom: BrowserTab
+    /// Nil while the bottom half is still to be chosen.
+    let bottom: BrowserTab?
     let barTop: CGFloat
     @State private var drag: CGFloat = 0
 
@@ -794,8 +808,16 @@ private struct SplitPages: View {
                     .frame(height: topHeight)
                 SplitHandle(drag: $drag, total: height, band: band, top: top, bottom: bottom)
                     .frame(height: band)
-                card(bottom, shape: UnevenRoundedRectangle(topLeadingRadius: corner, topTrailingRadius: corner))
-                    .frame(maxHeight: .infinity)
+                Group {
+                    if let bottom {
+                        card(bottom, shape: UnevenRoundedRectangle(topLeadingRadius: corner, topTrailingRadius: corner))
+                    } else {
+                        SplitPicker(top: top)
+                            .clipShape(UnevenRoundedRectangle(topLeadingRadius: corner, topTrailingRadius: corner))
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                }
+                .frame(maxHeight: .infinity)
             }
             .animation(.snappy(duration: 0.2), value: browser.selectedID)
         }
@@ -822,7 +844,7 @@ private struct SplitHandle: View {
     let total: CGFloat
     let band: CGFloat
     let top: BrowserTab
-    let bottom: BrowserTab
+    let bottom: BrowserTab?
     @State private var settled = 0
 
     var body: some View {
@@ -832,6 +854,8 @@ private struct SplitHandle: View {
             }
             .buttonStyle(GlyphButtonStyle())
             .accessibilityLabel("Swap the halves")
+            .opacity(bottom == nil ? 0 : 1)
+            .disabled(bottom == nil)
             Spacer()
             Capsule()
                 .fill(.white.opacity(0.42))
@@ -868,6 +892,79 @@ private struct SplitHandle: View {
         .sensoryFeedback(.impact(weight: .light), trigger: settled)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Split View handle")
+    }
+}
+
+/// Split View's bottom half before it has a page: what goes here, as a
+/// search field that opens the bar, and your other open tabs to tap.
+private struct SplitPicker: View {
+    @Environment(BrowserModel.self) private var browser
+    let top: BrowserTab
+
+    private var others: [BrowserTab] {
+        browser.tabs
+            .filter { $0.id != top.id && $0.isPrivate == top.isPrivate && $0.url != nil }
+            .sorted { $0.lastActive > $1.lastActive }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("Open below")
+                    .font(.system(size: 22, weight: .semibold))
+                    .padding(.top, 22)
+
+                Button { browser.pickSplitPage() } label: {
+                    HStack(spacing: 12) {
+                        Glyph(.search, size: 19).foregroundStyle(Theme.secondaryInk)
+                        Text(top.isPrivate ? "Private search or address" : "Search or enter address")
+                            .font(.system(size: 17))
+                            .foregroundStyle(Theme.secondaryInk)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(height: 52)
+                    .background(Theme.raised, in: .rect(cornerRadius: 18))
+                    .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.edge))
+                    .contentShape(.rect)
+                }
+                .buttonStyle(RowButtonStyle())
+
+                if !others.isEmpty {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Open tabs")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Theme.secondaryInk)
+                            .padding(.bottom, 6)
+                        ForEach(others.prefix(8)) { tab in
+                            Button { browser.startSplit(with: tab) } label: {
+                                HStack(spacing: 12) {
+                                    SiteIcon(host: tab.url?.displayHost ?? "", size: 22)
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(tab.displayTitle).font(.system(size: 16))
+                                        Text(tab.url?.displayHost ?? "")
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(Theme.secondaryInk)
+                                    }
+                                    .lineLimit(1)
+                                    Spacer()
+                                }
+                                .padding(.vertical, 9)
+                                .contentShape(.rect)
+                            }
+                            .buttonStyle(RowButtonStyle())
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            // Clear of the floating bar.
+            .padding(.bottom, Theme.barHeight + 40)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .foregroundStyle(Theme.ink)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.canvas)
     }
 }
 
