@@ -220,6 +220,8 @@ final class ContentBlocker {
         // Only the blocker's own handler: page translation keeps its own.
         controller.removeScriptMessageHandler(forName: CosmeticFilter.handlerName, contentWorld: CosmeticFilter.world)
         controller.removeScriptMessageHandler(forName: ConsentHandler.handlerName, contentWorld: ConsentHandler.world)
+        // Not blocking, so it stays on sites you allow too.
+        if let script = BackgroundPlay.script { controller.addUserScript(script) }
         guard !allowed else { return }
 
         for category in Category.allCases where isEnabled(category) {

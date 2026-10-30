@@ -157,6 +157,8 @@ final class BrowserModel {
         // spare for the next new tab once launch has settled, not during it.
         WebViewFactory.prewarm()
         restoreTabs()
+        // YouTube plays on as sound when roko leaves the screen.
+        BackgroundPlay.watch { [weak self] in self?.tabs.compactMap(\.webView) ?? [] }
         // A Notify Me notification opens its page.
         NotificationRouter.shared.open = { [weak self] url in self?.handleLink(url) }
         Parking.shared.say = { [weak self] message in self?.showToast(message) }

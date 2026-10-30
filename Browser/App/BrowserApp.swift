@@ -33,6 +33,8 @@ struct BrowserApp: App {
                 .onOpenURL { browser.handleLink($0) }
                 .task {
                     Appearance.apply()
+                    // Pages' sound plays on with roko in the background.
+                    BackgroundPlay.prepareSession()
                     // Links sent from the Mac open as tabs.
                     RokoSync.openLink = { [browser] url in browser.open(url, inNewTab: true) }
                 }

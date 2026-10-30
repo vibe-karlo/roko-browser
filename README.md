@@ -35,7 +35,7 @@ that you don't want (a sticky bar, a "Join" button, a promo row) goes with Hide 
 the page menu: tap it, tap it again, and it stays gone on that site.
 
 **And the rest.** Today's weather, news and to-dos on a new tab, to-dos synced with Apple
-Reminders, Home Screen widgets, pages translated into the languages you choose, and a count of
+Reminders, YouTube playing on as sound with roko closed, Home Screen widgets, pages translated into the languages you choose, and a count of
 the time all this has saved you.
 
 <p>
@@ -555,6 +555,14 @@ first. Files a page hands over (`Content-Disposition: attachment`, a `download` 
 WebKit can't show) download to a temporary folder and open in the share sheet, or in Wallet for a
 `.pkpass`. The delegate methods there are `@objc`: WebKit finds them by selector, and they sit
 outside the extension that declares the conformance.
+
+YouTube keeps playing as sound with roko in the background or the iPhone locked
+(`BackgroundPlay`). roko has the audio background mode and a playback audio session. Two pauses
+are undone: YouTube's own when its page goes out of view (background-play.js, in the page's
+world, tells it the page is still in view), and WebKit's, which stops every video with sound as
+the app leaves the screen. A play asked for just after that is allowed, so roko notes on
+willResignActive which YouTube page was playing and, on didEnterBackground, asks that one to
+play on. The Dynamic Island and the Lock Screen get Now Playing from WebKit itself.
 
 ## Parking
 

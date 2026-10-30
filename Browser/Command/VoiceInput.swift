@@ -188,6 +188,7 @@ final class VoiceInput {
         for ear in ears { ear.task?.cancel() }
         ears = []
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        BackgroundPlay.prepareSession()
         return text
     }
 

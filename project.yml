@@ -52,7 +52,8 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         # Notify Me: iOS wakes roko now and then to check watched pages.
         # iCloud sync: silent pushes bring other devices' changes.
-        UIBackgroundModes: [fetch, remote-notification]
+        # YouTube plays on as sound with roko in the background (BackgroundPlay).
+        UIBackgroundModes: [audio, fetch, remote-notification]
         BGTaskSchedulerPermittedIdentifiers: [com.growthstudio.roko.watch, com.growthstudio.roko.today]
         # Today: the weather where you are, and what's on your calendar.
         NSMicrophoneUsageDescription: Hold + and speak to search, open a site or add a to-do. The microphone is on only while you hold it.
