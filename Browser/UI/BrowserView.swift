@@ -49,6 +49,9 @@ struct BrowserView: View {
                     .animation(.snappy(duration: 0.3), value: browser.liveItems.isEmpty)
                     .animation(.snappy(duration: 0.25), value: browser.bandShowsStrip)
                 }
+                // Turned sideways, edge to edge: no blank strips beside the
+                // Dynamic Island. Each page keeps its text clear of it itself.
+                .ignoresSafeArea(edges: .horizontal)
             } else {
                 StartView()
                     // The bar floats over the page; the start page keeps clear of it.
@@ -249,6 +252,7 @@ struct BrowserView: View {
         .animation(.snappy(duration: 0.3), value: browser.appOffer?.url)
         .modifier(PageExtras(browser: browser, showsPlayer: showsPlayer, playerLift: playerLift))
         .modifier(CopiedLinkWatch(browser: browser))
+        .modifier(WelcomeCover(browser: browser))
         // Handoff: continue this page on a Mac or iPad.
         .userActivity(NSUserActivityTypeBrowsingWeb, element: browser.handoffPage) { page, activity in
             activity.webpageURL = page.url
@@ -327,7 +331,7 @@ struct BrowserView: View {
             browser.refreshLive()
             if browser.isBarCollapsed { browser.isBarCollapsed = false }
             // The first time on a new day: Today first.
-            if TodayModel.shouldOpenNow(), browser.panel == .none, browser.summary == nil, browser.browseForMe == nil {
+            if !browser.showsOnboarding, TodayModel.shouldOpenNow(), browser.panel == .none, browser.summary == nil, browser.browseForMe == nil {
                 browser.panel = .today
                 return
             }
@@ -385,6 +389,7 @@ struct BrowserView: View {
     /// Text that reads on whatever is behind the status bar.
     private var statusBarStyle: UIStatusBarStyle {
         // The summary and Browse for Me sit on the app's own canvas.
+        if browser.showsOnboarding { return .lightContent }  // the welcome is always dark
         if browser.summary != nil || browser.browseForMe != nil || browser.panel == .todos || browser.panel == .today
             || browser.panel == .shopping || browser.panel == .readLater || browser.digest != nil {
             return .default
@@ -509,7 +514,7 @@ private struct LoadErrorView: View {
 
 /// roko's eclipse with its inner disc moved along: 0 left of where the app
 /// icon has it, 1 right of it, so the mark seems to pass through an eclipse.
-nonisolated private struct Eclipse: Shape {
+nonisolated struct Eclipse: Shape {
     var shift: Double
     var animatableData: Double {
         get { shift }
@@ -804,30 +809,51 @@ private struct SplitPages: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let height = proxy.size.height + proxy.safeAreaInsets.bottom
-            let topHeight = min(max(height * browser.splitFraction + drag, 0), height - band)
-            VStack(spacing: 0) {
-                card(top, shape: UnevenRoundedRectangle(bottomLeadingRadius: corner, bottomTrailingRadius: corner))
-                    .frame(height: topHeight)
-                SplitHandle(drag: $drag, total: height, band: band, top: top, bottom: bottom)
-                    .frame(height: band)
-                Group {
-                    if let bottom {
-                        card(bottom, shape: UnevenRoundedRectangle(topLeadingRadius: corner, topTrailingRadius: corner))
-                    } else {
-                        SplitPicker(top: top)
-                            .clipShape(UnevenRoundedRectangle(topLeadingRadius: corner, topTrailingRadius: corner))
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
+            // Turned sideways, the halves sit side by side: the first on the left.
+            let sideBySide = proxy.size.width > proxy.size.height
+            let length = sideBySide ? proxy.size.width : proxy.size.height + proxy.safeAreaInsets.bottom
+            let first = min(max(length * browser.splitFraction + drag, 0), length - band)
+            Group {
+                if sideBySide {
+                    HStack(spacing: 0) {
+                        card(top, shape: UnevenRoundedRectangle(bottomTrailingRadius: corner, topTrailingRadius: corner))
+                            .frame(width: first)
+                        SplitHandle(drag: $drag, total: length, band: band, sideways: true, top: top, bottom: bottom)
+                            .frame(width: band)
+                        second(UnevenRoundedRectangle(topLeadingRadius: corner, bottomLeadingRadius: corner), from: .trailing)
+                    }
+                } else {
+                    VStack(spacing: 0) {
+                        card(top, shape: UnevenRoundedRectangle(bottomLeadingRadius: corner, bottomTrailingRadius: corner))
+                            .frame(height: first)
+                        SplitHandle(drag: $drag, total: length, band: band, top: top, bottom: bottom)
+                            .frame(height: band)
+                        second(UnevenRoundedRectangle(topLeadingRadius: corner, topTrailingRadius: corner), from: .bottom)
                     }
                 }
-                .frame(maxHeight: .infinity)
             }
+            .frame(width: proxy.size.width, height: proxy.size.height + (sideBySide ? 0 : proxy.safeAreaInsets.bottom), alignment: .top)
             .animation(.snappy(duration: 0.2), value: browser.selectedID)
         }
         // Black between and under the cards, not behind the status bar: that
         // band keeps the top page's colour, so the clock stays readable.
         .background(Color.black.ignoresSafeArea(edges: .bottom))
         .ignoresSafeArea(edges: .bottom)
+    }
+
+    /// The second half: its page, or the card that asks for one.
+    @ViewBuilder
+    private func second(_ shape: some Shape, from edge: Edge) -> some View {
+        Group {
+            if let bottom {
+                card(bottom, shape: shape)
+            } else {
+                SplitPicker(top: top, beside: edge == .trailing)
+                    .clipShape(shape)
+                    .transition(.move(edge: edge).combined(with: .opacity))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func card(_ tab: BrowserTab, shape: some Shape) -> some View {
@@ -839,46 +865,62 @@ private struct SplitPages: View {
     }
 }
 
-/// The band between the halves: swap on the left, the grip in the middle,
-/// close on the right, and the whole band drags.
+/// The band between the halves: swap at one end, the grip in the middle,
+/// close at the other, and the whole band drags. Upright between stacked
+/// halves when the iPhone is turned sideways.
 private struct SplitHandle: View {
     @Environment(BrowserModel.self) private var browser
     @Binding var drag: CGFloat
     let total: CGFloat
     let band: CGFloat
+    var sideways = false
     let top: BrowserTab
     let bottom: BrowserTab?
     @State private var settled = 0
 
+    private var close: some View {
+        Button { browser.endSplit() } label: {
+            Glyph(.close, size: 16)
+                .frame(width: sideways ? band : 52, height: sideways ? 44 : band)
+                .contentShape(.rect)
+        }
+        .buttonStyle(GlyphButtonStyle())
+        .accessibilityLabel("Close Split View")
+    }
+
     var body: some View {
-        HStack(spacing: 0) {
+        let layout = sideways ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
+        layout {
             Button { browser.swapSplit() } label: {
-                Glyph(.swap, size: 17).frame(width: 52, height: band).contentShape(.rect)
+                Glyph(.swap, size: 17)
+                    .rotationEffect(.degrees(sideways ? 90 : 0))
+                    .frame(width: sideways ? band : 52, height: sideways ? 52 : band)
+                    .contentShape(.rect)
             }
             .buttonStyle(GlyphButtonStyle())
             .accessibilityLabel("Swap the halves")
             .opacity(bottom == nil ? 0 : 1)
             .disabled(bottom == nil)
+            // Upright, close goes under swap at the top: at the bottom the bar would cover it.
+            if sideways { close }
             Spacer()
             Capsule()
                 .fill(.white.opacity(0.42))
-                .frame(width: 46, height: 5)
+                .frame(width: sideways ? 5 : 46, height: sideways ? 46 : 5)
             Spacer()
-            Button { browser.endSplit() } label: {
-                Glyph(.close, size: 16).frame(width: 52, height: band).contentShape(.rect)
-            }
-            .buttonStyle(GlyphButtonStyle())
-            .accessibilityLabel("Close Split View")
+            if !sideways { close }
         }
-        .padding(.horizontal, 8)
-        .frame(maxWidth: .infinity)
+        .padding(sideways ? .vertical : .horizontal, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .foregroundStyle(.white.opacity(0.85))
         .contentShape(.rect)
         .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
-            .onChanged { drag = $0.translation.height }
+            .onChanged { drag = sideways ? $0.translation.width : $0.translation.height }
             .onEnded { value in
-                let here = browser.splitFraction + value.translation.height / total
-                let thrown = browser.splitFraction + value.predictedEndTranslation.height / total
+                let moved = sideways ? value.translation.width : value.translation.height
+                let thrownBy = sideways ? value.predictedEndTranslation.width : value.predictedEndTranslation.height
+                let here = browser.splitFraction + moved / total
+                let thrown = browser.splitFraction + thrownBy / total
                 withAnimation(.spring(duration: 0.32, bounce: 0.12)) {
                     drag = 0
                     if here < 0.12 || thrown < 0.04 {
@@ -903,6 +945,8 @@ private struct SplitHandle: View {
 private struct SplitPicker: View {
     @Environment(BrowserModel.self) private var browser
     let top: BrowserTab
+    /// Side by side (the iPhone turned): it opens beside, not below.
+    var beside = false
 
     private var others: [BrowserTab] {
         browser.tabs
@@ -913,7 +957,7 @@ private struct SplitPicker: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Text("Open below")
+                Text(beside ? "Open beside" : "Open below")
                     .font(.system(size: 22, weight: .semibold))
                     .padding(.top, 22)
 
@@ -971,3 +1015,19 @@ private struct SplitPicker: View {
     }
 }
 
+/// The first time roko opens, over everything. Kept apart so the browser's
+/// body stays small enough for the compiler.
+private struct WelcomeCover: ViewModifier {
+    let browser: BrowserModel
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                if browser.showsOnboarding {
+                    Onboarding()
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeOut(duration: 0.35), value: browser.showsOnboarding)
+    }
+}

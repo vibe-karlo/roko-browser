@@ -158,6 +158,11 @@ extension View {
     func settingsPage(_ title: String) -> some View {
         scrollContentBackground(.hidden)
             .background(Theme.panel)
+            // Rows scrolled up go under a bar of the page's own colour, with
+            // room above the first one, rather than right up against the title.
+            .contentMargins(.top, 12, for: .scrollContent)
+            .toolbarBackground(Theme.panel, for: .navigationBar)
+            .toolbarBackgroundVisibility(.visible, for: .navigationBar)
             .navigationTitle(title)
     }
 }
@@ -917,6 +922,7 @@ private struct NotificationSettings: View {
 }
 
 private struct AboutSettings: View {
+    @Environment(BrowserModel.self) private var browser
     static var version: String {
         let info = Bundle.main.infoDictionary
         return (info?["CFBundleShortVersionString"] as? String ?? "") + " (\(info?["CFBundleVersion"] as? String ?? ""))"
@@ -935,6 +941,11 @@ private struct AboutSettings: View {
         Form {
             Section {
                 LabeledContent("Version", value: Self.version)
+                Button("Show the Welcome Again") {
+                    browser.panel = .none
+                    browser.showsOnboarding = true
+                }
+                .foregroundStyle(Theme.ink)
             }
             Section {
                 ForEach(credits, id: \.0) { credit in

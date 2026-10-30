@@ -262,7 +262,8 @@ final class BrowserModel {
             // not on the first keystroke.
             _ = Calculator.answer("1 km + 1")
         }
-        if tabs.isEmpty { panel = .command }
+        // The bar (and its keyboard) waits for the welcome to finish.
+        if tabs.isEmpty, !showsOnboarding { panel = .command }
     }
 
     /// Launch housekeeping, once things are quiet: pictures of tabs that are
@@ -459,6 +460,21 @@ final class BrowserModel {
         }
         self.preloaded = nil
         return preloaded.tab
+    }
+
+    // MARK: Welcome
+
+    /// The first time roko opens (or when asked for again in Settings).
+    var showsOnboarding = !UserDefaults.standard.bool(forKey: Onboarding.doneKey)
+        || ProcessInfo.processInfo.arguments.contains("-onboarding")
+
+    /// Done or skipped: straight into the bar, ready to type.
+    func finishOnboarding() {
+        showsOnboarding = false
+        Task {
+            try? await Task.sleep(for: .milliseconds(350))
+            showCommandBar()
+        }
     }
 
     // MARK: Peek
