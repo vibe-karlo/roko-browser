@@ -596,10 +596,12 @@ final class BrowserModel {
     var liveItems: [LiveItem] {
         _ = liveClock
         var items: [LiveItem] = []
-        if let tab = playerTab { items.append(.media(tab)) }
-        if let session = Parking.shared.active, hiddenParking != session.startedAt { items.append(.parking(session)) }
+        if Preferences.bandMedia, let tab = playerTab { items.append(.media(tab)) }
+        if Preferences.bandParking, let session = Parking.shared.active, hiddenParking != session.startedAt {
+            items.append(.parking(session))
+        }
         // Each to-do due is a page of its own, soonest first.
-        items += dueTodos.filter { !$0.done }.map { .todo($0) }
+        if Preferences.bandDue { items += dueTodos.filter { !$0.done }.map { .todo($0) } }
         // Then the rest of today, quietly.
         if Preferences.bandToday, !todayHidden { items += todayTodos.filter { !$0.done }.map { .today($0) } }
         return items

@@ -337,6 +337,10 @@ private struct TabsSettings: View {
     @AppStorage(Preferences.linkPeekKey) private var linkPeek = true
     @AppStorage(Preferences.swipeAnywhereKey) private var swipeAnywhere = true
     @AppStorage(Preferences.pinchForTabsKey) private var pinchForTabs = true
+    @AppStorage(Preferences.bandMediaKey) private var bandMedia = true
+    @AppStorage(Preferences.bandParkingKey) private var bandParking = true
+    @AppStorage(Preferences.bandDueKey) private var bandDue = true
+    @AppStorage(Preferences.bandTodayKey) private var bandToday = true
 
     var body: some View {
         Form {
@@ -364,7 +368,17 @@ private struct TabsSettings: View {
                 Toggle("Swipe anywhere to go back", isOn: $swipeAnywhere)
                 Toggle("Pinch a page to see your tabs", isOn: $pinchForTabs)
             } footer: {
-                Text("Peek: touch and hold a link to read and scroll the page before opening it. Swipe: back or forward from anywhere on a page, not just its edge.")
+                Text("Peek: touch and hold a link to see its page before opening it, open it in the background or add it to Read Later. Swipe: back or forward from anywhere on a page, not just its edge.")
+            }
+            Section {
+                Toggle("Sound and video", isOn: $bandMedia)
+                Toggle("Parking", isOn: $bandParking)
+                Toggle("To-dos due soon", isOn: $bandDue)
+                Toggle("Today's to-dos", isOn: $bandToday)
+            } header: {
+                Text("Under the page")
+            } footer: {
+                Text("What shows in the band under the page: a player for sound in another tab, parking counting down, a to-do from an hour before its time, and the rest of today in a thin strip. With all off, the page has the whole screen.")
             }
         }
         .settingsPage("Tabs")
@@ -421,15 +435,8 @@ private struct TodaySettings: View {
 }
 
 private struct TodoSettings: View {
-    @AppStorage(Preferences.bandTodayKey) private var bandToday = true
-
     var body: some View {
         Form {
-            Section {
-                Toggle("Today's to-dos under the page", isOn: $bandToday)
-            } footer: {
-                Text("A thin strip under the page with what's left for today; tap it to go through them. A to-do with a time shows in full from an hour before.")
-            }
             Section {
                 RemindersRow()
             } footer: {

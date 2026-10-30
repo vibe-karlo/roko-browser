@@ -12,6 +12,9 @@ enum Preferences {
     static let swipeAnywhereKey = "gesture.swipeAnywhere"
     static let pinchForTabsKey = "gesture.pinchForTabs"
     static let bandTodayKey = "band.today"
+    static let bandMediaKey = "band.media"
+    static let bandParkingKey = "band.parking"
+    static let bandDueKey = "band.due"
 
     private static func on(_ key: String) -> Bool {
         UserDefaults.standard.object(forKey: key) as? Bool ?? true
@@ -27,6 +30,12 @@ enum Preferences {
     static var linkPeek: Bool { on(linkPeekKey) }
     /// A sideways swipe anywhere on a page goes back or forward.
     static var swipeAnywhere: Bool { on(swipeAnywhereKey) }
+    /// Under the page: sound and video playing in another tab.
+    static var bandMedia: Bool { on(bandMediaKey) }
+    /// Under the page: paid parking counting down.
+    static var bandParking: Bool { on(bandParkingKey) }
+    /// Under the page: a to-do from an hour before its time.
+    static var bandDue: Bool { on(bandDueKey) }
     /// Today's to-dos in a thin strip under the page.
     static var bandToday: Bool { on(bandTodayKey) }
     /// Pinching a page in shows the tab switcher.

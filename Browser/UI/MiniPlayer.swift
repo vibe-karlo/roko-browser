@@ -69,6 +69,12 @@ struct LiveBand: View {
                 if up { browser.expandBand() } else if down, items.indices.contains(page) { browser.dismissLive(items[page]) }
             } else if down {
                 browser.collapseBand()
+            } else if up, items.indices.contains(page) {
+                // Up on a to-do: the whole list.
+                switch items[page] {
+                case .todo, .today: browser.panel = .todos
+                default: break
+                }
             }
         }
     }
