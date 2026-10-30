@@ -35,8 +35,8 @@ struct BrowserView: View {
                         pages
                             .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: showsPlayer ? 22 : 0,
                                                               bottomTrailingRadius: showsPlayer ? 22 : 0))
-                        if let playing = browser.playerTab {
-                            PlayerBand(tab: playing)
+                        if !browser.liveItems.isEmpty {
+                            LiveBand()
                                 .padding(.bottom, proxy.safeAreaInsets.bottom)
                                 .transition(.move(edge: .bottom))
                         }
@@ -44,8 +44,8 @@ struct BrowserView: View {
                     // Only below: the status bar's strip keeps the page's colour.
                     .background { (showsPlayer ? Color.black : Color.clear).ignoresSafeArea(edges: .bottom) }
                     .ignoresSafeArea(edges: .bottom)
-                    .animation(.snappy(duration: 0.3), value: browser.playerTab?.id)
-                    .animation(.snappy(duration: 0.25), value: browser.playerMinimized)
+                    .animation(.snappy(duration: 0.3), value: browser.liveItems.isEmpty)
+                    .animation(.snappy(duration: 0.25), value: browser.bandMinimized)
                 }
             } else {
                 StartView()
@@ -72,7 +72,7 @@ struct BrowserView: View {
                 // risen above it, the bar sat on top of the form being filled in.
                 .ignoresSafeArea(.keyboard, edges: .bottom)
                 // Above the player's band when there is one.
-                .padding(.bottom, showsPlayer ? PlayerBand.height(minimized: browser.playerMinimized) : 0)
+                .padding(.bottom, showsPlayer ? LiveBand.height(minimized: browser.bandMinimized) : 0)
                 .animation(.snappy(duration: 0.3), value: showsPlayer)
         }
         .overlay {
@@ -322,6 +322,7 @@ struct BrowserView: View {
             WidgetBridge.applyTicks()
             WidgetBridge.update()
             TodoAlerts.update()
+            browser.refreshLive()
             if browser.isBarCollapsed { browser.isBarCollapsed = false }
             // The first time on a new day: Today first.
             if TodayModel.shouldOpenNow(), browser.panel == .none, browser.summary == nil, browser.browseForMe == nil {
@@ -356,10 +357,10 @@ struct BrowserView: View {
 
     /// The mini player shows over the page and the bar, not over a panel or a screen of roko's own.
     private var showsPlayer: Bool {
-        browser.playerTab != nil && browser.selectedTab != nil
+        !browser.liveItems.isEmpty && browser.selectedTab != nil
     }
 
-    private var playerLift: CGFloat { showsPlayer ? PlayerBand.height(minimized: browser.playerMinimized) : 0 }
+    private var playerLift: CGFloat { showsPlayer ? LiveBand.height(minimized: browser.bandMinimized) : 0 }
 
     private var splitHalves: (top: BrowserTab, bottom: BrowserTab?)? {
         if let split = browser.split, let top = browser.tab(split.top), let bottom = browser.tab(split.bottom) {

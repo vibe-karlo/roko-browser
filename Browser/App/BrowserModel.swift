@@ -32,7 +32,10 @@ final class BrowserModel {
 
     private(set) var tabs: [BrowserTab] = []
     private(set) var selectedID: BrowserTab.ID?
-    var panel: Panel = .none
+    var panel: Panel = .none {
+        // Back from the to-do list or the bar (a to-do added there): what's due may have changed.
+        didSet { if [.todos, .command].contains(oldValue), panel != oldValue { refreshLive() } }
+    }
     var commandPrefill = ""
     var commandMode: CommandMode = .newTab
     var launcherContext: LauncherContext = .web
@@ -233,6 +236,8 @@ final class BrowserModel {
         restoreTabs()
         // Downloads resume in a live tab's web view.
         Downloads.shared.liveWebViews = { [weak self] in self?.tabs.compactMap(\.webView) ?? [] }
+        // The band under the page: parking and what's due, kept current.
+        startLiveTicker()
         // Ask roko, over text selected on a page.
         EdgeToEdgeWebView.ask = { [weak self] text in self?.browse(for: text) }
         // YouTube plays on as sound when roko leaves the screen.
@@ -555,14 +560,95 @@ final class BrowserModel {
         }
     }
 
-    /// Pulled down: a thin strip that keeps playing; a tap brings it back.
-    var playerMinimized = false
-
     /// Closed: paused, and gone until it plays again.
     func closePlayer(_ tab: BrowserTab) {
-        playerMinimized = false
         tab.playerDismissed = true
         Task { _ = await PageWatch.call(tab.webView, "pause") }
+    }
+
+    // MARK: Live band
+
+    /// What's going on right now, in the band under the page: sound playing in
+    /// another tab, parking counting down, a to-do due within the hour.
+    enum LiveItem: Identifiable {
+        case media(BrowserTab)
+        case parking(Parking.Session)
+        case todo(Todo)
+
+        var id: String {
+            switch self {
+            case .media(let tab): "media-\(tab.id)"
+            case .parking(let session): "parking-\(session.startedAt.timeIntervalSince1970)"
+            case .todo(let todo): "todo-\(todo.persistentModelID.hashValue)"
+            }
+        }
+    }
+
+    var liveItems: [LiveItem] {
+        _ = liveClock
+        var items: [LiveItem] = []
+        if let tab = playerTab { items.append(.media(tab)) }
+        if let session = Parking.shared.active, hiddenParking != session.startedAt { items.append(.parking(session)) }
+        if let todo = dueTodo, !todo.done { items.append(.todo(todo)) }
+        return items
+    }
+
+    /// Which of them the band shows, swiped sideways.
+    var livePage = 0
+    /// Pulled down: a thin strip, still live; a tap brings the band back.
+    var bandMinimized = false
+    /// Moves on twice a minute, so what's due comes and goes by itself.
+    private(set) var liveClock = Date.now
+    private(set) var dueTodo: Todo?
+    /// Parking put away from the band (by when it started); a new session shows again.
+    private var hiddenParking: Date?
+    @ObservationIgnored private var dismissedTodos = Set<PersistentIdentifier>()
+    @ObservationIgnored private var liveTicker: Task<Void, Never>?
+
+    /// The to-do with a time from half an hour ago to an hour from now, soonest first.
+    func refreshLive() {
+        liveClock = .now
+        guard let context else { return }
+        let now = Date.now
+        let todos = (try? context.fetch(FetchDescriptor<Todo>(predicate: #Predicate { !$0.done && $0.time != nil }))) ?? []
+        dueTodo = todos
+            .filter { todo in
+                guard let time = todo.time, !dismissedTodos.contains(todo.persistentModelID) else { return false }
+                return time > now.addingTimeInterval(-30 * 60) && time < now.addingTimeInterval(60 * 60)
+            }
+            .min { ($0.time ?? .distantFuture) < ($1.time ?? .distantFuture) }
+    }
+
+    func startLiveTicker() {
+        liveTicker?.cancel()
+        refreshLive()
+        liveTicker = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                self?.refreshLive()
+            }
+        }
+    }
+
+    /// Off the band: sound pauses; parking and a to-do just leave it.
+    func dismissLive(_ item: LiveItem) {
+        bandMinimized = false
+        switch item {
+        case .media(let tab): closePlayer(tab)
+        case .parking(let session): hiddenParking = session.startedAt
+        case .todo(let todo):
+            dismissedTodos.insert(todo.persistentModelID)
+            refreshLive()
+        }
+    }
+
+    /// Ticked off from the band.
+    func complete(_ todo: Todo) {
+        todo.done = true
+        todo.doneAt = .now
+        try? context?.save()
+        showToast("Done: \(todo.title)")
+        refreshLive()
     }
 
     // MARK: Hide Distracting Items
