@@ -233,6 +233,7 @@ private struct MediaRow: View {
                 .frame(width: 32, height: 32)
                 .background(.white.opacity(0.1), in: .circle)
                 .accessibilityLabel("AirPlay")
+            CollapseButton()
         }
         .padding(.horizontal, 16)
         .frame(maxHeight: .infinity)
@@ -287,6 +288,7 @@ private struct ParkingRow: View {
                 }
                 .accessibilityLabel("Add an hour")
             }
+            CollapseButton()
         }
         .padding(.horizontal, 16)
         .frame(maxHeight: .infinity)
@@ -329,9 +331,7 @@ private struct TodoRow: View {
                     Text(when(context.date))
                 }
             }
-            roundButton("Open To-do", action: { browser.panel = .todos }) {
-                Glyph(.todo, size: 16)
-            }
+            CollapseButton()
         }
         .padding(.horizontal, 16)
         .frame(maxHeight: .infinity)
@@ -342,6 +342,23 @@ private struct TodoRow: View {
     private func tick() {
         withAnimation(.snappy(duration: 0.2)) { ticked = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { browser.complete(todo) }
+    }
+}
+
+/// Folds the band into its thin strip: the same as pulling it down, which
+/// near the bottom edge iOS can take for Reachability.
+private struct CollapseButton: View {
+    @Environment(BrowserModel.self) private var browser
+
+    var body: some View {
+        Button { withAnimation(.snappy(duration: 0.25)) { browser.collapseBand() } } label: {
+            Image(systemName: "chevron.down")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white.opacity(0.55))
+                .frame(width: 24, height: 44)
+                .contentShape(.rect)
+        }
+        .accessibilityLabel("Make the band smaller")
     }
 }
 

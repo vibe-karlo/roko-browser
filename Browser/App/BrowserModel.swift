@@ -640,7 +640,7 @@ final class BrowserModel {
     @ObservationIgnored private var dismissedTodos = Set<PersistentIdentifier>()
     @ObservationIgnored private var liveTicker: Task<Void, Never>?
 
-    /// The to-dos with a time from half an hour ago to an hour from now, soonest first.
+    /// The to-dos whose time is within the next hour, soonest first.
     func refreshLive() {
         liveClock = .now
         guard let context else { return }
@@ -649,7 +649,8 @@ final class BrowserModel {
         dueTodos = todos
             .filter { todo in
                 guard let time = todo.time, !dismissedTodos.contains(todo.persistentModelID) else { return false }
-                return time > now.addingTimeInterval(-30 * 60) && time < now.addingTimeInterval(60 * 60)
+                // From an hour before its time until its time; after that it's overdue, in the strip.
+                return time > now && time < now.addingTimeInterval(60 * 60)
             }
             .sorted { ($0.time ?? .distantFuture) < ($1.time ?? .distantFuture) }
         let due = Set(dueTodos.map(\.persistentModelID))
