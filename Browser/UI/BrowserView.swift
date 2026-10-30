@@ -45,7 +45,7 @@ struct BrowserView: View {
                     .background { (showsPlayer ? Color.black : Color.clear).ignoresSafeArea(edges: .bottom) }
                     .ignoresSafeArea(edges: .bottom)
                     .animation(.snappy(duration: 0.3), value: browser.liveItems.isEmpty)
-                    .animation(.snappy(duration: 0.25), value: browser.bandMinimized)
+                    .animation(.snappy(duration: 0.25), value: browser.bandShowsStrip)
                 }
             } else {
                 StartView()
@@ -72,7 +72,7 @@ struct BrowserView: View {
                 // risen above it, the bar sat on top of the form being filled in.
                 .ignoresSafeArea(.keyboard, edges: .bottom)
                 // Above the player's band when there is one.
-                .padding(.bottom, showsPlayer ? LiveBand.height(minimized: browser.bandMinimized) : 0)
+                .padding(.bottom, showsPlayer ? LiveBand.height(minimized: browser.bandShowsStrip) : 0)
                 .animation(.snappy(duration: 0.3), value: showsPlayer)
         }
         .overlay {
@@ -360,7 +360,7 @@ struct BrowserView: View {
         !browser.liveItems.isEmpty && browser.selectedTab != nil
     }
 
-    private var playerLift: CGFloat { showsPlayer ? LiveBand.height(minimized: browser.bandMinimized) : 0 }
+    private var playerLift: CGFloat { showsPlayer ? LiveBand.height(minimized: browser.bandShowsStrip) : 0 }
 
     private var splitHalves: (top: BrowserTab, bottom: BrowserTab?)? {
         if let split = browser.split, let top = browser.tab(split.top), let bottom = browser.tab(split.bottom) {

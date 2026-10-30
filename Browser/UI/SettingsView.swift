@@ -421,8 +421,15 @@ private struct TodaySettings: View {
 }
 
 private struct TodoSettings: View {
+    @AppStorage(Preferences.bandTodayKey) private var bandToday = true
+
     var body: some View {
         Form {
+            Section {
+                Toggle("Today's to-dos under the page", isOn: $bandToday)
+            } footer: {
+                Text("A thin strip under the page with what's left for today; tap it to go through them. A to-do with a time shows in full from an hour before.")
+            }
             Section {
                 RemindersRow()
             } footer: {

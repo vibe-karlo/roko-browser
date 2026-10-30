@@ -574,13 +574,22 @@ final class BrowserModel {
         case media(BrowserTab)
         case parking(Parking.Session)
         case todo(Todo)
+        /// Today's (or overdue), not due yet: quiet, in the thin strip until asked for.
+        case today(Todo)
 
         var id: String {
             switch self {
             case .media(let tab): "media-\(tab.id)"
             case .parking(let session): "parking-\(session.startedAt.timeIntervalSince1970)"
             case .todo(let todo): "todo-\(todo.persistentModelID.hashValue)"
+            case .today(let todo): "today-\(todo.persistentModelID.hashValue)"
             }
+        }
+
+        /// Asks for the full band by itself: everything but today's quiet to-dos.
+        var isLoud: Bool {
+            if case .today = self { return false }
+            return true
         }
     }
 
@@ -591,7 +600,24 @@ final class BrowserModel {
         if let session = Parking.shared.active, hiddenParking != session.startedAt { items.append(.parking(session)) }
         // Each to-do due is a page of its own, soonest first.
         items += dueTodos.filter { !$0.done }.map { .todo($0) }
+        // Then the rest of today, quietly.
+        if Preferences.bandToday, !todayHidden { items += todayTodos.filter { !$0.done }.map { .today($0) } }
         return items
+    }
+
+    /// Only today's quiet to-dos and not opened: the band stays a thin strip.
+    var bandShowsStrip: Bool {
+        bandMinimized || (!liveItems.contains(where: \.isLoud) && !todayExpanded)
+    }
+
+    /// The thin strip opened into the band.
+    func expandBand() {
+        if liveItems.contains(where: \.isLoud) { bandMinimized = false } else { todayExpanded = true }
+    }
+
+    /// The band pulled down into the strip.
+    func collapseBand() {
+        if liveItems.contains(where: \.isLoud) { bandMinimized = true } else { todayExpanded = false }
     }
 
     /// Which of them the band shows, swiped sideways.
@@ -601,6 +627,12 @@ final class BrowserModel {
     /// Moves on twice a minute, so what's due comes and goes by itself.
     private(set) var liveClock = Date.now
     private(set) var dueTodos: [Todo] = []
+    /// The rest of today's to-dos (and overdue ones), timed ones first.
+    private(set) var todayTodos: [Todo] = []
+    /// Today's strip opened by a tap.
+    private var todayExpanded = false
+    /// Today's strip pulled away; back the next time roko opens.
+    private var todayHidden = false
     /// Parking put away from the band (by when it started); a new session shows again.
     private var hiddenParking: Date?
     @ObservationIgnored private var dismissedTodos = Set<PersistentIdentifier>()
@@ -618,6 +650,22 @@ final class BrowserModel {
                 return time > now.addingTimeInterval(-30 * 60) && time < now.addingTimeInterval(60 * 60)
             }
             .sorted { ($0.time ?? .distantFuture) < ($1.time ?? .distantFuture) }
+        let due = Set(dueTodos.map(\.persistentModelID))
+        let open = (try? context.fetch(FetchDescriptor<Todo>(predicate: #Predicate { !$0.done }))) ?? []
+        todayTodos = open
+            .filter { todo in
+                guard !due.contains(todo.persistentModelID), !dismissedTodos.contains(todo.persistentModelID) else { return false }
+                let section = TodoSection.of(todo, now: now)
+                return section == .today || section == .overdue
+            }
+            .sorted { a, b in
+                switch (a.time, b.time) {
+                case let (x?, y?): return x < y
+                case (_?, nil): return true
+                case (nil, _?): return false
+                default: return a.createdAt < b.createdAt
+                }
+            }
     }
 
     func startLiveTicker() {
@@ -640,6 +688,9 @@ final class BrowserModel {
         case .todo(let todo):
             dismissedTodos.insert(todo.persistentModelID)
             refreshLive()
+        case .today:
+            todayHidden = true
+            todayExpanded = false
         }
     }
 

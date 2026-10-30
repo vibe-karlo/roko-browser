@@ -17,7 +17,9 @@ struct LiveBand: View {
 
     private var items: [BrowserModel.LiveItem] { browser.liveItems }
     private var page: Int { min(browser.livePage, max(items.count - 1, 0)) }
-    private var minimized: Bool { browser.bandMinimized }
+    private var minimized: Bool { browser.bandShowsStrip }
+    /// Only today's quiet to-dos.
+    private var quiet: Bool { !items.contains(where: \.isLoud) }
 
     var body: some View {
         Group {
@@ -64,9 +66,9 @@ struct LiveBand: View {
             let down = dy > 30 || value.predictedEndTranslation.height > 110
             let up = dy < -15 || value.predictedEndTranslation.height < -60
             if minimized {
-                if up { browser.bandMinimized = false } else if down, items.indices.contains(page) { browser.dismissLive(items[page]) }
+                if up { browser.expandBand() } else if down, items.indices.contains(page) { browser.dismissLive(items[page]) }
             } else if down {
-                browser.bandMinimized = true
+                browser.collapseBand()
             }
         }
     }
@@ -92,14 +94,21 @@ struct LiveBand: View {
         switch item {
         case .media(let tab): MediaRow(tab: tab)
         case .parking(let session): ParkingRow(session: session)
-        case .todo(let todo): TodoRow(todo: todo)
+        case .todo(let todo), .today(let todo): TodoRow(todo: todo)
         }
     }
 
     /// Pulled down: still live, out of the way. Tap it for the band.
     private func strip(_ item: BrowserModel.LiveItem) -> some View {
-        Button { withAnimation(.snappy(duration: 0.25)) { browser.bandMinimized = false } } label: {
+        Button { withAnimation(.snappy(duration: 0.25)) { browser.expandBand() } } label: {
             HStack(spacing: 7) {
+                if quiet {
+                    // Today, at a glance: how many, and the first.
+                    Glyph(.todo, size: 13)
+                    Text(items.count == 1 ? "Today" : "Today · \(items.count)")
+                        .foregroundStyle(.white.opacity(0.55))
+                    if case .today(let todo) = item { Text(todo.title) }
+                } else {
                 switch item {
                 case .media(let tab):
                     Levels(playing: tab.media?.playing == true)
@@ -110,11 +119,12 @@ struct LiveBand: View {
                         Text("\(ParkingRow.left(until: session.endsAt, at: context.date)) left")
                             .monospacedDigit()
                     }
-                case .todo(let todo):
+                case .todo(let todo), .today(let todo):
                     Glyph(.todo, size: 13)
                     Text(todo.title)
                 }
-                if items.count > 1 {
+                }
+                if items.count > 1, !quiet {
                     Text("+\(items.count - 1)").foregroundStyle(.white.opacity(0.45))
                 }
                 Image(systemName: "chevron.up")
@@ -287,7 +297,11 @@ private struct TodoRow: View {
     @State private var ticked = false
 
     private func when(_ now: Date) -> String {
-        guard let time = todo.time else { return "Today" }
+        let overdue = TodoSection.of(todo, now: now) == .overdue
+        guard let time = todo.time else { return overdue ? "Overdue" : "Today" }
+        if overdue { return "Overdue, " + time.formatted(date: .abbreviated, time: .shortened) }
+        // Further off than the hour that brings it into the band by itself.
+        if time.timeIntervalSince(now) > 3600 { return "Today at " + time.formatted(date: .omitted, time: .shortened) }
         let minutes = Int((time.timeIntervalSince(now) / 60).rounded())
         let clock = time.formatted(date: .omitted, time: .shortened)
         if minutes > 0 { return "At \(clock), in \(minutes) min" }
