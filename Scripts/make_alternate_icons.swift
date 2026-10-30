@@ -93,7 +93,7 @@ func designed(_ name: String) -> String {
 
 /// Their order in the picker.
 let designedIcons = ["AppIcon-Ro", "AppIcon-RoOnOrange", "AppIcon-Octagon", "AppIcon-OctagonOnOrange",
-                     "AppIcon-Wordmark", "AppIcon-WordmarkOnOrange"]
+                     "AppIcon-Wordmark", "AppIcon-WordmarkOnOrange", "AppIcon-SunOrange"]
 
 func writeJSON(_ object: Any, to url: URL) {
     try! JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]).write(to: url)

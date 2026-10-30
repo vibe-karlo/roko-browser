@@ -1244,7 +1244,7 @@ private struct AppIconPicker: View {
                                 "AppIcon-Star", "AppIcon-StarOrange", "AppIcon-StarFlame",
                                 "AppIcon-ChevronsGraphite", "AppIcon-Plus", "AppIcon-RollingO",
                                 "AppIcon-Ro", "AppIcon-RoOnOrange", "AppIcon-Octagon", "AppIcon-OctagonOnOrange",
-                                "AppIcon-Wordmark", "AppIcon-WordmarkOnOrange"]
+                                "AppIcon-Wordmark", "AppIcon-WordmarkOnOrange", "AppIcon-SunOrange"]
     /// An icon no longer offered counts as the default.
     @State private var current = UIApplication.shared.alternateIconName.flatMap { icons.contains($0) ? $0 : nil } ?? "AppIcon"
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
