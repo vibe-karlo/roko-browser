@@ -7,6 +7,7 @@ const FRONT_TAB: Record<string, string> = {
   "com.google.Chrome": 'tell application "Google Chrome" to return (URL of active tab of front window) & "\\n" & (title of active tab of front window)',
   "company.thebrowser.Browser": 'tell application "Arc" to return (URL of active tab of front window) & "\\n" & (title of active tab of front window)',
   "com.brave.Browser": 'tell application "Brave Browser" to return (URL of active tab of front window) & "\\n" & (title of active tab of front window)',
+  "com.growthstudio.roko.mac": 'tell application id "com.growthstudio.roko.mac" to return (URL of current tab of front window) & "\\n" & (name of current tab of front window)',
   "com.microsoft.edgemac": 'tell application "Microsoft Edge" to return (URL of active tab of front window) & "\\n" & (title of active tab of front window)',
 };
 
@@ -17,7 +18,7 @@ export async function pageToSend(link?: string) {
   if (!url) {
     const front = await getFrontmostApplication();
     const script = front.bundleId ? FRONT_TAB[front.bundleId] : undefined;
-    if (!script) throw new Error(`Open a page in Safari, Chrome, Arc, Brave or Edge first, or give a link.`);
+    if (!script) throw new Error(`Open a page in roko, Safari, Chrome, Arc, Brave or Edge first, or give a link.`);
     [url, title = ""] = (await runAppleScript(script)).split("\n");
   }
   if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
