@@ -164,8 +164,8 @@ struct ToolsSheet: View {
             .padding(.vertical, 8)
 
             ToolRow(glyph: .split, title: browser.split == nil ? "Split View" : "Close Split View") {
-                browser.split == nil ? browser.startSplit() : browser.endSplit()
-                browser.panel = .none
+                // Starting it opens the bar for the second page; it closes this menu itself.
+                if browser.split == nil { browser.startSplit() } else { browser.endSplit(); browser.panel = .none }
             }
 
             ToolRow(glyph: .desktop, title: tab.wantsDesktopSite ? "Request Mobile Site" : "Request Desktop Site") {

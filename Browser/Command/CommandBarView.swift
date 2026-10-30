@@ -584,7 +584,7 @@ struct CommandBarView: View {
         case .web:
             switch browser.commandMode {
             case .privateTab: return "Private search or address"
-            case .currentTab, .newTab: return "Search or enter address"
+            case .currentTab, .newTab: return browser.isPickingSplit ? "Open below in Split View" : "Search or enter address"
             }
         }
     }
@@ -951,7 +951,7 @@ struct CommandBarView: View {
         case .readLater: browser.panel = .readLater
         case .reopenTab: browser.reopenClosedTab()
         case .downloads: browser.panel = .downloads
-        case .split: browser.split == nil ? browser.startSplit() : browser.endSplit()
+        case .split: if browser.split == nil { browser.startSplit() } else { browser.endSplit(); browser.panel = .none }
         case .copyMarkdown: browser.copyAsMarkdown()
         case .unlockHistory: Task { await PrivacyLock.shared.unlock() }
         case .askAboutSaved(let question):

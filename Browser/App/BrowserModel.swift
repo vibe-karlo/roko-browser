@@ -32,7 +32,10 @@ final class BrowserModel {
 
     private(set) var tabs: [BrowserTab] = []
     private(set) var selectedID: BrowserTab.ID?
-    var panel: Panel = .none
+    var panel: Panel = .none {
+        // The bar closed without a page opened from it: no split waiting for one.
+        didSet { if oldValue == .command, panel != .command { pendingSplitWith = nil } }
+    }
     var commandPrefill = ""
     var commandMode: CommandMode = .newTab
     var launcherContext: LauncherContext = .web
@@ -157,17 +160,14 @@ final class BrowserModel {
     /// How much of the screen the top half has.
     var splitFraction: CGFloat = 0.5
 
-    /// The page on screen and another tab, split: the one used last, or a
-    /// new tab from the bar when there's no other.
+    /// The page on screen and another, split. With no tab given (the page
+    /// menu, the bar), the bar opens for the page that goes below.
     func startSplit(with other: BrowserTab? = nil) {
         guard let current = selectedTab else { return }
         panel = .none
-        let partner = other ?? tabs.filter { $0.id != current.id && $0.isPrivate == current.isPrivate }
-            .max { $0.lastActive < $1.lastActive }
-        guard let partner, partner.id != current.id else {
-            // Nothing to split with yet: the bar opens one, and it goes below.
-            pendingSplitWith = current.id
+        guard let partner = other, partner.id != current.id else {
             showCommandBar(mode: current.isPrivate ? .privateTab : .newTab)
+            pendingSplitWith = current.id
             return
         }
         splitFraction = 0.5
@@ -176,8 +176,10 @@ final class BrowserModel {
         select(partner)
     }
 
-    /// Asked for with no other tab: the next tab opened from the bar joins it.
-    @ObservationIgnored private var pendingSplitWith: BrowserTab.ID?
+    /// Split View asked for from the page menu or the bar: the page the bar opens next joins it.
+    private var pendingSplitWith: BrowserTab.ID?
+    /// The bar is open for Split View's second page.
+    var isPickingSplit: Bool { pendingSplitWith != nil }
 
     /// Back to one tab: the one in use, or the one asked for.
     func endSplit(keeping kept: BrowserTab? = nil) {
@@ -338,6 +340,14 @@ final class BrowserModel {
     func select(_ tab: BrowserTab) {
         HitchWatch.start("select tab")
         finishHidingItems()
+        // Split View asked for: whatever the bar opens (an address, a search, a
+        // pin, a tab already open) is the half below.
+        if let first = pendingSplitWith, first != tab.id, panel == .command,
+           tabs.contains(where: { $0.id == first }), tabs.contains(where: { $0.id == tab.id }) {
+            pendingSplitWith = nil
+            splitFraction = 0.5
+            split = Split(top: first, bottom: tab.id)
+        }
         // In Split View, a tab from elsewhere takes the place of the half in use.
         if var current = split, !current.contains(tab.id), let selectedID {
             if current.top == selectedID { current.top = tab.id } else { current.bottom = tab.id }
@@ -377,12 +387,6 @@ final class BrowserModel {
             if isPrivate { PrivacyLock.shared.opened(tab.id) }
             tab.delegate = self
             tabs.append(tab)
-            // Split asked for with nothing to split with: this tab is the other half.
-            if let first = pendingSplitWith, inNewTab, tabs.contains(where: { $0.id == first }) {
-                pendingSplitWith = nil
-                splitFraction = 0.5
-                split = Split(top: first, bottom: tab.id)
-            }
             select(tab)
         }
         panel = .none

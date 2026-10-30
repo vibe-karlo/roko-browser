@@ -25,10 +25,23 @@ struct BrowserView: View {
             }
             .animation(.easeOut(duration: 0.2), value: browser.topTab?.topColor)
 
-            if let split = browser.split, let top = browser.tab(split.top), let bottom = browser.tab(split.bottom) {
-                SplitPages(top: top, bottom: bottom, barTop: barTop)
-            } else if let tab = browser.selectedTab {
-                PagePane(tab: tab, barTop: barTop)
+            if browser.selectedTab != nil, let playing = browser.playerTab {
+                // Something playing in another tab: the page lifts into a card
+                // and the player sits in the dark band under it (after Lens).
+                GeometryReader { proxy in
+                    VStack(spacing: 0) {
+                        pages
+                            .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 26, bottomTrailingRadius: 26))
+                        PlayerBand(tab: playing)
+                            .padding(.bottom, proxy.safeAreaInsets.bottom)
+                    }
+                    // Only below: the status bar's strip keeps the page's colour.
+                    .background { Color.black.ignoresSafeArea(edges: .bottom) }
+                    .ignoresSafeArea(edges: .bottom)
+                }
+                .transition(.opacity)
+            } else if browser.selectedTab != nil {
+                pages
             } else {
                 StartView()
                     // The bar floats over the page; the start page keeps clear of it.
@@ -53,6 +66,9 @@ struct BrowserView: View {
                 // Typing into a page, the keyboard covers the bar, as in Safari;
                 // risen above it, the bar sat on top of the form being filled in.
                 .ignoresSafeArea(.keyboard, edges: .bottom)
+                // Above the player's band when there is one.
+                .padding(.bottom, showsPlayer ? PlayerBand.height : 0)
+                .animation(.snappy(duration: 0.3), value: showsPlayer)
         }
         .overlay {
             if browser.panel == .tabs {
@@ -335,12 +351,20 @@ struct BrowserView: View {
 
     /// The mini player shows over the page and the bar, not over a panel or a screen of roko's own.
     private var showsPlayer: Bool {
-        browser.playerTab != nil && browser.panel == .none && !browser.launcherShown && browser.summary == nil
-            && browser.browseForMe == nil && browser.hidingItems == nil
+        browser.playerTab != nil && browser.selectedTab != nil
     }
 
-    /// Offers and toasts sit above the mini player while it shows.
-    private var playerLift: CGFloat { showsPlayer ? 70 : 0 }
+    private var playerLift: CGFloat { showsPlayer ? PlayerBand.height : 0 }
+
+    /// The tab on screen, or the two halves of a split.
+    @ViewBuilder
+    private var pages: some View {
+        if let split = browser.split, let top = browser.tab(split.top), let bottom = browser.tab(split.bottom) {
+            SplitPages(top: top, bottom: bottom, barTop: barTop)
+        } else if let tab = browser.selectedTab {
+            PagePane(tab: tab, barTop: barTop)
+        }
+    }
 
     /// Text that reads on whatever is behind the status bar.
     private var statusBarStyle: UIStatusBarStyle {
@@ -685,17 +709,6 @@ private struct PageExtras: ViewModifier {
                 }
             }
             .animation(.snappy(duration: 0.3), value: Downloads.shared.finished?.id)
-            .overlay(alignment: .bottom) {
-                if showsPlayer, let tab = browser.playerTab {
-                    // Resting on the bar; when the bar folds away, in its place.
-                    MiniPlayer(tab: tab)
-                        .padding(.horizontal, Theme.gutter)
-                        .padding(.bottom, browser.isBarCollapsed ? 4 : Theme.barHeight + 8 + 4 + 8)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-            }
-            .animation(.snappy(duration: 0.28), value: browser.isBarCollapsed)
-            .animation(.snappy(duration: 0.3), value: showsPlayer ? browser.playerTab?.id : nil)
     }
 }
 
@@ -758,10 +771,10 @@ private struct PagePane: View {
     }
 }
 
-/// Split View: two tabs, one above the other, with a handle between them to
-/// drag. It settles at a third, half or two thirds; dragged nearly shut, one
-/// half closes and the other has the screen again. The bar works the half you
-/// last touched.
+/// Split View: two tabs, one above the other, as two rounded cards on a dark
+/// band (after Amie). Drag the band to anywhere you like; it stays where you
+/// let go. Dragged nearly shut, that half closes and the other has the screen
+/// again. The bar works the half you last touched; the other is dimmed a little.
 private struct SplitPages: View {
     @Environment(BrowserModel.self) private var browser
     let top: BrowserTab
@@ -769,81 +782,90 @@ private struct SplitPages: View {
     let barTop: CGFloat
     @State private var drag: CGFloat = 0
 
-    private let handle: CGFloat = 30
-    private let stops: [CGFloat] = [1 / 3, 1 / 2, 2 / 3]
+    private let band: CGFloat = 28
+    private let corner: CGFloat = 26
 
     var body: some View {
         GeometryReader { proxy in
             let height = proxy.size.height + proxy.safeAreaInsets.bottom
-            let topHeight = min(max(height * browser.splitFraction + drag, 0), height - handle)
+            let topHeight = min(max(height * browser.splitFraction + drag, 0), height - band)
             VStack(spacing: 0) {
-                PagePane(tab: top, barTop: barTop)
+                card(top, shape: UnevenRoundedRectangle(bottomLeadingRadius: corner, bottomTrailingRadius: corner))
                     .frame(height: topHeight)
-                    .clipped()
-                    .overlay { if browser.selectedID != top.id { Color.black.opacity(0.18).allowsHitTesting(false) } }
-                SplitHandle(top: top, bottom: bottom, drag: $drag, total: height, handle: handle, stops: stops)
-                    .frame(height: handle)
-                PagePane(tab: bottom, barTop: barTop)
+                SplitHandle(drag: $drag, total: height, band: band, top: top, bottom: bottom)
+                    .frame(height: band)
+                card(bottom, shape: UnevenRoundedRectangle(topLeadingRadius: corner, topTrailingRadius: corner))
                     .frame(maxHeight: .infinity)
-                    .clipped()
-                    .overlay { if browser.selectedID != bottom.id { Color.black.opacity(0.18).allowsHitTesting(false) } }
             }
             .animation(.snappy(duration: 0.2), value: browser.selectedID)
         }
+        // Black between and under the cards, not behind the status bar: that
+        // band keeps the top page's colour, so the clock stays readable.
+        .background(Color.black.ignoresSafeArea(edges: .bottom))
         .ignoresSafeArea(edges: .bottom)
+    }
+
+    private func card(_ tab: BrowserTab, shape: some Shape) -> some View {
+        PagePane(tab: tab, barTop: barTop)
+            .overlay {
+                if browser.selectedID != tab.id { Color.black.opacity(0.12).allowsHitTesting(false) }
+            }
+            .clipShape(shape)
     }
 }
 
-/// Between the halves: the grip to drag, the two tabs' sites either side, a
-/// swap and a close.
+/// The band between the halves: swap on the left, the grip in the middle,
+/// close on the right, and the whole band drags.
 private struct SplitHandle: View {
     @Environment(BrowserModel.self) private var browser
-    let top: BrowserTab
-    let bottom: BrowserTab
     @Binding var drag: CGFloat
     let total: CGFloat
-    let handle: CGFloat
-    let stops: [CGFloat]
+    let band: CGFloat
+    let top: BrowserTab
+    let bottom: BrowserTab
+    @State private var settled = 0
 
     var body: some View {
         HStack(spacing: 0) {
             Button { browser.swapSplit() } label: {
-                Glyph(.swap, size: 18).frame(width: 44, height: handle).contentShape(.rect)
+                Glyph(.swap, size: 17).frame(width: 52, height: band).contentShape(.rect)
             }
             .buttonStyle(GlyphButtonStyle())
             .accessibilityLabel("Swap the halves")
             Spacer()
             Capsule()
-                .fill(Theme.faintInk)
-                .frame(width: 44, height: 5)
+                .fill(.white.opacity(0.42))
+                .frame(width: 46, height: 5)
             Spacer()
             Button { browser.endSplit() } label: {
-                Glyph(.close, size: 18).frame(width: 44, height: handle).contentShape(.rect)
+                Glyph(.close, size: 16).frame(width: 52, height: band).contentShape(.rect)
             }
             .buttonStyle(GlyphButtonStyle())
             .accessibilityLabel("Close Split View")
         }
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 8)
         .frame(maxWidth: .infinity)
-        .background(Theme.canvas)
-        .foregroundStyle(Theme.secondaryInk)
+        .foregroundStyle(.white.opacity(0.85))
         .contentShape(.rect)
-        .gesture(DragGesture(minimumDistance: 2, coordinateSpace: .global)
+        .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
             .onChanged { drag = $0.translation.height }
             .onEnded { value in
-                let end = browser.splitFraction + value.predictedEndTranslation.height / total
-                withAnimation(.spring(duration: 0.35, bounce: 0.15)) {
+                let here = browser.splitFraction + value.translation.height / total
+                let thrown = browser.splitFraction + value.predictedEndTranslation.height / total
+                withAnimation(.spring(duration: 0.32, bounce: 0.12)) {
                     drag = 0
-                    if end < 0.16 {
+                    if here < 0.12 || thrown < 0.04 {
                         browser.endSplit(keeping: bottom)
-                    } else if end > 0.84 {
+                    } else if here > 0.88 || thrown > 0.96 {
                         browser.endSplit(keeping: top)
                     } else {
-                        browser.splitFraction = stops.min { abs($0 - end) < abs($1 - end) } ?? 0.5
+                        // Where you let go, kept clear of the edges so both halves stay usable.
+                        browser.splitFraction = min(max(here, 0.18), 0.82)
                     }
                 }
+                settled += 1
             })
-        .sensoryFeedback(.selection, trigger: browser.splitFraction)
+        .sensoryFeedback(.impact(weight: .light), trigger: settled)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Split View handle")
     }

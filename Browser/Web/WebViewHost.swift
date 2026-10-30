@@ -31,6 +31,11 @@ struct WebViewHost: UIViewRepresentable {
         defer { coverBar(webView, in: container) }
         guard webView.superview !== container else { return }
 
+        // A page at its top stays at its top when it moves somewhere with a
+        // different inset (into or out of a split, under the status bar or not):
+        // left alone, it kept the old offset and opened partly scrolled.
+        let scrollView = webView.scrollView
+        let wasAtTop = webView.superview == nil || scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 1
         container.subviews.forEach { $0.removeFromSuperview() }
         webView.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(webView)
@@ -41,6 +46,12 @@ struct WebViewHost: UIViewRepresentable {
             webView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
         ])
         context.coordinator.track(webView, in: container)
+        if wasAtTop {
+            DispatchQueue.main.async {
+                container.layoutIfNeeded()
+                scrollView.setContentOffset(CGPoint(x: 0, y: -scrollView.adjustedContentInset.top), animated: false)
+            }
+        }
     }
 
     /// The page scrolls under the floating bar, but anything a site pins to the
