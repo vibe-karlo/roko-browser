@@ -1,14 +1,15 @@
 import SwiftUI
 
 /// Exploration: the bar as part of the dark band under the page, not a capsule
-/// floating over it. The page is a card; under it, on black, one quiet line:
-/// where you are (the site, tap to change the address, swipe to switch tabs),
-/// how many tabs, a new tab, and the page's menu. While a page loads, a thin
-/// line runs along the card's lower edge. Scrolling down folds it away and the
-/// card grows to the bottom; scrolling up brings it back.
+/// floating over it. The page is a card; under it, on black, three keys of one
+/// shape, an outlined rounded square: your tabs with how many, a new tab in the
+/// middle, and the page's menu. A sideways swipe across the band switches tabs,
+/// a swipe up shows them all. While a page loads, a thin line runs just under
+/// the card. Scrolling down folds it away and the card grows to the bottom;
+/// scrolling up brings it back.
 struct BandBar: View {
     @Environment(BrowserModel.self) private var browser
-    @State private var addressFrame: CGRect = .zero
+    @State private var plusFrame: CGRect = .zero
     @State private var switches = 0
 
     static let height: CGFloat = 50
@@ -16,79 +17,45 @@ struct BandBar: View {
     private var tab: BrowserTab? { browser.selectedTab }
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 0) {
             Button { browser.showTabs() } label: {
-                Text("\(browser.tabs.count)")
-                    .font(.system(size: 13, weight: .bold).monospacedDigit())
-                    .foregroundStyle(.white)
-                    .frame(width: 26, height: 26)
-                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.white.opacity(0.6), lineWidth: 1.6))
-                    .frame(width: 44, height: Self.height)
-                    .contentShape(.rect)
+                BandKey {
+                    Text("\(browser.tabs.count)")
+                        .font(.system(size: 13, weight: .bold).monospacedDigit())
+                }
             }
             .accessibilityLabel("Tabs, \(browser.tabs.count) open")
 
-            address
+            Spacer()
 
             Button {
-                browser.launcherOrigin = addressFrame
+                browser.launcherOrigin = plusFrame
                 browser.showCommandBar(mode: tab?.isPrivate == true ? .privateTab : .newTab)
             } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(.black)
-                    .frame(width: 34, height: 34)
-                    .background(.white, in: .circle)
-                    .frame(width: 44, height: Self.height)
-                    .contentShape(.rect)
+                BandKey(wide: true) {
+                    if tab?.isPrivate == true {
+                        Glyph(.eyeClosed, size: 16)
+                    } else {
+                        Image(systemName: "plus").font(.system(size: 15, weight: .bold))
+                    }
+                }
             }
-            .accessibilityLabel("New tab")
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { plusFrame = $0 }
+            .accessibilityLabel(tab?.isPrivate == true ? "Private search" : "New tab")
+
+            Spacer()
 
             Button { browser.panel = .tools } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 34, height: 34)
-                    .background(.white.opacity(0.12), in: .circle)
-                    .frame(width: 44, height: Self.height)
-                    .contentShape(.rect)
+                BandKey {
+                    Image(systemName: "chevron.up").font(.system(size: 13, weight: .bold))
+                }
             }
             .accessibilityLabel("Page menu")
         }
-        .padding(.horizontal, 8)
-        .frame(height: Self.height)
-        .overlay(alignment: .top) { progress }
-        .sensoryFeedback(.selection, trigger: switches)
-        .environment(\.colorScheme, .dark)
-    }
-
-    /// Where you are: the site, quietly, centred. A tap changes the address;
-    /// a sideways swipe moves to the tab beside; a swipe up shows them all.
-    private var address: some View {
-        let host = tab?.url?.displayHost ?? ""
-        return HStack(spacing: 7) {
-            if tab?.isPrivate == true {
-                Glyph(.eyeClosed, size: 14).foregroundStyle(.white.opacity(0.7))
-            } else if !host.isEmpty {
-                SiteIcon(host: host, size: 15)
-            }
-            Text(host.isEmpty ? "Search or enter address" : host)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(host.isEmpty ? .white.opacity(0.5) : .white)
-                .lineLimit(1)
-                .truncationMode(.middle)
-        }
         .padding(.horizontal, 14)
-        .frame(maxWidth: .infinity)
-        .frame(height: 38)
-        .background(.white.opacity(0.08), in: .capsule)
-        .contentShape(.capsule)
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { addressFrame = $0 }
-        .onTapGesture {
-            browser.launcherOrigin = addressFrame
-            browser.showCommandBar(prefill: tab?.url?.absoluteString ?? "", mode: .currentTab)
-        }
-        .gesture(DragGesture(minimumDistance: 20).onEnded { value in
+        .frame(height: Self.height)
+        .contentShape(.rect)
+        .simultaneousGesture(DragGesture(minimumDistance: 24).onEnded { value in
             let dx = value.translation.width, dy = value.translation.height
             if dy < -30, abs(dy) > abs(dx) {
                 browser.showTabs()
@@ -98,10 +65,9 @@ struct BandBar: View {
                 if browser.selectedID != before { switches += 1 }
             }
         })
-        .accessibilityElement()
-        .accessibilityLabel(host.isEmpty ? "Address" : "Address, \(host)")
-        .accessibilityHint("Edit the address")
-        .accessibilityAddTraits(.isButton)
+        .overlay(alignment: .top) { progress }
+        .sensoryFeedback(.selection, trigger: switches)
+        .environment(\.colorScheme, .dark)
     }
 
     /// Loading: a thin line along the top of the band, just under the card.
@@ -118,5 +84,21 @@ struct BandBar: View {
             .padding(.horizontal, 24)
             .transition(.opacity)
         }
+    }
+}
+
+/// The band's one key shape: an outlined rounded square (wider for the
+/// middle one), white on the black, its tap target the full height of the band.
+private struct BandKey<Content: View>: View {
+    var wide = false
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .foregroundStyle(.white)
+            .frame(width: wide ? 44 : 28, height: 28)
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.white.opacity(0.6), lineWidth: 1.6))
+            .frame(width: wide ? 72 : 52, height: BandBar.height)
+            .contentShape(.rect)
     }
 }
