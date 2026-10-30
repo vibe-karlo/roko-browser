@@ -28,6 +28,7 @@ targets:
           - "*.entitlements"
     dependencies:
       - target: RokoWidgets
+      - target: RokoShare
     info:
       path: Browser/Info.plist
       properties:
@@ -50,6 +51,9 @@ targets:
         # Where shared Browse for Me pages go (Server/share); empty hides Share.
         RokoShareServer: $(SHARE_SERVER)
         ITSAppUsesNonExemptEncryption: false
+        # Open links in apps: whether YouTube, Instagram... are installed
+        # (Browser/Web/AppLinks.swift; keep the two lists the same).
+        LSApplicationQueriesSchemes: [airbnb, barcelona, booking, com.amazon.mobile.shopping, comgooglemaps, discord, ebay, etsy, fb, figma, github, instagram, linkedin, medium, nflx, notion, pinterest, reddit, soundcloud, spotify, tg, tiktok, tripadvisor, twitch, twitter, uber, whatsapp, wolt, youtube, youtubemusic, zoomus]
         # Notify Me: iOS wakes roko now and then to check watched pages.
         # iCloud sync: silent pushes bring other devices' changes.
         # YouTube plays on as sound with roko in the background (BackgroundPlay).
@@ -136,6 +140,36 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.growthstudio.roko.widgets
         CODE_SIGN_ENTITLEMENTS: Shared/AppGroup.entitlements
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 6ZQC2F6CF2
+        SKIP_INSTALL: YES
+
+  # roko in other apps' share sheets (ShareExtension/ShareViewController.swift).
+  RokoShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ShareExtension
+        excludes:
+          - "Info.plist"
+    info:
+      path: ShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: roko
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            # A page's link, or words you selected.
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsText: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.growthstudio.roko.share
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: 6ZQC2F6CF2

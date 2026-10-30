@@ -11,6 +11,8 @@ struct TabStackView: View {
     @State private var focused: BrowserTab.ID?
     /// How far the whole switcher has been pulled up (negative), following the finger.
     @State private var lift: CGFloat = 0
+    /// A tab was thrown away while the switcher is open: offer it back.
+    @State private var closedHere = false
 
     private let returnThreshold: CGFloat = 90
 
@@ -37,6 +39,7 @@ struct TabStackView: View {
                 }
 
                 Spacer(minLength: 0)
+                reopenOffer
                 bottomRow
                     .padding(.bottom, max(proxy.safeAreaInsets.bottom, 12))
             }
@@ -48,7 +51,12 @@ struct TabStackView: View {
         .opacity(1 + lift / 600)
         // A thrown-away tab lands with a thud.
         .sensoryFeedback(.impact(weight: .medium), trigger: browser.tabs.count) { old, new in new < old }
-        .onAppear { focused = browser.selectedID ?? browser.tabs.last?.id }
+        .onAppear {
+            focused = browser.selectedID ?? browser.tabs.last?.id
+            closedHere = false
+        }
+        .animation(.snappy(duration: 0.3), value: closedHere)
+        .animation(.snappy(duration: 0.3), value: browser.recentlyClosed.count)
     }
 
     // MARK: Cards
@@ -100,6 +108,38 @@ struct TabStackView: View {
             focused = neighbours.min { abs($0 - index) < abs($1 - index) }.map { browser.tabs[$0].id }
         }
         browser.close(tab)
+        if !tab.isPrivate, tab.url != nil { closedHere = true }
+    }
+
+    /// The tab just thrown away, a tap from coming back with its history.
+    /// Built like the copied-link offer: what it is, then one word to act.
+    @ViewBuilder
+    private var reopenOffer: some View {
+        if closedHere, let closed = browser.recentlyClosed.last {
+            HStack(spacing: 14) {
+                HStack(spacing: 10) {
+                    SiteIcon(host: closed.url.displayHost, size: 18)
+                    Text(closed.url.displayHost)
+                        .font(.system(size: 15, weight: .medium))
+                }
+                Button("Reopen") {
+                    browser.reopenClosedTab()
+                    closedHere = false
+                }
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.accentText)
+                .frame(minHeight: 44)
+                .contentShape(.rect)
+            }
+            .lineLimit(1)
+            .padding(.leading, 14)
+            .padding(.trailing, 16)
+            .barSurface(cornerRadius: 14)
+            .compositingGroup()
+            .padding(.horizontal, Theme.gutter)
+            .padding(.bottom, 4)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
     }
 
     /// The selected page, blurred far out of focus: the switcher takes on the

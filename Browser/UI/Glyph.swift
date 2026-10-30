@@ -25,7 +25,9 @@ struct Glyph: View {
              // Hide Distracting Items.
              hideItems,
              // Settings.
-             palette, microphone, info, key, broom, globe, appIcon, notification
+             palette, microphone, info, key, broom, globe, appIcon, notification,
+             // A closed tab back, and a page opened in its app.
+             reopen, openApp
     }
 
     let kind: Kind

@@ -316,6 +316,7 @@ private struct AppearanceSettings: View {
 private struct TabsSettings: View {
     @AppStorage("archivePolicy") private var archive: ArchivePolicy = .day
     @AppStorage(Preferences.pullToSummarizeKey) private var pullToSummarize = true
+    @AppStorage(AppLinks.Mode.key) private var appLinks: AppLinks.Mode = .offer
 
     var body: some View {
         Form {
@@ -323,6 +324,13 @@ private struct TabsSettings: View {
                 Picker("Close unused tabs", selection: $archive) {
                     ForEach(ArchivePolicy.allCases) { Text($0.title).tag($0) }
                 }
+            }
+            Section {
+                Picker("Open links in apps", selection: $appLinks) {
+                    ForEach(AppLinks.Mode.allCases) { Text($0.title).tag($0) }
+                }
+            } footer: {
+                Text(appLinksFooter)
             }
             Section {
                 Toggle("Pull further to summarize", isOn: $pullToSummarize)
@@ -333,6 +341,14 @@ private struct TabsSettings: View {
             }
         }
         .settingsPage("Tabs")
+    }
+
+    private var appLinksFooter: String {
+        switch appLinks {
+        case .offer: "On a page whose app you have, like YouTube or Instagram, roko offers to open it there."
+        case .always: "A link you tap to a page whose app you have opens in that app."
+        case .never: "Pages always stay in roko."
+        }
     }
 }
 

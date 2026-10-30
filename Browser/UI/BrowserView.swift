@@ -221,6 +221,33 @@ struct BrowserView: View {
             }
         }
         .animation(.snappy(duration: 0.3), value: browser.copiedLinkOffer)
+        .overlay(alignment: .bottom) {
+            // A page whose app you have: built like the copied-link offer.
+            if let offer = browser.appOffer, browser.cookieOffer == nil, !browser.copiedLinkOffer, browser.panel == .none {
+                HStack(spacing: 14) {
+                    HStack(spacing: 10) {
+                        Glyph(.openApp, size: 18)
+                        Text(offer.app.name)
+                            .font(.system(size: 15, weight: .medium))
+                    }
+                    Button("Open in app") { browser.openInApp() }
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.accentText)
+                        .frame(minHeight: 44)
+                        .contentShape(.rect)
+                }
+                .lineLimit(1)
+                .padding(.leading, 14)
+                .padding(.trailing, 16)
+                .barSurface(cornerRadius: 14)
+                .compositingGroup()
+                .padding(.horizontal, Theme.gutter)
+                .padding(.bottom, Theme.barHeight + 20)
+                .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
+                                        removal: .opacity.animation(.easeOut(duration: 0.12))))
+            }
+        }
+        .animation(.snappy(duration: 0.3), value: browser.appOffer?.url)
         .modifier(CopiedLinkWatch(browser: browser))
         // Handoff: continue this page on a Mac or iPad.
         .userActivity(NSUserActivityTypeBrowsingWeb, element: browser.handoffPage) { page, activity in

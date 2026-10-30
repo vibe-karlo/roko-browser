@@ -76,8 +76,10 @@ struct ToolsSheet: View {
             .accessibilityHint("Edit the address")
 
             iconButton(.link, "Copy link") {
-                UIPasteboard.general.url = tab.url
-                if let url = tab.url { CopiedLink.copiedHere(url) }
+                // Without the parts that only say where it came from.
+                let link = tab.url.map(CleanLink.clean)
+                UIPasteboard.general.url = link
+                if let link { CopiedLink.copiedHere(link) }
                 browser.panel = .none
                 browser.showToast("Link copied")
             }
@@ -114,7 +116,7 @@ struct ToolsSheet: View {
                 browser.showToast(browser.isPinned(tab.url) ? "Pinned" : "Unpinned")
             }
             if let url = tab.url {
-                ShareLink(item: url) { ActionTile.Face(glyph: .share, title: "Share") }
+                ShareLink(item: CleanLink.clean(url)) { ActionTile.Face(glyph: .share, title: "Share") }
                     .buttonStyle(RowButtonStyle())
             }
         }

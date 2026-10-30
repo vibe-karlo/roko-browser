@@ -68,6 +68,12 @@ final class BrowserModel {
     @ObservationIgnored private var cookieOfferTask: Task<Void, Never>?
     /// Offered once per site while roko is open.
     @ObservationIgnored private var cookieOffersMade = Set<String>()
+    /// The page on screen has an app on this iPhone: offered above the bar,
+    /// once per site while roko is open (Settings → Tabs → Open links in apps).
+    private(set) var appOffer: (app: AppLinks.App, url: URL)?
+    @ObservationIgnored private var appOfferTask: Task<Void, Never>?
+    @ObservationIgnored private var appOffersMade = Set<String>()
+
     /// A link copied a moment ago, offered above the bar on opening roko.
     private(set) var copiedLinkOffer = false
     /// The link itself, when roko may read it; otherwise the offer pastes it.
@@ -157,6 +163,8 @@ final class BrowserModel {
         // spare for the next new tab once launch has settled, not during it.
         WebViewFactory.prewarm()
         restoreTabs()
+        // Ask roko, over text selected on a page.
+        EdgeToEdgeWebView.ask = { [weak self] text in self?.browse(for: text) }
         // YouTube plays on as sound when roko leaves the screen.
         BackgroundPlay.watch { [weak self] in self?.tabs.compactMap(\.webView) ?? [] }
         // A Notify Me notification opens its page.
@@ -391,9 +399,36 @@ final class BrowserModel {
         tab.webView?.reload()
     }
 
+    /// A tab you closed, kept with its back/forward history so it can come
+    /// back as it was. Only while roko is open, and never a private tab.
+    struct ClosedTab {
+        let url: URL
+        let title: String
+        let state: Data?
+        let index: Int
+    }
+
+    /// Most recent last; the oldest drop off past ten.
+    private(set) var recentlyClosed: [ClosedTab] = []
+
+    /// The last tab you closed, back where it was and on screen.
+    func reopenClosedTab() {
+        guard let closed = recentlyClosed.popLast() else { return }
+        let tab = BrowserTab(url: closed.url, title: closed.title, restoreState: closed.state)
+        tab.delegate = self
+        tabs.insert(tab, at: min(closed.index, tabs.count))
+        select(tab)
+        panel = .none
+        scheduleSave()
+    }
+
     func close(_ tab: BrowserTab) {
         HitchWatch.start("close tab")
         guard let index = tabs.firstIndex(where: { $0.id == tab.id }) else { return }
+        if !tab.isPrivate, let url = tab.url {
+            recentlyClosed.append(ClosedTab(url: url, title: tab.title, state: tab.interactionState, index: index))
+            if recentlyClosed.count > 10 { recentlyClosed.removeFirst() }
+        }
         tab.close()
         tabs.remove(at: index)
         if tab.isPrivate, !tabs.contains(where: \.isPrivate) { WebViewFactory.endPrivateSession() }
@@ -436,6 +471,14 @@ final class BrowserModel {
         // The parking timer: the bar, with the time left on top.
         case "roko://parking", "roko://bar": showCommandBar()
         case "roko://parking/extend": Parking.shared.extend()
+        // From another app's share sheet (ShareExtension): a link, or words to ask about.
+        case _ where url.scheme == "roko" && (url.host() == "open" || url.host() == "ask"):
+            let value = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first?.value
+            if url.host() == "open", let page = value.flatMap(URL.init(string:)), page.scheme?.hasPrefix("http") == true {
+                open(page, inNewTab: true)
+            } else if url.host() == "ask", let question = value, !question.isEmpty {
+                browse(for: question)
+            }
         default:
             guard url.scheme?.hasPrefix("http") == true else { return }
             open(url, inNewTab: true)
@@ -792,6 +835,7 @@ extension BrowserModel: BrowserTabDelegate {
     func tab(_ tab: BrowserTab, didFinishLoading url: URL, title: String) {
         // Went to another page while hiding (a swipe back): the mode was for that one.
         if tab.id == selectedID, hidingItems != nil { finishHidingItems() }
+        offerApp(for: tab, url: url)
         // Private pages leave nothing on disk, icons included.
         guard !tab.isPrivate else { return }
         if let webView = tab.webView {
@@ -838,6 +882,31 @@ extension BrowserModel: BrowserTabDelegate {
         }
     }
 
+    // MARK: Open in app
+
+    private func offerApp(for tab: BrowserTab, url: URL) {
+        guard AppLinks.Mode.current == .offer, tab.id == selectedID, panel == .none,
+              let app = AppLinks.installedApp(for: url),
+              appOffersMade.insert(app.scheme).inserted else { return }
+        appOffer = (app, url)
+        appOfferTask?.cancel()
+        appOfferTask = Task {
+            try? await Task.sleep(for: .seconds(8))
+            if !Task.isCancelled { appOffer = nil }
+        }
+    }
+
+    func openInApp() {
+        guard let offer = appOffer else { return }
+        appOffer = nil
+        appOfferTask?.cancel()
+        // The page you're on now, which may have moved on since the offer.
+        let url = selectedTab?.url.flatMap { AppLinks.installedApp(for: $0) == offer.app ? $0 : nil } ?? offer.url
+        Task {
+            if await !AppLinks.open(url) { showToast("\(offer.app.name) doesn't open this page") }
+        }
+    }
+
     #if DEBUG
     /// `-showOffer`: the cookie offer, to look at.
     func showCookieOfferForTesting() {
@@ -856,6 +925,10 @@ extension BrowserModel: BrowserTabDelegate {
         if copiedLinkOffer {
             copiedLinkOffer = false
             copiedLinkTask?.cancel()
+        }
+        if appOffer != nil {
+            appOffer = nil
+            appOfferTask?.cancel()
         }
     }
 

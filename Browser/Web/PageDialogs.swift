@@ -44,6 +44,44 @@ enum PageDialogs {
         }
     }
 
+    /// A site's own sign-in (HTTP Basic or Digest), asked before the page
+    /// loads, as routers and some work tools do: a name and a password, or nil.
+    static func signIn(_ webView: WKWebView, host: String, secure: Bool,
+                       name: String?) async -> (name: String, password: String)? {
+        guard webView.window != nil, let top, !top.isBeingDismissed, !top.isBeingPresented,
+              !(top is UIAlertController) else { return nil }
+        let site = URL(string: "https://\(host)")?.displayHost ?? host
+        let message = secure
+            ? "\(site) asks for a user name and password."
+            : "\(site) asks for a user name and password. The connection isn't private: they're sent as they are."
+        return await withCheckedContinuation { continuation in
+            let alert = PageAlert(title: "Sign in to \(site)", message: message, preferredStyle: .alert)
+            alert.addTextField {
+                $0.placeholder = "User name"
+                $0.text = name
+                $0.textContentType = .username
+                $0.autocapitalizationType = .none
+                $0.autocorrectionType = .no
+            }
+            alert.addTextField {
+                $0.placeholder = "Password"
+                $0.isSecureTextEntry = true
+                $0.textContentType = .password
+            }
+            alert.answer = { answer in
+                guard let answer, answer.index == 1 else { return continuation.resume(returning: nil) }
+                continuation.resume(returning: (answer.text ?? "", alert.textFields?.last?.text ?? ""))
+            }
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { [weak alert] _ in alert?.reply(nil) })
+            alert.addAction(UIAlertAction(title: "Sign In", style: .default) { [weak alert] _ in
+                alert?.reply((1, alert?.textFields?.first?.text))
+            })
+            top.present(alert, animated: true) {
+                if alert.presentingViewController == nil { alert.reply(nil) }
+            }
+        }
+    }
+
     /// A file the page handed over: a pass goes to Wallet, anything else to
     /// the share sheet (Save to Files, Calendar for an .ics, Books for a PDF).
     static func open(downloaded file: URL) {
@@ -100,6 +138,28 @@ extension BrowserTab: WKDownloadDelegate {
         return answer.text ?? ""
     }
 
+    // MARK: Sign-in
+
+    /// HTTP Basic and Digest sign-ins get roko's own dialog; everything else
+    /// (certificates, servers' trust) is left to WebKit. Kept for this run of
+    /// roko only, never saved.
+    @objc func webView(_ webView: WKWebView, respondTo challenge: URLAuthenticationChallenge) async
+        -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+        let space = challenge.protectionSpace
+        guard space.authenticationMethod == NSURLAuthenticationMethodHTTPBasic
+                || space.authenticationMethod == NSURLAuthenticationMethodHTTPDigest else {
+            return (.performDefaultHandling, nil)
+        }
+        // Three wrong tries: the site's own error page.
+        guard challenge.previousFailureCount < 3,
+              let answer = await PageDialogs.signIn(webView, host: space.host,
+                                                    secure: space.receivesCredentialSecurely,
+                                                    name: challenge.proposedCredential?.user) else {
+            return (.cancelAuthenticationChallenge, nil)
+        }
+        return (.useCredential, URLCredential(user: answer.name, password: answer.password, persistence: .forSession))
+    }
+
     // MARK: Other apps
 
     /// tel:, mailto:, maps, the App Store: a link you tapped opens at once.
@@ -128,8 +188,11 @@ extension BrowserTab: WKDownloadDelegate {
     // MARK: Downloads
 
     @objc func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse) async -> WKNavigationResponsePolicy {
-        let attachment = (navigationResponse.response as? HTTPURLResponse)?
-            .value(forHTTPHeaderField: "Content-Disposition")?.lowercased().hasPrefix("attachment") ?? false
+        let http = navigationResponse.response as? HTTPURLResponse
+        // An error (a sign-in you cancelled, a missing page) is shown, never
+        // saved: its body is often empty and of no type at all.
+        if let status = http?.statusCode, status >= 400 { return .allow }
+        let attachment = http?.value(forHTTPHeaderField: "Content-Disposition")?.lowercased().hasPrefix("attachment") ?? false
         // What WebKit can't show (a pass, a calendar file, a zip), or what the
         // site says is to be saved: a file, not a page.
         return navigationResponse.isForMainFrame && (attachment || !navigationResponse.canShowMIMEType) ? .download : .allow

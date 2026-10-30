@@ -84,4 +84,22 @@ final class EdgeToEdgeWebView: WKWebView {
         insets.bottom = 0
         return insets
     }
+
+    /// Ask roko, first in the menu over text you select: Browse for Me on
+    /// those words, as Arc Search does. Set by BrowserModel.
+    static var ask: ((String) -> Void)?
+
+    override func buildMenu(with builder: UIMenuBuilder) {
+        super.buildMenu(with: builder)
+        guard Self.ask != nil else { return }
+        let action = UIAction(title: "Ask roko", image: UIImage(named: "phosphor/browse")) { [weak self] _ in
+            self?.evaluateJavaScript("window.getSelection().toString()", in: nil, in: .defaultClient) { result in
+                guard case .success(let value) = result,
+                      let text = (value as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !text.isEmpty else { return }
+                Self.ask?(String(text.prefix(300)))
+            }
+        }
+        builder.insertChild(UIMenu(options: .displayInline, children: [action]), atStartOfMenu: .root)
+    }
 }

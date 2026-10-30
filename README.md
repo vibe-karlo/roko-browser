@@ -35,7 +35,8 @@ that you don't want (a sticky bar, a "Join" button, a promo row) goes with Hide 
 the page menu: tap it, tap it again, and it stays gone on that site.
 
 **And the rest.** Today's weather, news and to-dos on a new tab, to-dos synced with Apple
-Reminders, YouTube playing on as sound with roko closed, Home Screen widgets, pages translated into the languages you choose, and a count of
+Reminders, YouTube playing on as sound with roko closed, closed tabs a tap from coming back,
+clean links when you share, roko in every share sheet, Home Screen widgets, pages translated into the languages you choose, and a count of
 the time all this has saved you.
 
 <p>
@@ -535,8 +536,8 @@ closing on an answer, once each time it's open), and turned into time by stated 
 - **Address bar**: search engine, suggestions, the copied link, ticks as rows go by.
 - **Voice**: hold + to speak, and which languages it listens for (Croatian and English
   together, or one of them).
-- **Pages**: pull further to summarize (off, a pull only reloads), closing unused tabs, and
-  what's blocked (its own page).
+- **Pages**: pull further to summarize (off, a pull only reloads), closing unused tabs, opening
+  links in apps (Offer, Always or Off), and what's blocked (its own page).
 - **Today and to-dos**: opening Today each morning, the two daily nudges, alerts before a
   to-do's time, news, calendars, weather place.
 - **Summaries and answers**: answer language, Claude and its key, Notify Me (its own page).
@@ -555,6 +556,23 @@ first. Files a page hands over (`Content-Disposition: attachment`, a `download` 
 WebKit can't show) download to a temporary folder and open in the share sheet, or in Wallet for a
 `.pkpass`. The delegate methods there are `@objc`: WebKit finds them by selector, and they sit
 outside the extension that declares the conformance.
+
+Sites that sign you in before the page (HTTP Basic and Digest) get roko's own dialog
+(`PageDialogs.signIn`), from WebKit's authentication challenge; certificates and server trust
+are left to WebKit. A site's error with no page (an empty 401) is shown, never saved as a file.
+
+Open in app (`AppLinks`): iOS doesn't say which app claims a link without opening it, so roko
+checks whether the app is installed by its URL scheme (listed under LSApplicationQueriesSchemes
+in project.yml, the same list as in AppLinks.swift), then opens the page as a universal link
+only (`.universalLinksOnly`), which fails quietly if the app doesn't take that address.
+
+Copy Link and Share hand on the link without tracking parameters (`CleanLink`); the page keeps
+its own address. Ask roko sits first in the menu over selected text (`EdgeToEdgeWebView.buildMenu`)
+and runs Browse for Me on the selection.
+
+The share extension (ShareExtension/, target RokoShare) shows nothing: it turns what was shared
+into roko://open?url= or roko://ask?q= and opens roko with it (BrowserModel.handleLink). A share
+extension has no openURL of its own, so it finds the app it runs in up the responder chain.
 
 YouTube keeps playing as sound with roko in the background or the iPhone locked
 (`BackgroundPlay`). roko has the audio background mode and a playback audio session. Two pauses

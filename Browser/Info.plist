@@ -47,6 +47,40 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>airbnb</string>
+		<string>barcelona</string>
+		<string>booking</string>
+		<string>com.amazon.mobile.shopping</string>
+		<string>comgooglemaps</string>
+		<string>discord</string>
+		<string>ebay</string>
+		<string>etsy</string>
+		<string>fb</string>
+		<string>figma</string>
+		<string>github</string>
+		<string>instagram</string>
+		<string>linkedin</string>
+		<string>medium</string>
+		<string>nflx</string>
+		<string>notion</string>
+		<string>pinterest</string>
+		<string>reddit</string>
+		<string>soundcloud</string>
+		<string>spotify</string>
+		<string>tg</string>
+		<string>tiktok</string>
+		<string>tripadvisor</string>
+		<string>twitch</string>
+		<string>twitter</string>
+		<string>uber</string>
+		<string>whatsapp</string>
+		<string>wolt</string>
+		<string>youtube</string>
+		<string>youtubemusic</string>
+		<string>zoomus</string>
+	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoadsInWebContent</key>

@@ -412,6 +412,13 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
             await openOutside(url, tapped: navigationAction.navigationType == .linkActivated, in: webView)
             return (.cancel, preferences)
         }
+        // Open links in apps set to Always: a link you tap to another site
+        // whose app you have opens there, as in Safari.
+        if navigationAction.navigationType == .linkActivated, navigationAction.targetFrame?.isMainFrame != false,
+           !AppLinks.sameSite(webView.url, url), AppLinks.Mode.current == .always,
+           AppLinks.installedApp(for: url) != nil, await AppLinks.open(url) {
+            return (.cancel, preferences)
+        }
         // A link with download, or a blob a page saves: a file, not a page.
         if navigationAction.shouldPerformDownload {
             return (.download, preferences)

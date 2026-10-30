@@ -7,7 +7,7 @@ struct CommandItem: Identifiable {
              browse(String), summarize, findOnPage, privateTab, settings, copy(String),
              pasteLink, openCopied(URL), todos, today, openApp(URL), ask(String), askAboutPage(String), addTodo(String, TodoWhen, DateComponents?),
              payParking(city: String, zone: String), extendParking, endParking, shopping, addShopping(String),
-             saveForLater, readLater, askAboutSaved(String)
+             saveForLater, readLater, askAboutSaved(String), reopenTab
     }
 
     let id: String
@@ -943,6 +943,7 @@ struct CommandBarView: View {
         case .shopping: browser.panel = .shopping
         case .saveForLater: browser.saveForLater()
         case .readLater: browser.panel = .readLater
+        case .reopenTab: browser.reopenClosedTab()
         case .askAboutSaved(let question):
             if let digest = browser.digest { browser.ask(question, about: digest) } else { browser.panel = .none }
         case .addShopping(let typed):
@@ -1309,12 +1310,17 @@ enum CommandRanker {
                          subtitle: ReadLater.shared.unread.isEmpty ? "Pages you saved" : "\(ReadLater.shared.unread.count) to read",
                          kind: "Action", icon: .glyph(.readLater), action: .readLater)),
         ]
+            + (browser.recentlyClosed.last.map { closed in
+                [(words: ["reopen", "reopen tab", "closed tab", "undo close", "ponovno otvori"],
+                  item: CommandItem(id: "action-reopen", title: "Reopen closed tab", subtitle: closed.url.displayHost,
+                              kind: "Action", icon: .glyph(.reopen), action: .reopenTab))]
+            } ?? [])
         for (words, item) in actions where words.contains(where: { $0.hasPrefix(needle) }) {
             let needsPage = ["action-summarize", "action-find", "action-save-later"].contains(item.id)
             if needsPage && browser.selectedTab == nil { continue }
             // Typed in full, a place in roko (Settings, To-do) is what's meant,
             // not a web search for the word: it goes first, and Return opens it.
-            let isPlace = ["action-settings", "action-todos", "action-today", "action-shopping", "action-read-later"].contains(item.id)
+            let isPlace = ["action-settings", "action-todos", "action-today", "action-shopping", "action-read-later", "action-reopen"].contains(item.id)
             let exact = words.contains(needle)
             // "save for later" typed in full means this page, not a search for the words.
             if item.id == "action-save-later", exact, needle != "read later" {
