@@ -87,8 +87,8 @@ struct BrowserView: View {
         .overlay(alignment: .bottom) {
             // The command bar takes the bar's place rather than stacking on top of it.
             BottomBar()
-                .opacity(sideBar ? 0 : 1)
-                .allowsHitTesting(!sideBar)
+                .opacity(sideBar || browser.splitList != nil ? 0 : 1)
+                .allowsHitTesting(!sideBar && browser.splitList == nil)
                 .opacity(browser.launcherShown || browser.panel == .tabs || browser.pageBecomingSummary || browser.hidingItems != nil ? 0 : 1)
                 .allowsHitTesting(browser.hidingItems == nil)
                 // Faded, not folded: folding changes the page's insets, which stops a pull dead.
@@ -135,14 +135,14 @@ struct BrowserView: View {
             }
         }
         .overlay {
-            if browser.panel == .todos || browser.panel == .command && browser.launcherReturn == .todos {
+            if browser.panel == .todos || browser.panel == .command && browser.launcherReturn == .todos, browser.splitList == nil {
                 // Full screen, rising from the bar like Browse for Me.
                 TodoView()
                     .transition(.move(edge: .bottom))
             }
         }
         .overlay {
-            if browser.panel == .shopping {
+            if browser.panel == .shopping, browser.splitList == nil {
                 ShoppingView()
                     .transition(.move(edge: .bottom))
             }
@@ -866,6 +866,11 @@ private struct SplitPages: View {
             }
             .frame(width: proxy.size.width, height: proxy.size.height + (sideBySide ? 0 : proxy.safeAreaInsets.bottom), alignment: .top)
             .animation(.snappy(duration: 0.2), value: browser.selectedID)
+            .animation(.snappy(duration: 0.3), value: browser.splitList)
+        }
+        // The list covers the second half, so the bar works the page beside it.
+        .onChange(of: browser.splitList) { _, list in
+            if list != nil, browser.selectedID != top.id { browser.select(top) }
         }
         // Black between and under the cards, not behind the status bar: that
         // band keeps the top page's colour, so the clock stays readable.
@@ -873,11 +878,18 @@ private struct SplitPages: View {
         .ignoresSafeArea(edges: .bottom)
     }
 
-    /// The second half: its page, or the card that asks for one.
+    /// The second half: to-dos or the shopping list when they're open, its
+    /// page, or the card that asks for one.
     @ViewBuilder
     private func second(_ shape: some Shape, from edge: Edge) -> some View {
         Group {
-            if let bottom {
+            if let list = browser.splitList {
+                Group {
+                    if list == .todos { TodoView() } else { ShoppingView() }
+                }
+                .clipShape(shape)
+                .transition(.move(edge: edge).combined(with: .opacity))
+            } else if let bottom {
                 card(bottom, shape: shape)
             } else {
                 SplitPicker(top: top, beside: edge == .trailing)
@@ -986,6 +998,23 @@ private struct SplitPicker: View {
             .sorted { $0.lastActive > $1.lastActive }
     }
 
+    private func listButton(_ list: BrowserModel.Panel, glyph: Glyph.Kind, title: String) -> some View {
+        Button { browser.panel = list } label: {
+            HStack(spacing: 10) {
+                Glyph(glyph, size: 19).foregroundStyle(Theme.secondaryInk)
+                Text(title).font(.system(size: 16))
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(Theme.raised, in: .rect(cornerRadius: 18))
+            .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.edge))
+            .contentShape(.rect)
+        }
+        .buttonStyle(RowButtonStyle())
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -1008,6 +1037,12 @@ private struct SplitPicker: View {
                     .contentShape(.rect)
                 }
                 .buttonStyle(RowButtonStyle())
+
+                // Not a page: the list itself, beside the one on top.
+                HStack(spacing: 10) {
+                    listButton(.todos, glyph: .todo, title: "To-dos")
+                    listButton(.shopping, glyph: .basket, title: "Shopping list")
+                }
 
                 if !others.isEmpty {
                     VStack(alignment: .leading, spacing: 2) {

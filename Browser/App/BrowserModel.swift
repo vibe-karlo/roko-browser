@@ -183,6 +183,16 @@ final class BrowserModel {
     /// Split View is waiting for its second page (the card below, and the bar opened from it).
     var isPickingSplit: Bool { splitPickingTop != nil }
 
+    /// To-dos or the shopping list opened during Split View: they take the
+    /// second half, beside the page, instead of covering both.
+    var splitList: Panel? {
+        guard split != nil || isPickingSplit else { return nil }
+        for list in [Panel.todos, .shopping] where panel == list || panel == .command && launcherReturn == list {
+            return list
+        }
+        return nil
+    }
+
     /// The page on top while the bottom half is being chosen.
     var splitPickingTop: BrowserTab? {
         guard split == nil, let id = pendingSplitWith else { return nil }
@@ -197,6 +207,8 @@ final class BrowserModel {
 
     /// Back to one tab: the one in use, or the one asked for.
     func endSplit(keeping kept: BrowserTab? = nil) {
+        // A list in the second half goes with it, rather than filling the screen.
+        if splitList != nil { panel = .none }
         pendingSplitWith = nil
         guard split != nil else { return }
         split = nil
