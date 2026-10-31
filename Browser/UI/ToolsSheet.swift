@@ -30,13 +30,21 @@ struct ToolsSheet: View {
                     actionTiles(tab)
                     pageGroup(tab)
                     siteGroup(tab)
-                    blockingFooter(tab)
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 22)
+                .padding(.top, 8)
                 .padding(.bottom, 24)
             }
             .scrollBounceBehavior(.basedOnSize)
+            // Scrolled rows slip away a little under the grabber, not into it.
+            .mask {
+                VStack(spacing: 0) {
+                    LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 6)
+                    Color.black
+                }
+            }
+            .padding(.top, 14)
             .foregroundStyle(Theme.ink)
             .onAppear {
                 let host = tab.url?.host()
@@ -141,10 +149,6 @@ struct ToolsSheet: View {
                 ToolRow(glyph: .bell, title: "Notify Me", detail: isWatched(tab) ? "On" : "") { browser.panel = .notifyMe }
             }
 
-            ToolRow(glyph: .hideItems, title: "Hide Distracting Items", detail: hiddenDetail(tab)) {
-                browser.startHidingItems()
-            }
-
             translateRow(tab)
 
             HStack(spacing: 14) {
@@ -168,12 +172,8 @@ struct ToolsSheet: View {
                 if browser.split == nil { browser.startSplit() } else { browser.endSplit(); browser.panel = .none }
             }
 
-            ToolRow(glyph: .desktop, title: tab.wantsDesktopSite ? "Request Mobile Site" : "Request Desktop Site") {
-                tab.setDesktopSite(!tab.wantsDesktopSite)
-                browser.panel = .none
-            }
-
-            if !Downloads.shared.items.isEmpty {
+            // Only while something is coming in; otherwise the bar finds it.
+            if Downloads.shared.activeCount > 0 {
                 ToolRow(glyph: .download, title: "Downloads", detail: downloadsDetail) { browser.panel = .downloads }
             }
         }
@@ -274,6 +274,9 @@ struct ToolsSheet: View {
                     Glyph(.settings).foregroundStyle(Theme.secondaryInk).frame(width: 24)
                     Text("Site Settings").font(.system(size: 16))
                     Spacer()
+                    Text(blockingOn ? "Blocking on" : "Blocking off")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.faintInk)
                     Glyph(.chevronUp, size: 16)
                         .foregroundStyle(Theme.secondaryInk)
                         .rotationEffect(.degrees(siteSettingsOpen ? 0 : 180))
@@ -310,8 +313,15 @@ struct ToolsSheet: View {
                         cookieReason = on ? nil : .chosen
                     }))
                     .disabled(!blockingOn || !ContentBlocker.shared.isEnabled(.cookies))
+                ToolRow(glyph: .hideItems, title: "Hide Distracting Items", detail: hiddenDetail(tab)) {
+                    browser.startHidingItems()
+                }
                 if !HiddenItems.shared.selectors(for: host).isEmpty {
                     ToolRow(glyph: .hideItems, title: "Show Hidden Items") { browser.showHiddenItems() }
+                }
+                ToolRow(glyph: .desktop, title: tab.wantsDesktopSite ? "Request Mobile Site" : "Request Desktop Site") {
+                    tab.setDesktopSite(!tab.wantsDesktopSite)
+                    browser.panel = .none
                 }
                 ToolRow(glyph: .settings, title: "All settings") { browser.panel = .settings }
             }
@@ -333,36 +343,6 @@ struct ToolsSheet: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-    }
-
-    // MARK: Footer
-
-    /// The escape hatch when blocking breaks a site, as in Arc.
-    private func blockingFooter(_ tab: BrowserTab) -> some View {
-        Button {
-            guard let host = tab.url?.host() else { return }
-            let restore = blockingOn
-            blockingOn = !restore
-            ContentBlocker.shared.setAllowed(host: host, restore)
-            tab.webView?.reload()
-            browser.panel = .none
-            browser.showToast(restore ? "Showing the original page" : "Blocking again")
-        } label: {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(blockingOn ? "Ads, trackers and pop-ups blocked" : "Blocking is off for this site")
-                    .font(.system(size: 15, weight: .medium))
-                Text(blockingOn ? "Problems? Tap to restore the original page" : "Tap to block again")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.secondaryInk)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(Theme.raised, in: .rect(cornerRadius: 20))
-            .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.edge))
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
     }
 }
 
@@ -418,7 +398,7 @@ private struct ToolRow: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.vertical, 12)
             .contentShape(.rect)
         }
         .buttonStyle(RowButtonStyle())

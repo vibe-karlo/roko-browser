@@ -31,8 +31,8 @@ is marked with the page it comes from.
 
 **Clean pages.** Ads, trackers and cookie banners are gone before the page draws: consent pop-ups
 are answered with "reject", and subscription walls that freeze scrolling get it back. What's left
-that you don't want (a sticky bar, a "Join" button, a promo row) goes with Hide Distracting Items in
-the page menu: tap it, tap it again, and it stays gone on that site.
+that you don't want (a sticky bar, a "Join" button, a promo row) goes with Hide Distracting Items under
+Site Settings in the page menu: tap it, tap it again, and it stays gone on that site.
 
 **And the rest.** Today's weather, news and to-dos on a new tab, to-dos synced with Apple
 Reminders, YouTube playing on as sound with roko closed, closed tabs a tap from coming back,
