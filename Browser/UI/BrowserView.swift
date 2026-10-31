@@ -40,11 +40,12 @@ struct BrowserView: View {
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
                         pages
-                            // Sideways, as round as Split View's cards, so every corner matches.
-                            .clipShape(UnevenRoundedRectangle(topLeadingRadius: sideBar ? 26 : 0,
-                                                              bottomLeadingRadius: sideBar ? 26 : showsPlayer ? 22 : 0,
-                                                              bottomTrailingRadius: sideBar ? 26 : showsPlayer ? 22 : 0,
-                                                              topTrailingRadius: sideBar ? 26 : 0))
+                            // Sideways, a card: rounded just enough to read as one, as
+                            // Split View's side-by-side cards are, so every corner matches.
+                            .clipShape(UnevenRoundedRectangle(topLeadingRadius: sideBar ? 16 : 0,
+                                                              bottomLeadingRadius: sideBar ? 16 : showsPlayer ? 22 : 0,
+                                                              bottomTrailingRadius: sideBar ? 16 : showsPlayer ? 22 : 0,
+                                                              topTrailingRadius: sideBar ? 16 : 0))
                         if !browser.liveItems.isEmpty {
                             LiveBand()
                                 // Down into the home indicator's strip: on the black band it has room,
@@ -839,6 +840,8 @@ private struct SplitPages: View {
 
     private let band: CGFloat = 28
     private let corner: CGFloat = 26
+    /// Side by side the cards are smaller, and so is their rounding.
+    private let sideCorner: CGFloat = 16
 
     var body: some View {
         GeometryReader { proxy in
@@ -850,11 +853,11 @@ private struct SplitPages: View {
                 if sideBySide {
                     HStack(spacing: 0) {
                         // Side by side, two whole cards between the black strips.
-                        card(top, shape: RoundedRectangle(cornerRadius: corner))
+                        card(top, shape: RoundedRectangle(cornerRadius: sideCorner))
                             .frame(width: first)
                         SplitHandle(drag: $drag, total: length, band: band, sideways: true, top: top, bottom: bottom)
                             .frame(width: band)
-                        second(RoundedRectangle(cornerRadius: corner), from: .trailing)
+                        second(RoundedRectangle(cornerRadius: sideCorner), from: .trailing)
                     }
                 } else {
                     VStack(spacing: 0) {
