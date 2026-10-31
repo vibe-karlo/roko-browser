@@ -49,6 +49,10 @@ final class BrowserTab: NSObject, Identifiable {
     private(set) var topColor: UIColor?
 
     @ObservationIgnored private(set) var webView: WKWebView?
+    /// The view on screen that shows this page now: the one made last. Going
+    /// into or out of Split View, the old view lingers while it animates away
+    /// and took the page back from the new one, leaving the screen black.
+    @ObservationIgnored weak var host: UIView?
     @ObservationIgnored private var restoreState: Data?
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
     @ObservationIgnored weak var delegate: BrowserTabDelegate?

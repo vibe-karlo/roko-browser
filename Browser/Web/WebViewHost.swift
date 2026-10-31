@@ -21,13 +21,22 @@ struct WebViewHost: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
         let container = UIView()
         container.backgroundColor = .clear
+        tab.host = container
         return container
+    }
+
+    static func dismantleUIView(_ container: UIView, coordinator: Coordinator) {
+        // Gone: a view still showing the page may have it back.
+        if coordinator.parent.tab.host === container { coordinator.parent.tab.host = nil }
     }
 
     func updateUIView(_ container: UIView, context: Context) {
         context.coordinator.parent = self
         // Reading isLive (observed) makes SwiftUI call this again when a tab wakes.
         guard tab.isLive, let webView = tab.webView else { return }
+        // Only the newest view shows the page; one on its way out leaves it be.
+        if tab.host == nil { tab.host = container }
+        guard tab.host === container else { return }
         defer { coverBar(webView, in: container) }
         guard webView.superview !== container else { return }
 
