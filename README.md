@@ -42,7 +42,7 @@ the time all this has saved you.
 **Two at once, and more.** Two tabs at once in Split View. Touch and hold a link to see its page live, then
 open it, open it in the background or add it to Read Later. Forms you're filling in survive a crash.
 Private tabs and history behind Face ID. A mini player for sound in a tab you've left, a real
-download manager (also in Files), Copy as Markdown, swipe anywhere to go back, pinch for your tabs,
+download manager (also in Files), Copy as Markdown (under Share), swipe anywhere to go back, pinch for your tabs,
 and New Tab, Private Tab and Ask roko in Control Center, Shortcuts and Siri.
 
 <p>

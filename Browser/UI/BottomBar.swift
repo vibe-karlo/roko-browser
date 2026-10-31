@@ -5,6 +5,10 @@ import SwiftUI
 /// back as soon as you scroll up.
 struct BottomBar: View {
     @Environment(BrowserModel.self) private var browser
+    /// Turned sideways: a column in the strip beside the page, tabs at the
+    /// top, + in the middle, the page menu at the foot. It has its own strip,
+    /// so it stays while you scroll.
+    var upright = false
     /// Where the + capsule is on screen, for the launcher to grow out of.
     @State private var capsuleFrame: CGRect = .zero
     /// Tabs switched by swiping the bar; each one ticks.
@@ -12,23 +16,26 @@ struct BottomBar: View {
 
     var body: some View {
         Group {
-            if !browser.isBarCollapsed || browser.selectedTab == nil {
+            if upright {
+                expanded
+            } else if !browser.isBarCollapsed || browser.selectedTab == nil {
                 expanded
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .padding(.horizontal, Theme.gutter)
-        .padding(.bottom, 4)
+        .padding(.horizontal, upright ? 0 : Theme.gutter)
+        .padding(.bottom, upright ? 0 : 4)
         .animation(.snappy(duration: 0.28), value: browser.isBarCollapsed)
     }
 
     /// Arc's layout: the bar is about starting something new. Tabs on the left,
     /// a wide + in the middle, and everything about the current page behind ⌃.
     private var expanded: some View {
-        HStack(spacing: 0) {
+        let layout = upright ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
+        return layout {
             Button { browser.showTabs() } label: {
                 TabThumbnails(tabs: recentTabs, count: browser.tabs.count)
-                    .frame(width: 64, height: Theme.barHeight)
+                    .frame(width: upright ? 56 : 64, height: upright ? 64 : Theme.barHeight)
                     .contentShape(.rect)
             }
             .buttonStyle(GlyphButtonStyle())
@@ -41,7 +48,10 @@ struct BottomBar: View {
                 ZStack {
                     // On a private tab it says so, as what tapping does: a private search.
                     Group {
-                        if isPrivate {
+                        if isPrivate && upright {
+                            Glyph(.eyeClosed, size: 19)
+                                .transition(.opacity)
+                        } else if isPrivate {
                             HStack(spacing: 6) {
                                 // Centred on the word's lowercase letters, not its
                                 // capitals: measured, it sat 1.3 points high.
@@ -63,7 +73,7 @@ struct BottomBar: View {
                         .opacity(browser.voiceListening ? 1 : 0)
                 }
                 .animation(.snappy(duration: 0.15), value: browser.voiceListening)
-                    .frame(width: 104, height: 38)
+                    .frame(width: upright ? 44 : 104, height: upright ? 96 : 38)
                     .background {
                         // Becomes the launcher's field: there only while the launcher isn't,
                         // and only on a page (a screen over it has its own bar).
@@ -112,16 +122,17 @@ struct BottomBar: View {
                 Glyph(.chevronUp, size: 18, weight: 2)
                     .frame(width: 38, height: 38)
                     .background(Theme.raised, in: .circle)
-                    .frame(width: 64, height: Theme.barHeight)
+                    .frame(width: upright ? 56 : 64, height: upright ? 64 : Theme.barHeight)
                     .contentShape(.rect)
             }
             .buttonStyle(GlyphButtonStyle())
             .disabled(browser.selectedTab == nil)
             .accessibilityLabel("Page menu")
         }
-        .frame(height: Theme.barHeight + 8)
-        .overlay(alignment: .bottom) { progressLine }
-        .barSurface(cornerRadius: Theme.barRadius)
+        .frame(height: upright ? nil : Theme.barHeight + 8)
+        .padding(.vertical, upright ? 18 : 0)
+        .overlay(alignment: upright ? .leading : .bottom) { progressLine }
+        .modifier(BarSurface(on: !upright))
         // Alongside the + capsule's own hold, not over it: as a high-priority
         // gesture it held every touch until it knew it wasn't a swipe, so a
         // hold on + never reached the capsule.
@@ -201,24 +212,39 @@ struct BottomBar: View {
     @ViewBuilder
     private var progressLine: some View {
         if let tab = browser.selectedTab, tab.isLoading {
-            GeometryReader { proxy in
-                let track = proxy.size.width
-                Capsule()
-                    .fill(Theme.accent.opacity(0.75))
-                    .frame(width: max(6, track * tab.progress), height: 2)
-                    .animation(.easeOut(duration: 0.25), value: tab.progress)
+            if upright {
+                // Down the column's inner edge, beside the page it's loading.
+                GeometryReader { proxy in
+                    Capsule()
+                        .fill(Theme.accent.opacity(0.75))
+                        .frame(width: 2, height: max(6, proxy.size.height * tab.progress))
+                        .animation(.easeOut(duration: 0.25), value: tab.progress)
+                }
+                .frame(width: 2)
+                .padding(.vertical, 22)
+                .transition(.opacity)
+            } else {
+                GeometryReader { proxy in
+                    let track = proxy.size.width
+                    Capsule()
+                        .fill(Theme.accent.opacity(0.75))
+                        .frame(width: max(6, track * tab.progress), height: 2)
+                        .animation(.easeOut(duration: 0.25), value: tab.progress)
+                }
+                .frame(height: 2)
+                .padding(.horizontal, 22)
+                .padding(.bottom, 5)
+                .transition(.opacity)
             }
-            .frame(height: 2)
-            .padding(.horizontal, 22)
-            .padding(.bottom, 5)
-            .transition(.opacity)
         }
     }
 
     private var swipes: some Gesture {
         DragGesture(minimumDistance: 24)
             .onEnded { value in
-                let dx = value.translation.width, dy = value.translation.height
+                // Upright, the axes turn: along the column switches tabs, off it opens them.
+                let dx = upright ? -value.translation.height : value.translation.width
+                let dy = upright ? value.translation.width : value.translation.height
                 if dy < -40, abs(dy) > abs(dx) {
                     browser.showTabs()
                 } else if abs(dx) > 60, abs(dx) > abs(dy) {
@@ -227,6 +253,20 @@ struct BottomBar: View {
                     if browser.selectedID != before { switches += 1 }
                 }
             }
+    }
+}
+
+/// The floating bar's panel; upright, the column sits straight on the dark strip.
+private struct BarSurface: ViewModifier {
+    let on: Bool
+
+    func body(content: Content) -> some View {
+        if on {
+            content.barSurface(cornerRadius: Theme.barRadius)
+        } else {
+            // On black whichever look roko has, so its keys take their dark colours.
+            content.foregroundStyle(Theme.ink).environment(\.colorScheme, .dark)
+        }
     }
 }
 

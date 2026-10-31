@@ -124,8 +124,15 @@ struct ToolsSheet: View {
                 browser.showToast(browser.isPinned(tab.url) ? "Pinned" : "Unpinned")
             }
             if let url = tab.url {
-                ShareLink(item: CleanLink.clean(url)) { ActionTile.Face(glyph: .share, title: "Share") }
-                    .buttonStyle(RowButtonStyle())
+                // The link to another app, or the page itself as Markdown.
+                Menu {
+                    ShareLink(item: CleanLink.clean(url)) { Label("Share Link", systemImage: "square.and.arrow.up") }
+                    Button { browser.copyAsMarkdown() } label: { Label("Copy as Markdown", systemImage: "doc.richtext") }
+                } label: {
+                    ActionTile.Face(glyph: .share, title: "Share")
+                }
+                .buttonStyle(RowButtonStyle())
+                .menuStyle(.button)
             }
         }
     }
@@ -135,7 +142,6 @@ struct ToolsSheet: View {
     private func pageGroup(_ tab: BrowserTab) -> some View {
         VStack(spacing: 0) {
             ToolRow(glyph: .reader, title: "Reader Mode") { browser.openReader() }
-            ToolRow(glyph: .markdown, title: "Copy as Markdown") { browser.copyAsMarkdown() }
 
             // Not for private tabs: the list keeps the page and its text.
             if !tab.isPrivate {

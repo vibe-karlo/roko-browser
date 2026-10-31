@@ -7,6 +7,9 @@ struct BrowserView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
     @State private var barTop: CGFloat = 0
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    /// The strip beside the page, turned sideways, where the bar stands upright.
+    @State private var sideStrip: CGFloat = 0
 
     var body: some View {
         @Bindable var browser = browser
@@ -25,6 +28,10 @@ struct BrowserView: View {
             }
             .animation(.easeOut(duration: 0.2), value: browser.topTab?.topColor)
 
+            if sideBar {
+                Color.black.ignoresSafeArea()
+            }
+
             if browser.selectedTab != nil {
                 // One layout whatever is on screen, so a page is never shown by
                 // two at once (a layout on its way out took its page with it).
@@ -34,7 +41,8 @@ struct BrowserView: View {
                     VStack(spacing: 0) {
                         pages
                             .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: showsPlayer ? 22 : 0,
-                                                              bottomTrailingRadius: showsPlayer ? 22 : 0))
+                                                              bottomTrailingRadius: showsPlayer || sideBar ? 22 : 0,
+                                                              topTrailingRadius: sideBar ? 22 : 0))
                         if !browser.liveItems.isEmpty {
                             LiveBand()
                                 // Down into the home indicator's strip: on the black band it has room,
@@ -51,7 +59,8 @@ struct BrowserView: View {
                 }
                 // Turned sideways, edge to edge: no blank strips beside the
                 // Dynamic Island. Each page keeps its text clear of it itself.
-                .ignoresSafeArea(edges: .horizontal)
+                // The strip on the other side is the bar's.
+                .ignoresSafeArea(edges: sideBar ? .leading : .horizontal)
             } else {
                 StartView()
                     // The bar floats over the page; the start page keeps clear of it.
@@ -63,9 +72,23 @@ struct BrowserView: View {
         // it left a strip of the page's background under it, and when the bar
         // folded away while scrolling, a blank band above the home indicator.
         // The page learns which strip the bar covers from barTop (WebViewHost).
+        .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.trailing } action: { sideStrip = $0 }
+        .overlay(alignment: .trailing) {
+            if sideBar {
+                BottomBar(upright: true)
+                    .frame(width: max(sideStrip, 56))
+                    .frame(maxHeight: .infinity)
+                    .opacity(browser.launcherShown || browser.panel == .tabs || browser.pageBecomingSummary || browser.hidingItems != nil ? 0 : 1)
+                    .allowsHitTesting(browser.hidingItems == nil)
+                    .animation(.launcher, value: browser.launcherShown)
+                    .ignoresSafeArea(edges: .trailing)
+            }
+        }
         .overlay(alignment: .bottom) {
             // The command bar takes the bar's place rather than stacking on top of it.
             BottomBar()
+                .opacity(sideBar ? 0 : 1)
+                .allowsHitTesting(!sideBar)
                 .opacity(browser.launcherShown || browser.panel == .tabs || browser.pageBecomingSummary || browser.hidingItems != nil ? 0 : 1)
                 .allowsHitTesting(browser.hidingItems == nil)
                 // Faded, not folded: folding changes the page's insets, which stops a pull dead.
@@ -362,6 +385,11 @@ struct BrowserView: View {
     }
 
     /// The mini player shows over the page and the bar, not over a panel or a screen of roko's own.
+    /// Turned sideways on a page: the bar leaves the bottom for the strip at the side.
+    private var sideBar: Bool {
+        verticalSizeClass == .compact && browser.selectedTab != nil
+    }
+
     private var showsPlayer: Bool {
         !browser.liveItems.isEmpty && browser.selectedTab != nil
     }
@@ -380,9 +408,9 @@ struct BrowserView: View {
     private var pages: some View {
         // Picking the second page and showing it are one view, for the same reason.
         if let halves = splitHalves {
-            SplitPages(top: halves.top, bottom: halves.bottom, barTop: barTop)
+            SplitPages(top: halves.top, bottom: halves.bottom, barTop: sideBar ? .greatestFiniteMagnitude : barTop)
         } else if let tab = browser.selectedTab {
-            PagePane(tab: tab, barTop: barTop)
+            PagePane(tab: tab, barTop: sideBar ? .greatestFiniteMagnitude : barTop)
         }
     }
 
@@ -562,6 +590,9 @@ private struct BottomPanel<Content: View>: View {
     @ViewBuilder let content: Content
     @State private var shown = false
     @State private var drag: CGFloat = 0
+    /// The screen it rises on: turned sideways it's short and wide, so the
+    /// panel keeps below the top and to a column's width.
+    @State private var room: CGSize = .zero
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -576,10 +607,10 @@ private struct BottomPanel<Content: View>: View {
                         .frame(width: 36, height: 5)
                         .padding(.top, 8)
                     content
-                        .frame(maxHeight: 640)
+                        .frame(maxHeight: room.height > 0 ? min(640, room.height - 24) : 640)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: room.width > room.height ? 560 : .infinity)
                 .background {
                     UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
                         .fill(Theme.panel)
@@ -598,6 +629,7 @@ private struct BottomPanel<Content: View>: View {
                 .transition(.move(edge: .bottom))
             }
         }
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { room = $0 }
         .onAppear { withAnimation(.spring(duration: 0.4, bounce: 0.12)) { shown = true } }
     }
 
