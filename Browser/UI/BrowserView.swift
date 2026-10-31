@@ -40,9 +40,11 @@ struct BrowserView: View {
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
                         pages
-                            .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: showsPlayer ? 22 : 0,
-                                                              bottomTrailingRadius: showsPlayer || sideBar ? 22 : 0,
-                                                              topTrailingRadius: sideBar ? 22 : 0))
+                            // Sideways, as round as Split View's cards, so every corner matches.
+                            .clipShape(UnevenRoundedRectangle(topLeadingRadius: sideBar ? 26 : 0,
+                                                              bottomLeadingRadius: sideBar ? 26 : showsPlayer ? 22 : 0,
+                                                              bottomTrailingRadius: sideBar ? 26 : showsPlayer ? 22 : 0,
+                                                              topTrailingRadius: sideBar ? 26 : 0))
                         if !browser.liveItems.isEmpty {
                             LiveBand()
                                 // Down into the home indicator's strip: on the black band it has room,
@@ -57,10 +59,9 @@ struct BrowserView: View {
                     .animation(.snappy(duration: 0.3), value: browser.liveItems.isEmpty)
                     .animation(.snappy(duration: 0.25), value: browser.bandShowsStrip)
                 }
-                // Turned sideways, edge to edge: no blank strips beside the
-                // Dynamic Island. Each page keeps its text clear of it itself.
-                // The strip on the other side is the bar's.
-                .ignoresSafeArea(edges: sideBar ? .leading : .horizontal)
+                // Turned sideways the page is a card between two black strips:
+                // the Dynamic Island's on one side, the bar's on the other.
+                .ignoresSafeArea(edges: sideBar ? [] : .horizontal)
             } else {
                 StartView()
                     // The bar floats over the page; the start page keeps clear of it.
@@ -848,11 +849,12 @@ private struct SplitPages: View {
             Group {
                 if sideBySide {
                     HStack(spacing: 0) {
-                        card(top, shape: UnevenRoundedRectangle(bottomTrailingRadius: corner, topTrailingRadius: corner))
+                        // Side by side, two whole cards between the black strips.
+                        card(top, shape: RoundedRectangle(cornerRadius: corner))
                             .frame(width: first)
                         SplitHandle(drag: $drag, total: length, band: band, sideways: true, top: top, bottom: bottom)
                             .frame(width: band)
-                        second(UnevenRoundedRectangle(topLeadingRadius: corner, bottomLeadingRadius: corner), from: .trailing)
+                        second(RoundedRectangle(cornerRadius: corner), from: .trailing)
                     }
                 } else {
                     VStack(spacing: 0) {
@@ -933,18 +935,24 @@ private struct SplitHandle: View {
     }
 
     var body: some View {
+        // Nothing to swap with a half still to choose, or a list in it.
+        let canSwap = bottom != nil && browser.splitList == nil
         let layout = sideways ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
         layout {
-            Button { browser.swapSplit() } label: {
-                Glyph(.swap, size: 17)
-                    .rotationEffect(.degrees(sideways ? 90 : 0))
-                    .frame(width: sideways ? band : 52, height: sideways ? 52 : band)
-                    .contentShape(.rect)
+            // Upright it leaves its place, so close takes the top; lying down an
+            // empty place keeps the grip in the middle.
+            if canSwap || !sideways {
+                Button { browser.swapSplit() } label: {
+                    Glyph(.swap, size: 17)
+                        .rotationEffect(.degrees(sideways ? 90 : 0))
+                        .frame(width: sideways ? band : 52, height: sideways ? 52 : band)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(GlyphButtonStyle())
+                .accessibilityLabel("Swap the halves")
+                .opacity(canSwap ? 1 : 0)
+                .disabled(!canSwap)
             }
-            .buttonStyle(GlyphButtonStyle())
-            .accessibilityLabel("Swap the halves")
-            .opacity(bottom == nil ? 0 : 1)
-            .disabled(bottom == nil)
             // Upright, close goes under swap at the top: at the bottom the bar would cover it.
             if sideways { close }
             Spacer()
@@ -1002,7 +1010,10 @@ private struct SplitPicker: View {
         Button { browser.panel = list } label: {
             HStack(spacing: 10) {
                 Glyph(glyph, size: 19).foregroundStyle(Theme.secondaryInk)
-                Text(title).font(.system(size: 16))
+                Text(title)
+                    .font(.system(size: 16))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 16)
@@ -1041,7 +1052,7 @@ private struct SplitPicker: View {
                 // Not a page: the list itself, beside the one on top.
                 HStack(spacing: 10) {
                     listButton(.todos, glyph: .todo, title: "To-dos")
-                    listButton(.shopping, glyph: .basket, title: "Shopping list")
+                    listButton(.shopping, glyph: .basket, title: "Shopping")
                 }
 
                 if !others.isEmpty {
