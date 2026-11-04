@@ -214,7 +214,7 @@ if (!still) {
     const vh = innerHeight;
     if (!pulled) {
       const r = puller.getBoundingClientRect();
-      puller.style.setProperty("--p", 6 + 88 * Math.max(0, Math.min(1, (vh * .8 - r.top) / (vh * .55))) + "%");
+      puller.style.setProperty("--p", 6 + 56 * Math.max(0, Math.min(1, (vh * .8 - r.top) / (vh * .55))) + "%");
     }
   };
   addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(frame); } }, { passive: true });

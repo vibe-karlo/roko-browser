@@ -120,16 +120,14 @@ div>.row:has(span){min-height:54px}
 .duo{display:grid;gap:72px;margin-top:clamp(44px,6vw,88px)}
 .duo article>p{margin-top:12px;max-width:27em;color:var(--soft)}
 .duo article{display:flex;flex-direction:column;min-width:0}
-.bleed{--w:min(330px,84vw);margin-top:32px;padding-bottom:0;border-radius:calc(var(--w)*.15) calc(var(--w)*.15) 0 0}
-.bleed .screen{aspect-ratio:828/1400;border-radius:calc(var(--w)*.13) calc(var(--w)*.13) 0 0}
-.duo article:last-child .bleed{margin-bottom:0}
-.puller{user-select:none;-webkit-user-select:none}
-/* The picture runs past the cropped screen (1800 against 1400): the edge is measured in the screen, where the handle is. */
-.puller .top{clip-path:inset(0 0 calc(100% - var(--p)*.7778) 0)}
+.duo .device{margin-top:32px}
+.puller{aspect-ratio:828/1800;user-select:none;-webkit-user-select:none}
+.puller .top{clip-path:inset(0 0 calc(100% - var(--p)) 0)}
 .grip{position:absolute;touch-action:none}
 .puller .grip,.splitter .grip{left:0;right:0;height:60px;margin-top:-30px;cursor:ns-resize}
 .puller .grip{top:var(--p)}
 .puller .grip::after,.splitter .grip::after{content:"";position:absolute;left:50%;top:28.5px;width:74px;height:3px;margin-left:-37px;border-radius:3px;background:var(--glow);box-shadow:0 1px 3px #0008}
+.puller .grip::after{top:26px}
 
 /* Clean: the slider is the whole argument. */
 .clean{padding:var(--gap) var(--gutter);text-align:center;background:linear-gradient(#1d110c,var(--floor) 30%)}
@@ -246,7 +244,7 @@ footer .go{margin-top:clamp(30px,4vw,44px)}
 @media(min-width:820px){
   .reasons{grid-template-columns:repeat(3,minmax(0,1fr));gap:40px}
   .stats{grid-template-columns:repeat(4,minmax(0,1fr));padding:36px 20px}
-  .crop,.bleed{--w:340px}
+  .crop,.duo .device{--w:340px}
   .duo{grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(32px,5vw,72px)}
   .duo article>p{min-height:5em}
   .bar .duo article>p{min-height:0}
