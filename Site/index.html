@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>roko: the browser that answers back</title>
-<meta name="description" content="roko is a browser for iPhone with one bar for everything. It opens sites, answers questions, summarizes pages and removes ads, cookie banners and pop-ups.">
-<meta property="og:title" content="roko: the browser that answers back"><meta property="og:description" content="One bar for everything, on iPhone. In beta on TestFlight."><meta property="og:image" content="/img/browse.jpg"><meta name="theme-color" content="#0f0f0e">
+<title>roko: a light, fast browser for iPhone</title>
+<meta name="description" content="roko is a light, fast browser for iPhone with nothing in your way. It removes ads, cookies and pop-ups, then summarizes pages, answers questions and keeps your to-dos.">
+<meta property="og:title" content="roko: a light, fast browser for iPhone"><meta property="og:description" content="Light, fast and nothing in your way. In beta on TestFlight."><meta property="og:image" content="/img/browse.jpg"><meta name="theme-color" content="#0f0f0e">
 <link rel="icon" href="/img/icon-48.png"><link rel="apple-touch-icon" href="/img/icon-180.png"><link rel="preload" href="/fonts/cabinet-800.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/style.css">
 </head><body>
 <nav class="nav" aria-label="Main">
@@ -14,17 +14,27 @@
 <header class="hero" id="top">
   <svg class="eclipse" viewBox="0 0 400 400" aria-hidden="true"><defs><mask id="bite"><rect width="400" height="400" fill="#fff"/><circle id="moon" cx="234" cy="200" r="96" fill="#000"/></mask></defs><circle cx="200" cy="200" r="192" fill="currentColor" mask="url(#bite)"/></svg>
   <div class="grain"></div>
-  <h1>The browser that answers back.</h1>
+  <h1>The light, fast browser for iPhone.</h1>
   <div class="bar">
-    <label for="ask">It's a working bar. Try it.</label>
     <div class="field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg>
-      <input id="ask" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type a sum, a site or a question" enterkeyhint="go"></div>
+      <input id="ask" aria-label="Try roko's bar" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Try it: weather, sums, days until..." enterkeyhint="go"></div>
     <div class="answer" id="answer" aria-live="polite"><b>15% of 240 = 36</b><span>Answered right in the bar</span><i>Sum</i></div>
-    <p class="beta"><a class="go" href="https://testflight.apple.com/join/M2ZrEUV1">Join the TestFlight beta <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 9.5l7-7M4 2.5h5.5V8"/></svg></a> For iPhone. The App Store is next.</p>
+    <p class="beta"><a class="go" href="https://testflight.apple.com/join/M2ZrEUV1">Join the TestFlight beta <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 9.5l7-7M4 2.5h5.5V8"/></svg></a> iOS 27 or later</p>
   </div>
 </header>
 
 <main>
+<section class="speed" id="speed">
+  <h2>It opens before you've finished reaching for it.</h2>
+  <dl>
+    <div><dt>160 ms</dt><dd>to the first screen</dd></div>
+    <div><dt>0.1 s</dt><dd>from Go to a page, when it's your top result</dd></div>
+    <div><dt>28 MB</dt><dd>for the whole app</dd></div>
+    <div><dt>0%</dt><dd>CPU while you read</dd></div>
+  </dl>
+  <p class="hint">Measured on Release builds in October 2026: first screen warm on iPhone 17 Pro, page load and CPU in the simulator, size from the build itself. Your numbers will vary with your iPhone and connection.</p>
+</section>
+
 <section class="pull" id="pull">
   <div><h2>Pull down to summarize.</h2>
     <p class="lede">A recipe gets its time, ingredients and steps. A review gets its picks side by side. A news story leads with what happened.</p></div>
@@ -44,8 +54,10 @@
 <section class="clean" id="clean">
   <h2>Ads, cookies and pop-ups, gone.</h2>
   <p class="lede">Ads and trackers go before the page draws, and cookie questions get "reject". If a site breaks, one tap brings back the original.</p>
-  <div class="crop"><img src="/img/controls.jpg" alt="roko's page menu with switches to block ads and trackers, block pop-ups and reject cookies, site by site" loading="lazy"></div>
-</section>
+  <div class="slide" id="compare" style="--p:50%"><img src="/img/before.jpg" alt="A recipe page hidden behind a cookie wall from 133 partners" loading="lazy"><img class="top" src="/img/after.jpg" alt="The same recipe in roko, with no wall" loading="lazy"><div class="line"></div>
+    <input type="range" min="0" max="100" value="50" aria-label="Compare the page without roko and with roko"></div>
+  <p class="hint">Drag across: the same page, without roko on the left and with it on the right.</p>
+  </section>
 
 <section class="trio" id="yours">
   <h2>And it's on your side.</h2>
@@ -68,7 +80,9 @@
       <li><b>iCloud sync</b>Pins, history, to-dos and settings.</li>
       <li><b>iPhone Duo</b>Page above the fold, trackpad below.</li>
     </ul></div>
-  <img class="screen" id="splitshot" src="/img/split.jpg" alt="Two Wikipedia articles open at once in roko's Split View" loading="lazy">
+  <div class="splitwrap"><div class="splitter" id="splitter" style="--s:52%"><img class="one" src="/img/page.jpg" alt="The Espresso article on Wikipedia, on top" loading="lazy"><div class="two"><img src="/img/bourbon.jpg" alt="The Bourbon coffee article on Wikipedia, below" loading="lazy"></div><div class="grip"></div>
+    <input type="range" min="28" max="76" value="52" aria-label="Drag the divider between the two pages"></div>
+    <p class="hint" style="text-align:center">Drag the divider</p></div>
 </section>
 
 <section class="faq" id="questions">
@@ -85,7 +99,7 @@
 
 <footer>
   <div class="grain"></div>
-  <div class="close"><h2>One bar for everything.</h2><a class="go" href="https://testflight.apple.com/join/M2ZrEUV1">Join the TestFlight beta <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 9.5l7-7M4 2.5h5.5V8"/></svg></a></div>
+  <div class="close"><h2>Less waiting, less clutter.</h2><a class="go" href="https://testflight.apple.com/join/M2ZrEUV1">Join the TestFlight beta <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 9.5l7-7M4 2.5h5.5V8"/></svg></a></div>
   <div class="cols">
     <a href="/support">Support</a><a href="/privacy">Privacy policy</a><a href="mailto:karlo@growthstudio.hr?subject=roko">karlo@growthstudio.hr</a>
   </div>

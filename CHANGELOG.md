@@ -6,7 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Website
-- roko has a site in `Site/`, with a working copy of the bar, support and the privacy policy.
+- roko has a site in `Site/`: speed first, a working copy of the bar with weather and days until, draggable before and after and Split View, support and the privacy policy.
 
 ### Changed
 - Shared answers have a Report link, which emails roko.
@@ -26,6 +26,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Turning on private browsing says so: "Private" in the address field, and what it means under it.
+- In private browsing the bar offers no pins, history or sites, and what you type goes to the search engine only when you search.
 - iCloud sync is on: pins, history and settings follow you between devices through your own iCloud account.
 - iPhone Duo: with the phone open, the bar, the page menu and the address field keep to one half instead of lying across the fold; Split View parts at the fold, side by side or stacked; pages keep clear of the clock at the side, open or shut, and it stays readable on black beside a split.
 - iPhone Duo propped open with the fold lying across, like a small laptop: the page stands above the fold and ends there, the bar lies below it on black, and the page menu rises only as far as the fold. The empty lower half works like a trackpad: drag there and the page above scrolls, with its own momentum and bounce.

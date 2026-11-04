@@ -42,10 +42,46 @@ async function rate(amount, from, to, stamp) {
   } catch { if (stamp === asked) show("Rates need a connection", "roko works it out in the bar", "Rate", true); }
 }
 
+const holidays = { christmas: [12, 25], "new year": [1, 1], "new years": [1, 1], halloween: [10, 31], "valentine's day": [2, 14], "valentines day": [2, 14] };
+const months = "january february march april may june july august september october november december".split(" ");
+function daysUntil(low) {
+  const m = low.match(/^(?:how many )?days (?:until|till|to|since)\s+(.+?)\??$/); if (!m) return null;
+  const since = /since/.test(low), name = m[1].replace(/^the /, "");
+  let month, day, year;
+  if (holidays[name]) [month, day] = holidays[name];
+  else {
+    let d = name.match(/^(\d{1,2})\.?\s+([a-z]+)\.?(?:\s+(\d{4}))?$/), e = name.match(/^([a-z]+)\s+(\d{1,2})(?:,?\s+(\d{4}))?$/);
+    if (d) { day = +d[1]; month = months.findIndex(x => x.startsWith(d[2].slice(0, 3))) + 1; year = d[3] && +d[3]; }
+    else if (e) { day = +e[2]; month = months.findIndex(x => x.startsWith(e[1].slice(0, 3))) + 1; year = e[3] && +e[3]; }
+    else return null;
+    if (!month) return null;
+  }
+  const now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let when = new Date(year || now.getFullYear(), month - 1, day);
+  if (!year && !since && when < today) when = new Date(now.getFullYear() + 1, month - 1, day);
+  const n = Math.abs(Math.round((when - today) / 864e5));
+  return [`${n} day${n === 1 ? "" : "s"}`, `${since ? "Since" : "Until"} ${when.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`];
+}
+
+async function weather(place, stamp) {
+  const name = (place || Intl.DateTimeFormat().resolvedOptions().timeZone.split("/").pop().replace(/_/g, " ")).trim();
+  show("…", `Weather in ${name}`, "Weather");
+  try {
+    const geo = (await (await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1`)).json()).results?.[0];
+    if (!geo) { if (stamp === asked) show("Place not found", name, "Weather", true); return; }
+    const c = (await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}&longitude=${geo.longitude}&current=temperature_2m,weather_code`)).json()).current;
+    if (stamp !== asked) return;
+    const code = c.weather_code, sky = code === 0 ? "Clear" : code < 3 ? "Partly cloudy" : code === 3 ? "Cloudy" : code < 50 ? "Fog" : code < 70 ? "Rain" : code < 80 ? "Snow" : code < 90 ? "Showers" : "Storms";
+    show(`${Math.round(c.temperature_2m)}° ${sky}`, `Right now in ${geo.name}`, "Weather");
+  } catch { if (stamp === asked) show("Weather needs a connection", "roko shows it in the bar", "Weather", true); }
+}
+
 function answer(raw) {
   const text = raw.trim(), low = text.toLowerCase(), stamp = ++asked;
   if (!text) return show("15% of 240 = 36", "Answered right in the bar", "Sum");
   let m;
+  const until = daysUntil(low); if (until) return show(until[0], until[1], "Date");
+  if ((m = low.match(/^(?:weather|forecast)(?:\s+(?:in|for|at)\s+(.+))?$/)) || (m = low.match(/^(.+?)\s+weather$/))) return void weather(m[1], stamp);
   if ((m = low.match(/^([\d.]+)\s*%\s*of\s*([\d.]+)$/))) return show(`${text} = ${tidy(m[1] / 100 * m[2])}`, "Answered right in the bar", "Sum");
   if ((m = low.match(/^([\d.,]+)\s*([a-z]{3})\s+(?:in|to)\s+([a-z]{3})$/))) return void rate(parseFloat(m[1].replace(",", "")), m[2].toUpperCase(), m[3].toUpperCase(), stamp);
   if ((m = low.match(/^([\d.]+)\s*(km|mi|kg|lb|cm|in|m|ft|l)(?:\s+(?:in|to)\s+[a-z]+)?$/))) { const [to, by] = units[m[2]]; return show(`${tidy(m[1] * by)} ${to}`, `${m[1]} ${m[2]}`, "Unit"); }
@@ -60,7 +96,7 @@ input.addEventListener("input", () => { stopped = true; answer(input.value); });
 
 // The bar shows itself until someone reaches for it.
 let stopped = still;
-const samples = ["250 usd in eur", "time in tokyo", "call Petra tomorrow", "how long do you boil an egg?", "12 km", "wikipedia.org"];
+const samples = ["weather in tokyo", "days until christmas", "250 usd in eur", "call Petra tomorrow", "how long do you boil an egg?", "time in new york"];
 input.addEventListener("focus", () => { if (!stopped) { stopped = true; input.value = ""; answer(""); } });
 (async () => {
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -75,7 +111,10 @@ input.addEventListener("focus", () => { if (!stopped) { stopped = true; input.va
 // The eclipse closes as the first screen goes by.
 const moon = document.getElementById("moon");
 const puller = document.getElementById("puller"), range = puller.querySelector("input");
-const shot = document.getElementById("splitshot");
+for (const [box, name] of [[document.getElementById("compare"), "--p"], [document.getElementById("splitter"), "--s"]]) {
+  const r = box.querySelector("input");
+  r.addEventListener("input", () => box.style.setProperty(name, r.value + "%"));
+}
 let pulled = false;
 range.addEventListener("input", () => { pulled = true; puller.style.setProperty("--p", range.value + "%"); });
 if (!still) {
@@ -90,8 +129,6 @@ if (!still) {
       puller.style.setProperty("--p", p * 100 + "%");
       range.value = p * 100;
     }
-    const s = shot.getBoundingClientRect();
-    if (s.bottom > 0 && s.top < vh) shot.style.transform = `translateY(${(s.top + s.height / 2 - vh / 2) * -.04}px)`;
   };
   addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(frame); } }, { passive: true });
   frame();

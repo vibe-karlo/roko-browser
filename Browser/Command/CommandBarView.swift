@@ -213,6 +213,7 @@ struct CommandBarView: View {
             rebuild()
         }
         .onChange(of: Parking.shared.session) { rebuild() }
+        .onChange(of: browser.commandMode) { rebuild() }
         .task(id: query) {
             // "weather in London", "vrijeme u Zagrebu": a town's weather, after a short pause.
             guard WeatherQuery.place(in: query) != nil else { return }
@@ -241,7 +242,8 @@ struct CommandBarView: View {
         .task(id: query) {
             // A short pause so suggestions aren't requested for every keystroke.
             let text = query.trimmingCharacters(in: .whitespaces)
-            guard browser.launcherContext == .web, UserDefaults.standard.object(forKey: "suggestions") as? Bool ?? true,
+            // Private: what's typed doesn't go to the search engine letter by letter.
+            guard browser.commandMode != .privateTab, browser.launcherContext == .web, UserDefaults.standard.object(forKey: "suggestions") as? Bool ?? true,
                   text.count >= 2, Omnibox.url(from: text) == nil else {
                 suggestions = []
                 return
@@ -955,6 +957,12 @@ struct CommandBarView: View {
                                         subtitle: url.displayHost, kind: "", icon: .site(url.displayHost), action: .open(url)))
             }
             items = rows
+        }
+        // Private: nothing of yours offered, and no site or search guessed at.
+        if browser.commandMode == .privateTab {
+            items.removeAll { item in
+                ["pin-", "recent-", "history-", "suggest-", "suggested-", "popular-", "site-"].contains { item.id.hasPrefix($0) }
+            }
         }
         // Resolve where Return would go before it's pressed.
         switch items.first?.action {
