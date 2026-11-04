@@ -8,6 +8,8 @@ struct BrowserView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var barTop: CGFloat = 0
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.fold) private var fold
+    @Environment(\.propped) private var propped
     /// The strip beside the page, turned sideways, where the bar stands upright.
     @State private var sideStrip: CGFloat = 0
     /// Both sides' insets: held upright, only a Duo has any, for its clock.
@@ -34,6 +36,15 @@ struct BrowserView: View {
                 Color.black.ignoresSafeArea()
             }
 
+            // Propped open, black from the fold down, for the bar to lie on.
+            // From a little above it, so the page's round corners show black.
+            if let fold, standsOnFold {
+                GeometryReader { proxy in
+                    Color.black.padding(.top, fold.minY - proxy.frame(in: .global).minY - 20)
+                }
+                .ignoresSafeArea()
+            }
+
             if browser.selectedTab != nil {
                 // One layout whatever is on screen, so a page is never shown by
                 // two at once (a layout on its way out took its page with it).
@@ -42,12 +53,15 @@ struct BrowserView: View {
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
                         pages
+                            // Propped open, the page ends at the fold.
+                            .frame(height: standsOnFold ? fold.map { max($0.minY - proxy.frame(in: .global).minY, 0) } : nil)
                             // Sideways, a card: rounded just enough to read as one, as
                             // Split View's side-by-side cards are, so every corner matches.
                             .clipShape(UnevenRoundedRectangle(topLeadingRadius: sideBar ? 16 : 0,
-                                                              bottomLeadingRadius: sideBar ? 16 : showsPlayer ? 22 : 0,
-                                                              bottomTrailingRadius: sideBar ? 16 : showsPlayer ? 22 : 0,
+                                                              bottomLeadingRadius: sideBar || standsOnFold ? 16 : showsPlayer ? 22 : 0,
+                                                              bottomTrailingRadius: sideBar || standsOnFold ? 16 : showsPlayer ? 22 : 0,
                                                               topTrailingRadius: sideBar ? 16 : 0))
+                            .frame(maxHeight: .infinity, alignment: .top)
                         if !browser.liveItems.isEmpty {
                             LiveBand()
                                 // Down into the home indicator's strip: on the black band it has room,
@@ -61,6 +75,7 @@ struct BrowserView: View {
                     .ignoresSafeArea(edges: .bottom)
                     .animation(.snappy(duration: 0.3), value: browser.liveItems.isEmpty)
                     .animation(.snappy(duration: 0.25), value: browser.bandShowsStrip)
+                    .animation(.snappy(duration: 0.3), value: standsOnFold)
                 }
                 // Turned sideways the page is a card between two black strips:
                 // the Dynamic Island's on one side, the bar's on the other.
@@ -398,6 +413,12 @@ struct BrowserView: View {
         verticalSizeClass == .compact && browser.selectedTab != nil
     }
 
+    /// Propped open on one page: it stands above the fold, the bar lies below.
+    /// A split already parts at the fold, a page on each half.
+    private var standsOnFold: Bool {
+        propped && browser.selectedTab != nil && splitHalves == nil
+    }
+
     /// A Duo with its clock at the side, not turned the way the bar moves there.
     private var clockBeside: Bool { !sideBar && sideInsets > 0 }
 
@@ -425,7 +446,7 @@ struct BrowserView: View {
         if let halves = splitHalves {
             SplitPages(top: halves.top, bottom: halves.bottom, barTop: sideBar ? .greatestFiniteMagnitude : barTop)
         } else if let tab = browser.selectedTab {
-            PagePane(tab: tab, barTop: sideBar ? .greatestFiniteMagnitude : barTop)
+            PagePane(tab: tab, barTop: sideBar || standsOnFold ? .greatestFiniteMagnitude : barTop)
         }
     }
 
@@ -609,6 +630,10 @@ private struct BottomPanel<Content: View>: View {
     /// The screen it rises on: turned sideways it's short and wide, so the
     /// panel keeps below the top and to a column's width.
     @State private var room: CGSize = .zero
+    /// Propped open it stays on the lower half, under the fold.
+    @Environment(\.fold) private var fold
+    @Environment(\.propped) private var propped
+    @State private var roomBottom: CGFloat = 0
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -623,7 +648,7 @@ private struct BottomPanel<Content: View>: View {
                         .frame(width: 36, height: 5)
                         .padding(.top, 8)
                     content
-                        .frame(maxHeight: room.height > 0 ? min(640, room.height - 24) : 640)
+                        .frame(maxHeight: room.height > 0 ? min(640, room.height - 24, belowFold) : 640)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: room.width > room.height ? 560 : .infinity)
@@ -648,7 +673,14 @@ private struct BottomPanel<Content: View>: View {
             }
         }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { room = $0 }
+        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY } action: { roomBottom = $0 }
         .onAppear { withAnimation(.spring(duration: 0.4, bounce: 0.12)) { shown = true } }
+    }
+
+    /// The content's room under the fold, its grab handle and a little air taken off.
+    private var belowFold: CGFloat {
+        guard propped, let fold else { return .greatestFiniteMagnitude }
+        return max(roomBottom - fold.maxY - 21, 200)
     }
 
     private func close() {

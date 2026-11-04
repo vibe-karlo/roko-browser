@@ -6,6 +6,9 @@ import SwiftUI
 extension EnvironmentValues {
     /// In global coordinates.
     @Entry var fold: CGRect? = nil
+    /// Propped open with the fold lying across, like a small laptop: the page
+    /// stands on the upper half and the controls lie on the lower.
+    @Entry var propped = false
 }
 
 extension View {
@@ -48,6 +51,8 @@ private struct FoldReader: ViewModifier {
     @State private var hinge = 0
     /// Shut, the outer screen has no fold, whatever was last read.
     @State private var shut = false
+    /// Bent well short of flat, so a slight flex doesn't rearrange the page.
+    @State private var bent = false
 
     func body(content: Content) -> some View {
         if #available(iOS 27.1, *) {
@@ -66,11 +71,13 @@ private struct FoldReader: ViewModifier {
                         }
                     }
                 }
-                .onHingeChange { _, new in
+                .onHingeChange { old, new in
                     shut = new.hinge?.status == .closed
-                    hinge += 1
+                    bent = new.hinge.map { $0.status == .partiallyOpen && $0.angle.degrees < 150 } ?? false
+                    if old.hinge?.status != new.hinge?.status { hinge += 1 }
                 }
                 .environment(\.fold, fold)
+                .environment(\.propped, bent && fold.map { $0.width > $0.height } ?? false)
         } else {
             content
         }
