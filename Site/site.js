@@ -38,7 +38,7 @@ async function rate(amount, from, to, stamp) {
     const key = from + to;
     rates[key] ??= (await (await fetch(`https://api.frankfurter.dev/v1/latest?base=${from}&symbols=${to}`)).json()).rates[to];
     if (stamp !== asked) return;
-    show(`${tidy(amount * rates[key])} ${to}`, `${tidy(amount)} ${from} at today's rate`, "Rate");
+    show(`${(amount * rates[key]).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${to}`, `${tidy(amount)} ${from} at today's rate`, "Rate");
   } catch { if (stamp === asked) show("Rates need a connection", "roko works it out in the bar", "Rate", true); }
 }
 
