@@ -5,6 +5,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Documentation
+- A privacy policy: docs/privacy.md.
+
 ### Added
 - iCloud sync is on: pins, history and settings follow you between devices through your own iCloud account.
 - iPhone Duo: with the phone open, the bar, the page menu and the address field keep to one half instead of lying across the fold; Split View parts at the fold, side by side or stacked; pages keep clear of the clock at the side, open or shut, and it stays readable on black beside a split.
