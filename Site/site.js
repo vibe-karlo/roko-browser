@@ -14,7 +14,7 @@ function show(big, note, kind, small) {
   b.textContent = big; b.className = small ? "small" : "";
   out.querySelector("span").textContent = note;
   out.querySelector("i").textContent = kind;
-  out.querySelector("use").setAttribute("href", kind === "To-do" ? "#i-todo" : kind === "Ask" ? "#i-browse" : kind === "Search" || kind === "Open" ? "#i-search" : "#i-equals");
+  out.querySelector("use").setAttribute("href", kind === "To-do" ? "#i-todo" : kind === "Ask" ? "#i-browse" : !kind || kind === "Search" || kind === "Open" ? "#i-search" : "#i-equals");
   const q = input.value.trim().toLowerCase();
   let at = 0;
   const left = samples.filter(x => x !== q);
@@ -85,7 +85,8 @@ async function weather(place, stamp) {
 
 function answer(raw) {
   const text = raw.trim(), low = text.toLowerCase(), stamp = ++asked;
-  if (!text) return show("36", "15% of 240", "Sum");
+  out.classList.remove("typing");
+  if (!text) return show("Type anything", "Or tap one below", "", true);
   let m;
   const until = daysUntil(low); if (until) return show(until[0], until[1], "Date");
   if ((m = low.match(/^(?:weather|forecast)(?:\s+(?:in|for|at)\s+(.+))?$/)) || (m = low.match(/^(.+?)\s+weather$/))) return void weather(m[1], stamp);
@@ -133,7 +134,7 @@ const hero = document.getElementById("top");
     await wait(s === 0 ? 1300 : 2600);
     if (stopped) return;
     if (scrollY > hero.offsetHeight) { s--; continue; }
-    input.value = "";
+    input.value = ""; answer(""); out.classList.add("typing");
     for (const c of samples[s]) { if (stopped) return; input.value += c; await wait(44); }
     if (!stopped) { tryAt = s + 1; answer(input.value); }
   }

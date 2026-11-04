@@ -43,9 +43,11 @@ h3{font-size:clamp(27px,2.6vw,36px);line-height:1.12}
 .hero .grain{-webkit-mask-image:linear-gradient(transparent 20%,#000 60%,#000 90%,transparent);mask-image:linear-gradient(transparent 20%,#000 60%,#000 90%,transparent)}
 .hero h1{max-width:15ch}
 .hero-sub{margin-top:18px;color:var(--soft);font-size:clamp(18px,1.6vw,22px)}
-.hero-meta{margin-top:26px;color:#f4f1ebd9;font-size:15px}
 .stage{display:grid;justify-items:center;margin-top:clamp(40px,6vw,88px);width:100%}
-.flank{display:none}
+.flank.left{margin-bottom:18px;color:var(--soft);font-size:15px}
+.flank.left br{display:none}
+.flank.right{margin-top:28px}
+.flank.right p{margin-top:12px;color:#f4f1ebd9;font-size:15px}
 /* The phone is an iPhone's real shape, 402 by 874 points: everything inside
    is measured in the screen's own width, so it keeps its proportions at any size. */
 .live{--w:min(344px,88vw);text-align:left}
@@ -72,7 +74,8 @@ h3{font-size:clamp(27px,2.6vw,36px);line-height:1.12}
 .field .val{flex:1;min-width:0;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:16px}
 .field .val.ph{color:var(--faint)}
 .answer,.row{display:flex;align-items:center;gap:14px;width:calc(100% - 16px);margin:0 8px;padding:0 14px;text-align:left;color:var(--soft)}
-.answer{min-height:68px;background:var(--ui2);border-radius:18px}
+.answer{min-height:68px;background:var(--ui2);border-radius:18px;transition:opacity .2s}
+.answer.typing{opacity:.35}
 .answer>div,.row>div{flex:1;min-width:0}
 .answer b,.row b{display:block;color:var(--ink);font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .answer b{font-weight:600;font-size:clamp(21px,6vw,25px);line-height:1.2}
@@ -110,15 +113,16 @@ div>.row:has(span){min-height:54px}
 .stats{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:26px 10px;width:min(1040px,100%);margin:-104px auto 0;padding:28px 12px;background:#1b1a19;border-radius:32px;box-shadow:inset 0 0 0 1px var(--edge),inset 0 1px 0 #ffffff14,0 14px 20px -18px #000}
 .stats dt{font:800 clamp(38px,5.2vw,68px)/1 var(--display);color:var(--glow);letter-spacing:.015em;white-space:nowrap}
 .stats dd{margin:8px auto 0;max-width:10.5em;color:var(--soft);font-size:15px;line-height:1.3}
-.reasons{display:grid;gap:30px;width:min(1040px,100%);margin:clamp(56px,7vw,96px) auto 0;text-align:left;color:var(--soft)}
+.reasons{display:grid;gap:30px;width:min(1040px,100%);margin:clamp(56px,7vw,96px) auto 0;color:var(--soft)}
+.reasons li{text-wrap:balance}
 .reasons b{display:block;margin-bottom:4px;color:var(--ink);font:800 22px/1.2 var(--display)}
-.note{width:min(1040px,100%);margin:clamp(40px,5vw,64px) auto 0;color:var(--faint);font-size:13px;line-height:1.5;text-align:left}
+.note{width:min(640px,100%);margin:clamp(40px,5vw,64px) auto 0;color:var(--faint);font-size:13px;line-height:1.5}
 
 /* Smart: two screens standing on the seam into the next section. */
-.smart{padding:0 var(--gutter);text-align:center;background:linear-gradient(var(--floor) 55%,#1d110c)}
-.smart .duo article>p{margin-inline:auto}
+.smart{padding:0 var(--gutter) var(--gap);text-align:center}
+.smart .duo article>p,.bar .duo article>p{margin-inline:auto}
 .duo{display:grid;gap:72px;margin-top:clamp(44px,6vw,88px)}
-.duo article>p{margin-top:12px;max-width:27em;color:var(--soft)}
+.duo article>p{margin-top:12px;max-width:27em;color:var(--soft);text-wrap:balance}
 .duo article{display:flex;flex-direction:column;min-width:0}
 .duo .device{margin-top:32px}
 .puller{aspect-ratio:828/1800;user-select:none;-webkit-user-select:none}
@@ -132,7 +136,7 @@ div>.row:has(span){min-height:54px}
 /* Clean: the slider is the whole argument. */
 .clean{padding:var(--gap) var(--gutter);text-align:center;background:linear-gradient(#1d110c,var(--floor) 30%)}
 .clean h2{margin-inline:auto}
-.lede{margin:16px auto 0;max-width:30em;color:var(--soft);font-size:clamp(17px,1.5vw,20px)}
+.lede{text-wrap:balance;margin:16px auto 0;max-width:30em;color:var(--soft);font-size:clamp(17px,1.5vw,20px)}
 .versus{display:grid;grid-template-columns:1fr 1fr;gap:28px 12px;margin-top:clamp(40px,6vw,80px);align-items:start}
 .versus .device{--w:min(350px,88vw);grid-column:1/-1;grid-row:2}
 .lab{color:var(--soft);font-size:15px;line-height:1.35;transition:opacity .15s}
@@ -144,8 +148,8 @@ div>.row:has(span){min-height:54px}
 .slide .grip{top:0;bottom:0;left:var(--p);width:2px;margin-left:-1px;background:var(--glow);pointer-events:none}
 .slide .grip::after{content:"";position:absolute;top:50%;left:-1px;width:4px;height:74px;margin-top:-37px;border-radius:4px;background:var(--glow);box-shadow:0 1px 3px #0008}
 .hint{margin-top:18px;color:var(--faint);font-size:14px}
-.hide{display:grid;gap:36px;width:min(920px,100%);margin:var(--gap) auto 0;text-align:left;align-items:center}
-.hide .words p{margin-top:12px;max-width:27em;color:var(--soft)}
+.hide{display:grid;gap:36px;width:min(920px,100%);margin:var(--gap) auto 0;align-items:center}
+.hide .words p{margin:12px auto 0;max-width:27em;color:var(--soft);text-wrap:balance}
 .hide .words .hint{color:var(--faint);font-size:14px}
 /* A small made-up site inside the phone, and the same tap-tap the app uses. */
 .demo-phone{--w:min(344px,88vw)}
@@ -194,12 +198,11 @@ div>.row:has(span){min-height:54px}
 .splitter .grip{top:calc(var(--s) + 1.5%)}
 
 /* The bar's other jobs, drawn live rather than photographed. */
-.bar{padding:0 var(--gutter) var(--gap)}
+.bar{padding:0 var(--gutter);text-align:center;background:linear-gradient(var(--floor) 55%,#1d110c)}
 .bar .duo{align-items:stretch}
-.panel{display:flex;flex-direction:column;gap:6px;height:310px;padding:10px 6px;background:var(--ui);border-radius:30px;box-shadow:inset 0 0 0 1px #ffffff1c,inset 0 1px 0 #ffffff12;overflow:hidden}
+.panel{margin-top:32px;text-align:left;display:flex;flex-direction:column;gap:6px;height:310px;padding:10px 6px;background:var(--ui);border-radius:30px;box-shadow:inset 0 0 0 1px #ffffff1c,inset 0 1px 0 #ffffff12;overflow:hidden}
 .panel .field{flex:none;margin:0 2px 2px}
 .panel .answer.flat{min-height:64px}
-.bar h3{margin-top:26px}
 .eye{display:flex;align-items:center;justify-content:flex-end;gap:7px;min-height:44px;min-width:44px;margin-right:-8px;padding-inline:8px;color:var(--faint);font-size:14px;font-weight:500}
 .eye em{font-style:normal;color:#f08a58}
 .eye .ic{width:22px;height:22px}
@@ -247,24 +250,22 @@ footer .go{margin-top:clamp(30px,4vw,44px)}
   .crop,.duo .device{--w:340px}
   .duo{grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(32px,5vw,72px)}
   .duo article>p{min-height:5em}
-  .bar .duo article>p{min-height:0}
   .versus{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:clamp(28px,5vw,72px);align-items:center}
   .versus .device{--w:370px;grid-column:2;grid-row:1}
   .lab.without{text-align:right}
   .lab.with{text-align:left}
-  .hide{grid-template-columns:minmax(0,1fr) auto;gap:clamp(40px,7vw,110px)}
+  .hide{grid-template-columns:minmax(0,1fr) auto;gap:clamp(40px,7vw,110px);text-align:left}
+  .hide .words p{margin-inline:0}
   .tall{--w:370px}
   .list{grid-template-columns:repeat(4,minmax(0,1fr));gap:56px 32px}
   .faq{grid-template-columns:minmax(0,4fr) minmax(0,7fr);gap:clamp(28px,6vw,96px)}
 }
 @media(min-width:1100px){
-  .hero-sub,.hero-meta{display:none}
   .stage{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:clamp(36px,5vw,84px);align-items:start}
-  .flank{margin-top:clamp(70px,9vh,120px)}
-  .flank{display:block}
+  .flank.left,.flank.right{margin:clamp(70px,9vh,120px) 0 0}
+  .flank.left br{display:inline}
   .flank.left{justify-self:end;text-align:right;font:500 clamp(24px,2.1vw,30px)/1.2 var(--display);color:var(--ink)}
   .flank.right{justify-self:start;text-align:left}
-  .flank.right p{margin-top:12px;color:#f4f1ebd9;font-size:15px}
 }
 /* Plain pages: the policy and support. */
 .doc{max-width:720px;margin:auto;padding:clamp(110px,14vw,160px) var(--gutter) 96px}
