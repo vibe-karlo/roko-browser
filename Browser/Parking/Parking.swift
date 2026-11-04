@@ -267,14 +267,33 @@ enum MessageComposer {
 
     static var canSend: Bool { MFMessageComposeViewController.canSendText() }
 
+    /// Puts away whatever has the keyboard and waits for it to go; a moment
+    /// at most, should it not say so.
+    private static func keyboardDown() async {
+        let hide = NotificationCenter.default.notifications(named: UIResponder.keyboardDidHideNotification)
+        guard UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) else { return }
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { for await _ in hide { break } }
+            group.addTask { try? await Task.sleep(for: .milliseconds(600)) }
+            await group.next()
+            group.cancelAll()
+        }
+    }
+
     static func send(to number: String, body: String, pretend: Bool = false) async -> Bool {
         if pretend { return true }
         // One text at a time: a second tap ("Add an hour" twice) waits for nothing.
-        guard canSend, delegate == nil, let top = PageDialogs.top, !top.isBeingDismissed else { return false }
+        guard canSend, delegate == nil else { return false }
+        // Messages draws its own keyboard: with roko's still up (the address
+        // field, a page's form) it lands over the box with the Send button.
+        await keyboardDown()
+        guard delegate == nil, let top = PageDialogs.top, !top.isBeingDismissed else { return false }
         return await withCheckedContinuation { continuation in
             let compose = MFMessageComposeViewController()
             compose.recipients = [number]
             compose.body = body
+            // The whole screen, so the box and Send have room above its keyboard.
+            compose.modalPresentationStyle = .fullScreen
             let delegate = Delegate()
             delegate.done = { sent in
                 Self.delegate = nil
