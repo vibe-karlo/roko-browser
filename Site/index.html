@@ -1,106 +1,144 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>roko: the iOS browser built for speed</title>
-<meta name="description" content="roko is a light, fast browser for iPhone. It's smart when you ask, with a Smart Bar, AI summaries and Browse for Me, and it removes ads, cookies and pop-ups.">
-<meta property="og:title" content="roko: the iOS browser built for speed"><meta property="og:description" content="Fast, smart and nothing in your way. In beta on TestFlight."><meta property="og:image" content="/img/browse.jpg"><meta name="theme-color" content="#0f0f0e">
-<link rel="icon" href="/img/icon-48.png"><link rel="apple-touch-icon" href="/img/icon-180.png"><link rel="preload" href="/fonts/cabinet-800.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/style.css?3">
+<meta name="description" content="roko is a light, fast browser for iPhone. It answers in the bar, summarizes pages and reads the web for you, and removes ads, cookies and pop-ups.">
+<meta property="og:title" content="roko: the iOS browser built for speed"><meta property="og:description" content="Light, smart and nothing in your way. In beta on TestFlight."><meta property="og:image" content="https://rokobrowser.vercel.app/img/share.jpg"><meta name="twitter:card" content="summary_large_image"><meta name="theme-color" content="#0f0f0e">
+<link rel="icon" href="/img/icon-48.png"><link rel="apple-touch-icon" href="/img/icon-180.png"><link rel="preload" href="/fonts/cabinet-800.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/style.css?11">
 </head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="i-history" viewBox="0 0 256 256"><path d="M136,80v43.47l36.12,21.67a8,8,0,0,1-8.24,13.72l-40-24A8,8,0,0,1,120,128V80a8,8,0,0,1,16,0Zm-8-48A95.44,95.44,0,0,0,60.08,60.15C52.81,67.51,46.35,74.59,40,82V64a8,8,0,0,0-16,0v40a8,8,0,0,0,8,8H72a8,8,0,0,0,0-16H49c7.15-8.42,14.27-16.35,22.39-24.57a80,80,0,1,1,1.66,114.75,8,8,0,1,0-11,11.64A96,96,0,1,0,128,32Z"/></symbol><symbol id="i-microphone" viewBox="0 0 256 256"><path d="M128,176a48.05,48.05,0,0,0,48-48V64a48,48,0,0,0-96,0v64A48.05,48.05,0,0,0,128,176ZM96,64a32,32,0,0,1,64,0v64a32,32,0,0,1-64,0Zm40,143.6V240a8,8,0,0,1-16,0V207.6A80.11,80.11,0,0,1,48,128a8,8,0,0,1,16,0,64,64,0,0,0,128,0,8,8,0,0,1,16,0A80.11,80.11,0,0,1,136,207.6Z"/></symbol><symbol id="i-search" viewBox="0 0 256 256"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></symbol><symbol id="i-equals" viewBox="0 0 256 256"><path d="M224,160a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,160ZM40,104H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16Z"/></symbol><symbol id="i-eye" viewBox="0 0 256 256"><path d="M247.31,124.76c-.35-.79-8.82-19.58-27.65-38.41C194.57,61.26,162.88,48,128,48S61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.34c18.83-18.83,27.3-37.61,27.65-38.4A8,8,0,0,0,247.31,124.76ZM128,192c-30.78,0-57.67-11.19-79.93-33.25A133.47,133.47,0,0,1,25,128,133.33,133.33,0,0,1,48.07,97.25C70.33,75.19,97.22,64,128,64s57.67,11.19,79.93,33.25A133.46,133.46,0,0,1,231.05,128C223.84,141.46,192.43,192,128,192Zm0-112a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"/></symbol><symbol id="i-eyeClosed" viewBox="0 0 256 256"><path d="M228,175a8,8,0,0,1-10.92-3l-19-33.2A123.23,123.23,0,0,1,162,155.46l5.87,35.22a8,8,0,0,1-6.58,9.21A8.4,8.4,0,0,1,160,200a8,8,0,0,1-7.88-6.69l-5.77-34.58a133.06,133.06,0,0,1-36.68,0l-5.77,34.58A8,8,0,0,1,96,200a8.4,8.4,0,0,1-1.32-.11,8,8,0,0,1-6.58-9.21L94,155.46a123.23,123.23,0,0,1-36.06-16.69L39,172A8,8,0,1,1,25.06,164l20-35a153.47,153.47,0,0,1-19.3-20A8,8,0,1,1,38.22,99c16.6,20.54,45.64,45,89.78,45s73.18-24.49,89.78-45A8,8,0,1,1,230.22,109a153.47,153.47,0,0,1-19.3,20l20,35A8,8,0,0,1,228,175Z"/></symbol><symbol id="i-todo" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H128a8,8,0,0,1,0-16h88A8,8,0,0,1,224,128ZM128,72h88a8,8,0,0,0,0-16H128a8,8,0,0,0,0,16Zm88,112H128a8,8,0,0,0,0,16h88a8,8,0,0,0,0-16ZM82.34,42.34,56,68.69,45.66,58.34A8,8,0,0,0,34.34,69.66l16,16a8,8,0,0,0,11.32,0l32-32A8,8,0,0,0,82.34,42.34Zm0,64L56,132.69,45.66,122.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32,0l32-32a8,8,0,0,0-11.32-11.32Zm0,64L56,196.69,45.66,186.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32,0l32-32a8,8,0,0,0-11.32-11.32Z"/></symbol><symbol id="i-browse" viewBox="0 0 256 256"><path d="M197.58,129.06,146,110l-19-51.62a15.92,15.92,0,0,0-29.88,0L78,110l-51.62,19a15.92,15.92,0,0,0,0,29.88L78,178l19,51.62a15.92,15.92,0,0,0,29.88,0L146,178l51.62-19a15.92,15.92,0,0,0,0-29.88ZM137,164.22a8,8,0,0,0-4.74,4.74L112,223.85,91.78,169A8,8,0,0,0,87,164.22L32.15,144,87,123.78A8,8,0,0,0,91.78,119L112,64.15,132.22,119a8,8,0,0,0,4.74,4.74L191.85,144ZM144,40a8,8,0,0,1,8-8h16V16a8,8,0,0,1,16,0V32h16a8,8,0,0,1,0,16H184V64a8,8,0,0,1-16,0V48H152A8,8,0,0,1,144,40ZM248,88a8,8,0,0,1-8,8h-8v8a8,8,0,0,1-16,0V96h-8a8,8,0,0,1,0-16h8V72a8,8,0,0,1,16,0v8h8A8,8,0,0,1,248,88Z"/></symbol><symbol id="i-readLater" viewBox="0 0 256 256"><path d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Zm0,177.57-51.77-32.35a8,8,0,0,0-8.48,0L72,209.57V48H184Z"/></symbol><symbol id="i-translate" viewBox="0 0 256 256"><path d="M247.15,212.42l-56-112a8,8,0,0,0-14.31,0l-21.71,43.43A88,88,0,0,1,108,126.93,103.65,103.65,0,0,0,135.69,64H160a8,8,0,0,0,0-16H104V32a8,8,0,0,0-16,0V48H32a8,8,0,0,0,0,16h87.63A87.76,87.76,0,0,1,96,116.35a87.74,87.74,0,0,1-19-31,8,8,0,1,0-15.08,5.34A103.63,103.63,0,0,0,84,127a87.55,87.55,0,0,1-52,17,8,8,0,0,0,0,16,103.46,103.46,0,0,0,64-22.08,104.18,104.18,0,0,0,51.44,21.31l-26.6,53.19a8,8,0,0,0,14.31,7.16L148.94,192h70.11l13.79,27.58A8,8,0,0,0,240,224a8,8,0,0,0,7.15-11.58ZM156.94,176,184,121.89,211.05,176Z"/></symbol><symbol id="i-play" viewBox="0 0 256 256"><path d="M232.4,114.49,88.32,26.35a16,16,0,0,0-16.2-.3A15.86,15.86,0,0,0,64,39.87V216.13A15.94,15.94,0,0,0,80,232a16.07,16.07,0,0,0,8.36-2.35L232.4,141.51a15.81,15.81,0,0,0,0-27ZM80,215.94V40l143.83,88Z"/></symbol><symbol id="i-today" viewBox="0 0 256 256"><path d="M240,152H199.55a73.54,73.54,0,0,0,.45-8,72,72,0,0,0-144,0,73.54,73.54,0,0,0,.45,8H16a8,8,0,0,0,0,16H240a8,8,0,0,0,0-16ZM72,144a56,56,0,1,1,111.41,8H72.59A56.13,56.13,0,0,1,72,144Zm144,56a8,8,0,0,1-8,8H48a8,8,0,0,1,0-16H208A8,8,0,0,1,216,200ZM72.84,43.58a8,8,0,0,1,14.32-7.16l8,16a8,8,0,0,1-14.32,7.16Zm-56,48.84a8,8,0,0,1,10.74-3.57l16,8a8,8,0,0,1-7.16,14.31l-16-8A8,8,0,0,1,16.84,92.42Zm192,15.16a8,8,0,0,1,3.58-10.73l16-8a8,8,0,1,1,7.16,14.31l-16,8a8,8,0,0,1-10.74-3.58Zm-48-55.16,8-16a8,8,0,0,1,14.32,7.16l-8,16a8,8,0,1,1-14.32-7.16Z"/></symbol><symbol id="i-reopen" viewBox="0 0 256 256"><path d="M224,128a96,96,0,0,1-94.71,96H128A95.38,95.38,0,0,1,62.1,197.8a8,8,0,0,1,11-11.63A80,80,0,1,0,71.43,71.39a3.07,3.07,0,0,1-.26.25L44.59,96H72a8,8,0,0,1,0,16H24a8,8,0,0,1-8-8V56a8,8,0,0,1,16,0V85.8L60.25,60A96,96,0,0,1,224,128Z"/></symbol><symbol id="i-download" viewBox="0 0 256 256"><path d="M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0Zm-101.66,5.66a8,8,0,0,0,11.32,0l40-40a8,8,0,0,0-11.32-11.32L136,124.69V32a8,8,0,0,0-16,0v92.69L93.66,98.34a8,8,0,0,0-11.32,11.32Z"/></symbol><symbol id="i-split" viewBox="0 0 256 256"><path d="M208,136H48a16,16,0,0,0-16,16v40a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A16,16,0,0,0,208,136Zm0,56H48V152H208v40Zm0-144H48A16,16,0,0,0,32,64v40a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V64A16,16,0,0,0,208,48Zm0,56H48V64H208v40Z"/></symbol><symbol id="i-hideItems" viewBox="0 0 256 256"><path d="M225,80.4,183.6,39a24,24,0,0,0-33.94,0L31,157.66a24,24,0,0,0,0,33.94l30.06,30.06A8,8,0,0,0,66.74,224H216a8,8,0,0,0,0-16h-84.7L225,114.34A24,24,0,0,0,225,80.4ZM108.68,208H70.05L42.33,180.28a8,8,0,0,1,0-11.31L96,115.31,148.69,168Zm105-105L160,156.69,107.31,104,161,50.34a8,8,0,0,1,11.32,0l41.38,41.38a8,8,0,0,1,0,11.31Z"/></symbol><symbol id="i-topic-speed" viewBox="0 0 256 256"><path d="M215.79,118.17a8,8,0,0,0-5-5.66L153.18,90.9l14.66-73.33a8,8,0,0,0-13.69-7l-112,120a8,8,0,0,0,3,13l57.63,21.61L88.16,238.43a8,8,0,0,0,13.69,7l112-120A8,8,0,0,0,215.79,118.17ZM109.37,214l10.47-52.38a8,8,0,0,0-5-9.06L62,132.71l84.62-90.66L136.16,94.43a8,8,0,0,0,5,9.06l52.8,19.8Z"/></symbol><symbol id="i-blocking" viewBox="0 0 256 256"><path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.26,47,25.53a8,8,0,0,0,4.2,0c1-.27,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Zm0,72c0,37.07-13.66,67.16-40.6,89.42A129.3,129.3,0,0,1,128,223.62a128.25,128.25,0,0,1-38.92-21.81C61.82,179.51,48,149.3,48,112l0-56,160,0ZM82.34,141.66a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32l-56,56a8,8,0,0,1-11.32,0Z"/></symbol></svg>
 <nav class="nav" aria-label="Main">
-  <a class="mark" href="/"><svg viewBox="0 0 100 100" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M50 2a48 48 0 1 0 0 96a48 48 0 0 0 0-96Zm8.5 24a24 24 0 1 1 0 48a24 24 0 0 1 0-48Z"/></svg>roko</a>
-  <a class="link" href="#smart">Features</a><a class="link" href="#questions">Questions</a><a class="link" href="/support">Support</a>
-  <a class="go" href="https://testflight.apple.com/join/M2ZrEUV1">Get the beta <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 9.5l7-7M4 2.5h5.5V8"/></svg></a>
+  <a class="mark" href="/"><svg viewBox="0 0 100 100" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M50 2a48 48 0 1 0 0 96a48 48 0 0 0 0-96Zm8.500 24a24 24 0 1 1 0 48a24 24 0 0 1 0-48Z"/></svg>roko</a>
+  <a class="link" href="#fast">Speed</a><a class="link" href="#smart">Smart</a><a class="link" href="#clean">Clean</a><a class="link" href="/support">Support</a>
+  <a class="go" href="https://testflight.apple.com/join/M2ZrEUV1">Get the beta <svg class="arr" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 9.5l7-7M4 2.5h5.5V8"/></svg></a>
 </nav>
 
 <header class="hero" id="top">
+  <div class="grain"></div>
   <h1>The iOS browser built for speed.</h1>
-  <p class="beta">Free beta on TestFlight. iOS 27 or later.</p>
-  <div class="phone">
-    <img class="status" src="/img/status.jpg?2" alt="" width="900" height="102">
-    <div class="field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg>
-      <input id="ask" aria-label="Try roko's Smart Bar" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search or enter address" enterkeyhint="go"></div>
-    <div class="answer" id="answer" aria-live="polite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 9.5h14M5 14.5h14"/></svg><div><b>15% of 240 = 36</b><span>Answered right in the bar</span></div><i>Sum</i></div>
-    <div class="row" id="rowsearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg><div><b id="typed">Try the Smart Bar</b><span>Type weather, a sum or days until</span></div></div>
-    <div class="row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M11 4c.8 4.5 2.5 6.200 7 7c-4.500.8-6.200 2.500-7 7c-.8-4.500-2.500-6.200-7-7c4.500-.8 6.200-2.500 7-7Z"/></svg><div><b>Browse for me</b><span>Reads the web and answers</span></div><i>AI</i></div>
-    <img class="keys" src="/img/keyboard.jpg?2" alt="" width="900" height="655">
+  <p class="hero-sub">Light, smart and nothing in your way.</p>
+  <div class="stage">
+    <p class="flank left">This is the real bar.<br>Go on, type something.</p>
+    <div class="device live">
+      <div class="ui">
+        <div class="status"><span>9:41</span><i class="island"></i><span class="bars"><svg viewBox="0 0 44 14" fill="currentColor" aria-hidden="true"><rect x="0" y="9" width="3.500" height="5" rx="1"/><rect x="5.500" y="6.500" width="3.500" height="7.500" rx="1"/><rect x="11" y="3.500" width="3.500" height="10.500" rx="1"/><rect x="16.500" y="0" width="3.500" height="14" rx="1"/><rect x="26" y="1" width="16" height="12" rx="3.500"/><rect x="42.800" y="4.500" width="1.200" height="5" rx=".6"/></svg></span></div>
+        <label class="field"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><input id="ask" aria-label="Try roko's bar" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search or enter address" enterkeyhint="go"></label>
+        <div class="answer" id="answer" aria-live="polite"><svg class="ic" aria-hidden="true"><use href="#i-equals"/></svg><div><b>36</b><span>15% of 240</span></div><i>Sum</i></div>
+        <div id="tries">
+          <button type="button" class="row"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><b>weather in tokyo</b></button>
+          <button type="button" class="row"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><b>days until christmas</b></button>
+          <button type="button" class="row"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><b>250 usd in eur</b></button>
+          <button type="button" class="row"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><b>call petra tomorrow at 15</b></button>
+          <button type="button" class="row"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><b>time in new york</b></button>
+        </div>
+      <div class="kb" id="kb" aria-hidden="true">
+        <div class="layer" data-l="abc"><div class="kr"><button type="button" class="k" data-k="q">q</button><button type="button" class="k" data-k="w">w</button><button type="button" class="k" data-k="e">e</button><button type="button" class="k" data-k="r">r</button><button type="button" class="k" data-k="t">t</button><button type="button" class="k" data-k="y">y</button><button type="button" class="k" data-k="u">u</button><button type="button" class="k" data-k="i">i</button><button type="button" class="k" data-k="o">o</button><button type="button" class="k" data-k="p">p</button></div><div class="kr in"><button type="button" class="k" data-k="a">a</button><button type="button" class="k" data-k="s">s</button><button type="button" class="k" data-k="d">d</button><button type="button" class="k" data-k="f">f</button><button type="button" class="k" data-k="g">g</button><button type="button" class="k" data-k="h">h</button><button type="button" class="k" data-k="j">j</button><button type="button" class="k" data-k="k">k</button><button type="button" class="k" data-k="l">l</button></div><div class="kr"><button type="button" class="k fn" data-k="shift" aria-label="Shift"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 4 3.500 13H8v7h8v-7h4.500Z"/></svg></button><button type="button" class="k" data-k="z">z</button><button type="button" class="k" data-k="x">x</button><button type="button" class="k" data-k="c">c</button><button type="button" class="k" data-k="v">v</button><button type="button" class="k" data-k="b">b</button><button type="button" class="k" data-k="n">n</button><button type="button" class="k" data-k="m">m</button><button type="button" class="k fn" data-k="back" aria-label="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8.500 5H20a1.500 1.500 0 0 1 1.500 1.500v11A1.500 1.500 0 0 1 20 19H8.500L2.500 12Z"/><path d="M11.500 9.500l5 5M16.500 9.500l-5 5"/></svg></button></div><div class="kr"><button type="button" class="k fn wide" data-k="123">123</button><button type="button" class="k sp" data-k=" " aria-label="Space"></button><button type="button" class="k" data-k=".">.</button><button type="button" class="k go-k" data-k="go" aria-label="Go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M14 6l6 6-6 6"/></svg></button></div></div>
+        <div class="layer" data-l="123" hidden><div class="kr"><button type="button" class="k" data-k="1">1</button><button type="button" class="k" data-k="2">2</button><button type="button" class="k" data-k="3">3</button><button type="button" class="k" data-k="4">4</button><button type="button" class="k" data-k="5">5</button><button type="button" class="k" data-k="6">6</button><button type="button" class="k" data-k="7">7</button><button type="button" class="k" data-k="8">8</button><button type="button" class="k" data-k="9">9</button><button type="button" class="k" data-k="0">0</button></div><div class="kr"><button type="button" class="k" data-k="-">-</button><button type="button" class="k" data-k="/">/</button><button type="button" class="k" data-k=":">:</button><button type="button" class="k" data-k=";">;</button><button type="button" class="k" data-k="(">(</button><button type="button" class="k" data-k=")">)</button><button type="button" class="k" data-k="$">$</button><button type="button" class="k" data-k="&">&</button><button type="button" class="k" data-k="a">a</button><button type="button" class="k" data-k="m">m</button><button type="button" class="k" data-k="p">p</button><button type="button" class="k" data-k=";">;</button><button type="button" class="k" data-k="@">@</button></div><div class="kr"><button type="button" class="k" data-k="%">%</button><button type="button" class="k" data-k="+">+</button><button type="button" class="k" data-k="*">*</button><button type="button" class="k" data-k="=">=</button><button type="button" class="k" data-k=",">,</button><button type="button" class="k" data-k="?">?</button><button type="button" class="k" data-k="!">!</button><button type="button" class="k fn" data-k="back" aria-label="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8.500 5H20a1.500 1.500 0 0 1 1.500 1.500v11A1.500 1.500 0 0 1 20 19H8.500L2.500 12Z"/><path d="M11.500 9.500l5 5M16.500 9.500l-5 5"/></svg></button></div><div class="kr"><button type="button" class="k fn wide" data-k="abc">ABC</button><button type="button" class="k sp" data-k=" " aria-label="Space"></button><button type="button" class="k" data-k=".">.</button><button type="button" class="k go-k" data-k="go" aria-label="Go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M14 6l6 6-6 6"/></svg></button></div></div>
+      <div class="kbfoot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9.200"/><path d="M8 14.200c.9 1.500 2.300 2.300 4 2.300s3.100-.8 4-2.300"/><circle cx="9" cy="9.800" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="9.800" r="1" fill="currentColor" stroke="none"/></svg><svg class="ic" aria-hidden="true"><use href="#i-microphone"/></svg></div>
+      </div>
+      </div>
+    </div>
+    <div class="flank right"><a class="go big" href="https://testflight.apple.com/join/M2ZrEUV1">Join the TestFlight beta <svg class="arr" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 9.5l7-7M4 2.5h5.5V8"/></svg></a><p>Free. iPhone, iOS 27 or later.</p></div>
   </div>
+  <p class="hero-meta">Free beta on TestFlight. iPhone, iOS 27 or later.</p>
 </header>
 
 <main>
 <section class="fast" id="fast">
+  <div class="grain"></div>
+  <h2>Open it. It's already there.</h2>
+  <div class="device crop"><div class="screen"><img src="/img/page.jpg" alt="A Wikipedia article open in roko" loading="lazy" width="828" height="1800"></div></div>
   <dl class="stats">
     <div><dt>160 ms</dt><dd>to open</dd></div>
     <div><dt>0.1 s</dt><dd>from Go to your top result</dd></div>
-    <div><dt>28 MB</dt><dd>the whole app</dd></div>
+    <div><dt>28 MB</dt><dd>for the whole app</dd></div>
     <div><dt>0%</dt><dd>CPU while you read</dd></div>
   </dl>
-  <p class="note">Measured on Release builds in October 2026: opening warm on iPhone 17 Pro, page load and CPU in the simulator, size from the build. Your numbers will vary with your iPhone and connection.</p>
-  <div class="why">
-    <h2>Light by design.</h2>
-    <ul><li><b>It starts before you tap.</b> Your top result begins loading while you type.</li><li><b>Idle means idle.</b> Nothing polls in the background while you read.</li><li><b>Tabs sleep.</b> At most three stay live, and video waits for a tap.</li></ul>
-  </div>
+  <ul class="reasons">
+    <li><b>It starts before you tap.</b>Your top result begins loading while you type.</li>
+    <li><b>Idle means idle.</b>Nothing keeps running while you read.</li>
+    <li><b>Tabs sleep.</b>Three stay awake at most, and video waits for a tap.</li>
+  </ul>
+  <p class="note">Measured in October 2026 on Release builds: opening on iPhone 17 Pro, page load and CPU in the simulator, size from the build. Yours will vary with your iPhone and connection.</p>
 </section>
 
 <section class="smart" id="smart">
   <h2>Smart when you ask.</h2>
-  <div class="pair">
-    <div class="words"><h3>Pull down to summarize.</h3><p>A recipe gets its time, ingredients and steps. A review gets its picks side by side. A news story leads with what happened.</p></div>
-    <div class="puller screenbox" id="puller" style="--p:100%"><img src="/img/page.jpg" alt="A Wikipedia article about espresso in roko" loading="lazy" width="552" height="1200"><img class="top" src="/img/summary.jpg" alt="The same article as a summary with its ingredients and method" loading="lazy" width="552" height="1200"><div class="grip" data-grip></div>
-      <input class="sr" type="range" min="0" max="100" value="100" aria-label="Pull the summary over the page"></div>
-  </div>
-  <div class="pair flip">
-    <div class="words"><h3>Ask. It reads the web for you.</h3><p>An answer with numbered sources, the best options with their prices, and what to watch out for. Apple Intelligence writes it on your iPhone, or your own Claude key.</p></div>
-    <img class="screen" src="/img/browse.jpg" alt="Browse for Me answering when to visit Japan, based on 10 pages" loading="lazy" width="552" height="1200">
+  <div class="duo">
+    <article>
+      <h3>Pull down to summarize.</h3>
+      <p>A recipe gets its time, ingredients and steps. A review, its picks side by side. A news story, what happened.</p>
+      <div class="device bleed"><div class="screen puller" id="puller" style="--p:88%"><img src="/img/page.jpg" alt="A Wikipedia article about espresso" loading="lazy" width="828" height="1800"><img class="top" src="/img/summary.jpg" alt="The same article as a summary, with its ingredients and method" loading="lazy" width="828" height="1800"><div class="grip" title="Drag"></div><input class="sr" type="range" min="6" max="94" value="88" aria-label="Pull the summary over the page"></div></div>
+    </article>
+    <article>
+      <h3>Ask. It reads the web for you.</h3>
+      <p>An answer with numbered sources, the best options with their prices, and what to watch out for.</p>
+      <div class="device bleed"><div class="screen"><img src="/img/browse.jpg" alt="Browse for Me answering when to visit Japan, based on 10 pages" loading="lazy" width="828" height="1800"></div></div>
+    </article>
   </div>
 </section>
 
 <section class="clean" id="clean">
   <h2>Nothing in your way.</h2>
-  <div class="pair">
-    <div class="words"><h3>Ads, cookies and pop-ups, gone.</h3><p>Ads and trackers go before the page draws, and cookie questions get "reject". If a site breaks, one tap brings back the original.</p><p class="hint">Drag across. Without roko on the left, with it on the right.</p></div>
-    <div class="slide screenbox" id="compare" style="--p:50%"><img src="/img/before.jpg" alt="A recipe page hidden behind a cookie wall from 133 partners" loading="lazy" width="552" height="1200"><img class="top" src="/img/after.jpg" alt="The same recipe in roko, with no wall" loading="lazy" width="552" height="1200"><div class="grip"></div>
-      <input class="sr" type="range" min="0" max="100" value="50" aria-label="Compare the page without roko and with roko"></div>
+  <p class="lede">Ads and trackers go before the page draws. Cookie questions get "reject". Newsletter pop-ups stay hidden.</p>
+  <div class="versus">
+    <p class="lab without" id="labA"><b>Without roko</b>133 partners want a word first.</p>
+    <div class="device"><div class="screen slide" id="compare" style="--p:50%"><img src="/img/before.jpg" alt="A recipe page hidden behind a cookie wall from 133 partners" loading="lazy" width="828" height="1800"><img class="top" src="/img/after.jpg" alt="The same recipe in roko, with no wall" loading="lazy" width="828" height="1800"><div class="grip"></div><input class="sr" type="range" min="0" max="100" value="50" aria-label="Compare the page without roko and with roko"></div></div>
+    <p class="lab with" id="labB"><b>With roko</b>The pancakes.</p>
   </div>
-  <div class="pair flip">
-    <div class="words"><h3>Still see it? Tap it away.</h3><p>Tap a sticky bar or a promo twice, and it stays gone on that site.</p></div>
-    <img class="screen" src="/img/hide.jpg" alt="A photo on a page marked to be hidden, with the bar saying tap it again to hide it" loading="lazy" width="552" height="1200">
+  <p class="hint">Drag across the page.</p>
+  <div class="hide">
+    <div class="words"><h3>Still see it? Tap it away.</h3><p>Tap a sticky bar or a promo twice and it stays gone on that site. If a site ever breaks, one tap brings back the original.</p></div>
+    <div class="device up"><div class="screen"><img src="/img/hide.jpg" alt="A photo marked to be hidden, with the bar saying tap it again to hide it" loading="lazy" width="828" height="1800"></div></div>
   </div>
 </section>
 
 <section class="split" id="split">
+  <div class="grain"></div>
   <h2>Two pages at once.</h2>
-  <p class="lede">Upright or sideways. Drag the divider to give either page more room.</p>
-  <div class="both">
-    <div class="splitter screenbox" id="splitter" style="--s:50%"><img class="one" src="/img/page.jpg" alt="The Espresso article on top" loading="lazy" width="552" height="1200"><div class="two"><img src="/img/bourbon.jpg" alt="The Bourbon coffee article below" loading="lazy" width="552" height="1200"></div><div class="grip"></div>
-      <input class="sr" type="range" min="28" max="76" value="50" aria-label="Drag the divider between the two pages"></div>
-    <img class="screen wide" src="/img/side.jpg" alt="Two articles side by side with the phone turned sideways" loading="lazy" width="1500" height="690">
+  <p class="lede">Upright or sideways. Drag the divider to give either one more room.</p>
+  <div class="splitart">
+    <div class="device land"><div class="screen"><img src="/img/side.jpg" alt="Two articles side by side with the iPhone turned sideways" loading="lazy" width="1700" height="782"></div></div>
+    <div class="device tall" id="tall"><div class="screen splitter" id="splitter" style="--s:50%"><img class="one" src="/img/page.jpg" alt="The Espresso article on top" loading="lazy" width="828" height="1800"><div class="two"><img src="/img/bourbon.jpg" alt="The Bourbon coffee article below" loading="lazy" width="828" height="1800"></div><div class="grip" title="Drag"></div><input class="sr" type="range" min="28" max="76" value="50" aria-label="Drag the divider between the two pages"></div></div>
   </div>
 </section>
 
-<section class="more" id="more">
-  <h2>And the rest.</h2>
-  <div class="two-up">
-    <figure><img class="screen" src="/img/todo.jpg" alt="Typing call Petra tomorrow at 15 in the bar offers a new to-do for tomorrow at 3 PM" loading="lazy" width="552" height="1200"><figcaption><b>Type it. It's a to-do.</b>"Call Petra tomorrow at 15" lands on your list, and stays in step with Apple Reminders.</figcaption></figure>
-    <figure><img class="screen" src="/img/private.jpg" alt="The address bar in private mode, saying private browsing is on" loading="lazy" width="552" height="1200"><figcaption><b>Private when you want it.</b>No history and no suggestions, and the cookies go with your last private tab. Lock it with Face ID.</figcaption></figure>
+<section class="bar" id="bar">
+  <h2>One bar, a lot of jobs.</h2>
+  <div class="duo">
+    <article>
+      <div class="panel">
+        <div class="field"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><span class="val">call Petra tomorrow at 15</span></div>
+        <div class="answer flat"><svg class="ic" aria-hidden="true"><use href="#i-todo"/></svg><div><b class="small">Call Petra</b><span>Tomorrow at 3:00 PM</span></div><i>To-do</i></div>
+        <div class="row"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><div><b>call Petra tomorrow at 15</b><span>Search Google</span></div></div>
+        <div class="row"><svg class="ic" aria-hidden="true"><use href="#i-browse"/></svg><div><b>Browse for me</b><span>Reads the web and answers</span></div></div>
+      </div>
+      <h3>Type it. It's a to-do.</h3>
+      <p>It lands on your list with its time, and stays in step with Apple Reminders.</p>
+    </article>
+    <article>
+      <div class="panel" id="privacy">
+        <div class="field"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><span class="val ph" id="privPh">Private search</span><button type="button" class="eye" id="eye" aria-pressed="true" aria-label="Private browsing"><em>Private</em><svg class="ic on" aria-hidden="true"><use href="#i-eyeClosed"/></svg><svg class="ic off" aria-hidden="true"><use href="#i-eye"/></svg></button></div>
+        <div class="note-on"><svg class="ic" aria-hidden="true"><use href="#i-eyeClosed"/></svg><b>Private browsing is on</b><span>Pages you open here stay out of your history. Their cookies and sign-ins go when you close your last private tab.</span></div>
+        <div class="note-off"><div class="row"><svg class="ic" aria-hidden="true"><use href="#i-history"/></svg><div><b>Espresso - Wikipedia</b><span>en.wikipedia.org</span></div></div><div class="row"><svg class="ic" aria-hidden="true"><use href="#i-history"/></svg><div><b>Easy pancakes</b><span>bbcgoodfood.com</span></div></div><div class="row"><svg class="ic" aria-hidden="true"><use href="#i-history"/></svg><div><b>Bourbon coffee - Wikipedia</b><span>en.wikipedia.org</span></div></div></div>
+      </div>
+      <h3>Private when you want it.</h3>
+      <p>Tap the eye to try it. Your pins, history and suggestions step aside, and Face ID can lock the tabs.</p>
+    </article>
   </div>
-  <ul class="list">
-    <li><b>Read Later</b>Pages kept to read and summarize offline.</li>
-    <li><b>Translate</b>Into the languages you choose.</li>
-    <li><b>Mini player</b>Sound keeps going in a tab you've left.</li>
-    <li><b>Today</b>Weather, news and to-dos on a new tab.</li>
-    <li><b>Closed tabs</b>A tap from coming back.</li>
-    <li><b>Downloads</b>A real manager, also in Files.</li>
-    <li><b>iCloud sync</b>Pins, history, to-dos and settings.</li>
-    <li><b>iPhone Duo</b>Page above the fold, trackpad below.</li>
-  </ul>
+</section>
+
+<section class="rest" id="rest">
+  <h2>And the small things.</h2>
+  <ul class="list"><li><svg class="ic" aria-hidden="true"><use href="#i-readLater"/></svg><b>Read Later</b><span>Pages kept to read and summarize offline.</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-translate"/></svg><b>Translate</b><span>Any page, into the languages you choose.</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-play"/></svg><b>Mini player</b><span>Sound keeps going in a tab you've left.</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-today"/></svg><b>Today</b><span>Weather, news and to-dos on a new tab.</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-reopen"/></svg><b>Closed tabs</b><span>A tap from coming back.</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg><b>Downloads</b><span>A real manager, also in Files.</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-blocking"/></svg><b>Face ID</b><span>Private tabs and history open only for you.</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-split"/></svg><b>iPhone Duo</b><span>The page above the fold, a trackpad below.</span></li></ul>
 </section>
 
 <section class="faq" id="questions">
   <h2>Questions.</h2>
   <div>
     <details><summary>Is it free? <svg viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 1v12M1 7h12"/></svg></summary><p>The beta on TestFlight is free.</p></details>
-    <details><summary>What does it know about me? <svg viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 1v12M1 7h12"/></svg></summary><p>roko has no account, no ads and no tracking of its own. The <a href="/privacy">privacy policy</a> lists everything that leaves your iPhone.</p></details>
-    <details><summary>Which iPhones does it work on? <svg viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 1v12M1 7h12"/></svg></summary><p>iPhones running iOS 27 or later. Summaries and answers use Apple Intelligence where your iPhone has it. You can also add your own Claude API key.</p></details>
-    <details><summary>Can it be my default browser? <svg viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 1v12M1 7h12"/></svg></summary><p>Not yet. Default browsers need Apple's permission, and so do passkeys and site-matched passwords. Those requests come next.</p></details>
+    <details><summary>What does roko know about me? <svg viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 1v12M1 7h12"/></svg></summary><p>There's no account, no ads and no tracking of its own. The <a href="/privacy">privacy policy</a> lists everything that leaves your iPhone.</p></details>
+    <details><summary>Which iPhones does it run on? <svg viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 1v12M1 7h12"/></svg></summary><p>Any iPhone on iOS 27 or later. Summaries and answers use Apple Intelligence where your iPhone has it, or your own Claude API key.</p></details>
+    <details><summary>Can it be my default browser? <svg viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 1v12M1 7h12"/></svg></summary><p>Not yet. That needs Apple's approval, and so do passkeys and passwords matched to the site you're on. We're asking.</p></details>
     <details><summary>A site isn't working right. <svg viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 1v12M1 7h12"/></svg></summary><p>Open the page menu and tap the blocking card. That site goes back to the original, and every other site stays clean.</p></details>
   </div>
 </section>
@@ -108,8 +146,9 @@
 
 <footer>
   <div class="grain"></div>
-  <div class="close"><h2>Fast, smart and nothing in your way.</h2><a class="go" href="https://testflight.apple.com/join/M2ZrEUV1">Join the TestFlight beta <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 9.5l7-7M4 2.5h5.5V8"/></svg></a></div>
+  <h2>Light, smart and nothing in your way.</h2>
+  <a class="go big" href="https://testflight.apple.com/join/M2ZrEUV1">Join the TestFlight beta <svg class="arr" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 9.5l7-7M4 2.5h5.5V8"/></svg></a>
   <div class="cols"><a href="/support">Support</a><a href="/privacy">Privacy policy</a><a href="mailto:karlo@growthstudio.hr?subject=roko">karlo@growthstudio.hr</a></div>
 </footer>
-<script src="/site.js?2"></script>
+<script src="/site.js?11"></script>
 </body></html>

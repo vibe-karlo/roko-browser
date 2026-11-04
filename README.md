@@ -480,7 +480,7 @@ times an hour; each ask reads a few rows.
 
 ## Website
 
-`Site/` is the static site at rokobrowser.vercel.app: the page, `/support` and `/privacy` (written out from `docs/privacy.md`). The Smart Bar on the phone at the top really answers: sums, units, times and days until are worked out in `site.js`, rates come from frankfurter.dev and weather from Open-Meteo. Written for a phone first. Vercel deploys it from GitHub on a push that changes `Site/` (root `vercel.json`).
+`Site/` is the static site at rokobrowser.vercel.app: the page, `/support` and `/privacy` (written out from `docs/privacy.md`). The phone at the top is live DOM at an iPhone's real 402 by 874 shape, sized in its own width (`cqw`), with a working keyboard so a phone's own doesn't cover it: sums, units, times and days until are worked out in `site.js`, rates come from frankfurter.dev and weather from Open-Meteo. Written for a phone first. Vercel deploys it from GitHub on a push that changes `Site/` (root `vercel.json`).
 
 ## Credits
 

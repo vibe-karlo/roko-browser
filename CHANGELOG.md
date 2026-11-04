@@ -6,7 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Website
-- roko has a site in `Site/`, phone first: the Smart Bar working on a real screen with weather and days until, speed numbers, draggable before and after and Split View, support and the privacy policy.
+- roko has a site in `Site/`, phone first: a live iPhone in true proportions with the bar and a working keyboard, speed numbers, draggable summary, before and after and Split View, a private switch to try, support and the privacy policy.
 
 ### Changed
 - Shared answers have a Report link, which emails roko.

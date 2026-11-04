@@ -1,4 +1,7 @@
 const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const samples = ["weather in tokyo", "days until christmas", "250 usd in eur", "call petra tomorrow at 15", "time in new york", "15% of 240", "12 km"];
+const tries = document.querySelectorAll("#tries .row");
+let tryAt = 0;
 const input = document.getElementById("ask"), out = document.getElementById("answer");
 
 const zones = { tokyo: "Asia/Tokyo", london: "Europe/London", "new york": "America/New_York", paris: "Europe/Paris", zagreb: "Europe/Zagreb", berlin: "Europe/Berlin", sydney: "Australia/Sydney", dubai: "Asia/Dubai", "los angeles": "America/Los_Angeles", singapore: "Asia/Singapore" };
@@ -6,15 +9,16 @@ const units = { km: ["mi", .621371], mi: ["km", 1.60934], kg: ["lb", 2.20462], l
 const rates = {};
 let asked = 0;
 
-const typed = document.getElementById("typed"), typedNote = typed.nextElementSibling;
 function show(big, note, kind, small) {
-  const box = out.querySelector("div");
-  const b = box.querySelector("b"), s = box.querySelector("span");
-  b.textContent = big; b.className = small ? "small" : ""; s.textContent = note;
+  const b = out.querySelector("b");
+  b.textContent = big; b.className = small ? "small" : "";
+  out.querySelector("span").textContent = note;
   out.querySelector("i").textContent = kind;
-  const q = input.value.trim();
-  typed.textContent = q || "Try the Smart Bar";
-  typedNote.textContent = q ? "Search Google" : "Type weather, a sum or days until";
+  out.querySelector("use").setAttribute("href", kind === "To-do" ? "#i-todo" : kind === "Ask" ? "#i-browse" : kind === "Search" || kind === "Open" ? "#i-search" : "#i-equals");
+  const q = input.value.trim().toLowerCase();
+  let at = 0;
+  const left = samples.filter(x => x !== q);
+  for (const row of tries) { const t = left[(tryAt + at++) % left.length]; row.querySelector("b").textContent = t; row.dataset.q = t; }
 }
 const tidy = n => Number(n.toFixed(4)).toLocaleString("en-US", { maximumFractionDigits: 4 });
 
@@ -81,61 +85,114 @@ async function weather(place, stamp) {
 
 function answer(raw) {
   const text = raw.trim(), low = text.toLowerCase(), stamp = ++asked;
-  if (!text) return show("15% of 240 = 36", "Answered right in the bar", "Sum");
+  if (!text) return show("36", "15% of 240", "Sum");
   let m;
   const until = daysUntil(low); if (until) return show(until[0], until[1], "Date");
   if ((m = low.match(/^(?:weather|forecast)(?:\s+(?:in|for|at)\s+(.+))?$/)) || (m = low.match(/^(.+?)\s+weather$/))) return void weather(m[1], stamp);
-  if ((m = low.match(/^([\d.]+)\s*%\s*of\s*([\d.]+)$/))) return show(`${text} = ${tidy(m[1] / 100 * m[2])}`, "Answered right in the bar", "Sum");
+  if ((m = low.match(/^([\d.]+)\s*%\s*of\s*([\d.]+)$/))) return show(tidy(m[1] / 100 * m[2]), text, "Sum");
   if ((m = low.match(/^([\d.,]+)\s*([a-z]{3})\s+(?:in|to)\s+([a-z]{3})$/))) return void rate(parseFloat(m[1].replace(",", "")), m[2].toUpperCase(), m[3].toUpperCase(), stamp);
   if ((m = low.match(/^([\d.]+)\s*(km|mi|kg|lb|cm|in|m|ft|l)(?:\s+(?:in|to)\s+[a-z]+)?$/))) { const [to, by] = units[m[2]]; return show(`${tidy(m[1] * by)} ${to}`, `${m[1]} ${m[2]}`, "Unit"); }
   if ((m = low.match(/^(?:time in\s+)?(.+?)(?:\s+time)?$/)) && zones[m[1]]) return show(new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: zones[m[1]] }), `Right now in ${m[1].replace(/\b\w/g, c => c.toUpperCase())}`, "Time");
-  if (/^[\d\s.()+\-*/x×÷]+$/.test(low) && /\d/.test(low)) { try { return show(`= ${tidy(sum(low))}`, text, "Sum"); } catch {} }
-  if (/^(https?:\/\/)?[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(\/\S*)?$/.test(low)) return show(low.replace(/^https?:\/\//, ""), "Opens the site", "Open", true);
-  if (/\?$/.test(text) || /^(how|what|why|when|where|who|which|is|are|can|should|best)\b/.test(low)) return show(text, "Browse for Me reads the web and answers", "Ask", true);
-  if (/^(call|buy|email|text|pay|book|remember|pick up|send)\b/.test(low) || /\b(tomorrow|tonight|on (mon|tues|wednes|thurs|fri|satur|sun)day)\b/.test(low)) return show(text[0].toUpperCase() + text.slice(1), /tomorrow/.test(low) ? "New to-do for tomorrow" : "New to-do", "To-do", true);
-  show(text, "Searches with the engine you chose", "Search", true);
+  if (/^[\d\s.()+\-*/x×÷]+$/.test(low) && /\d/.test(low)) { try { return show(tidy(sum(low)), text, "Sum"); } catch {} }
+  if (/^(https?:\/\/)?[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(\/\S*)?$/.test(low)) return show(low.replace(/^https?:\/\//, ""), "Opens the site, already loading", "Open", true);
+  if (/\?$/.test(text) || /^(how|what|why|when|where|who|which|is|are|can|should|best)\b/.test(low)) return show(text, "Browse for me: reads the web and answers", "Ask", true);
+  if (/^(call|buy|email|text|pay|book|remember|pick up|send)\b/.test(low) || /\b(tomorrow|tonight)\b/.test(low)) {
+    const when = low.match(/\b(today|tonight|tomorrow)\b/), at = low.match(/\bat (\d{1,2})(?::(\d{2}))?\b/);
+    const name = text.replace(/\s+(today|tonight|tomorrow)\b/i, "").replace(/\s+at \d{1,2}(:\d{2})?\b/i, "").replace(/\bpetra\b/i, "Petra");
+    const hour = at ? +at[1] : 0, time = at ? `${hour % 12 || 12}:${at[2] || "00"} ${hour < 12 ? "AM" : "PM"}` : "";
+    return show(name[0].toUpperCase() + name.slice(1), [when ? when[1][0].toUpperCase() + when[1].slice(1) : "New to-do", time && `at ${time}`].filter(Boolean).join(" "), "To-do", true);
+  }
+  show(text, "Search Google", "Search", true);
 }
 input.addEventListener("input", () => { stopped = true; answer(input.value); });
 
+// On a touch screen the keyboard on the page is the keyboard: nothing jumps.
+if (matchMedia("(pointer: coarse)").matches) input.setAttribute("inputmode", "none");
+const kb = document.getElementById("kb");
+let upper = false;
+function put(text) { stopped = true; input.value = text; answer(text); }
+kb.addEventListener("pointerdown", e => e.preventDefault());
+kb.addEventListener("click", e => {
+  const k = e.target.closest(".k")?.dataset.k; if (k === undefined) return;
+  if (k === "123" || k === "abc") { for (const l of kb.querySelectorAll(".layer")) l.hidden = l.dataset.l !== k; return; }
+  if (k === "shift") { upper = !upper; kb.classList.toggle("up", upper); return; }
+  if (k === "go") { out.querySelector("span").textContent = "In roko, Go takes you there"; return; }
+  if (k === "back") return put(input.value.slice(0, -1));
+  put(input.value + (upper ? k.toUpperCase() : k));
+  if (upper) { upper = false; kb.classList.remove("up"); }
+});
+for (const row of tries) row.addEventListener("click", () => { tryAt++; put(row.dataset.q); });
+
 // The bar shows itself until someone reaches for it.
 let stopped = still;
-const samples = ["weather in tokyo", "days until christmas", "250 usd in eur", "call Petra tomorrow", "how long do you boil an egg?", "time in new york"];
 input.addEventListener("focus", () => { if (!stopped) { stopped = true; input.value = ""; answer(""); } });
+const hero = document.getElementById("top");
 (async () => {
   const wait = ms => new Promise(r => setTimeout(r, ms));
   for (let s = 0; !stopped; s = (s + 1) % samples.length) {
-    await wait(s === 0 ? 1400 : 2600);
+    await wait(s === 0 ? 1300 : 2600);
+    if (stopped) return;
+    if (scrollY > hero.offsetHeight) { s--; continue; }
     input.value = "";
-    for (const c of samples[s]) { if (stopped) return; input.value += c; await wait(46); }
-    if (!stopped) answer(input.value);
+    for (const c of samples[s]) { if (stopped) return; input.value += c; await wait(44); }
+    if (!stopped) { tryAt = s + 1; answer(input.value); }
   }
 })();
 
-const puller = document.getElementById("puller");
-let pulled = false;
-function drag(box, name, axis, min, max, area, onUse) {
+const puller = document.getElementById("puller"), compare = document.getElementById("compare");
+const labA = document.getElementById("labA"), labB = document.getElementById("labB");
+let pulled = false, compared = false;
+function drag(box, name, axis, min, max, area, onUse, onSet) {
   const range = box.querySelector("input");
-  const set = v => { v = Math.max(min, Math.min(max, v)); box.style.setProperty(name, v + "%"); range.value = v; };
+  const set = v => { v = Math.max(min, Math.min(max, v)); box.style.setProperty(name, v + "%"); range.value = v; onSet?.(v); };
   range.addEventListener("input", () => { onUse?.(); set(+range.value); });
   let on = false;
   const at = e => { const r = box.getBoundingClientRect(); set(axis === "x" ? (e.clientX - r.left) / r.width * 100 : (e.clientY - r.top) / r.height * 100); };
-  area.addEventListener("pointerdown", e => { on = true; onUse?.(); area.setPointerCapture(e.pointerId); at(e); e.preventDefault(); });
+  area.addEventListener("pointerdown", e => { on = true; onUse?.(); area.setPointerCapture(e.pointerId); at(e); });
   area.addEventListener("pointermove", e => { if (on) at(e); });
   for (const end of ["pointerup", "pointercancel"]) area.addEventListener(end, () => { on = false; });
+  return set;
 }
-drag(puller, "--p", "y", 0, 100, puller.querySelector(".grip"), () => { pulled = true; });
-const compare = document.getElementById("compare"); drag(compare, "--p", "x", 0, 100, compare);
+drag(puller, "--p", "y", 6, 94, puller.querySelector(".grip"), () => { pulled = true; });
+const shade = v => { labA.style.opacity = .5 + .5 * Math.min(1, v / 50); labB.style.opacity = .5 + .5 * Math.min(1, (100 - v) / 50); };
+const setCompare = drag(compare, "--p", "x", 0, 100, compare, () => { compared = true; }, shade);
 const splitter = document.getElementById("splitter"); drag(splitter, "--s", "y", 28, 76, splitter.querySelector(".grip"));
 
-// The summary comes down over the page as it scrolls in, until someone takes it.
+// The eye really switches: the note, or what private leaves out.
+const privacy = document.getElementById("privacy"), eye = document.getElementById("eye"), ph = document.getElementById("privPh");
+eye.addEventListener("click", () => {
+  const open = privacy.classList.toggle("open");
+  eye.setAttribute("aria-pressed", String(!open));
+  ph.textContent = open ? "Search or enter address" : "Private search";
+});
+
 if (!still) {
+  // The summary comes down over the page as it scrolls in, until someone takes it.
   let queued = false;
+  const tall = document.getElementById("tall");
   const frame = () => {
     queued = false;
-    if (pulled) return;
-    const r = puller.getBoundingClientRect(), vh = innerHeight;
-    puller.style.setProperty("--p", Math.max(0, Math.min(1, (vh * .85 - r.top) / (vh * .6))) * 100 + "%");
+    const vh = innerHeight;
+    if (!pulled) {
+      const r = puller.getBoundingClientRect();
+      puller.style.setProperty("--p", 6 + 88 * Math.max(0, Math.min(1, (vh * .8 - r.top) / (vh * .55))) + "%");
+    }
+    if (innerWidth >= 820) { const r = tall.getBoundingClientRect(); if (r.bottom > 0 && r.top < vh) tall.style.transform = `translateY(${(r.top + r.height / 2 - vh / 2) * -.05}px)`; }
+    else tall.style.transform = "";
   };
   addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(frame); } }, { passive: true });
   frame();
+  // Once, the first time it's seen: the line shows it moves.
+  new IntersectionObserver((seen, io) => {
+    if (!seen[0].isIntersecting) return;
+    io.disconnect();
+    const start = performance.now();
+    const tick = t => {
+      if (compared) return;
+      const k = Math.min(1, (t - start) / 1800);
+      setCompare(50 + 28 * Math.sin(k * Math.PI * 2) * (1 - k * .2) * (k < 1 ? 1 : 0));
+      if (k < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, { threshold: .5 }).observe(compare);
 }
