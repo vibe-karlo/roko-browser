@@ -199,6 +199,9 @@ struct MarkdownText: View {
         // News and essays lead with their gist: a big number over them was
         // always one the model reached for, never one the reader came for.
         if page.kind == .article { page.stats = [] }
+        // Nor a count of what the answer itself holds: "5 methods", "3 key
+        // numbers". A bare count only means something as a recipe's servings.
+        page.stats.removeAll { Self.countsItself($0, in: page.kind) }
         // Nor an ingredient's amount: "350g pasta" or "3 eggs" up top only
         // repeats a line of the list below, and pushes the time out of view.
         let items = page.sections.flatMap(\.lines).compactMap { line -> (name: String, amount: String)? in
@@ -230,6 +233,18 @@ struct MarkdownText: View {
         if !page.picks.isEmpty || lines.contains(where: { if case .versus = $0 { true } else { false } }) { return .compare }
         if lines.contains(where: { if case .person = $0 { true } else { false } }) { return .article }
         return .general
+    }
+
+    private static let selfCounts: Set<String> = [
+        "method", "methods", "count", "mentioned", "key", "number", "numbers", "tip", "tips", "step", "steps",
+        "way", "ways", "point", "points", "source", "sources", "option", "options", "item", "items", "page", "pages",
+        "fact", "facts", "idea", "ideas", "type", "types", "ingredient", "ingredients", "tool", "tools", "section", "sections",
+    ]
+
+    private static func countsItself(_ stat: Stat, in kind: PageKind) -> Bool {
+        let words = (stat.value + " " + stat.label).lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        if words.contains(where: selfCounts.contains) { return true }
+        return kind != .recipe && stat.value.trimmingCharacters(in: .whitespaces).allSatisfy(\.isNumber)
     }
 
     /// A year or a date isn't a number anyone came for, however the model

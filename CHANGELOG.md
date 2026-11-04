@@ -15,6 +15,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Time saved is counted more modestly: a summary against reading a third of the page, Browse for Me against opening three pages. What was already counted is brought down to match.
 
 ### Fixed
+- Summaries and Browse for Me no longer show big numbers that only count what the answer holds, such as "5 methods" or "3 key numbers".
 - Voice and Translate no longer offer a language they can't use, which could come from the phone's language list (one showed "English and Comanche").
 
 ### Documentation
