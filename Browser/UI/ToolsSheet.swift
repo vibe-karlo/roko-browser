@@ -29,6 +29,7 @@ struct ToolsSheet: View {
                     addressRow(tab)
                     actionTiles(tab)
                     pageGroup(tab)
+                    blockingCard(tab)
                     siteGroup(tab)
                 }
                 .padding(.horizontal, 16)
@@ -124,15 +125,10 @@ struct ToolsSheet: View {
                 browser.showToast(browser.isPinned(tab.url) ? "Pinned" : "Unpinned")
             }
             if let url = tab.url {
-                // The link to another app, or the page itself as Markdown.
-                Menu {
-                    ShareLink(item: CleanLink.clean(url)) { Label("Share Link", systemImage: "square.and.arrow.up") }
-                    Button { browser.copyAsMarkdown() } label: { Label("Copy as Markdown", systemImage: "doc.richtext") }
-                } label: {
+                ShareLink(item: CleanLink.clean(url)) {
                     ActionTile.Face(glyph: .share, title: "Share")
                 }
                 .buttonStyle(RowButtonStyle())
-                .menuStyle(.button)
             }
         }
     }
@@ -271,6 +267,35 @@ struct ToolsSheet: View {
 
     // MARK: Site
 
+    /// The way out when blocking breaks a site, as in Arc. WebKit doesn't say
+    /// how much it blocked, so this says what, not how many.
+    private func blockingCard(_ tab: BrowserTab) -> some View {
+        Button {
+            guard let host = tab.url?.host() else { return }
+            let restore = blockingOn
+            blockingOn = !restore
+            ContentBlocker.shared.setAllowed(host: host, restore)
+            tab.webView?.reload()
+            browser.panel = .none
+            browser.showToast(restore ? "Showing the original page" : "Blocking again")
+        } label: {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(blockingOn ? "Ads, trackers and pop-ups blocked" : "Blocking is off for this site")
+                    .font(.system(size: 15, weight: .medium))
+                Text(blockingOn ? "Problems? Tap to restore the original page" : "Tap to block again")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.secondaryInk)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(Theme.raised, in: .rect(cornerRadius: 20))
+            .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.edge))
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+    }
+
     private func siteGroup(_ tab: BrowserTab) -> some View {
         VStack(spacing: 0) {
             Button {
@@ -280,9 +305,6 @@ struct ToolsSheet: View {
                     Glyph(.settings).foregroundStyle(Theme.secondaryInk).frame(width: 24)
                     Text("Site Settings").font(.system(size: 16))
                     Spacer()
-                    Text(blockingOn ? "Blocking on" : "Blocking off")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.faintInk)
                     Glyph(.chevronUp, size: 16)
                         .foregroundStyle(Theme.secondaryInk)
                         .rotationEffect(.degrees(siteSettingsOpen ? 0 : 180))

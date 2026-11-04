@@ -23,8 +23,19 @@ enum SavedStats {
         var seconds: Double { cookieSeconds + summarySeconds + answerSeconds + instantSeconds }
     }
 
+    /// What was counted under the earlier, higher estimates, brought down to
+    /// about what these give: a fifth for summaries, a minute for an answer.
+    private static func adoptLowerEstimates() {
+        guard !defaults.bool(forKey: "saved.lowerEstimates") else { return }
+        defaults.set(true, forKey: "saved.lowerEstimates")
+        defaults.set(defaults.double(forKey: "saved.summarySeconds") * 0.2, forKey: "saved.summarySeconds")
+        defaults.set(min(defaults.double(forKey: "saved.answerSeconds"), 60 * Double(defaults.integer(forKey: "saved.answers"))),
+                     forKey: "saved.answerSeconds")
+    }
+
     static var totals: Totals {
-        Totals(cookieBars: defaults.integer(forKey: "saved.cookieBars"),
+        adoptLowerEstimates()
+        return Totals(cookieBars: defaults.integer(forKey: "saved.cookieBars"),
                cookieClicks: defaults.integer(forKey: "saved.cookieClicks"),
                cookieSeconds: defaults.double(forKey: "saved.cookieSeconds"),
                summaries: defaults.integer(forKey: "saved.summaries"),
@@ -45,19 +56,20 @@ enum SavedStats {
         add(Double(clicks) * secondsPerClick, to: "saved.cookieSeconds")
     }
 
-    /// A page read as a summary: the reading it spared, at skimming speed,
-    /// at most half an hour for one page.
+    /// A page read as a summary: the part of it you'd have read (people read
+    /// about a third of a page), less the summary, at most five minutes.
     static func summary(pageWords: Int, summaryWords: Int) {
-        let seconds = min(1800, max(0, Double(pageWords - summaryWords) / readingSpeed * 60))
+        let seconds = min(300, max(0, Double(pageWords) * 0.35 - Double(summaryWords)) / readingSpeed * 60)
         guard seconds > 0 else { return }
         add(1, to: "saved.summaries")
         add(seconds, to: "saved.summarySeconds")
     }
 
-    /// An answer from Browse for Me: a search and a look at each page it read,
-    /// less the time to read the answer; half a minute at the least.
+    /// An answer from Browse for Me: a search and half a minute on each of the
+    /// three pages you'd have opened, whatever it read itself, less the time
+    /// to read the answer; 15 seconds at the least.
     static func answer(pagesRead: Int, answerWords: Int) {
-        let seconds = max(30, 20 + 60 * Double(min(pagesRead, 8)) - Double(answerWords) / readingSpeed * 60)
+        let seconds = max(15, 20 + 30 * Double(min(pagesRead, 3)) - Double(answerWords) / readingSpeed * 60)
         add(1, to: "saved.answers")
         add(seconds, to: "saved.answerSeconds")
     }
@@ -104,6 +116,7 @@ enum SavedStats {
     }
 
     private static func noteStart() {
+        adoptLowerEstimates()
         if defaults.object(forKey: "saved.since") == nil { defaults.set(Date.now, forKey: "saved.since") }
     }
 

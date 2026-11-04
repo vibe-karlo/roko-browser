@@ -30,6 +30,9 @@ final class Parking {
         var plate: String
         var startedAt: Date
         var endsAt: Date
+        /// A pretend session from "test parking": its hours are texted here,
+        /// never to the operator, and nothing is paid.
+        var testNumber: String? = nil
         var city: ParkingCity? { ParkingCity.with(id: cityID) }
         var zone: ParkingZone? { city?.zone(zoneCode) }
     }
@@ -120,7 +123,8 @@ final class Parking {
     /// for the zone already being paid, carries on an hour longer).
     func pay(_ zone: ParkingZone, in city: ParkingCity) {
         guard let plate = plates.first else { return }
-        if let session, session.cityID == city.id, session.zoneCode == zone.code, session.endsAt > .now {
+        if let session, session.cityID == city.id, session.zoneCode == zone.code, session.endsAt > .now,
+           session.testNumber == nil {
             return extend()
         }
         guard let ends = city.chargingEnds(after: .now) else { return }
@@ -141,6 +145,7 @@ final class Parking {
     /// Another hour, by another text, up to the zone's daily limit.
     func extend() {
         guard let current = session, let zone = current.zone, let city = current.city else { return }
+        if let number = current.testNumber { return extendTest(to: number) }
         guard canExtend, let ends = city.chargingEnds(after: .now) else {
             if let limit = zone.maxMinutesPerDay, paidToday(zone: zone, city: city) + zone.ticketMinutes > limit {
                 say?("\(zone.name) allows \(limit / 60) hours a day")
@@ -166,23 +171,42 @@ final class Parking {
     /// Where "test parking" texts: yours, kept on this iPhone only.
     var testNumber: String? { UserDefaults.standard.string(forKey: "parking.testNumber") }
 
-    /// The message window a paid text opens, to a number of your own. Pays
-    /// for nothing and leaves the timer alone.
+    /// A pretend hour on the timer, in the first zone roko knows, to try
+    /// adding an hour with: that opens the message window a paid text does, to
+    /// a number of your own. Pays for nothing. Not while real parking runs.
     func test(to number: String) {
         UserDefaults.standard.set(number, forKey: "parking.testNumber")
+        if let active, active.testNumber == nil {
+            say?("Parking is running: end it to test")
+            return
+        }
+        guard let city = ParkingCity.all.first, let zone = city.zones.first else { return }
+        let now = Date.now
+        session = Session(cityID: city.id, zoneCode: zone.code, plate: "TEST", startedAt: now,
+                          endsAt: now.addingTimeInterval(3600), testNumber: number)
+        saveAndShow()
+        say?("Test parking: 1 hour, nothing paid")
+    }
+
+    private func extendTest(to number: String) {
         guard Self.pretendSent || MessageComposer.canSend else {
             say?("This iPhone can't send texts")
             return
         }
         Task {
-            let sent = await MessageComposer.send(to: number, body: "roko parking test", pretend: Self.pretendSent)
-            say?(sent ? "Test text sent" : "Test text not sent")
+            guard await MessageComposer.send(to: number, body: "roko parking test", pretend: Self.pretendSent),
+                  var updated = session, updated.testNumber != nil else { return }
+            updated.endsAt = max(updated.endsAt, .now).addingTimeInterval(3600)
+            session = updated
+            saveAndShow()
+            say?("Test hour added, nothing paid")
         }
     }
 
     /// Whether another text is allowed: within the zone's daily limit, and
     /// while charging lasts past the current end.
     var canExtend: Bool {
+        if session?.testNumber != nil { return true }
         guard let session, let zone = session.zone, let city = session.city,
               let ends = city.chargingEnds(after: .now), session.endsAt < ends else { return false }
         guard let limit = zone.maxMinutesPerDay else { return true }

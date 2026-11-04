@@ -33,8 +33,13 @@ struct TranslationTarget: Hashable, Identifiable, Sendable {
     /// are chosen: English, and the phone's own language when that's another.
     static var chosen: [String] {
         get {
+            // Only what can be translated into: the phone's list can hold others.
+            let offered = TranslationTarget.offered.map(\.rawValue)
             let stored = UserDefaults.standard.stringArray(forKey: key) ?? []
-            return stored.isEmpty ? ["en"] + Audience.spoken.filter { $0 != "en" }.prefix(1) : stored
+            let kept = stored.filter(offered.contains)
+            if !kept.isEmpty, kept.count == stored.count { return kept }
+            let phone = ["en"] + Audience.spoken.filter { $0 != "en" && offered.contains($0) }.prefix(1)
+            return kept + phone.filter { !kept.contains($0) }
         }
         set { UserDefaults.standard.set(newValue, forKey: key) }
     }

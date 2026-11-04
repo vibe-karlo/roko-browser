@@ -42,7 +42,7 @@ the time all this has saved you.
 **Two at once, and more.** Two tabs at once in Split View, parted at the fold on iPhone Duo, which props up like a small laptop with the page above and a trackpad for it below. Touch and hold a link to see its page live, then
 open it, open it in the background or add it to Read Later. Forms you're filling in survive a crash.
 Private tabs and history behind Face ID. A mini player for sound in a tab you've left, a real
-download manager (also in Files), Copy as Markdown (under Share), swipe anywhere to go back, pinch for your tabs,
+download manager (also in Files), Copy as Markdown (type "markdown"), swipe anywhere to go back, pinch for your tabs,
 and New Tab, Private Tab and Ask roko in Control Center, Shortcuts and Siri.
 
 <p>
@@ -610,6 +610,10 @@ texts, act as if each one was sent.
 Adding a city: its zones and numbers in `ParkingCity`, its bounding box and zone tags in
 `Scripts/build_parking.py` (or another source of zone outlines, such as Zagreb's ArcGIS layers), then
 rebuild the data.
+
+To try it without paying, type `test parking` and a number of your own (remembered after that): a
+pretend hour runs on the timer, and adding an hour opens the message window to that number. A test
+session (`Session.testNumber`) can't text the operator, and paying for real replaces it.
 
 ## Widgets
 

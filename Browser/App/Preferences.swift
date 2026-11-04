@@ -1,4 +1,5 @@
 import Foundation
+import Speech
 
 /// The switches for roko's own features, read where each feature runs. Every
 /// one is on unless it's been turned off in Settings.
@@ -79,13 +80,16 @@ nonisolated enum Audience {
 
     /// What dictation listens for: the phone's first two languages, with
     /// English alongside a single other one (web addresses and product names
-    /// are often said in English).
+    /// are often said in English). Only languages iOS can hear: a phone's list
+    /// can hold others, and those would be offered and then never listened for.
     static var voiceLanguages: [String] {
-        var codes = Array(spoken.prefix(2))
+        var codes = Array(spoken.filter(heard.contains).prefix(2))
         if codes.isEmpty { codes = ["en"] }
         if codes.count == 1, codes[0] != "en" { codes.append("en") }
         return codes
     }
+
+    private static let heard = Set(SFSpeechRecognizer.supportedLocales().compactMap { $0.language.languageCode?.identifier })
 
     /// The phone's languages, and the language of where it is when that isn't
     /// among them: an English phone in Croatia also gets Croatian.

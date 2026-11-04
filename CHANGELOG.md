@@ -5,6 +5,17 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Share in the page menu opens the share sheet straight away. Copy as Markdown stays, by typing "markdown".
+- Turned sideways, tabs are narrow upright cards, several at once to swipe through, instead of one wide strip.
+- The Tabs row in Settings has the same icon as the tabs button.
+- The page menu has its blocking card back, as in Arc: "Ads, trackers and pop-ups blocked. Problems? Tap to restore the original page."
+- "test parking" starts a pretend hour on the timer. Adding an hour opens the message window to your own number, and nothing is paid.
+- Time saved is counted more modestly: a summary against reading a third of the page, Browse for Me against opening three pages. What was already counted is brought down to match.
+
+### Fixed
+- Voice and Translate no longer offer a language they can't use, which could come from the phone's language list (one showed "English and Comanche").
+
 ### Documentation
 - A privacy policy: docs/privacy.md.
 

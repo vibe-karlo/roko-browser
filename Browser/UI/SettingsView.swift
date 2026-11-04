@@ -37,7 +37,7 @@ struct SettingsView: View {
                     link(.appIcon, "App icon") {
                         Form { AppIconPicker() }.settingsPage("App icon")
                     }
-                    link(.tab, "Tabs", archive.title) { TabsSettings() }
+                    link(.tabs, "Tabs", archive.title) { TabsSettings() }
                     link(.translate, "Translate", translateLanguages.count == 1
                          ? TranslationTarget(rawValue: translateLanguages[0]).name
                          : "\(translateLanguages.count) languages") { TranslateSettings() }
@@ -214,7 +214,7 @@ private struct SavedPage: View {
             } header: {
                 Text(SavedStats.duration(totals.seconds) + (totals.since.map { " since \($0.formatted(.dateTime.day().month(.wide)))" } ?? ""))
             } footer: {
-                Text("Estimates: 3 seconds a click, reading at 230 words a minute, a search plus a minute for each page Browse for Me read, and 10 to 20 seconds for each answer in the bar. Only counts, on this iPhone.")
+                Text("Estimates: 3 seconds a click, reading a third of a page at 230 words a minute, a search plus half a minute on each of three pages for Browse for Me, and 10 to 20 seconds for each answer in the bar. Only counts, on this iPhone.")
             }
             Section {
                 Button("Start Counting Again", role: .destructive) { confirmReset = true }

@@ -794,11 +794,11 @@ struct CommandBarView: View {
         guard words.count >= 2, words[0] == "test", words[1] == "parking" else { return nil }
         let typed = words.dropFirst(2).joined().filter { $0.isNumber || $0 == "+" }
         guard let number = typed.isEmpty ? Parking.shared.testNumber : typed else {
-            return CommandItem(id: "parking-test", title: "Test the parking text",
+            return CommandItem(id: "parking-test", title: "Start test parking",
                                subtitle: "Add a number of your own: test parking 0991234567",
                                kind: "", icon: .glyph(.car), action: .search(query))
         }
-        return CommandItem(id: "parking-test", title: "Test the parking text", subtitle: "To \(number) · nothing is paid",
+        return CommandItem(id: "parking-test", title: "Start test parking", subtitle: "Nothing paid · texts go to \(number)",
                            kind: "Test", icon: .glyph(.car), action: .testParking(number))
     }
 

@@ -18,11 +18,14 @@ struct TabStackView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let cardWidth = (proxy.size.width * 0.76).rounded()
+            // Turned sideways the cards stay upright and narrow: several at
+            // once to swipe through, rather than one wide strip of a page.
+            let sideways = proxy.size.width > proxy.size.height
+            let cardHeight = sideways ? proxy.size.height - 130 : min((proxy.size.width * 0.76).rounded() * 1.95, proxy.size.height - 230)
+            let cardWidth = sideways ? (cardHeight * 0.62).rounded() : (proxy.size.width * 0.76).rounded()
             // Each card shows this much before the next one covers it.
             // Most of the focused card shows; the next one just overlaps its edge.
-            let stride = (proxy.size.width * 0.66).rounded()
-            let cardHeight = min(cardWidth * 1.95, proxy.size.height - 230)
+            let stride = (cardWidth * 0.87).rounded()
 
             VStack(spacing: 0) {
                 // Pins live above the address field, not here.
@@ -272,7 +275,7 @@ private struct TabCard: View {
 
     @State private var throwOffset: CGFloat = 0
     private let closeDistance: CGFloat = 140
-    private let corner: CGFloat = 34
+    private var corner: CGFloat { min(34, width * 0.16) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -351,7 +354,9 @@ private struct TabCard: View {
             Image(uiImage: snapshot)
                 .resizable()
                 .scaledToFill()
-                .frame(width: width, height: height, alignment: .top)
+                // From the left: a sideways picture in a narrow card keeps the
+                // site's logo, where the middle of the page wouldn't.
+                .frame(width: width, height: height, alignment: .topLeading)
                 .clipped()
         } else {
             Theme.raised.overlay {
