@@ -263,6 +263,7 @@ struct CommandBarView: View {
             LazyVStack(spacing: 2) {
                 // Best match first, right under the field.
                 if browser.launcherContext == .todo && query.isEmpty && !dueTodos.isEmpty { todoWidget }
+                if showsPrivateNote { privateNote }
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     Group {
                         if case .pasteLink = item.action {
@@ -355,6 +356,31 @@ struct CommandBarView: View {
             scrollRequest = nil
         }
         }
+    }
+
+    private var showsPrivateNote: Bool {
+        browser.launcherContext == .web && browser.commandMode == .privateTab && query.isEmpty
+    }
+
+    /// Says what private means as soon as it's on, in what it really does: the
+    /// tab keeps no history, and its data goes with the last private tab.
+    private var privateNote: some View {
+        VStack(spacing: 8) {
+            Glyph(.eyeClosed, size: 28).foregroundStyle(Theme.accent)
+            Text("Private browsing is on")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+            Text("Pages you open here stay out of your history. Their cookies and sign-ins go when you close your last private tab.")
+                .font(.system(size: 14))
+                .foregroundStyle(Theme.secondaryInk)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: 320)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 22)
+        .accessibilityElement(children: .combine)
+        .transition(.opacity)
     }
 
     /// A link copied a moment ago that roko can't read without iOS asking: a
@@ -571,11 +597,18 @@ struct CommandBarView: View {
                 withAnimation(.easeOut(duration: 0.14)) { blink = false }
             }
         } label: {
-            Glyph(isPrivate ? .eyeClosed : .eye, size: 22)
-                .foregroundStyle(isPrivate ? Theme.accent : Theme.secondaryInk)
-                .scaleEffect(x: 1, y: blink ? 0.12 : 1)
-                .frame(width: 40, height: 44)
-                .contentShape(.rect)
+            HStack(spacing: 6) {
+                if isPrivate {
+                    Text("Private")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Theme.accentText)
+                }
+                Glyph(isPrivate ? .eyeClosed : .eye, size: 22)
+                    .foregroundStyle(isPrivate ? Theme.accent : Theme.secondaryInk)
+                    .scaleEffect(x: 1, y: blink ? 0.12 : 1)
+            }
+            .frame(minWidth: 40, minHeight: 44)
+            .contentShape(.rect)
         }
         .sensoryFeedback(.selection, trigger: isPrivate)
         .buttonStyle(.plain)

@@ -25,6 +25,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - A privacy policy: docs/privacy.md.
 
 ### Added
+- Turning on private browsing says so: "Private" in the address field, and what it means under it.
 - iCloud sync is on: pins, history and settings follow you between devices through your own iCloud account.
 - iPhone Duo: with the phone open, the bar, the page menu and the address field keep to one half instead of lying across the fold; Split View parts at the fold, side by side or stacked; pages keep clear of the clock at the side, open or shut, and it stays readable on black beside a split.
 - iPhone Duo propped open with the fold lying across, like a small laptop: the page stands above the fold and ends there, the bar lies below it on black, and the page menu rises only as far as the fold. The empty lower half works like a trackpad: drag there and the page above scrolls, with its own momentum and bounce.
