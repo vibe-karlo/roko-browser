@@ -28,6 +28,7 @@ struct BrowserApp: App {
     var body: some Scene {
         WindowGroup {
             BrowserView()
+                .readsFold()
                 .environment(browser)
                 .tint(Theme.accent)
                 .onOpenURL { browser.handleLink($0) }

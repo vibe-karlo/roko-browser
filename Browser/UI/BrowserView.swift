@@ -8,6 +8,7 @@ struct BrowserView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var barTop: CGFloat = 0
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.fold) private var fold
     /// The strip beside the page, turned sideways, where the bar stands upright.
     @State private var sideStrip: CGFloat = 0
 
@@ -28,7 +29,7 @@ struct BrowserView: View {
             }
             .animation(.easeOut(duration: 0.2), value: browser.topTab?.topColor)
 
-            if sideBar {
+            if sideBar || splitBesideClock {
                 Color.black.ignoresSafeArea()
             }
 
@@ -62,7 +63,8 @@ struct BrowserView: View {
                 }
                 // Turned sideways the page is a card between two black strips:
                 // the Dynamic Island's on one side, the bar's on the other.
-                .ignoresSafeArea(edges: sideBar ? [] : .horizontal)
+                // On an open Duo the clock runs down the side: the page keeps clear of it.
+                .ignoresSafeArea(edges: sideBar || fold != nil ? [] : .horizontal)
             } else {
                 StartView()
                     // The bar floats over the page; the start page keeps clear of it.
@@ -89,6 +91,8 @@ struct BrowserView: View {
         .overlay(alignment: .bottom) {
             // The command bar takes the bar's place rather than stacking on top of it.
             BottomBar()
+                // On an open Duo, to one side of the fold rather than across it.
+                .keepsOffFold()
                 .opacity(sideBar || browser.splitList != nil ? 0 : 1)
                 .allowsHitTesting(!sideBar && browser.splitList == nil)
                 .opacity(browser.launcherShown || browser.panel == .tabs || browser.pageBecomingSummary || browser.hidingItems != nil ? 0 : 1)
@@ -392,6 +396,13 @@ struct BrowserView: View {
         verticalSizeClass == .compact && browser.selectedTab != nil
     }
 
+    /// Split on an open Duo with the clock at the side: black runs on under it.
+    /// Turned, with the clock on top, that band keeps the top page's colour.
+    private var splitBesideClock: Bool {
+        guard let fold, fold.height > fold.width else { return false }
+        return splitHalves != nil
+    }
+
     private var showsPlayer: Bool {
         !browser.liveItems.isEmpty && browser.selectedTab != nil
     }
@@ -420,6 +431,7 @@ struct BrowserView: View {
     private var statusBarStyle: UIStatusBarStyle {
         // The summary and Browse for Me sit on the app's own canvas.
         if browser.showsOnboarding { return .lightContent }  // the welcome is always dark
+        if splitBesideClock { return .lightContent }  // on the black beside the halves
         if browser.summary != nil || browser.browseForMe != nil || browser.panel == .todos || browser.panel == .today
             || browser.panel == .shopping || browser.panel == .readLater || browser.digest != nil {
             return .default
@@ -618,6 +630,8 @@ private struct BottomPanel<Content: View>: View {
                         .fill(Theme.panel)
                         .ignoresSafeArea(edges: .bottom)
                 }
+                // On an open Duo it rises on the bar's side of the fold.
+                .keepsOffFold()
                 .offset(y: max(0, drag))
                 .gesture(DragGesture()
                     .onChanged { drag = $0.translation.height }
@@ -836,6 +850,7 @@ private struct SplitPages: View {
     /// Nil while the bottom half is still to be chosen.
     let bottom: BrowserTab?
     let barTop: CGFloat
+    @Environment(\.fold) private var fold
     @State private var drag: CGFloat = 0
 
     private let band: CGFloat = 28
@@ -848,7 +863,9 @@ private struct SplitPages: View {
             // Turned sideways, the halves sit side by side: the first on the left.
             let sideBySide = proxy.size.width > proxy.size.height
             let length = sideBySide ? proxy.size.width : proxy.size.height + proxy.safeAreaInsets.bottom
-            let first = min(max(length * browser.splitFraction + drag, 0), length - band)
+            // On an open Duo the halves part at the fold until you drag them elsewhere.
+            let atFold = browser.splitFraction == 0.5 ? foldMiddle(in: proxy, sideBySide: sideBySide) : nil
+            let first = min(max((atFold.map { $0 - band / 2 } ?? length * browser.splitFraction) + drag, 0), length - band)
             Group {
                 if sideBySide {
                     HStack(spacing: 0) {
@@ -881,6 +898,14 @@ private struct SplitPages: View {
         // band keeps the top page's colour, so the clock stays readable.
         .background(Color.black.ignoresSafeArea(edges: .bottom))
         .ignoresSafeArea(edges: .bottom)
+    }
+
+    /// Where the fold runs across this view, if it lies along the way the halves part.
+    private func foldMiddle(in proxy: GeometryProxy, sideBySide: Bool) -> CGFloat? {
+        guard let fold, (fold.height > fold.width) == sideBySide else { return nil }
+        let frame = proxy.frame(in: .global)
+        let middle = sideBySide ? fold.midX - frame.minX : fold.midY - frame.minY
+        return middle > 0 && middle < (sideBySide ? frame.width : frame.height) ? middle : nil
     }
 
     /// The second half: to-dos or the shopping list when they're open, its

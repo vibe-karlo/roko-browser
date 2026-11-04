@@ -32,6 +32,7 @@ struct CommandItem: Identifiable {
 struct CommandBarView: View {
     @Environment(BrowserModel.self) private var browser
     @Environment(\.modelContext) private var context
+    @Environment(\.fold) private var fold
     @Query(sort: \Pin.order) private var pins: [Pin]
     @Query(sort: \Todo.createdAt) private var todos: [Todo]
     /// Ticked in the bar a moment ago: still shown, struck through.
@@ -85,12 +86,22 @@ struct CommandBarView: View {
     /// (the system's, SwiftKey, one that says its size late) can move it.
     private var fieldTarget: CGRect {
         let screen = UIScreen.main.bounds
+        // On an open Duo, the half the field keeps to (as keepsOffFold picks it).
+        if let fold, fold.height > fold.width {
+            let before = fold.minX - Self.safeInsets.left
+            let after = screen.width - Self.safeInsets.right - fold.maxX
+            return before >= after
+                ? CGRect(x: Self.safeInsets.left + 8, y: Self.safeTop + 8, width: before - 16, height: 56)
+                : CGRect(x: fold.maxX + 8, y: Self.safeTop + 8, width: after - 16, height: 56)
+        }
         return CGRect(x: 8, y: Self.safeTop + 8, width: screen.width - 16, height: 56)
     }
 
-    private static var safeTop: CGFloat {
+    private static var safeTop: CGFloat { safeInsets.top }
+
+    private static var safeInsets: UIEdgeInsets {
         let window = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first
-        return window?.safeAreaInsets.top ?? 59
+        return window?.safeAreaInsets ?? UIEdgeInsets(top: 59, left: 0, bottom: 0, right: 0)
     }
 
     /// Panel corner, and the row inset inside it. Rows round by the difference,
@@ -131,6 +142,8 @@ struct CommandBarView: View {
             .padding(.horizontal, 8)
             .padding(.top, 8)
             .padding(.bottom, 4)
+            // On an open Duo, to one side of the fold like the bar it grew from.
+            .keepsOffFold()
         }
         .onAppear {
             HitchWatch.note("appeared")

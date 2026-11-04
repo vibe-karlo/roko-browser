@@ -6,6 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- iPhone Duo: with the phone open, the bar, the page menu and the address field keep to one half instead of lying across the fold; Split View parts at the fold, side by side or stacked; pages keep clear of the clock at the side, which stays readable on black beside a split.
 - A welcome for the first time roko opens: seven short pages over warm orange light that rises as roko wakes, follows you from page to page and floods the screen as you start browsing, ending in the bar ready to type. Each page shows its feature playing by itself (the bar answering, a to-do typed the way you'd say it and ticked off, two pages in Split View, a page cleaned of ads and a cookie pop-up, a page pulled into its summary, private tabs) and offers one choice: the search engine, today's to-dos under the page, blocking, pull to summarize, locking private tabs. Skip at any time; Settings → About roko → Show the Welcome Again brings it back.
 - Turned sideways, the page runs edge to edge on the Dynamic Island's side, and the bar stands upright in the strip on the other: tabs at the top, + in the middle, the page menu at the foot, on black beside the page's rounded edge. It stays put while you scroll, and the page menu rises to a column's width, kept below the top of the screen.
 - Settings pages: rows scrolled up slide under a solid title bar, with room above the first one.
