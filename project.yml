@@ -102,18 +102,15 @@ targets:
         ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: YES
         CODE_SIGN_STYLE: Automatic
         # The App Group shared with the widgets (Shared/WidgetSnapshot.swift).
-        # Sync.entitlements and Browser.entitlements carry it too, for when
-        # either replaces this file below.
-        CODE_SIGN_ENTITLEMENTS: Shared/AppGroup.entitlements
+        # Sync.entitlements carries it; Browser.entitlements does too, for when
+        # it replaces that file below.
+        CODE_SIGN_ENTITLEMENTS: Browser/Sync.entitlements
         # Your team, kept here so regenerating the project doesn't drop it.
-        DEVELOPMENT_TEAM: 6ZQC2F6CF2
-        # iCloud sync (pins, history, settings) needs the paid Apple Developer
-        # Program: a Personal team can't sign iCloud or push notifications.
-        # Once the team is paid, uncomment both lines and run xcodegen.
-        # ICLOUD_SYNC turns sync on in code; never set it without these
-        # entitlements, or CloudKit traps. See README, "iCloud sync".
-        # CODE_SIGN_ENTITLEMENTS: Browser/Sync.entitlements
-        # SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) ICLOUD_SYNC
+        DEVELOPMENT_TEAM: 38LY88937Z
+        # iCloud sync (pins, history, settings). ICLOUD_SYNC turns sync on in
+        # code; never set it without Sync.entitlements above, or CloudKit
+        # traps. See README, "iCloud sync".
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) ICLOUD_SYNC
         # Once Apple grants your team the managed entitlements (browser,
         # passkeys, Private Cloud Compute), use these two lines instead: the
         # file has iCloud's entitlements too. The flag lets the app use Apple's
@@ -148,7 +145,7 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Shared/AppGroup.entitlements
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: 6ZQC2F6CF2
+        DEVELOPMENT_TEAM: 38LY88937Z
         SKIP_INSTALL: YES
 
   # roko in other apps' share sheets (ShareExtension/ShareViewController.swift).
@@ -175,10 +172,10 @@ targets:
               NSExtensionActivationSupportsText: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.growthstudio.roko.share
+        PRODUCT_BUNDLE_IDENTIFIER: com.growthstudio.roko.shareextension
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: 6ZQC2F6CF2
+        DEVELOPMENT_TEAM: 38LY88937Z
         SKIP_INSTALL: YES
 
   # Open in roko, in the list of actions under a share sheet (as Arc's
@@ -209,9 +206,9 @@ targets:
               NSExtensionActivationSupportsWebURLWithMaxCount: 1
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.growthstudio.roko.action
+        PRODUCT_BUNDLE_IDENTIFIER: com.growthstudio.roko.actionextension
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: 6ZQC2F6CF2
+        DEVELOPMENT_TEAM: 38LY88937Z
         SKIP_INSTALL: YES

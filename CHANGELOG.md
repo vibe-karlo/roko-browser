@@ -6,6 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- iCloud sync is on: pins, history and settings follow you between devices through your own iCloud account.
 - iPhone Duo: with the phone open, the bar, the page menu and the address field keep to one half instead of lying across the fold; Split View parts at the fold, side by side or stacked; pages keep clear of the clock at the side, open or shut, and it stays readable on black beside a split.
 - iPhone Duo propped open with the fold lying across, like a small laptop: the page stands above the fold and ends there, the bar lies below it on black, and the page menu rises only as far as the fold. The empty lower half works like a trackpad: drag there and the page above scrolls, with its own momentum and bounce.
 - A welcome for the first time roko opens: seven short pages over warm orange light that rises as roko wakes, follows you from page to page and floods the screen as you start browsing, ending in the bar ready to type. Each page shows its feature playing by itself (the bar answering, a to-do typed the way you'd say it and ticked off, two pages in Split View, a page cleaned of ads and a cookie pop-up, a page pulled into its summary, private tabs) and offers one choice: the search engine, today's to-dos under the page, blocking, pull to summarize, locking private tabs. Skip at any time; Settings → About roko → Show the Welcome Again brings it back.
@@ -221,6 +222,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Notify Me, as in Safari: in a page's menu, say what to look for ("size M in stock", or nothing for anything new) and check hourly, daily or weekly. roko reads the page in the background, Apple's on-device model decides whether it's what you asked for, and a notification opens the page. Settings lists the watched pages.
 
 ### Changed
+- roko is signed by a paid Apple Developer team, so a build lasts a year instead of seven days. The App Group and the Share and Action extensions have new identifiers, because the free team still holds the old ones.
 - Summaries and answers take the shape of what they're about, with one quiet colour each: apricot for recipes, sage for how-tos, sea glass for comparisons, stone for articles.
   - **Big numbers first:** a recipe opens with "30 min · 4 servings · Easy", a price question with the price.
   - **Recipes:** ingredients as a checklist to tick, amounts on the right, then numbered steps. Tap a number to mark it done; the next one lights up.

@@ -28,7 +28,7 @@
 	<!-- The App Group shared with the Home Screen widgets. -->
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.growthstudio.roko</string>
+		<string>group.com.growthstudio.roko.shared</string>
 	</array>
 </dict>
 </plist>

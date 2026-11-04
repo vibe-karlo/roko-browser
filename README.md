@@ -294,7 +294,6 @@ with `-checkWatches`; with `-perf`, each step is logged (`WATCH`).
 
 ## Not done yet
 
-- iCloud sync is built but off: it needs the paid Apple Developer Program (see "iCloud sync").
 - A count of blocked items: WebKit doesn't report blocks to the app.
 - Default-browser status needs Apple's browser entitlement, which is requested separately.
 
@@ -313,12 +312,9 @@ Records can't be unique in CloudKit, so two devices can add the same page before
 from each other: `Store.mergeDuplicates` folds those at launch and when roko comes back to the
 front. Deletions go one by one rather than as a batch, so they reach iCloud too.
 
-**Off until the team is in the paid Apple Developer Program**: a Personal team can't sign
-iCloud or push notifications. Then uncomment `CODE_SIGN_ENTITLEMENTS` and
-`SWIFT_ACTIVE_COMPILATION_CONDITIONS` under "iCloud sync" in `project.yml`, run `xcodegen`, and
-build with an Apple ID in Xcode (Settings, Accounts): automatic signing adds iCloud and push
-to the app ID and creates the container. Without the flag the same two stores are used, on the
-device only. Builds use the development CloudKit environment; before an App Store release,
+**On**: `project.yml` signs with `Browser/Sync.entitlements` and sets `ICLOUD_SYNC`; never set the
+flag without those entitlements, or CloudKit traps. Without both, the same two stores are used, on
+the device only. Builds use the development CloudKit environment; before an App Store release,
 deploy the schema to production in the CloudKit Console.
 
 Continuing between devices: roko hands the page on screen off through Handoff (a Mac's Dock
@@ -619,7 +615,7 @@ rebuild the data.
 
 The `RokoWidgets` extension (`Widgets/`) has three Home Screen widgets and the parking Live
 Activity. They can't read roko's store, so the app writes a small copy into the App Group
-`group.com.growthstudio.roko` (`Shared/WidgetSnapshot.swift`): the to-dos due by tomorrow, the
+`group.com.growthstudio.roko.shared` (`Shared/WidgetSnapshot.swift`): the to-dos due by tomorrow, the
 current weather and the bar's pinned answers. `App/WidgetBridge.swift` writes it after every save
 that touches a to-do, every new weather and every time the bar lists your pins, and only when it
 changed, which is also the only time widgets are asked to reload. A widget's timeline holds now
@@ -629,8 +625,8 @@ Ticking a to-do in a widget runs `CompleteTodoIntent` in the extension: it adds 
 a list in the group's shared defaults and the widget redraws without it. roko takes the list and
 marks those done at launch and each time it becomes active.
 
-The App Group is in `Shared/AppGroup.entitlements` (both targets), and in `Sync.entitlements` and
-`Browser.entitlements` for when either is switched on. Automatic signing registers it on the
+The App Group is in `Shared/AppGroup.entitlements` (the widgets), and in `Sync.entitlements` (the
+app) and `Browser.entitlements` for when that is switched on. Automatic signing registers it on the
 team; the first build after adding it needs Xcode's Signing & Capabilities to have the team set.
 
 ## Reminders

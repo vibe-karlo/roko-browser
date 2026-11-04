@@ -48,7 +48,7 @@ nonisolated struct WidgetSnapshot: Codable, Equatable {
     /// Optional: files written before answers came along have none.
     var answers: [Answer]?
 
-    static let group = "group.com.growthstudio.roko"
+    static let group = "group.com.growthstudio.roko.shared"
 
     private static var file: URL? {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group)?
