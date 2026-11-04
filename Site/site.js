@@ -6,12 +6,15 @@ const units = { km: ["mi", .621371], mi: ["km", 1.60934], kg: ["lb", 2.20462], l
 const rates = {};
 let asked = 0;
 
+const typed = document.getElementById("typed"), typedNote = typed.nextElementSibling;
 function show(big, note, kind, small) {
-  out.innerHTML = "";
-  const b = document.createElement("b"); b.textContent = big; if (small) b.className = "small";
-  const s = document.createElement("span"); s.textContent = note;
-  const i = document.createElement("i"); i.textContent = kind;
-  out.append(b, s, i);
+  const box = out.querySelector("div");
+  const b = box.querySelector("b"), s = box.querySelector("span");
+  b.textContent = big; b.className = small ? "small" : ""; s.textContent = note;
+  out.querySelector("i").textContent = kind;
+  const q = input.value.trim();
+  typed.textContent = q || "Try the Smart Bar";
+  typedNote.textContent = q ? "Search Google" : "Type weather, a sum or days until";
 }
 const tidy = n => Number(n.toFixed(4)).toLocaleString("en-US", { maximumFractionDigits: 4 });
 
@@ -108,27 +111,30 @@ input.addEventListener("focus", () => { if (!stopped) { stopped = true; input.va
   }
 })();
 
-// The eclipse closes as the first screen goes by.
-const moon = document.getElementById("moon");
-const puller = document.getElementById("puller"), range = puller.querySelector("input");
-for (const [box, name] of [[document.getElementById("compare"), "--p"], [document.getElementById("splitter"), "--s"]]) {
-  const r = box.querySelector("input");
-  r.addEventListener("input", () => box.style.setProperty(name, r.value + "%"));
-}
+const puller = document.getElementById("puller");
 let pulled = false;
-range.addEventListener("input", () => { pulled = true; puller.style.setProperty("--p", range.value + "%"); });
+function drag(box, name, axis, min, max, area, onUse) {
+  const range = box.querySelector("input");
+  const set = v => { v = Math.max(min, Math.min(max, v)); box.style.setProperty(name, v + "%"); range.value = v; };
+  range.addEventListener("input", () => { onUse?.(); set(+range.value); });
+  let on = false;
+  const at = e => { const r = box.getBoundingClientRect(); set(axis === "x" ? (e.clientX - r.left) / r.width * 100 : (e.clientY - r.top) / r.height * 100); };
+  area.addEventListener("pointerdown", e => { on = true; onUse?.(); area.setPointerCapture(e.pointerId); at(e); e.preventDefault(); });
+  area.addEventListener("pointermove", e => { if (on) at(e); });
+  for (const end of ["pointerup", "pointercancel"]) area.addEventListener(end, () => { on = false; });
+}
+drag(puller, "--p", "y", 0, 100, puller.querySelector(".grip"), () => { pulled = true; });
+const compare = document.getElementById("compare"); drag(compare, "--p", "x", 0, 100, compare);
+const splitter = document.getElementById("splitter"); drag(splitter, "--s", "y", 28, 76, splitter.querySelector(".grip"));
+
+// The summary comes down over the page as it scrolls in, until someone takes it.
 if (!still) {
   let queued = false;
   const frame = () => {
     queued = false;
-    const y = scrollY, vh = innerHeight;
-    moon.setAttribute("cx", 234 - Math.min(34, 34 * y / vh));
-    if (!pulled) {
-      const r = puller.getBoundingClientRect();
-      const p = Math.max(0, Math.min(1, (vh * .8 - r.top) / (vh * .55)));
-      puller.style.setProperty("--p", p * 100 + "%");
-      range.value = p * 100;
-    }
+    if (pulled) return;
+    const r = puller.getBoundingClientRect(), vh = innerHeight;
+    puller.style.setProperty("--p", Math.max(0, Math.min(1, (vh * .85 - r.top) / (vh * .6))) * 100 + "%");
   };
   addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(frame); } }, { passive: true });
   frame();
