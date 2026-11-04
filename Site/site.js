@@ -142,13 +142,14 @@ const hero = document.getElementById("top");
 const puller = document.getElementById("puller"), compare = document.getElementById("compare");
 const labA = document.getElementById("labA"), labB = document.getElementById("labB");
 let pulled = false, compared = false;
+document.addEventListener("dragstart", e => { if (e.target.closest?.(".screen")) e.preventDefault(); });
 function drag(box, name, axis, min, max, area, onUse, onSet) {
   const range = box.querySelector("input");
   const set = v => { v = Math.max(min, Math.min(max, v)); box.style.setProperty(name, v + "%"); range.value = v; onSet?.(v); };
   range.addEventListener("input", () => { onUse?.(); set(+range.value); });
   let on = false;
   const at = e => { const r = box.getBoundingClientRect(); set(axis === "x" ? (e.clientX - r.left) / r.width * 100 : (e.clientY - r.top) / r.height * 100); };
-  area.addEventListener("pointerdown", e => { on = true; onUse?.(); area.setPointerCapture(e.pointerId); at(e); });
+  area.addEventListener("pointerdown", e => { if (e.pointerType === "mouse") e.preventDefault(); on = true; onUse?.(); area.setPointerCapture(e.pointerId); at(e); });
   area.addEventListener("pointermove", e => { if (on) at(e); });
   for (const end of ["pointerup", "pointercancel"]) area.addEventListener(end, () => { on = false; });
   return set;
@@ -157,6 +158,46 @@ drag(puller, "--p", "y", 6, 94, puller.querySelector(".grip"), () => { pulled = 
 const shade = v => { labA.style.opacity = .5 + .5 * Math.min(1, v / 50); labB.style.opacity = .5 + .5 * Math.min(1, (100 - v) / 50); };
 const setCompare = drag(compare, "--p", "x", 0, 100, compare, () => { compared = true; }, shade);
 const splitter = document.getElementById("splitter"); drag(splitter, "--s", "y", 28, 76, splitter.querySelector(".grip"));
+const panes = document.getElementById("panes"); drag(panes, "--x", "x", 34, 66, panes.querySelector(".grip"));
+
+// The same tap-tap as the app: the first marks it, the second hides it.
+{
+  const demo = document.getElementById("demo");
+  const title = document.getElementById("hTitle"), sub = document.getElementById("hSub"), undo = document.getElementById("hUndo"), done = document.getElementById("hDone");
+  const hidden = [];
+  let marked = document.getElementById("adbox"), finished = false;
+  const say = () => {
+    undo.disabled = !hidden.length && !marked;
+    done.textContent = finished ? "Again" : "Done";
+    if (finished) { title.textContent = hidden.length ? "Stays gone on this site" : "Nothing hidden"; sub.textContent = hidden.length ? `${hidden.length} hidden` : "Tap Again to try it"; }
+    else if (marked) { title.textContent = "Tap it again to hide it"; sub.textContent = `Marked: ${marked.dataset.h}`; }
+    else { title.textContent = "Tap something to hide"; sub.textContent = hidden.length ? `${hidden.length} hidden` : "Tap it again to hide it"; }
+  };
+  const mark = el => { marked?.classList.remove("marked"); marked = el; el?.classList.add("marked"); };
+  demo.addEventListener("click", e => {
+    const el = e.target.closest(".h"); if (!el || finished) return;
+    if (el !== marked) { mark(el); return say(); }
+    mark(null);
+    el.style.height = el.offsetHeight + "px";
+    el.offsetHeight;
+    el.classList.add("gone");
+    hidden.push(el);
+    say();
+  });
+  undo.addEventListener("click", () => {
+    if (finished) return;
+    if (marked) mark(null);
+    else { const el = hidden.pop(); if (el) { el.classList.remove("gone"); setTimeout(() => { el.style.height = ""; }, 340); } }
+    say();
+  });
+  done.addEventListener("click", () => {
+    mark(null);
+    if (finished) { for (const el of hidden.splice(0)) { el.classList.remove("gone"); setTimeout(() => { el.style.height = ""; }, 340); } }
+    finished = !finished;
+    say();
+  });
+  say();
+}
 
 // The eye really switches: the note, or what private leaves out.
 const privacy = document.getElementById("privacy"), eye = document.getElementById("eye"), ph = document.getElementById("privPh");
