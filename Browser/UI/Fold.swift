@@ -93,3 +93,52 @@ private struct FoldReader: ViewModifier {
         return region.frame.offsetBy(dx: origin.x, dy: origin.y)
     }
 }
+
+/// Propped open, the lower half works the page standing above it, as a
+/// trackpad does: drag here and the page moves, with the page's own momentum
+/// and bounce. An empty scroll view of the same travel, following its fingers.
+struct PageTrackpad: UIViewRepresentable {
+    let tab: BrowserTab
+    let onUse: () -> Void
+
+    func makeUIView(context: Context) -> UIScrollView {
+        let pad = UIScrollView()
+        pad.delegate = context.coordinator
+        pad.backgroundColor = .clear
+        pad.alwaysBounceVertical = true
+        pad.isDirectionalLockEnabled = true
+        pad.showsVerticalScrollIndicator = false
+        pad.showsHorizontalScrollIndicator = false
+        pad.contentInsetAdjustmentBehavior = .never
+        // A tap on the status bar is for the page itself.
+        pad.scrollsToTop = false
+        return pad
+    }
+
+    func updateUIView(_ pad: UIScrollView, context: Context) {
+        context.coordinator.parent = self
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
+
+    final class Coordinator: NSObject, UIScrollViewDelegate {
+        var parent: PageTrackpad
+
+        init(parent: PageTrackpad) { self.parent = parent }
+
+        func scrollViewWillBeginDragging(_ pad: UIScrollView) {
+            guard let page = parent.tab.webView?.scrollView else { return }
+            // The same travel as the page's, though the pad is a different size.
+            pad.contentSize = CGSize(width: max(page.contentSize.width - page.bounds.width + pad.bounds.width, 0),
+                                     height: max(page.contentSize.height - page.bounds.height + pad.bounds.height, 0))
+            pad.contentInset = page.adjustedContentInset
+            pad.contentOffset = page.contentOffset
+            parent.onUse()
+        }
+
+        func scrollViewDidScroll(_ pad: UIScrollView) {
+            guard pad.isTracking || pad.isDecelerating else { return }
+            parent.tab.webView?.scrollView.contentOffset = pad.contentOffset
+        }
+    }
+}

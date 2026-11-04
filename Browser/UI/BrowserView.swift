@@ -10,6 +10,8 @@ struct BrowserView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.fold) private var fold
     @Environment(\.propped) private var propped
+    /// Once it's been dragged, the lower half's hint has done its job.
+    @State private var trackpadUsed = false
     /// The strip beside the page, turned sideways, where the bar stands upright.
     @State private var sideStrip: CGFloat = 0
     /// Both sides' insets: held upright, only a Duo has any, for its clock.
@@ -40,7 +42,26 @@ struct BrowserView: View {
             // From a little above it, so the page's round corners show black.
             if let fold, standsOnFold {
                 GeometryReader { proxy in
-                    Color.black.padding(.top, fold.minY - proxy.frame(in: .global).minY - 20)
+                    let top = proxy.frame(in: .global).minY
+                    ZStack {
+                        Color.black.padding(.top, fold.minY - top - 20)
+                        // The empty half scrolls the page standing above it.
+                        if let tab = browser.selectedTab {
+                            PageTrackpad(tab: tab) { trackpadUsed = true }
+                                .overlay {
+                                    if !trackpadUsed {
+                                        Text("Drag here to scroll the page")
+                                            .font(.system(size: 15))
+                                            .foregroundStyle(.white.opacity(0.45))
+                                            .padding(.bottom, Theme.barHeight)
+                                            .allowsHitTesting(false)
+                                            .transition(.opacity)
+                                    }
+                                }
+                                .animation(.easeOut(duration: 0.3), value: trackpadUsed)
+                                .padding(.top, fold.maxY - top)
+                        }
+                    }
                 }
                 .ignoresSafeArea()
             }
