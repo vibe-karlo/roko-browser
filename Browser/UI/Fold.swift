@@ -46,6 +46,8 @@ private struct FoldReader: ViewModifier {
     @State private var fold: CGRect?
     /// Bumped as the hinge moves: the fold's region is read again then.
     @State private var hinge = 0
+    /// Shut, the outer screen has no fold, whatever was last read.
+    @State private var shut = false
 
     func body(content: Content) -> some View {
         if #available(iOS 27.1, *) {
@@ -56,15 +58,18 @@ private struct FoldReader: ViewModifier {
                         // it's asked for a few times before settling on none.
                         Color.clear.task(id: [hinge, Int(proxy.size.width), Int(proxy.size.height)]) {
                             for _ in 0..<12 {
-                                let found = Self.fold(in: proxy)
+                                let found = shut ? nil : Self.fold(in: proxy)
                                 if fold != found { fold = found }
-                                if found != nil || Task.isCancelled { return }
+                                if found != nil || shut || Task.isCancelled { return }
                                 try? await Task.sleep(for: .milliseconds(250))
                             }
                         }
                     }
                 }
-                .onHingeChange { _, _ in hinge += 1 }
+                .onHingeChange { _, new in
+                    shut = new.hinge?.status == .closed
+                    hinge += 1
+                }
                 .environment(\.fold, fold)
         } else {
             content

@@ -8,9 +8,10 @@ struct BrowserView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var barTop: CGFloat = 0
     @Environment(\.verticalSizeClass) private var verticalSizeClass
-    @Environment(\.fold) private var fold
     /// The strip beside the page, turned sideways, where the bar stands upright.
     @State private var sideStrip: CGFloat = 0
+    /// Both sides' insets: held upright, only a Duo has any, for its clock.
+    @State private var sideInsets: CGFloat = 0
 
     var body: some View {
         @Bindable var browser = browser
@@ -63,8 +64,8 @@ struct BrowserView: View {
                 }
                 // Turned sideways the page is a card between two black strips:
                 // the Dynamic Island's on one side, the bar's on the other.
-                // On an open Duo the clock runs down the side: the page keeps clear of it.
-                .ignoresSafeArea(edges: sideBar || fold != nil ? [] : .horizontal)
+                // On a Duo, open or shut, the clock runs down the side: the page keeps clear of it.
+                .ignoresSafeArea(edges: sideBar || clockBeside ? [] : .horizontal)
             } else {
                 StartView()
                     // The bar floats over the page; the start page keeps clear of it.
@@ -77,6 +78,7 @@ struct BrowserView: View {
         // folded away while scrolling, a blank band above the home indicator.
         // The page learns which strip the bar covers from barTop (WebViewHost).
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.trailing } action: { sideStrip = $0 }
+        .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.leading + $0.safeAreaInsets.trailing } action: { sideInsets = $0 }
         .overlay(alignment: .trailing) {
             if sideBar {
                 BottomBar(upright: true)
@@ -396,12 +398,12 @@ struct BrowserView: View {
         verticalSizeClass == .compact && browser.selectedTab != nil
     }
 
-    /// Split on an open Duo with the clock at the side: black runs on under it.
-    /// Turned, with the clock on top, that band keeps the top page's colour.
-    private var splitBesideClock: Bool {
-        guard let fold, fold.height > fold.width else { return false }
-        return splitHalves != nil
-    }
+    /// A Duo with its clock at the side, not turned the way the bar moves there.
+    private var clockBeside: Bool { !sideBar && sideInsets > 0 }
+
+    /// Split with the clock at the side: black runs on under it. Turned, with
+    /// the clock on top, that band keeps the top page's colour.
+    private var splitBesideClock: Bool { clockBeside && splitHalves != nil }
 
     private var showsPlayer: Bool {
         !browser.liveItems.isEmpty && browser.selectedTab != nil
