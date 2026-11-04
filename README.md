@@ -478,6 +478,10 @@ It runs at `https://roko-share.roko-browser.workers.dev`, on Cloudflare's free p
 (100,000 requests and 5 million rows read a day). One iPhone with roko open asks about 900
 times an hour; each ask reads a few rows.
 
+## Website
+
+`Site/` is the static site at rokobrowser.vercel.app: the page, `/support` and `/privacy` (written out from `docs/privacy.md`). The bar at the top of the page really answers: sums, units and times are worked out in `site.js`, and rates come from frankfurter.dev. Deploy with `npx vercel deploy --prod` from `Site/`.
+
 ## Credits
 
 Icons: [Phosphor Icons](https://phosphoricons.com) (regular and bold), MIT License,

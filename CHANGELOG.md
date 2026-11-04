@@ -5,6 +5,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Website
+- roko has a site in `Site/`, with a working copy of the bar, support and the privacy policy.
+
 ### Changed
 - Shared answers have a Report link, which emails roko.
 - Share in the page menu opens the share sheet straight away. Copy as Markdown stays, by typing "markdown".
