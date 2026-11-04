@@ -38,6 +38,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Pages open the moment you press Go. While you type in the bar, the site its top row would open starts loading out of sight (as Safari's Preload Top Hit does), drawn in place behind everything, so Go shows a page already laid out instead of a black and then a white screen. Measured in the simulator: about 1.3 seconds from Go to the first picture before, under 0.1 seconds now. It waits for a quarter-second pause in typing, only for a site (never a search), only for a new tab, and the page is dropped if you close the bar or type something else. The spare web view new tabs start from is built again after each one is taken, not only at launch.
 
 ### Fixed
+- Parking: typing "test parking" and a number of your own opens the same message window a paid text does, paying for nothing, so it can be tried without parking.
 - Parking: the text that pays or adds an hour opens with roko's own keyboard put away and across the whole screen, so the keyboard no longer covers the message box and its Send button.
 - Closing Split View, or opening it again, no longer leaves a page black: the half on its way out took the page back from the screen that replaced it.
 - A sign-in or other error a site answered with no page (an empty 401 or 404 of no type) came up as a file to save, named after the address. It shows as the site's page now.

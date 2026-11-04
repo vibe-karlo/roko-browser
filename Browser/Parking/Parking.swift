@@ -163,6 +163,23 @@ final class Parking {
         }
     }
 
+    /// Where "test parking" texts: yours, kept on this iPhone only.
+    var testNumber: String? { UserDefaults.standard.string(forKey: "parking.testNumber") }
+
+    /// The message window a paid text opens, to a number of your own. Pays
+    /// for nothing and leaves the timer alone.
+    func test(to number: String) {
+        UserDefaults.standard.set(number, forKey: "parking.testNumber")
+        guard Self.pretendSent || MessageComposer.canSend else {
+            say?("This iPhone can't send texts")
+            return
+        }
+        Task {
+            let sent = await MessageComposer.send(to: number, body: "roko parking test", pretend: Self.pretendSent)
+            say?(sent ? "Test text sent" : "Test text not sent")
+        }
+    }
+
     /// Whether another text is allowed: within the zone's daily limit, and
     /// while charging lasts past the current end.
     var canExtend: Bool {

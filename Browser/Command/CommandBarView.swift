@@ -6,7 +6,7 @@ struct CommandItem: Identifiable {
         case open(URL), switchTab(BrowserTab), openPin(Pin), search(String),
              browse(String), summarize, findOnPage, privateTab, settings, copy(String),
              pasteLink, openCopied(URL), todos, today, openApp(URL), ask(String), askAboutPage(String), addTodo(String, TodoWhen, DateComponents?),
-             payParking(city: String, zone: String), extendParking, endParking, shopping, addShopping(String),
+             payParking(city: String, zone: String), extendParking, endParking, testParking(String), shopping, addShopping(String),
              saveForLater, readLater, askAboutSaved(String), reopenTab, downloads, copyMarkdown, unlockHistory, split
     }
 
@@ -786,6 +786,22 @@ struct CommandBarView: View {
         }
     }
 
+    /// "test parking 0991234567": the same message window a paid text opens,
+    /// to that number, with no zone and no time on the clock. The number stays
+    /// on this iPhone, so next time "test parking" is enough.
+    static func testParkingRow(_ query: String) -> CommandItem? {
+        let words = query.lowercased().split(separator: " ")
+        guard words.count >= 2, words[0] == "test", words[1] == "parking" else { return nil }
+        let typed = words.dropFirst(2).joined().filter { $0.isNumber || $0 == "+" }
+        guard let number = typed.isEmpty ? Parking.shared.testNumber : typed else {
+            return CommandItem(id: "parking-test", title: "Test the parking text",
+                               subtitle: "Add a number of your own: test parking 0991234567",
+                               kind: "", icon: .glyph(.car), action: .search(query))
+        }
+        return CommandItem(id: "parking-test", title: "Test the parking text", subtitle: "To \(number) · nothing is paid",
+                           kind: "Test", icon: .glyph(.car), action: .testParking(number))
+    }
+
     /// A weather answer: now, the day under it.
     static func weatherRow(id: String, _ weather: TodayWeather, action: CommandItem.Action) -> CommandItem {
         CommandItem(id: id, title: "\(Int(weather.temperature.rounded()))° " + weather.condition + (weather.place.map { " in \($0)" } ?? ""),
@@ -812,6 +828,10 @@ struct CommandBarView: View {
         // "parking" in a city roko pays in: your zone, ready to pay, or the time left.
         if ParkingQuery.matches(query) {
             items.insert(contentsOf: Self.parkingRows(typed: true), at: 0)
+        }
+        // Only when typed out: the parking text sent to a number of your own.
+        if let test = Self.testParkingRow(query) {
+            items.insert(test, at: 0)
         }
         // Asked for the weather and it's half an hour old: fetch it now (one small request).
         if items.contains(where: { $0.id == "weather" }),
@@ -1005,6 +1025,9 @@ struct CommandBarView: View {
         case .extendParking:
             browser.panel = .none
             Parking.shared.extend()
+        case .testParking(let number):
+            browser.panel = .none
+            Parking.shared.test(to: number)
         case .endParking:
             Parking.shared.end()
             browser.showToast("Parking timer ended")
