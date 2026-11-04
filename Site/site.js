@@ -158,7 +158,6 @@ drag(puller, "--p", "y", 6, 94, puller.querySelector(".grip"), () => { pulled = 
 const shade = v => { labA.style.opacity = .5 + .5 * Math.min(1, v / 50); labB.style.opacity = .5 + .5 * Math.min(1, (100 - v) / 50); };
 const setCompare = drag(compare, "--p", "x", 0, 100, compare, () => { compared = true; }, shade);
 const splitter = document.getElementById("splitter"); drag(splitter, "--s", "y", 28, 76, splitter.querySelector(".grip"));
-const panes = document.getElementById("panes"); drag(panes, "--x", "x", 34, 66, panes.querySelector(".grip"));
 
 // The same tap-tap as the app: the first marks it, the second hides it.
 {
@@ -210,7 +209,6 @@ eye.addEventListener("click", () => {
 if (!still) {
   // The summary comes down over the page as it scrolls in, until someone takes it.
   let queued = false;
-  const tall = document.getElementById("tall");
   const frame = () => {
     queued = false;
     const vh = innerHeight;
@@ -218,8 +216,6 @@ if (!still) {
       const r = puller.getBoundingClientRect();
       puller.style.setProperty("--p", 6 + 88 * Math.max(0, Math.min(1, (vh * .8 - r.top) / (vh * .55))) + "%");
     }
-    if (innerWidth >= 820) { const r = tall.getBoundingClientRect(); if (r.bottom > 0 && r.top < vh) tall.style.transform = `translateY(${(r.top + r.height / 2 - vh / 2) * -.05}px)`; }
-    else tall.style.transform = "";
   };
   addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(frame); } }, { passive: true });
   frame();

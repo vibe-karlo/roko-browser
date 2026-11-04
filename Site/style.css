@@ -124,10 +124,11 @@ div>.row:has(span){min-height:54px}
 .bleed .screen{aspect-ratio:828/1400;border-radius:calc(var(--w)*.13) calc(var(--w)*.13) 0 0}
 .duo article:last-child .bleed{margin-bottom:0}
 .puller{user-select:none;-webkit-user-select:none}
-.puller .top{clip-path:inset(0 0 calc(100% - var(--p)) 0)}
+/* The picture runs past the cropped screen (1800 against 1400): the edge is measured in the screen, where the handle is. */
+.puller .top{clip-path:inset(0 0 calc(100% - var(--p)*.7778) 0)}
 .grip{position:absolute;touch-action:none}
 .puller .grip,.splitter .grip{left:0;right:0;height:60px;margin-top:-30px;cursor:ns-resize}
-.puller .grip{top:calc(var(--p)*1.0)}
+.puller .grip{top:var(--p)}
 .puller .grip::after,.splitter .grip::after{content:"";position:absolute;left:50%;top:28.5px;width:74px;height:3px;margin-left:-37px;border-radius:3px;background:var(--glow);box-shadow:0 1px 3px #0008}
 
 /* Clean: the slider is the whole argument. */
@@ -183,25 +184,11 @@ div>.row:has(span){min-height:54px}
 .hidebar #hUndo:disabled{color:#5d5a55;cursor:default}
 .hidebar svg{width:5.400cqw;height:5.400cqw}
 
-/* Split: sideways is the star, the upright one crosses its edge. */
-.split{position:relative;isolation:isolate;padding:0 var(--gutter) var(--gap);background:linear-gradient(var(--floor) 8%,#1c0f0a 44%,var(--coal) 72%,#170c08 92%,var(--floor))}
+/* Split: one phone, with the divider to drag. */
+.split{position:relative;isolation:isolate;padding:0 var(--gutter) var(--gap);text-align:center;background:linear-gradient(var(--floor) 8%,#1c0f0a 44%,var(--coal) 72%,#170c08 92%,var(--floor))}
 .split .grain{-webkit-mask-image:linear-gradient(transparent 10%,#000 50%,transparent 95%);mask-image:linear-gradient(transparent 10%,#000 50%,transparent 95%)}
-.split h2{max-width:10ch}
-.split .lede{margin-inline:0}
-.splitart{display:grid;gap:32px;margin-top:clamp(40px,6vw,72px)}
-.land{--w:100%;width:100%;padding:6px;border-radius:30px}
-.land .screen{border-radius:24px}
-/* Sideways, the same two pages side by side: each fills its pane, so nothing is cut as the divider moves. */
-.sideways{container-type:inline-size;aspect-ratio:2868/1320;user-select:none;-webkit-user-select:none}
-.panes{position:absolute;inset:0 6.600cqw}
-.pane{position:absolute;top:0;bottom:0;overflow:hidden;container-type:inline-size;background:#fff;border-radius:2.800cqw}
-.pane.left{left:0;width:calc(var(--x) - 1.500cqw)}
-.pane.right{right:0;width:calc(100% - var(--x) - 1.500cqw)}
-.pane img{position:absolute;left:0;width:100%;max-width:none;height:auto;top:-13.600cqw}
-.panes .grip{top:0;bottom:0;left:var(--x);width:64px;margin-left:-32px;cursor:ew-resize}
-.panes .grip::after{content:"";position:absolute;top:50%;left:30.5px;width:3px;height:74px;margin-top:-37px;border-radius:3px;background:var(--glow);box-shadow:0 1px 3px #0008}
-.screen.sideways>img.rail{inset:0 0 0 auto;width:6.600%;height:100%}
-.tall{--w:min(300px,76vw)}
+.split .lede{margin-inline:auto}
+.tall{margin-top:clamp(40px,6vw,72px)}
 .splitter{container-type:inline-size;aspect-ratio:828/1800;user-select:none;-webkit-user-select:none}
 .splitter>.one{position:absolute;inset:0;clip-path:inset(0 0 calc(100% - var(--s)) 0 round 0 0 22px 22px)}
 .splitter .two{position:absolute;left:0;right:0;bottom:0;top:calc(var(--s) + 3%);overflow:hidden;border-radius:22px 22px 0 0}
@@ -268,9 +255,7 @@ footer .go{margin-top:clamp(30px,4vw,44px)}
   .lab.without{text-align:right}
   .lab.with{text-align:left}
   .hide{grid-template-columns:minmax(0,1fr) auto;gap:clamp(40px,7vw,110px)}
-  .splitart{display:block;position:relative;padding-bottom:110px}
-  .land{width:calc(100% - 200px)}
-  .tall{--w:268px;position:absolute;right:0;bottom:0;margin:0;z-index:1}
+  .tall{--w:370px}
   .list{grid-template-columns:repeat(4,minmax(0,1fr));gap:56px 32px}
   .faq{grid-template-columns:minmax(0,4fr) minmax(0,7fr);gap:clamp(28px,6vw,96px)}
 }
