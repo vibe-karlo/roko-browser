@@ -26,7 +26,7 @@
     // The link's own address, e.g. "https://roko.app". Empty: whatever address served it.
     "PUBLIC_URL": "",
     // An address for "Report" under each page. Empty: no Report link.
-    "REPORT_EMAIL": "",
+    "REPORT_EMAIL": "karlo@growthstudio.hr",
     // "true" lets search engines list shared pages. Link previews work either way.
     "INDEXABLE": "false"
   }

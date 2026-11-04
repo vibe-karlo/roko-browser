@@ -6,6 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- Shared answers have a Report link, which emails roko.
 - Share in the page menu opens the share sheet straight away. Copy as Markdown stays, by typing "markdown".
 - Turned sideways, tabs are narrow upright cards, several at once to swipe through, instead of one wide strip.
 - The Tabs row in Settings has the same icon as the tabs button.
