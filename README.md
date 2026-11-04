@@ -611,7 +611,7 @@ Adding a city: its zones and numbers in `ParkingCity`, its bounding box and zone
 `Scripts/build_parking.py` (or another source of zone outlines, such as Zagreb's ArcGIS layers), then
 rebuild the data.
 
-To try it without paying, type `test parking` and a number of your own (remembered after that): a
+In development and TestFlight builds (`Parking.canTest`, never the App Store), to try it without paying, type `test parking` and a number of your own (remembered after that): a
 pretend hour runs on the timer, and adding an hour opens the message window to that number. A test
 session (`Session.testNumber`) can't text the operator, and paying for real replaces it.
 

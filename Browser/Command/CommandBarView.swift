@@ -790,6 +790,7 @@ struct CommandBarView: View {
     /// to that number, with no zone and no time on the clock. The number stays
     /// on this iPhone, so next time "test parking" is enough.
     static func testParkingRow(_ query: String) -> CommandItem? {
+        guard Parking.canTest else { return nil }
         let words = query.lowercased().split(separator: " ")
         guard words.count >= 2, words[0] == "test", words[1] == "parking" else { return nil }
         let typed = words.dropFirst(2).joined().filter { $0.isNumber || $0 == "+" }

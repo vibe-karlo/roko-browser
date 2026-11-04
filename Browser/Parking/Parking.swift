@@ -168,6 +168,17 @@ final class Parking {
         }
     }
 
+    /// "test parking" is for builds on their way, not for the App Store: this
+    /// is false unless the build shows it's a development or TestFlight one.
+    static let canTest: Bool = {
+        #if targetEnvironment(simulator)
+        true
+        #else
+        Bundle.main.path(forResource: "embedded", ofType: "mobileprovision") != nil
+            || Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+        #endif
+    }()
+
     /// Where "test parking" texts: yours, kept on this iPhone only.
     var testNumber: String? { UserDefaults.standard.string(forKey: "parking.testNumber") }
 
