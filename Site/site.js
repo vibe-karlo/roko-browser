@@ -154,7 +154,7 @@ function drag(box, name, axis, min, max, area, onUse, onSet) {
   for (const end of ["pointerup", "pointercancel"]) area.addEventListener(end, () => { on = false; });
   return set;
 }
-drag(puller, "--p", "y", 6, 94, puller.querySelector(".grip"), () => { pulled = true; });
+drag(puller, "--p", "y", 6, 100, puller.querySelector(".grip"), () => { pulled = true; });
 const shade = v => { labA.style.opacity = .5 + .5 * Math.min(1, v / 50); labB.style.opacity = .5 + .5 * Math.min(1, (100 - v) / 50); };
 const setCompare = drag(compare, "--p", "x", 0, 100, compare, () => { compared = true; }, shade);
 const splitter = document.getElementById("splitter"); drag(splitter, "--s", "y", 28, 76, splitter.querySelector(".grip"));
