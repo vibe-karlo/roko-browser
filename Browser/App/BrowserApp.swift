@@ -1,3 +1,4 @@
+import CoreSpotlight
 import SwiftData
 import SwiftUI
 import UserNotifications
@@ -32,6 +33,10 @@ struct BrowserApp: App {
                 .environment(browser)
                 .tint(Theme.accent)
                 .onOpenURL { browser.handleLink($0) }
+                .onContinueUserActivity(CSSearchableItemActionType) { SpotlightIndex.open($0, in: browser) }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+                    SpotlightIndex.update(container)
+                }
                 .task {
                     Appearance.apply()
                     // Pages' sound plays on with roko in the background.

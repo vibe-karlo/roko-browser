@@ -30,7 +30,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urlparse(self.path)
         body, kind = page.encode(), "text/html"
-        if url.path != "/run":
+        if url.path == "/asset.svg":
+            body, kind = b'<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><!--' + b"x" * 50000 + b"--></svg>", "image/svg+xml"
+        elif url.path == "/asset.js":
+            body, kind = b"//" + b"x" * 50000 + b"\n", "text/javascript"
+        elif url.path != "/run":
             body, kind = b"", "text/plain"
         self.send_response(200)
         self.send_header("content-type", kind)

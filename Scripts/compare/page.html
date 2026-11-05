@@ -2,6 +2,8 @@
 <title>Browser comparison</title><body style="font:17px system-ui;margin:24px"><h1 id="out">Testing…</h1>
 <script>
 const q = new URLSearchParams(location.search), hosts = __HOSTS__;
+// Heavy: 30 more things for the load event to wait for, about 1.5 MB, each one fresh.
+if (q.get("heavy") === "1") for (let i = 0; i < 30; i++) document.write(i % 3 ? `<img src="/asset.svg?${i}-${q.get("r")}-${Math.random()}">` : `<script src="/asset.js?${i}-${Math.random()}"><\/script>`);
 const send = data => fetch("/report", {method: "POST", body: JSON.stringify({b: q.get("b"), r: q.get("r"), ...data}), keepalive: true});
 const reach = host => Promise.race([
   fetch("https://" + host + "/?" + Math.random(), {mode: "no-cors", cache: "no-store"}).then(() => true, () => false),
