@@ -37,7 +37,7 @@ that you don't want (a sticky bar, a "Join" button, a promo row) goes with Hide 
 Site Settings in the page menu: tap it, tap it again, and it stays gone on that site.
 
 **And the rest.** Today's weather, news and to-dos on a new tab, to-dos synced with Apple
-Reminders, YouTube playing on as sound with roko closed, closed tabs a tap from coming back,
+Reminders, closed tabs a tap from coming back,
 clean links when you share, roko in every share sheet, Home Screen widgets, pages translated into the languages you choose, and a count of
 the time all this has saved you.
 
@@ -492,7 +492,9 @@ roko's own code is free software under the [GNU General Public License, version 
 | --- | --- | --- |
 | Mozilla Readability | `Browser/Resources/Vendor/Readability.js` | Apache 2.0 (see the file) |
 | EasyList, EasyPrivacy and Fanboy's lists, converted to WebKit's format and trimmed | `Browser/Resources/Blocklists` | GPL 3 or later, or CC BY-SA 3.0. Credit: The EasyList authors, [easylist.to](https://easylist.to). The App Store build uses them under CC BY-SA. |
+| DuckDuckGo Autoconsent, with Consent-O-Matic's rules | `Browser/Resources/Scripts/consent-*.js` | MPL 2.0 |
 | Phosphor Icons | `Browser/Resources/Assets.xcassets/phosphor` | MIT (below) |
+| Map data | `Browser/Resources/Parking` | © OpenStreetMap contributors, ODbL |
 | Product names | `Browser/Resources/Shopping/products.txt` | From one shop's published price list, not ours to license |
 | Screenshots | `Site/img`, `docs/screens` | They show other people's pages, such as Wikipedia (CC BY-SA), which stay theirs |
 | Cabinet Grotesk | Not in this repository | Closed-source font: the site loads it from [Fontshare](https://www.fontshare.com), and its licence forbids copies here |

@@ -928,14 +928,22 @@ private struct AboutSettings: View {
         return (info?["CFBundleShortVersionString"] as? String ?? "") + " (\(info?["CFBundleVersion"] as? String ?? ""))"
     }
 
-    private let credits: [(String, String)] = [
-        ("Filter lists", "EasyList, EasyPrivacy and Fanboy's Cookie List (CC BY-SA 3.0)"),
-        ("Cookie pop-ups", "DuckDuckGo Autoconsent, with Consent-O-Matic's rules (MPL 2.0)"),
-        ("Article extraction", "Mozilla Readability (Apache 2.0)"),
-        ("Icons", "Phosphor Icons (MIT)"),
-        ("Parking zones", "© OpenStreetMap contributors (ODbL)"),
-        ("Weather", "Open-Meteo.com (CC BY 4.0)"),
+    private let credits: [(String, String, String)] = [
+        ("Filter lists", "The EasyList authors: EasyList, EasyPrivacy and Fanboy's lists, converted and trimmed (CC BY-SA 3.0)", "https://easylist.to"),
+        ("Cookie pop-ups", "DuckDuckGo Autoconsent, with Consent-O-Matic's rules (MPL 2.0)", "https://github.com/duckduckgo/autoconsent"),
+        ("Article extraction", "Mozilla Readability, © 2010 Arc90 Inc (Apache 2.0)", "https://github.com/mozilla/readability"),
+        ("Icons", "Phosphor Icons, © 2023 Phosphor Icons (MIT)", "https://phosphoricons.com"),
+        ("Map data", "© OpenStreetMap contributors (ODbL)", "https://www.openstreetmap.org/copyright"),
+        ("Weather", "Open-Meteo.com (CC BY 4.0)", "https://open-meteo.com"),
     ]
+
+    private static let mit = """
+        Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+        The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+        """
 
     var body: some View {
         Form {
@@ -946,15 +954,28 @@ private struct AboutSettings: View {
                     browser.showsOnboarding = true
                 }
                 .foregroundStyle(Theme.ink)
+                Link(destination: URL(string: "https://github.com/vibe-karlo/roko-browser")!) {
+                    LabeledContent("Source code", value: "GPL-3.0")
+                }
+                .foregroundStyle(Theme.ink)
             }
             Section {
                 ForEach(credits, id: \.0) { credit in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(credit.0).foregroundStyle(Theme.ink)
-                        Text(credit.1).font(.footnote).foregroundStyle(Theme.secondaryInk)
+                    Link(destination: URL(string: credit.2)!) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(credit.0).foregroundStyle(Theme.ink)
+                            Text(credit.1).font(.footnote).foregroundStyle(Theme.secondaryInk)
+                        }
+                        .padding(.vertical, 2)
                     }
-                    .padding(.vertical, 2)
                 }
+                NavigationLink("MIT License") {
+                    ScrollView {
+                        Text(Self.mit).font(.footnote).foregroundStyle(Theme.secondaryInk).padding()
+                    }
+                    .navigationTitle("MIT License")
+                }
+                .foregroundStyle(Theme.ink)
             } header: {
                 Text("Built with")
             }

@@ -9,6 +9,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - roko has a site in `Site/`, phone first: a live iPhone in true proportions with the bar and a working keyboard, speed numbers, a draggable summary, a before and after slider, Split View with a divider to drag, a made-up page to tap things away on, a private switch to try, hold to speak to try, a to-do widget and a shopping list that really tick, which AI runs where, iPhone Duo in the questions, a link to the code on GitHub, support and the privacy policy.
 
 ### Changed
+- Version 1.0. About roko links each credit and the source code, and carries the MIT License text.
 - roko is open source, under GPL-3.0. The README lists the parts that keep their own terms, and the site loads its headline font from Fontshare, whose licence doesn't allow a copy in a public repository.
 - roko opens with a search field in the bar when tabs are restored, as Apple asks of a browser. It becomes the + again once you scroll or open the bar.
 - Sharing an answer as a public page is gone. Pages already shared can still be taken down in Settings → Shared pages, and they keep their Report link.
