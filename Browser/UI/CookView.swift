@@ -98,6 +98,7 @@ struct CookView: View {
     private var tint: Color { PageKind.recipe.tint }
     private var steps: [String] { model.recipe.steps }
     private var isLast: Bool { model.step >= steps.count - 1 }
+    private var timers: CookTimers { .shared }
 
     var body: some View {
         GeometryReader { proxy in
@@ -199,6 +200,7 @@ struct CookView: View {
                 Spacer(minLength: 0)
                 if close { closeButton.alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 8 } }
             }
+            if !timers.running.isEmpty { timerRow }
             // The biggest size this step fits at; a very long one scrolls rather than being cut.
             ViewThatFits(in: .vertical) {
                 ForEach([40, 34, 28, 24] as [CGFloat], id: \.self) { stepText(size: $0) }
@@ -207,6 +209,12 @@ struct CookView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .id(model.step)
             .transition(.push(from: goingOn ? .trailing : .leading))
+            .tint(tint)
+            // A time in the step, tapped: its timer.
+            .environment(\.openURL, OpenURLAction { url in
+                if let seconds = Int(url.host() ?? "") { startTimer(seconds) }
+                return .handled
+            })
         }
         .clipped()
         .contentShape(.rect)
@@ -216,12 +224,74 @@ struct CookView: View {
         })
     }
 
+    /// The step, with each time in it a link that starts its timer.
+    private var stepWithTimes: AttributedString {
+        let step = steps[min(model.step, steps.count - 1)]
+        var text = AttributedString(step)
+        for time in CookTime.find(in: step) {
+            guard let range = Range(time.range, in: text) else { continue }
+            text[range].link = URL(string: "timer://\(time.seconds)")
+            text[range].underlineStyle = timers.isRunning(seconds: time.seconds, step: model.step, recipe: model.recipe.title) ? nil : .single
+        }
+        return text
+    }
+
     private func stepText(size: CGFloat) -> some View {
-        Text(steps[min(model.step, steps.count - 1)])
+        Text(stepWithTimes)
             .font(.system(size: size, design: .serif))
             .lineSpacing(size * 0.14)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: Timers
+
+    /// Each one running, big enough to read across a kitchen, and a way to call it
+    /// off. Side by side while they fit, then one under another, none out of reach.
+    private var timerRow: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 18) { timerItems }
+            VStack(alignment: .leading, spacing: 0) { timerItems }
+        }
+    }
+
+    private var timerItems: some View {
+        ForEach(timers.running) { timer in
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Group {
+                    if timer.isRinging {
+                        Text("Time's up")
+                    } else {
+                        Text(timerInterval: Date.now...max(timer.endsAt, .now), countsDown: true)
+                            .monospacedDigit()
+                    }
+                }
+                .font(.system(size: 26, weight: .semibold, design: .serif))
+                .foregroundStyle(tint)
+                .fixedSize()
+                Text(timer.recipe == model.recipe.title ? "step \(timer.step + 1)" : timer.recipe)
+                    .font(.system(size: 14, design: .serif))
+                    .foregroundStyle(faint)
+                    .lineLimit(1)
+                Button { timers.end(timer) } label: {
+                    Glyph(.close, size: 13, weight: 2)
+                        .foregroundStyle(faint)
+                        .frame(width: 32, height: 44)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 5 }
+                .accessibilityLabel(timer.isRinging ? "Stop this timer" : "Cancel this timer")
+            }
+        }
+    }
+
+    private func startTimer(_ seconds: Int) {
+        Task {
+            if let problem = await timers.start(seconds: seconds, step: model.step, recipe: model.recipe.title) {
+                browser.showToast(problem)
+            }
+        }
     }
 
     // MARK: Turning

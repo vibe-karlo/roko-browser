@@ -68,6 +68,8 @@ targets:
         # fix is asked for just this once when precise location is off for roko.
         NSLocationTemporaryUsageDescriptionDictionary:
           Parking: Finding the parking zone you're in needs your exact location, just this once.
+        # Cook Mode's timers: real alarms, which ring even with the sound off.
+        NSAlarmKitUsageDescription: A timer you start in Cook Mode rings here, even with the sound off or roko closed.
         # Paid parking's time left, on the Lock Screen and in the Dynamic Island.
         NSSupportsLiveActivities: true
         NSCalendarsFullAccessUsageDescription: Today shows what's left on your calendar for the day. It stays on this iPhone.

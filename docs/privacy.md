@@ -49,7 +49,7 @@ ask for parking. Your plates and parking history stay on your iPhone.
 ## Permissions
 
 roko asks only when a feature needs it: location, microphone and speech recognition, camera for
-pages that ask, Calendar, Reminders, adding images to Photos, and Face ID for private tabs. You
+pages that ask, Calendar, Reminders, alarms for Cook Mode timers, adding images to Photos, and Face ID for private tabs. You
 can change any of these in iOS Settings.
 
 ## Private tabs

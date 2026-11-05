@@ -244,6 +244,7 @@ struct BrowserView: View {
                     .transition(.identity)
             }
         }
+        .modifier(CookScreen(browser: browser))
         .overlay(alignment: .bottom) {
             if let toast = browser.toast {
                 Text(toast)
@@ -774,8 +775,8 @@ private struct CopiedLinkWatch: ViewModifier {
     }
 }
 
-/// Reader Mode, a sheet or a book across the fold of an open Duo, and Cook Mode.
-/// Kept apart so the browser's body stays small enough for the compiler.
+/// Reader Mode: a sheet, or a book across the fold of an open Duo. Kept apart
+/// so the browser's body stays small enough for the compiler.
 private struct ReaderScreens: ViewModifier {
     @Bindable var browser: BrowserModel
     let asBook: Bool
@@ -795,6 +796,15 @@ private struct ReaderScreens: ViewModifier {
                 }
             }
             .animation(.easeOut(duration: 0.25), value: browser.reader?.id)
+    }
+}
+
+/// Cook Mode, under the toasts that report on its timers.
+private struct CookScreen: ViewModifier {
+    let browser: BrowserModel
+
+    func body(content: Content) -> some View {
+        content
             .overlay {
                 if let cook = browser.cook {
                     CookView(model: cook)
