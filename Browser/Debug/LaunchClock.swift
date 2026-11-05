@@ -14,8 +14,8 @@ enum LaunchClock {
 
     static let isEnabled = ProcessInfo.processInfo.arguments.contains("-perf")
 
-    static func mark(_ label: String) {
+    static func mark(_ label: @autoclosure () -> String) {
         guard isEnabled else { return }
-        print(String(format: "PERF %@ %.0fms", label, elapsed))
+        print(String(format: "PERF %@ %.0fms", label(), elapsed))
     }
 }

@@ -120,6 +120,22 @@ final class ContentBlocker {
 
     private final class Once { var done = false }
 
+    /// Asks WebKit for the lists now. It finds them on its own queue while the
+    /// main thread sets up the app, so they're ready the moment a page wants them.
+    func lookUpEarly() {
+        for category in Category.allCases {
+            let identifier = "\(category.rawValue)-\(Self.listsVersion)"
+            let (found, reply) = AsyncStream.makeStream(of: WKContentRuleList?.self)
+            earlyLookups[identifier] = found
+            store.lookUpContentRuleList(forIdentifier: identifier) { list, _ in
+                reply.yield(list)
+                reply.finish()
+            }
+        }
+    }
+
+    private var earlyLookups: [String: AsyncStream<WKContentRuleList?>] = [:]
+
     private func load() async {
         // The hiding indexes load alongside the request lists; pages only wait
         // for the request lists, so nothing loads unfiltered.
@@ -130,7 +146,12 @@ final class ContentBlocker {
             let identifier = "\(category.rawValue)-\(Self.listsVersion)"
             current.insert(identifier)
 
-            if let list = try? await store.contentRuleList(forIdentifier: identifier) {
+            if let early = earlyLookups[identifier] {
+                for await list in early where list != nil {
+                    compiled[category] = list
+                }
+                if compiled[category] != nil { continue }
+            } else if let list = try? await store.contentRuleList(forIdentifier: identifier) {
                 compiled[category] = list
                 continue
             }

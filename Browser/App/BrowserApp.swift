@@ -12,9 +12,12 @@ struct BrowserApp: App {
 
     init() {
         LaunchClock.mark("appInit")
-        // From the very start: a page asked for at launch waits for the lists.
+        // From the very start, and not in a Task, which would wait for the main
+        // thread to come free: a page asked for at launch waits for the lists.
+        ContentBlocker.shared.lookUpEarly()
         Task { await ContentBlocker.shared.prepare() }
         container = Store.makeContainer()
+        LaunchClock.mark("storeOpen")
         // Before launch finishes, so a tap on a notification that opens roko isn't missed.
         UNUserNotificationCenter.current().delegate = NotificationRouter.shared
         TodoAlerts.watch(container)
@@ -26,6 +29,7 @@ struct BrowserApp: App {
         // iCloud tells roko about changes from other devices with silent
         // pushes, which need no permission.
         if Store.syncs { UIApplication.shared.registerForRemoteNotifications() }
+        LaunchClock.mark("initDone")
     }
 
     var body: some Scene {

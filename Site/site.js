@@ -316,8 +316,8 @@ const proofData = {
   },
   block: {
     unit: v => v.toFixed(0) + "%", low: false, head: "Blocks more than Brave.",
-    note: "Of the 122 hosts on d3ward's public ad and tracker list that at least one browser reached, the share each browser stopped. One run, on an earlier roko build and before Lens 1.1.",
-    values: { roko: 83.6, brave: 66.4, arc: 64.8, lens: 50.0, safari: 44.3, duckduckgo: 24.6, firefox: 13.9, edge: 7.4, chrome: 0 },
+    note: "Of the 122 hosts on d3ward's public ad and tracker list that at least one browser reached, the share each browser stopped. One run each, on roko 1.0 (9) and Lens 1.1.",
+    values: { roko: 83.6, brave: 66.4, arc: 64.8, lens: 54.9, safari: 44.3, duckduckgo: 24.6, firefox: 13.9, edge: 7.4, chrome: 0 },
   },
   speed: {
     unit: v => v.toFixed(2) + " s", low: true, head: "Beats Chrome and Safari.",

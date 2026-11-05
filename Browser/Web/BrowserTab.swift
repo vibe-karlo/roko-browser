@@ -42,7 +42,11 @@ final class BrowserTab: NSObject, Identifiable {
     /// the pages you open next in the tab, until you show the original.
     private(set) var translation: TranslationTarget?
     var lastActive: Date
-    private(set) var snapshot: UIImage?
+    /// The tab's picture: the one taken this run, else the one saved last run,
+    /// read from disk the first time it's wanted rather than for every tab at launch.
+    var snapshot: UIImage? { taken ?? saved }
+    private var taken: UIImage?
+    @ObservationIgnored private lazy var saved: UIImage? = isPrivate ? nil : UIImage(contentsOfFile: snapshotFile.path)
     private(set) var isLive = false
     /// The colour the page wants around its top edge: its theme-color, else its
     /// background. The status bar band takes it, as in Safari.
@@ -105,7 +109,6 @@ final class BrowserTab: NSObject, Identifiable {
         self.restoreState = restoreState
         super.init()
         if !isPrivate {
-            snapshot = UIImage(contentsOfFile: snapshotFile.path)
             formDraft = FormDrafts.draft(for: id)
         }
     }
@@ -127,7 +130,7 @@ final class BrowserTab: NSObject, Identifiable {
     /// restored tab still has its picture in the tab switcher.
     func keep(_ image: UIImage?) {
         guard let image else { return }
-        snapshot = image
+        taken = image
         guard !isPrivate else { return }
         let file = snapshotFile
         // Compressing a JPEG takes a few milliseconds: never on the main thread.
@@ -153,7 +156,8 @@ final class BrowserTab: NSObject, Identifiable {
     func releaseSnapshotMemory() {
         guard !isPrivate, snapshot != nil, FileManager.default.fileExists(atPath: snapshotFile.path),
               let light = UIImage(contentsOfFile: snapshotFile.path) else { return }
-        snapshot = light
+        saved = light
+        taken = nil
     }
 
     func discardSnapshot() {
@@ -176,7 +180,9 @@ final class BrowserTab: NSObject, Identifiable {
         // A hibernation still taking its snapshot is called off: this tab is wanted.
         hibernation += 1
         guard webView == nil else { return }
+        LaunchClock.mark("wake \(url?.host() ?? "-")")
         let webView = WebViewFactory.make(isPrivate: isPrivate)
+        LaunchClock.mark("webViewMade")
         webView.navigationDelegate = self
         webView.uiDelegate = self
         PageWatch.shared.register(webView, for: self)
@@ -535,6 +541,7 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        LaunchClock.mark("commit \(webView.url?.host() ?? "-")")
         perf("commit", webView.url)
         media = nil
         leaveForm(for: webView.url)
@@ -555,6 +562,7 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        LaunchClock.mark("finish \(webView.url?.host() ?? "-")")
         perf("finish", webView.url)
         if LaunchClock.isEnabled {
             let host = webView.url?.host() ?? "-"

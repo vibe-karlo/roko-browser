@@ -11,6 +11,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - The site has a changelog at `/changes`, linked from the home page's footer: what each public version brought, in short lines.
 
 ### Changed
+- Opening a link starts the page about 80 ms sooner: the block lists load while the app sets up rather than after, and tabs' pictures are read when they're wanted rather than for every tab at launch.
 - Pages load faster: the half-megabyte of cookie pop-up rules now loads after the page rather than before it, and the block lists start loading sooner at launch. A known pop-up can show for a moment before it's answered.
 
 ### Added

@@ -282,7 +282,9 @@ final class BrowserModel {
         // Build one web view now so the restored tab takes it, then build the
         // spare for the next new tab once launch has settled, not during it.
         WebViewFactory.prewarm()
+        LaunchClock.mark("webViewBuilt")
         restoreTabs()
+        LaunchClock.mark("tabsRestored \(tabs.count)")
         // Downloads resume in a live tab's web view.
         Downloads.shared.liveWebViews = { [weak self] in self?.tabs.compactMap(\.webView) ?? [] }
         // The band under the page: parking and what's due, kept current.
@@ -301,6 +303,9 @@ final class BrowserModel {
         Task {
             await ContentBlocker.shared.prepare()
             LaunchClock.mark("blockerReady")
+            // A link that opened roko arrives about now: give it a moment, so the
+            // last tab doesn't start loading for nothing.
+            try? await Task.sleep(for: .milliseconds(60))
             // Only now start the restored page, so its very first requests are
             // already filtered. Until then its saved snapshot stands in.
             if let tab = selectedTab { select(tab) }
@@ -912,6 +917,7 @@ final class BrowserModel {
     /// roko's own links (from its reminders, the parking Live Activity) and
     /// pages handed over by notifications or other apps.
     func handleLink(_ url: URL) {
+        LaunchClock.mark("link")
         switch url.absoluteString {
         case "roko://today": panel = .today
         case "roko://todo": panel = .todos
