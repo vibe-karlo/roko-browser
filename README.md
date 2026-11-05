@@ -68,9 +68,8 @@ The alternates in Settings → App icon come from `swift Scripts/make_alternate_
 Browser/Resources/Assets.xcassets`: marks drawn in the script, and whole designed tiles from
 `Scripts/icons/*.svg` (named for their icon set) rendered as they are.
 
-Summarize works out of the box on Apple Intelligence devices. Browse for Me (and summaries
-on older iPhones) needs a Claude API key: paste it in Settings, where it's stored in the
-Keychain.
+Summarize and Browse for Me work out of the box on Apple Intelligence devices. On older iPhones
+they need a Claude API key: paste it in Settings, where it's stored in the Keychain.
 
 ## How it's built
 
@@ -480,7 +479,7 @@ times an hour; each ask reads a few rows.
 
 ## Website
 
-`Site/` is the static site at rokobrowser.vercel.app: the page, `/support` and `/privacy` (written out from `docs/privacy.md`). The phone at the top is live DOM at an iPhone's real 402 by 874 shape, sized in its own width (`cqw`), with a working keyboard so a phone's own doesn't cover it: sums, units, times and days until are worked out in `site.js`, rates come from frankfurter.dev and weather from Open-Meteo. The summary, the before and after and Split View are dragged by the same helper in `site.js`, and the page in the hide section is made up, so nothing on it belongs to another site. Written for a phone first. Vercel deploys it from GitHub on a push that changes `Site/` (root `vercel.json`).
+`Site/` is the static site at rokobrowser.vercel.app: the page, `/support` and `/privacy` (written out from `docs/privacy.md`). The phone at the top is live DOM at an iPhone's real 402 by 874 shape, sized in its own width (`cqw`), with a working keyboard so a phone's own doesn't cover it: sums, units, times and days until are worked out in `site.js`, rates come from frankfurter.dev and weather from Open-Meteo. The summary, the before and after and Split View are dragged by the same helper in `site.js`, and the page in the hide section is made up, so nothing on it belongs to another site. The widget and the shopping list in the bar section are live DOM too, with the app's own labels and sizes, and they really tick. Written for a phone first. Vercel deploys it from GitHub on a push that changes `Site/` (root `vercel.json`).
 
 ## Credits
 

@@ -207,6 +207,34 @@ eye.addEventListener("click", () => {
   ph.textContent = open ? "Search or enter address" : "Private search";
 });
 
+// The widget really ticks: a to-do goes, and the count with it.
+const tdRows = [...document.querySelectorAll(".td-r")], tdLeft = document.getElementById("tdLeft"), tdDone = document.getElementById("tdDone");
+const tdSay = () => {
+  const left = tdRows.filter(r => !r.classList.contains("off")).length;
+  tdLeft.textContent = left ? left + " left" : "";
+  tdDone.hidden = left > 0;
+  // All done, it says so, then the day starts over for the next person to try.
+  if (!left) setTimeout(() => { for (const r of tdRows) { r.classList.remove("off"); r.disabled = false; } tdSay(); }, 2800);
+};
+for (const r of tdRows) r.addEventListener("click", () => { r.classList.add("off"); r.disabled = true; setTimeout(tdSay, 200); });
+
+// The list really works: three shops, and things ticked off in each.
+const shop = document.getElementById("shop"), shopTabs = [...shop.querySelectorAll(".shops button")], shopLists = [...shop.querySelectorAll(".aisles")];
+const shopCount = () => {
+  for (const tab of shopTabs) {
+    const left = shop.querySelectorAll(`[data-for=${tab.dataset.shop}] .item[aria-pressed=false]`).length;
+    tab.querySelector("em").textContent = left || "";
+  }
+};
+for (const tab of shopTabs) tab.addEventListener("click", () => {
+  for (const each of shopTabs) each.setAttribute("aria-pressed", String(each === tab));
+  for (const list of shopLists) list.hidden = list.dataset.for !== tab.dataset.shop;
+});
+for (const item of shop.querySelectorAll(".item")) item.addEventListener("click", () => {
+  item.setAttribute("aria-pressed", String(item.getAttribute("aria-pressed") !== "true"));
+  shopCount();
+});
+
 if (!still) {
   // The summary comes down over the page as it scrolls in, until someone takes it.
   let queued = false;
