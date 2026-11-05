@@ -22,6 +22,7 @@ Usage:
     python3 -I Scripts/build_blocklists.py --offline --dns  # cached lists, fresh DNS
 """
 
+import hashlib
 import json
 import re
 import sys
@@ -396,6 +397,11 @@ def main() -> int:
             f"{stats['hide']} hiding rules ({len(cosmetic['keyed'])} keys, {len(cosmetic['always'])} always, "
             f"{len(cosmetic['scoped'])} sites), {stats['skipped']} skipped"
         )
+    # What the app compiles from: the same lists keep their compiled form across app updates.
+    digest = hashlib.sha256()
+    for path in sorted(OUT.glob("*.json")) + sorted(OUT.glob("*-hosts.txt")):
+        digest.update(path.read_bytes())
+    (OUT / "version.txt").write_text(digest.hexdigest()[:16] + "\n")
     return 0
 
 

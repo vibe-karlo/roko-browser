@@ -16,6 +16,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - No gap under what a page pins to the bottom when the bar folds away above a band, or under YouTube's bar at the screen's edge.
 
 ### Changed
+- Updates that don't change the block lists no longer recompile them, so the first launch after one is as quick as any other.
 - Blocks more on ad-heavy sites: an ad recovery host seen on index.hr, and The Sun's own ad and tracking hosts.
 - More ad and tracker hosts blocked, on the ones EasyList and EasyPrivacy miss. `Scripts/compare` tests browsers the same way, against d3ward's public list.
 - Version 1.0. About roko links each credit and the source code, and carries the MIT License text.

@@ -127,7 +127,7 @@ final class ContentBlocker {
         var current: Set<String> = []
         for category in Category.allCases {
             guard let url = Bundle.main.url(forResource: category.rawValue, withExtension: "json") else { continue }
-            let identifier = Self.identifier(for: category, file: url)
+            let identifier = "\(category.rawValue)-\(Self.listsVersion)"
             current.insert(identifier)
 
             if let list = try? await store.contentRuleList(forIdentifier: identifier) {
@@ -177,13 +177,11 @@ final class ContentBlocker {
         return out + (others.first == "]" || !any ? "" : ",") + others
     }
 
-    private static func identifier(for category: Category, file: URL) -> String {
-        let hosts = Bundle.main.url(forResource: "\(category.rawValue)-hosts", withExtension: "txt")
-        let size = ((try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
-            + ((try? hosts?.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
-        return "\(category.rawValue)-\(build)-\(size)"
-    }
+    /// From the lists' own contents (build_blocklists.py), not the build: an update
+    /// with the same lists keeps their compiled form and opens without compiling.
+    private static let listsVersion = Bundle.main.url(forResource: "version", withExtension: "txt")
+        .flatMap { try? String(contentsOf: $0, encoding: .utf8) }?
+        .trimmingCharacters(in: .whitespacesAndNewlines) ?? "0"
 
     // MARK: Wiring
 

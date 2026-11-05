@@ -96,8 +96,9 @@ swift Scripts/verify_blocklists.swift
 ```
 
 The first converts EasyList, EasyPrivacy and Fanboy's Cookie List to WebKit's format; the
-second compiles them with the real WebKit engine to prove they load. Bump the build number
-when you ship new lists so the app recompiles them.
+second compiles them with the real WebKit engine to prove they load. The first also writes
+`version.txt`, a hash of the lists: the app recompiles only when that changes (about 2 s on a Mac, on a
+new install or an update with new lists), so other updates open straight away.
 
 The build keeps the lists lean without losing anything that can still serve an ad:
 
