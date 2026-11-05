@@ -323,6 +323,9 @@ final class BrowserModel {
         ConsentHandler.shared.onAccepted = { [weak self] host, _ in
             self?.showToast("Accepted cookies: \(URL(string: "https://\(host)")?.displayHost ?? host) needs them")
         }
+        ContentBlocker.shared.onAdsAllowed = { [weak self] host in
+            self?.showToast("Ads allowed: \(URL(string: "https://\(host)")?.displayHost ?? host) shows nothing without them")
+        }
         Task {
             await ContentBlocker.shared.prepare()
             LaunchClock.mark("blockerReady")

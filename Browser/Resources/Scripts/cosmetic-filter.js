@@ -259,7 +259,9 @@
     const text = (el.innerText || "").trim();
     return text.length >= 20 && text.length <= 1500 && WALL_WORDS.test(text);
   };
+  let hidAWall = false;
   const hideWall = (box) => {
+    hidAWall = true;
     if (!wallStyle) {
       wallStyle = document.createElement("style");
       wallStyle.textContent = `[${WALL}]{display:none!important}`;
@@ -297,6 +299,26 @@
   };
   if (document.readyState === "complete") armWalls();
   else addEventListener("load", armWalls, { once: true });
+
+  // A page that keeps nothing once it has seen its ads fail (BILD's leaves its
+  // header and footer, and an "adblockwall" frame): there's nothing to hide a wall
+  // from. Known by its wall, a page about a screen tall, and next to no words or
+  // pictures. The app then lets this site's ads through and loads it again.
+  const refusesToShow = () => {
+    const body = document.body;
+    if (!body || (body.innerText || "").trim().length > 1200) return false;
+    if (document.documentElement.scrollHeight > innerHeight * 1.6 || document.images.length > 12) return false;
+    return hidAWall || document.querySelector('iframe[src*="adblock" i], iframe[id*="adblock" i], [class*="adblockwall" i], [id*="adblockwall" i]') !== null;
+  };
+  let reportedRefusal = false;
+  const checkRefusal = () => {
+    if (reportedRefusal || !refusesToShow()) return;
+    reportedRefusal = true;
+    handler.postMessage({ host: location.hostname, refused: true }).catch(() => {});
+  };
+  const armRefusal = () => { for (const delay of [3500, 7000, 12000]) setTimeout(checkRefusal, delay); };
+  if (document.readyState === "complete") armRefusal();
+  else addEventListener("load", armRefusal, { once: true });
 
   // The first request goes with the next frame, for the first paint. Later
   // ones wait for the page to settle a little: a page building itself asked

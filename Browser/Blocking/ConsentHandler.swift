@@ -50,15 +50,22 @@ final class ConsentHandler: NSObject, WKScriptMessageHandlerWithReply {
                 asked = true;
                 window.webkit.messageHandlers.\(Self.handlerName).postMessage({ type: "rokoLoad" });
             };
+            // A pop-up can also sit in a frame on any address (The Telegraph's is served
+            // from its own site, under scrambled names): a frame big enough to cover the
+            // page with a button saying yes. Ad frames are smaller, and most have no buttons.
+            const coversPage = () => innerWidth >= 280 && innerHeight >= 300
+                && /accept|agree|consent|allow|acept|aceit|accett|akzept|zustimm|prihvat|prihvać/i.test(
+                    [...document.querySelectorAll("button, [role=button]")].slice(0, 12).map((b) => b.innerText).join(" "));
             const wanted = () => !gate
                 || (gate.patterns && new RegExp(gate.patterns).test(location.href))
-                || (gate.selectors && document.querySelector(gate.selectors) !== null);
+                || (gate.selectors && document.querySelector(gate.selectors) !== null)
+                || coversPage();
             const begin = () => {
                 if (begun) return;
                 begun = true;
                 if (wanted()) return ask();
                 // A frame's banner can be drawn a moment after the frame loads.
-                if (gate && gate.selectors) setTimeout(() => { if (wanted()) ask(); }, 1500);
+                if (gate) for (const delay of [1500, 4000, 8000]) setTimeout(() => { if (!asked && wanted()) ask(); }, delay);
             };
             if (document.readyState === "complete") return begin();
             addEventListener("load", begin, { once: true });

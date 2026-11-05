@@ -10,6 +10,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - roko has a site in `Site/`, phone first: a live iPhone in true proportions with the bar and a working keyboard, speed numbers, a draggable summary, a before and after slider, Split View with a divider to drag, a made-up page to tap things away on, a private switch to try, hold to speak to try, a to-do widget and a shopping list that really tick, which AI runs where, iPhone Duo in the questions, a link to the code on GitHub, support and the privacy policy.
 - The site has a changelog at `/changes`, linked from the home page's footer: what each public version brought, in short lines.
 
+### Fixed
+- Pay-or-consent walls that no rule knows now get answered. The case for "the only other way past it costs money" only ran after a rule had recognised the pop-up, so a site's own wall (Marca's, Corriere's) and Sourcepoint's with a subscribe button (BILD's, Welt's, The Telegraph's) stayed up or were only hidden. roko now knows one by its two buttons, in any of the larger European languages, and says yes, as it does for any wall. Your choice is remembered per site and shown in Site Settings.
+- A pop-up in a frame that covers the page is found on any address, not only a consent platform's, which is how The Telegraph's is served.
+- A page that empties itself because its ads are blocked (BILD's) loads properly: roko lets that one site's ads through, says so, and reloads. Trackers, cookies and pop-ups stay handled, and Site Settings can undo it.
+- Rules for "everything but this type" in the block lists (`||2mdn.net^$~media`) were dropped when converting them, which let Google's ad images through. About a hundred more rules now apply.
+
 ### Changed
 - Cookie pop-ups cost a page less after it has loaded. Only frames that can hold a pop-up (a consent platform's own frame, or one of the few sites whose rules run in a frame) are sent the pop-up rules; the dozens of ad frames on a news page used to get 190 KB each. A page is checked for a pop-up ten times instead of twenty, a frame five, and the scan of the page's whole text on each check is gone (nothing read it). On The Verge that is 35 messages between the page and roko instead of 88.
 - Launch housekeeping (the spare web view, the calculator's warm-up, old pictures and history, the iCloud duplicate check) is spread over the first few seconds rather than done in one go, which cost a frame while the first page was still settling.

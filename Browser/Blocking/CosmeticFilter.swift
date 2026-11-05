@@ -79,6 +79,12 @@ final class CosmeticFilter: NSObject, WKScriptMessageHandlerWithReply {
             if LaunchClock.isEnabled { print("WALL \(body["host"] ?? "") \(wall)") }
             return (nil, nil)
         }
+        // The page shows nothing while its ads are blocked: let them through here.
+        if let body = message.body as? [String: Any], body["refused"] as? Bool == true,
+           let host = body["host"] as? String, let webView = message.webView {
+            ContentBlocker.shared.allowAds(on: host, reloading: webView)
+            return (nil, nil)
+        }
         guard let body = message.body as? [String: Any], let keys = body["keys"] as? [String] else {
             return (nil, nil)
         }

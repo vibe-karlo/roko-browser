@@ -5,7 +5,8 @@
 // (ConsentHandler.swift), and accepts only where a site doesn't work without:
 //
 // - a wall: rejecting failed and the pop-up is still in the way;
-// - a price on no: the pop-up's reject button is "Reject and Pay";
+// - a price on no: the pop-up's reject button is "Reject and Pay", or the only
+//   other way past it is a subscription, also where no rule knows the pop-up;
 // - blocked content: the page shows a consent platform's "accept cookies to
 //   see this video" placeholder, after roko rejected, or because the platform
 //   itself was blocked (roko's cookie list blocks many of them) and never asked.
@@ -48,6 +49,48 @@ const payToReject = () => buttonsOnPage().some((b) => PAY_TO_REJECT.test(label(b
 // Its accept button, pressed directly: a platform's rule can miss a site's
 // own variant of the pop-up ("I Accept" beside "Reject and Pay").
 const acceptBeside = () => buttonsOnPage().find((b) => ACCEPT.test(label(b)));
+
+// A wall that no rule answers: a site's own (Marca's, Corriere's), or a platform's
+// that Autoconsent leaves alone on purpose (Sourcepoint's with a subscribe button).
+// Yes is free and no is a subscription, whatever the words, so roko says yes:
+// a box pinned over the page, or a pop-up's whole frame, that talks about cookies
+// or data and has both buttons. A newsletter's subscribe box has no accept button,
+// and an "accept only necessary" isn't a yes.
+const WALL_YES = /\b(accept|agree|consent|allow)\b|acept|aceit|accett|accept|akzept|zustimm|einverstanden|prihvać|prihvac|slažem|slazem|akkoord|zgadzam|souhlas/i;
+const WALL_NOT_YES = /necess|essential|notwendig|erforderlich|nužn|nuzn|only|solo|nur\b|manag|setting|prefer|einstell|option|custom|personal|gestion|ajust|configur|detail|learn|more/i;
+const WALL_PAY = /subscri|suscri|abonn|abbon|\babo\b|\bpay\b|\bpaga|\bpago\b|bezahl|kaufen|\bbuy\b|purchase|\bpur\b|pretplat|assin/i;
+const WALL_WORDS = /cookie|kolačić|kolacic|consent|tracking|privacy|partner|personal|datos|daten|données|donnees|dati\b|podat|werbung|publicidad|pubblicit|publicité|adverts/i;
+const WALL_BUTTONS = 'button, a, [role="button"], input[type="button"], input[type="submit"]';
+
+// The big pinned box around a button: a wall's buttons often sit in a small
+// pinned footer of their own (Corriere's), inside the box that covers the page.
+const pinnedBox = (el) => {
+    for (let node = el, depth = 0; node && node !== document.body && depth < 20; node = node.parentElement, depth++) {
+        const position = getComputedStyle(node).position;
+        if (position !== 'fixed' && position !== 'sticky') continue;
+        const rect = node.getBoundingClientRect();
+        if (rect.width >= window.innerWidth * 0.6 && rect.height >= window.innerHeight * 0.25) return node;
+    }
+    return null;
+};
+
+// The yes button of such a wall, or null.
+const paidWall = (mainFrame) => {
+    const buttons = [...document.querySelectorAll(WALL_BUTTONS)].filter((b) => {
+        const rect = b.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 && label(b).length > 0 && label(b).length <= 60 && shown(b);
+    });
+    const pay = buttons.filter((b) => WALL_PAY.test(label(b)));
+    if (!pay.length) return null;
+    for (const yes of buttons) {
+        const words = label(yes);
+        if (!WALL_YES.test(words) || WALL_NOT_YES.test(words) || WALL_PAY.test(words)) continue;
+        const box = mainFrame ? pinnedBox(yes) : document.body;
+        if (!box || !pay.some((b) => box.contains(b))) continue;
+        if (WALL_WORDS.test((box.innerText || '').slice(0, 3000))) return yes;
+    }
+    return null;
+};
 
 const label = (el) => (el.innerText || el.value || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim();
 
@@ -210,6 +253,21 @@ export function start(AutoConsent, filterCompactRules, compactRules) {
         }
     };
 
+    // Also in frames: Sourcepoint's pop-up is a frame of its own.
+    const watchForPaidWall = () => {
+        for (const delay of [1000, 2500, 5000, 9000, 14000]) {
+            setTimeout(async () => {
+                if (accepted) return;
+                const button = paidWall(mainFrame);
+                if (!button) return;
+                accepted = true;
+                await post({ type: 'rokoWall', cmp: 'roko-paid-wall' });
+                button.click();
+                countSaved(1);
+            }, delay);
+        }
+    };
+
     const watchForBlockedContent = () => {
         let reported = false;
         for (const delay of [2000, 5000, 9000]) {
@@ -255,6 +313,7 @@ export function start(AutoConsent, filterCompactRules, compactRules) {
         },
         { autoconsent: [], compact: filterCompactRules(compactRules, { url: location.href, mainFrame }) },
     );
+    watchForPaidWall();
     if (mainFrame) {
         watchForBlockedContent();
         watchForPlainBanner();

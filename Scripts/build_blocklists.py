@@ -51,6 +51,8 @@ DEDUPE_AGAINST = {"popups": "cookies"}
 # WebKit refuses to compile a list past this size.
 MAX_RULES = 150_000
 
+ALL_RESOURCE_TYPES = ["document", "image", "style-sheet", "script", "font", "media", "fetch", "ping", "websocket", "svg-document", "other"]
+
 RESOURCE_TYPES = {
     "script": "script",
     "image": "image",
@@ -156,6 +158,7 @@ def network_rule(line: str) -> dict | None:
     pattern, _, options = line.partition("$")
     trigger: dict = {}
     resource_types: list[str] = []
+    excluded_types: list[str] = []
     whole_document = False
 
     for option in filter(None, options.split(",")):
@@ -169,6 +172,8 @@ def network_rule(line: str) -> dict | None:
             trigger["load-type"] = ["first-party"]
         elif name in RESOURCE_TYPES:
             resource_types.append(RESOURCE_TYPES[name])
+        elif name.startswith("~") and name[1:] in RESOURCE_TYPES:
+            excluded_types.append(RESOURCE_TYPES[name[1:]])
         elif name == "document" and exception:
             whole_document = True
         elif name == "domain":
@@ -180,7 +185,7 @@ def network_rule(line: str) -> dict | None:
             else:
                 return None
         else:
-            return None  # redirect, csp, removeparam, negated types, ...
+            return None  # redirect, csp, removeparam, ...
 
     if exception and whole_document:
         domain = pattern.lstrip("|").rstrip("^|/").lower()
@@ -195,6 +200,9 @@ def network_rule(line: str) -> dict | None:
     if regex is None:
         return None
     trigger = {"url-filter": regex, **trigger}
+    # "Everything but media" (||2mdn.net^$~media): WebKit only takes a list of what to match.
+    if excluded_types and not resource_types:
+        resource_types = [t for t in ALL_RESOURCE_TYPES if t not in excluded_types]
     if resource_types:
         trigger["resource-type"] = sorted(set(resource_types))
     action = "ignore-previous-rules" if exception else "block"

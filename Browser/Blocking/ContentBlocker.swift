@@ -54,6 +54,20 @@ final class ContentBlocker {
         allowedHosts(category).contains(Self.normalize(host))
     }
 
+    /// Tells the browser, so it can say what happened ("Ads allowed…").
+    var onAdsAllowed: ((_ host: String) -> Void)?
+
+    /// A site shows nothing while its ads are blocked (BILD's anti-adblock empties the
+    /// page). A page beats a blocked ad: its ads are let through, here only, and it loads
+    /// again. Trackers, cookies and pop-ups stay handled, and Site Settings can undo it.
+    func allowAds(on host: String, reloading webView: WKWebView) {
+        guard !isAllowed(host: host, category: .ads) else { return }
+        setAllowed(host: host, category: .ads, true)
+        apply(to: webView.configuration.userContentController, host: host)
+        onAdsAllowed?(host)
+        webView.reload()
+    }
+
     func setAllowed(host: String, category: Category? = nil, _ allowed: Bool) {
         var hosts = allowedHosts(category)
         if allowed { hosts.insert(Self.normalize(host)) } else { hosts.remove(Self.normalize(host)) }
@@ -221,7 +235,7 @@ final class ContentBlocker {
     /// the same setup (most of them) doesn't tear it down and resend it.
     private let applied = NSMapTable<WKUserContentController, NSString>.weakToStrongObjects()
 
-    private func apply(to controller: WKUserContentController, host: String?) {
+    func apply(to controller: WKUserContentController, host: String?) {
         let allowed = host.map { isAllowed(host: $0) } ?? false
         let exempt = Category.allCases.filter { category in
             !isEnabled(category) || host.map { isAllowed(host: $0, category: category) } == true

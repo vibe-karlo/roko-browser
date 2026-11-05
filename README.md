@@ -385,6 +385,16 @@ it looks at the page's top-level boxes and anything named like a cookie notice f
 ("Reject", "Decline", "Only necessary", "Odbij", "Ablehnen"…). roko is asked as for any pop-up,
 and the reject button, or the accept one where cookies are allowed on the site, is pressed.
 Whole labels only, so a sentence containing "reject" is never clicked.
+
+**Pay or consent.** A wall whose only no is a subscription gets a yes, whether or not a rule knows it:
+`paidWall` in `bridge.js` looks for a box pinned over the page (or a frame that covers it) that talks about
+cookies or data and holds both a yes button and a subscribe or pay button. Sourcepoint's rule leaves these
+alone on purpose, and its top-level rule only hides them, which is why BILD showed an empty page. A frame on
+any address is sent the rules when it's big enough to cover the page and has a button saying yes.
+
+**A page that refuses to show.** `cosmetic-filter.js` reports a page about a screen tall with next to no words
+and an anti-adblock wall in it. `ContentBlocker.allowAds` then lets that site's ads through and reloads, once.
+
 ## To-do and Today
 
 To-do (`Models/Todo.swift`, `UI/TodoView.swift`) is one list of SwiftData models in the synced
