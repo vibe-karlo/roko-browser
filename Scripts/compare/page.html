@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Browser comparison</title><body style="font:17px system-ui;margin:24px"><h1 id="out">Testing…</h1>
+<script>
+const q = new URLSearchParams(location.search), hosts = __HOSTS__;
+const send = data => fetch("/report", {method: "POST", body: JSON.stringify({b: q.get("b"), r: q.get("r"), ...data}), keepalive: true});
+const reach = host => Promise.race([
+  fetch("https://" + host + "/?" + Math.random(), {mode: "no-cors", cache: "no-store"}).then(() => true, () => false),
+  new Promise(done => setTimeout(() => done(null), 8000)),
+]);
+addEventListener("load", async () => {
+  await send({kind: "loaded", ms: performance.now()});
+  if (q.get("score") !== "1") return void (document.getElementById("out").textContent = "Loaded");
+  const seen = {};
+  for (let i = 0; i < hosts.length; i += 12) await Promise.all(hosts.slice(i, i + 12).map(async h => { seen[h[2]] = await reach(h[2]); }));
+  await send({kind: "score", seen, groups: Object.fromEntries(hosts.map(h => [h[2], h[0]]))});
+  document.getElementById("out").textContent = Object.values(seen).filter(v => v !== true).length + " of " + hosts.length + " not reached";
+});
+</script>

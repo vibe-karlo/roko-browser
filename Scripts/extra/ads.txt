@@ -23,3 +23,24 @@ sib.hr,sib.net.hr##.div-gpt
 glas-slavonije.hr##.se-module--banner
 glas-slavonije.hr##.se-module__ad
 glas-slavonije.hr##.iat-adhesion-bar
+
+! Ad hosts EasyList misses, found with d3ward's public test. Third party only, so
+! an advertiser can still open their own dashboard.
+||m.doubleclick.net^$third-party
+||mediavisor.doubleclick.net^$third-party
+||afs.googlesyndication.com^$third-party
+||adtago.s3.amazonaws.com^$third-party
+||advice-ads.s3.amazonaws.com^$third-party
+||an.facebook.com^$third-party
+||ads-api.twitter.com^$third-party
+||ads.youtube.com^$third-party
+||ads.pinterest.com^$third-party
+||ads.tiktok.com^$third-party
+||ads-api.tiktok.com^$third-party
+||ads-sg.tiktok.com^$third-party
+||business-api.tiktok.com^$third-party
+||ads.yahoo.com^$third-party
+||partnerads.ysm.yahoo.com^$third-party
+||adtech.yahooinc.com^$third-party
+||gemini.yahoo.com^$third-party
+||unityads.unity3d.com^$third-party

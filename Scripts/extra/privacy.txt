@@ -3,3 +3,16 @@
 ! Glas Slavonije: telemetry pings and a data collector.
 ||nladmin.net^$third-party
 ||cloud-hub.eu^$third-party
+
+! Trackers EasyPrivacy misses, found with d3ward's public test. Third party only.
+||analyticsengine.s3.amazonaws.com^$third-party
+||analytics.s3.amazonaws.com^$third-party
+||click.googleanalytics.com^$third-party
+||log.byteoversea.com^$third-party
+||udc.yahoo.com^$third-party
+||udcm.yahoo.com^$third-party
+||log.fc.yahoo.com^$third-party
+||analytics.query.yahoo.com^$third-party
+||adfstat.yandex.ru^$third-party
+||appmetrica.yandex.ru^$third-party
+||metrika.yandex.ru^$third-party

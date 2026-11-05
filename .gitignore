@@ -4,3 +4,4 @@ xcuserdata/
 DerivedData/
 build/
 Scripts/.cache/
+Scripts/compare/results.jsonl
