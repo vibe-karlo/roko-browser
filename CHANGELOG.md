@@ -35,7 +35,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Turned sideways, tab cards sit side by side instead of overlapping.
 - On iPhone Duo lying flat, the bar's field runs across the screen like the keyboard. Bent open, it still keeps to one side of the fold.
 - On iPhone Duo held open sideways, the page fills the whole screen, with the normal bar floating over it and folding away as you scroll. The clock shows on roko's own screens, not over a page, where it would sit on the site's menu.
-- On iPhone Duo lying flat, search is one panel across the fold, and the page menu opens in the middle. Bent, each keeps to one side of the bend.
+- On iPhone Duo lying flat, search is one panel across the fold, and the page menu opens in the middle. Bent, search keeps to one side of the bend, and the page menu and messages to the bar's side.
 
 ### Fixed
 - Sign-in and payment windows work. A window a page opens now reaches the page that opened it, so it can hand back the sign-in and close itself, and roko returns to that page. Sites used to be told their pop-up was blocked.

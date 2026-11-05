@@ -172,6 +172,13 @@ final class BrowserModel {
         uprightFoldOpen && selectedTab != nil && split == nil
             && (pageBeside && browseForMe != nil || readLaterBeside || summary != nil)
     }
+    /// Which half of an open Duo the bar has to keep to, when it does: the page's
+    /// side of what stands beside it, or under the page it works in a split.
+    var barSide: HorizontalEdge? {
+        if screenBeside { return .trailing }
+        guard uprightFoldOpen, split != nil || splitPickingTop != nil else { return nil }
+        return split?.bottom == selectedID ? .trailing : .leading
+    }
     var cook: CookModel?
     var reader: ReaderModel?
     /// Summarize all, over Read Later.

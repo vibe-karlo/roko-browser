@@ -23,6 +23,12 @@ extension View {
     func keepsOffFold(prefer: HorizontalEdge? = nil, evenFlat: Bool = false) -> some View {
         modifier(OffFold(prefer: prefer, evenFlat: evenFlat))
     }
+
+    /// On the same half of an open Duo as the bar: what the bar opens rises above
+    /// it, and what reports on it appears there, not across the screen from it.
+    func staysWithBar(_ browser: BrowserModel) -> some View {
+        keepsOffFold(prefer: browser.barSide, evenFlat: browser.barSide != nil)
+    }
 }
 
 private struct OffFold: ViewModifier {

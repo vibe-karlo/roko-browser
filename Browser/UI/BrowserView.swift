@@ -152,8 +152,8 @@ struct BrowserView: View {
                 // across the screen. Bent, to one side of the bend; beside an
                 // answer or a list, on the page's side; in a split, under the page it works.
                 .frame(maxWidth: uprightFold != nil ? 480 : nil)
-                .keepsOffFold(prefer: barSide, evenFlat: barSide != nil)
-                .animation(.snappy(duration: 0.28), value: barSide)
+                .staysWithBar(browser)
+                .animation(.snappy(duration: 0.28), value: browser.barSide)
                 .ignoresSafeArea(.container, edges: uprightFold != nil ? .horizontal : [])
                 .opacity(sideBar || browser.splitList != nil ? 0 : 1)
                 .allowsHitTesting(!sideBar && browser.splitList == nil)
@@ -259,8 +259,8 @@ struct BrowserView: View {
                     .barSurface(cornerRadius: 14)
                     .compositingGroup()
                     .padding(.bottom, Theme.barHeight + 20 + playerLift)
-                    // Never across the fold of an open Duo.
-                    .keepsOffFold(prefer: .trailing)
+                    // Never across the bend of an open Duo.
+                    .staysWithBar(browser)
                     .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
                                             removal: .opacity.animation(.easeOut(duration: 0.12))))
                     .allowsHitTesting(false)
@@ -489,13 +489,6 @@ struct BrowserView: View {
         browser.screenBeside ? uprightFold : nil
     }
 
-    /// Which half of an open Duo the bar has to keep to, when it does.
-    private var barSide: HorizontalEdge? {
-        if besideFold != nil { return .trailing }
-        guard uprightFold != nil, splitHalves != nil else { return nil }
-        return browser.split?.bottom == browser.selectedID ? .trailing : .leading
-    }
-
     /// The tab beside came from the answer or the list, and has a way back to them.
     private var closesBeside: Bool { browser.pageBeside && besideFold != nil }
 
@@ -712,6 +705,7 @@ private final class Connection {
 /// top corners, square bottom ones, running under the home indicator. Tap
 /// outside or drag it down to close.
 private struct BottomPanel<Content: View>: View {
+    @Environment(BrowserModel.self) private var browser
     let dismiss: () -> Void
     @ViewBuilder let content: Content
     @State private var shown = false
@@ -746,8 +740,8 @@ private struct BottomPanel<Content: View>: View {
                         .fill(Theme.panel)
                         .ignoresSafeArea(edges: .bottom)
                 }
-                // On a Duo bent open it rises on one side of the bend. Lying flat, in the middle.
-                .keepsOffFold(prefer: .trailing)
+                // Above the bar on a Duo bent open. Lying flat, in the middle.
+                .staysWithBar(browser)
                 .offset(y: max(0, drag))
                 .gesture(DragGesture()
                     .onChanged { drag = $0.translation.height }
