@@ -235,6 +235,47 @@ for (const item of shop.querySelectorAll(".item")) item.addEventListener("click"
   shopCount();
 });
 
+// Hold to speak, as in the app: the capsule fills, then listens, and the
+// words come into the bar until the finger lifts. The words are written here.
+const hold = document.getElementById("spHold"), spVal = document.getElementById("spVal"), spMain = document.getElementById("spMain"), spSub = document.getElementById("spSub");
+const heard = ["days", "until", "Christmas"];
+let spTimers = [], spCount = 0, spHeld = false;
+const spSay = (main, sub) => { spMain.textContent = main; spSub.textContent = sub; };
+const spRows = () => {
+  const said = heard.slice(0, spCount).join(" ");
+  spVal.textContent = said;
+  spVal.classList.remove("ph");
+  if (spCount < heard.length) return spSay(said, "Search");
+  const now = new Date(), day = new Date(now.getFullYear(), 11, 25);
+  if (now > day) day.setFullYear(day.getFullYear() + 1);
+  const days = Math.ceil((day - now) / 864e5);
+  spSay(days === 1 ? "1 day" : days + " days", "Until 25 December");
+};
+const spStart = () => {
+  if (spHeld) return;
+  spHeld = true;
+  spCount = 0;
+  spVal.textContent = "Search or enter address";
+  spVal.classList.add("ph");
+  spTimers.push(setTimeout(() => hold.classList.add("fill"), 120));
+  spTimers.push(setTimeout(() => { hold.classList.add("on"); spSay("Listening", "Let go when you're done"); }, 360));
+  heard.forEach((_, i) => spTimers.push(setTimeout(() => { spCount = i + 1; spRows(); }, 760 + i * 380)));
+};
+const spEnd = () => {
+  if (!spHeld) return;
+  spHeld = false;
+  spTimers.forEach(clearTimeout);
+  spTimers = [];
+  hold.classList.remove("fill", "on");
+  if (!spCount) spSay("Keep holding", "Let go when you're done");
+};
+hold.addEventListener("pointerdown", e => { hold.setPointerCapture(e.pointerId); spStart(); });
+for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) hold.addEventListener(type, spEnd);
+hold.addEventListener("contextmenu", e => e.preventDefault());
+hold.addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); spStart(); } });
+hold.addEventListener("keyup", spEnd);
+hold.addEventListener("blur", spEnd);
+
 if (!still) {
   // The summary comes down over the page as it scrolls in, until someone takes it.
   let queued = false;

@@ -248,6 +248,22 @@ div>.row:has(span){min-height:54px}
 .item[aria-pressed=true]{color:var(--faint)}
 .item[aria-pressed=true] i{background:#f08a58;box-shadow:none}
 .item[aria-pressed=true] i::after{content:"";width:9px;height:5px;margin-top:-2px;border:solid #1a1a1b;border-width:0 0 2px 2px;transform:rotate(-45deg)}
+.speak{display:grid;gap:32px;width:min(920px,100%);margin:clamp(44px,6vw,88px) auto 0;align-items:center}
+.speak .words p{margin:12px auto 0;max-width:27em;color:var(--soft);text-wrap:balance}
+.speak .words .hint{color:var(--faint);font-size:14px}
+.speak .panel{margin-top:0;height:250px}
+.speak .answer b.small{font-weight:600;font-size:21px}
+.speakbar{display:flex;justify-content:center;margin-top:auto;padding-bottom:8px}
+.hold{position:relative;overflow:hidden;display:grid;place-items:center;width:124px;height:46px;background:var(--ui2);border-radius:23px;color:var(--ink);touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;transition:transform .2s cubic-bezier(.2,.8,.2,1)}
+.hold::before{content:"";position:absolute;inset:0 auto 0 0;width:0;background:#f08a5859}
+.hold.fill::before{width:100%;transition:width .24s linear}
+.hold .ic{position:relative;grid-area:1/1}
+.hold .plus{width:20px;height:20px}
+.hold .mic{opacity:0;color:#f08a58}
+.hold.on{transform:scale(1.06)}
+.hold.on::before{width:0;transition:none}
+.hold.on .plus{opacity:0}
+.hold.on .mic{opacity:1}
 .note-off{display:none}
 #privacy.open .note-on{display:none}
 #privacy.open .note-off{display:block}
@@ -287,6 +303,8 @@ footer .go{margin-top:clamp(30px,4vw,44px)}
   .duo{grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(32px,5vw,72px)}
   .duo article>p{min-height:5em}
   .bar .duo{row-gap:clamp(64px,7vw,96px)}
+  .speak{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(40px,7vw,96px);text-align:left}
+  .speak .words p{margin-inline:0}
   .versus{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:clamp(28px,5vw,72px);align-items:center}
   .versus .device{--w:370px;grid-column:2;grid-row:1}
   .lab.without{text-align:right}
