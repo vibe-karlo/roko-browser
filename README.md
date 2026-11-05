@@ -152,8 +152,9 @@ developer account. Until then the app runs without them and never touches them.
 | Saved passwords suggested for the site you're on (without it, iOS offers only the Passwords key and a full list) | `com.apple.developer.web-browser` | Default-browser entitlement request (developer account) |
 | Apple's cloud model for Summarize and Browse for Me | `com.apple.developer.private-cloud-compute` | developer.apple.com/contact/request/private-cloud-compute/ |
 
-The app already meets the browser requirements (it declares http/https and opens to an
-address field). Once granted:
+The app already meets the browser requirements: it declares http/https and opens to an address
+field, either the bar's launcher or, with tabs restored, the bar's capsule standing open as a search
+field until the page is scrolled or the bar is opened (`showsLaunchField`). Once granted:
 
 1. In `project.yml`, swap the active `CODE_SIGN_ENTITLEMENTS` and
    `SWIFT_ACTIVE_COMPILATION_CONDITIONS` lines for the commented ones below them, then run
@@ -412,10 +413,10 @@ goes to the background or Today opens, so one never reports something already do
 
 ## Sharing answers
 
-Share in Browse for Me turns the page into a short link anyone can open, as Arc does. The
-server is `Server/share`, a Cloudflare Worker with a D1 database, both on Cloudflare's free
-plan. Nothing is uploaded until Share is tapped. Sharing again after a follow-up updates the
-same page. Settings → Shared pages lists what this iPhone shared; swipe one to unshare it.
+The app no longer shares answers: public pages would need reporting and moderation, so the Share
+button is gone. Pages shared from earlier betas stay on the server, and Settings → Shared pages
+lists any from this iPhone; swipe one to unshare it. The server is `Server/share`, a Cloudflare
+Worker with a D1 database, both on Cloudflare's free plan, and Mac sync runs on it too.
 
 - **The page** (`src/page.js`) lays the answer out as the app does, in the app's palette,
   light or dark, with the topic icons copied from the app (`npm run icons`). It has no

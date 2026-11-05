@@ -83,7 +83,6 @@ struct BrowseForMeView: View {
                                     reword: { session.reask(turn, as: $0) },
                                     ask: { session.ask($0) },
                                     open: open,
-                                    share: shareAction(for: turn),
                                     jump: { id in
                                         withAnimation(.snappy(duration: 0.45)) {
                                             scroller.scrollTo(id, anchor: UnitPoint(x: 0.5, y: 0.06))
@@ -129,7 +128,7 @@ struct BrowseForMeView: View {
     private var footer: some View {
         // One bar: close on the left as on every screen, Ask in its
         // middle, and where the page comes from (the AI answer or the search
-        // engine's results) on the right. The roko signature and Share sit at the end of the answer.
+        // engine's results) on the right. The roko signature sits at the end of the answer.
         ContextBar(leading: .init(glyph: .close, label: "Close", action: close),
                    glyph: .browse, title: "Ask",
                    launch: { browser.showCommandBar(context: .followUp) },
@@ -148,29 +147,8 @@ struct BrowseForMeView: View {
             }
     }
 
-    /// Share, for an answer that's finished, where sharing is set up.
-    private func shareAction(for turn: BrowseForMeModel) -> (() -> Void)? {
-        guard AnswerSharing.isAvailable, turn.phase == .done else { return nil }
-        return { share() }
-    }
-
     private func close() {
         withAnimation(.spring(duration: 0.35, bounce: 0)) { browser.browseForMe = nil }
-    }
-
-    /// Uploads the page (or its follow-ups since), then offers the link.
-    private func share() {
-        guard !session.isSharing else { return }
-        session.isSharing = true
-        Task {
-            defer { session.isSharing = false }
-            do {
-                let url = try await AnswerSharing.share(session)
-                ShareSheet.present([url])
-            } catch {
-                browser.showToast(error.localizedDescription)
-            }
-        }
     }
 
     private func open(_ url: URL) {
@@ -235,8 +213,6 @@ private struct TurnSection: View {
     let reword: (String) -> Void
     let ask: (String) -> Void
     let open: (URL) -> Void
-    /// Shares the page, once there's something to share.
-    var share: (() -> Void)? = nil
     /// Scrolls the page to a part of this answer.
     var jump: ((String) -> Void)? = nil
 
@@ -285,27 +261,13 @@ private struct TurnSection: View {
                 // Under the answer, once it's written: for seeing it done.
                 if turn.phase == .done, !turn.videos.isEmpty { videos.transition(Self.reveal(0)) }
                 if !credit.isEmpty {
-                    // Signed, so a screenshot of the answer says where it's from,
-                    // with Share on the same line once the last answer is in.
+                    // Signed, so a screenshot of the answer says where it's from.
                     HStack(spacing: 10) {
                         RokoSignature()
                         Text(credit)
                             .font(.system(size: 13))
                             .foregroundStyle(Theme.faintInk)
-                        Spacer(minLength: 8)
-                        if isLatest, let share {
-                            Button(action: share) {
-                                HStack(spacing: 6) {
-                                    Glyph(.share, size: 15, weight: 1.8)
-                                    Text("Share").font(.system(size: 15, weight: .medium))
-                                }
-                                .foregroundStyle(Theme.secondaryInk)
-                                .frame(minHeight: 44)
-                                .contentShape(.rect)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Share this page")
-                        }
+                        Spacer(minLength: 0)
                     }
                     .transition(.opacity)
                 }

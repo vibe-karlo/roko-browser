@@ -8,10 +8,6 @@ import WebKit
 @Observable
 final class BrowseSession: Identifiable {
     private(set) var turns: [BrowseForMeModel]
-    /// Its link, once shared (AnswerSharing).
-    var shared: AnswerSharing.Shared?
-    /// Uploading for a share right now.
-    var isSharing = false
 
     /// Showing the search engine's results instead of the answers.
     var showsSearch = false {

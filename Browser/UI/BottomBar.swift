@@ -26,6 +26,7 @@ struct BottomBar: View {
         .padding(.horizontal, upright ? 0 : Theme.gutter)
         .padding(.bottom, upright ? 0 : 4)
         .animation(.snappy(duration: 0.28), value: browser.isBarCollapsed)
+        .animation(.snappy(duration: 0.28), value: browser.showsLaunchField)
     }
 
     /// Arc's layout: the bar is about starting something new. Tabs on the left,
@@ -48,8 +49,23 @@ struct BottomBar: View {
                 ZStack {
                     // On a private tab it says so, as what tapping does: a private search.
                     Group {
-                        if isPrivate && upright {
+                        if launchField && !upright {
+                            HStack(spacing: 8) {
+                                Glyph(isPrivate ? .eyeClosed : .search, size: 17)
+                                Text(isPrivate ? "Private search or address" : "Search or enter address")
+                                    .font(.system(size: 15))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                Spacer(minLength: 0)
+                            }
+                            .foregroundStyle(Theme.secondaryInk)
+                            .padding(.horizontal, 14)
+                            .transition(.opacity)
+                        } else if isPrivate && upright {
                             Glyph(.eyeClosed, size: 19)
+                                .transition(.opacity)
+                        } else if launchField {
+                            Glyph(.search, size: 19)
                                 .transition(.opacity)
                         } else if isPrivate {
                             HStack(spacing: 6) {
@@ -66,6 +82,7 @@ struct BottomBar: View {
                         }
                     }
                     .animation(.easeOut(duration: 0.2), value: isPrivate)
+                    .animation(.easeOut(duration: 0.2), value: launchField)
                     .opacity(browser.voiceListening ? 0 : 1)
                     Image(systemName: "mic.fill")
                         .font(.system(size: 17, weight: .semibold))
@@ -73,7 +90,8 @@ struct BottomBar: View {
                         .opacity(browser.voiceListening ? 1 : 0)
                 }
                 .animation(.snappy(duration: 0.15), value: browser.voiceListening)
-                    .frame(width: upright ? 44 : 104, height: upright ? 96 : 38)
+                    .frame(width: upright ? 44 : launchField ? nil : 104, height: upright ? 96 : 38)
+                    .frame(maxWidth: launchField && !upright ? .infinity : nil)
                     .background {
                         // Becomes the launcher's field: there only while the launcher isn't,
                         // and only on a page (a screen over it has its own bar).
@@ -96,6 +114,8 @@ struct BottomBar: View {
             }
             .scaleEffect(browser.voiceListening ? 1.06 : 1)
             .animation(.snappy(duration: 0.2), value: browser.voiceListening)
+            // Takes the room from the spacers either side of it.
+            .layoutPriority(launchField ? 1 : 0)
             .gesture(holdToTalk.updating($touching) { _, touching, _ in touching = true })
             // A hold cut short (an alert, a call, Control Center) never ends: reset it
             // once the touch is gone, so the next hold works and the microphone stops.
@@ -111,7 +131,7 @@ struct BottomBar: View {
                 }
             }
             .accessibilityElement()
-            .accessibilityLabel(isPrivate ? "Private search" : "New tab")
+            .accessibilityLabel(launchField ? (isPrivate ? "Private search or address" : "Search or enter address") : isPrivate ? "Private search" : "New tab")
             .accessibilityHint(Preferences.holdToTalk ? "Hold to speak" : "")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { browser.showCommandBar() }
@@ -200,6 +220,8 @@ struct BottomBar: View {
     }
 
     private var isPrivate: Bool { browser.selectedTab?.isPrivate == true }
+
+    private var launchField: Bool { browser.showsLaunchField && browser.selectedTab != nil }
 
     private var onPage: Bool {
         ![.today, .todos, .shopping, .readLater].contains(browser.panel) && browser.browseForMe == nil && browser.summary == nil && browser.digest == nil

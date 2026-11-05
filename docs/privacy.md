@@ -1,6 +1,6 @@
 # roko privacy policy
 
-Last updated: 4 November 2026
+Last updated: 5 November 2026
 
 roko is a web browser for iPhone, made by Karlo Koenig. It has no accounts, no ads, no analytics
 and no tracking of its own. What you do in roko stays on your iPhone unless it is listed below.
@@ -33,10 +33,10 @@ use public exchange rate services, which receive only the request for rates.
 
 **Site icons.** Icons for sites may be fetched from DuckDuckGo, which sees the site's name.
 
-**Sharing an answer.** Nothing is uploaded until you tap Share. The answer then goes to roko's
-server as a public page anyone with the link can open. The server keeps the page, a hash of its
-edit token, and a salted hash of your IP address used only to limit abuse. You can unshare it in
-Settings → Shared pages.
+**Answers shared from earlier betas.** roko no longer shares answers. A page you shared from an
+earlier beta stays on roko's server as a public page anyone with the link can open, with a hash of
+its edit token and a salted hash of your IP address used only to limit abuse, until you unshare it
+in Settings → Shared pages.
 
 **Sync with your Mac.** This is off unless you turn it on. Your to-dos, shopping lists and Read
 Later then go through roko's server to reach your other devices. You can remove them by turning

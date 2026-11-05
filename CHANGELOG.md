@@ -10,7 +10,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 - roko is open source, under GPL-3.0. The README lists the parts that keep their own terms, and the site loads its headline font from Fontshare, whose licence doesn't allow a copy in a public repository.
-- Shared answers have a Report link, which emails roko.
+- roko opens with a search field in the bar when tabs are restored, as Apple asks of a browser. It becomes the + again once you scroll or open the bar.
+- Sharing an answer as a public page is gone. Pages already shared can still be taken down in Settings → Shared pages, and they keep their Report link.
 - Share in the page menu opens the share sheet straight away. Copy as Markdown stays, by typing "markdown".
 - Turned sideways, tabs are narrow upright cards, several at once to swipe through, instead of one wide strip.
 - The Tabs row in Settings has the same icon as the tabs button.

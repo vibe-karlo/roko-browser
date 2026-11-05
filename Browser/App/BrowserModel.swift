@@ -34,7 +34,10 @@ final class BrowserModel {
     private(set) var selectedID: BrowserTab.ID?
     var panel: Panel = .none {
         // Back from the to-do list or the bar (a to-do added there): what's due may have changed.
-        didSet { if [.todos, .command].contains(oldValue), panel != oldValue { refreshLive() } }
+        didSet {
+            if [.todos, .command].contains(oldValue), panel != oldValue { refreshLive() }
+            if panel == .command { showsLaunchField = false }
+        }
     }
     var commandPrefill = ""
     var commandMode: CommandMode = .newTab
@@ -51,7 +54,12 @@ final class BrowserModel {
     private(set) var voiceListening = false
     /// What was said, once + is let go, for the launcher to take as typed.
     var voiceResult: String?
-    var isBarCollapsed = false
+    var isBarCollapsed = false {
+        didSet { if isBarCollapsed { showsLaunchField = false } }
+    }
+    /// Just launched: the bar's capsule stands open as a search field, as Apple
+    /// asks of a browser, until the page is scrolled or the bar is opened.
+    var showsLaunchField = true
     /// Hide Distracting Items is on: how many things were hidden so far, or nil.
     private(set) var hidingItems: Int?
     @ObservationIgnored private let picker = HiddenItemsPicker()
