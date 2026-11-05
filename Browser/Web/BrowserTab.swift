@@ -11,6 +11,10 @@ protocol BrowserTabDelegate: AnyObject {
     func tab(_ tab: BrowserTab, says message: String)
     /// A link touched and held: its menu, with the page live in the preview.
     func tab(_ tab: BrowserTab, linkMenuFor url: URL) -> UIContextMenuConfiguration?
+    /// A page opened a window of its own: it becomes a tab, still tied to that page.
+    func tab(_ tab: BrowserTab, openedWindow webView: WKWebView, showing url: URL?)
+    /// A window the page opened closed itself: the sign-in is done.
+    func tabClosedItself(_ tab: BrowserTab)
     /// The preview was tapped: the page becomes a tab, where it was scrolled to.
     func tabOpensPeek(_ tab: BrowserTab)
     /// The menu went away.
@@ -38,6 +42,8 @@ final class BrowserTab: NSObject, Identifiable {
     @ObservationIgnored private var hibernation = 0
     /// Asks sites for their desktop layout; set from the page menu.
     private(set) var wantsDesktopSite = false
+    /// The tab whose page opened this one as a window: back there when it closes.
+    @ObservationIgnored var opener: BrowserTab.ID?
     /// The language this tab's pages are translated into, if any. Stays on for
     /// the pages you open next in the tab, until you show the original.
     private(set) var translation: TranslationTarget?
@@ -183,14 +189,10 @@ final class BrowserTab: NSObject, Identifiable {
         LaunchClock.mark("wake \(url?.host() ?? "-")")
         let webView = WebViewFactory.make(isPrivate: isPrivate)
         LaunchClock.mark("webViewMade")
-        webView.navigationDelegate = self
-        webView.uiDelegate = self
-        PageWatch.shared.register(webView, for: self)
-        self.webView = webView
-        isLive = true
-        observe(webView)
+        take(webView)
 
         let wanted = url
+        dressForDark(webView, host: wanted?.host())
         if let restoreState {
             webView.interactionState = restoreState
             self.restoreState = nil
@@ -202,6 +204,16 @@ final class BrowserTab: NSObject, Identifiable {
         } else if let url {
             webView.load(URLRequest(url: url))
         }
+    }
+
+    /// The tab's page from now on: its own, or a window WebKit is about to fill.
+    func take(_ webView: WKWebView) {
+        webView.navigationDelegate = self
+        webView.uiDelegate = self
+        PageWatch.shared.register(webView, for: self)
+        self.webView = webView
+        isLive = true
+        observe(webView)
     }
 
     func hibernate() async {
@@ -387,11 +399,35 @@ final class BrowserTab: NSObject, Identifiable {
     private(set) var bottomColor: UIColor?
 
     private func updateBottomColor() {
-        let color = showsFooterColor ? (footerColor ?? pageBackground) : pageBackground
+        let background = darkCanvas ?? pageBackground
+        let color = showsFooterColor ? (footerColor ?? background) : background
         if color != bottomColor { bottomColor = color }
     }
     /// Whether the strip past the page's end currently shows the footer colour.
     @ObservationIgnored private var showsFooterColor = false
+
+    /// Force dark pages has flipped this one: colours read from it show inverted.
+    @ObservationIgnored private var pageFlipped = false
+    /// The colour a page under Force dark pages shows, from the page itself: see
+    /// through on black, the web view can't say. Nil with the setting off.
+    @ObservationIgnored private var darkCanvas: UIColor?
+
+    /// Before a page is asked for: nothing light around it, the status bar included.
+    fileprivate func dressForDark(_ webView: WKWebView, host: String?) {
+        ForceDark.dress(webView, for: host)
+        darkCanvas = ForceDark.applies(to: host) ? ForceDark.canvas : nil
+        if darkCanvas != nil { topColor = darkCanvas }
+    }
+
+    /// From the page, before it's drawn: whether it was flipped, and on what background.
+    func noteDark(flipped: Bool, canvas: String?) {
+        guard let webView else { return }
+        pageFlipped = flipped
+        darkCanvas = Self.color(canvas).map { flipped ? $0.inverted : $0 } ?? ForceDark.canvas
+        webView.underPageBackgroundColor = darkCanvas
+        updateTopColor(webView)
+        updateBottomColor()
+    }
 
     /// Reads the two colours that meet the screen edges. Top: a header that is
     /// fixed or sticky and spans the width; its first solid background, from the
@@ -434,7 +470,11 @@ final class BrowserTab: NSObject, Identifiable {
         guard let webView else { return }
         webView.evaluateJavaScript(Self.pageColorsScript, in: nil, in: .defaultClient) { [weak self, weak webView] result in
             guard let self, let webView, case .success(let value) = result, let colors = value as? [String: Any] else { return }
-            let top = Self.color(colors["top"]), bottom = Self.color(colors["bottom"])
+            var top = Self.color(colors["top"]), bottom = Self.color(colors["bottom"])
+            if pageFlipped {
+                top = top?.inverted
+                bottom = bottom?.inverted
+            }
             if top != pinnedHeaderColor {
                 pinnedHeaderColor = top
                 updateTopColor(webView)
@@ -462,17 +502,18 @@ final class BrowserTab: NSObject, Identifiable {
     func showFooterColor(_ show: Bool) {
         guard show != showsFooterColor, let webView else { return }
         showsFooterColor = show
-        webView.underPageBackgroundColor = show ? footerColor : nil
+        webView.underPageBackgroundColor = show ? footerColor : darkCanvas
         updateBottomColor()
     }
 
     private func updateTopColor(_ webView: WKWebView) {
         // A sticky navigation bar wins: it is literally what touches the status bar.
-        let color = pinnedHeaderColor ?? webView.themeColor ?? pageBackground
+        let theme = pageFlipped ? webView.themeColor?.inverted : webView.themeColor
+        let color = pinnedHeaderColor ?? theme ?? darkCanvas ?? pageBackground
         // Ignore see-through colours; they'd show the app's own backdrop instead.
         var alpha: CGFloat = 0
         color?.getRed(nil, green: nil, blue: nil, alpha: &alpha)
-        let usable = alpha > 0.9 ? color : nil
+        let usable = alpha > 0.9 ? color : darkCanvas
         if usable != topColor { topColor = usable }
     }
 }
@@ -500,6 +541,8 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
         if !["http", "https", "about", "blob", "data"].contains(scheme) {
             // tel:, mailto:, maps, App Store links: hand off to the system.
             await openOutside(url, tapped: navigationAction.navigationType == .linkActivated, in: webView)
+            // A new tab that only led to the app has nothing in it: it goes, as in Safari.
+            if webView.backForwardList.currentItem == nil { delegate?.tabOnlyDownloaded(self) }
             return (.cancel, preferences)
         }
         // Open links in apps set to Always: a link you tap to another site
@@ -519,6 +562,7 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
         if navigationAction.targetFrame?.isMainFrame == true {
             let asked = CACurrentMediaTime()
             navigationStarted = asked
+            dressForDark(webView, host: url.host())
             // Instant once the lists are loaded; on a fresh install it holds the
             // first page until blocking is ready rather than loading it bare,
             // for three seconds at most.
@@ -553,6 +597,10 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
         // A new page: forget the old colours, and read this one's once it has drawn.
         pinnedHeaderColor = nil
         footerColor = nil
+        // Assumed flipped until it says, a moment later: no white band meanwhile.
+        pageFlipped = ForceDark.applies(to: webView.url?.host())
+        darkCanvas = pageFlipped ? ForceDark.canvas : nil
+        if pageFlipped { webView.underPageBackgroundColor = darkCanvas }
         showFooterColor(false)
         updateTopColor(webView)
         Task {
@@ -637,11 +685,41 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                  for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        // target="_blank" and window.open: open as a real tab instead of a popup.
-        if let url = navigationAction.request.url {
-            delegate?.tab(self, wantsNewTabWith: url)
+        let url = navigationAction.request.url
+        // To another app: nothing to show here, so no tab.
+        if let url, let scheme = url.scheme?.lowercased(), !["http", "https", "about", "blob", "data"].contains(scheme) {
+            Task { await openOutside(url, tapped: navigationAction.navigationType == .linkActivated, in: webView) }
+            return nil
         }
-        return nil
+        // A plain target="_blank" link: an ordinary tab, on the spare web view.
+        if navigationAction.navigationType == .linkActivated, let url {
+            delegate?.tab(self, wantsNewTabWith: url)
+            return nil
+        }
+        // window.open, which sign-in and payment windows use. They need the
+        // window back (nil tells the page its pop-up was blocked) and need to
+        // reach the page that opened them, so it's a tab on WebKit's own web view.
+        let window = WebViewFactory.makeWindow(configuration: configuration)
+        ForceDark.dress(window, for: url?.host() ?? webView.url?.host())
+        delegate?.tab(self, openedWindow: window, showing: url)
+        return window
+    }
+
+    func webViewDidClose(_ webView: WKWebView) {
+        delegate?.tabClosedItself(self)
+    }
+}
+
+private extension UIColor {
+    /// As the flip shows it: inverted, then CSS's own hue-rotate(180deg) matrix.
+    var inverted: UIColor {
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        let (r, g, b) = (1 - red, 1 - green, 1 - blue)
+        func clamped(_ value: CGFloat) -> CGFloat { min(max(value, 0), 1) }
+        return UIColor(red: clamped(-0.574 * r + 1.43 * g + 0.144 * b),
+                       green: clamped(0.426 * r + 0.43 * g + 0.144 * b),
+                       blue: clamped(0.426 * r + 1.43 * g - 0.856 * b), alpha: alpha)
     }
 }
 

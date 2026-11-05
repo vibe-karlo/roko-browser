@@ -18,6 +18,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Versions go 0.1.x: the number rises only when a build goes to public testing, and private testing moves only the build number. The next public version is 0.1.1.
 
 ### Added
+- Force dark pages, in Settings > Appearance: every site goes dark, using its own dark mode if it has one and leaving a site that's already dark alone. No white flash before a page draws. A switch in a page's Site Settings leaves that site out. Off by default, and off it adds nothing to any page.
+- Search with Qwant, or with an engine of your own: a name and an address with %s where the words go, in Settings > Search engine.
+- Save as PDF in the page menu: the whole page, in Downloads, to open, share or print from there.
 - Close all your tabs at once: hold the tabs button in the bar, or long-press a card in the switcher. The switcher opens with Undo, which brings them all back with their history and pictures. Private tabs stay until they're all that's left, since nothing can bring those back.
 - iPhone search finds your pinned sites and opens your to-do and shopping lists. What's on the lists stays out of search.
 - On iPhone Duo held open sideways, Reader is a book: a page each side of the fold, a real page curl, and text size down the outer edge. Words and paragraphs carry across a turn, and a heading stays with its text.
@@ -33,6 +36,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - On iPhone Duo held open sideways, the bar stands down the outer edge under the clock, as Apple asks, and the page menu opens beside it.
 
 ### Fixed
+- Sign-in and payment windows work. A window a page opens now reaches the page that opened it, so it can hand back the sign-in and close itself, and roko returns to that page. Sites used to be told their pop-up was blocked.
+- A link that redirects to another app no longer leaves a blank tab behind. Asking to open the app, it now says "This page" rather than the app's raw link.
 - A message on iPhone Duo no longer straddles the fold.
 - No gap under what a page pins to the bottom when the bar folds away above a band, or under YouTube's bar at the screen's edge.
 

@@ -172,6 +172,18 @@ final class Downloads: NSObject {
         finishedTask?.cancel()
     }
 
+    /// A file roko made itself (Save as PDF), listed and offered like any other.
+    func add(_ data: Data, named name: String, from source: URL?) -> Bool {
+        let chosen = freeName(name)
+        guard (try? data.write(to: Self.folder.appendingPathComponent(chosen), options: .atomic)) != nil else { return false }
+        let size = Int64(data.count)
+        let item = Item(id: UUID(), name: chosen, source: source, state: .done, received: size, total: size, startedAt: .now)
+        items.insert(item, at: 0)
+        save()
+        offer(item)
+        return true
+    }
+
     // MARK: Opening
 
     /// A pass goes to Wallet; anything else opens in Quick Look, where it can
@@ -313,6 +325,10 @@ extension Downloads: WKDownloadDelegate {
             PageDialogs.open(downloaded: file(for: item))
             return
         }
+        offer(item)
+    }
+
+    private func offer(_ item: Item) {
         finished = item
         finishedTask?.cancel()
         finishedTask = Task {

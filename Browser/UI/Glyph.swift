@@ -32,6 +32,8 @@ struct Glyph: View {
              download, play, pause, pip, lock, skipBack, skipForward, markdown,
              // Split View.
              swap, split,
+             // Force dark pages, Save as PDF.
+             forceDark, pdf,
              // Cook Mode.
              cook = "topic-food"
     }

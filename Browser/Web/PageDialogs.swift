@@ -178,7 +178,8 @@ extension BrowserTab {
         case "maps": "Maps"
         default: "another app"
         }
-        let host = webView.url.map { $0.displayHost } ?? "This page"
+        // A redirect in a new tab: the "page" is the app's own link, no name to show.
+        let host = webView.url.flatMap { $0.scheme?.hasPrefix("http") == true ? $0.displayHost : nil } ?? "This page"
         guard let answer = await PageDialogs.ask(webView, title: "Open \(app)?", message: "\(host) wants to open \(app).",
                                                  buttons: [("Cancel", .cancel), ("Open", .default)]),
               answer.index == 1 else { return }

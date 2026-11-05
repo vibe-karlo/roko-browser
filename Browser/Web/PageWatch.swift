@@ -50,6 +50,8 @@ final class PageWatch: NSObject, WKScriptMessageHandler {
                                          isFloating: body["floating"] as? Bool ?? false)
         case "mediaGone":
             tab.media = nil
+        case "dark":
+            tab.noteDark(flipped: body["flipped"] as? Bool ?? false, canvas: body["canvas"] as? String)
         default:
             break
         }

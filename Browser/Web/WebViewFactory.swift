@@ -75,7 +75,16 @@ enum WebViewFactory {
         PageWatch.shared.install(in: controller)
         configuration.userContentController = controller
 
-        let webView = EdgeToEdgeWebView(frame: .zero, configuration: configuration)
+        return finished(EdgeToEdgeWebView(frame: .zero, configuration: configuration))
+    }
+
+    /// A window a page opened (sign-in, payment): WebKit's configuration, which
+    /// ties it to the page that opened it, in the same kind of web view.
+    static func makeWindow(configuration: WKWebViewConfiguration) -> WKWebView {
+        finished(EdgeToEdgeWebView(frame: .zero, configuration: configuration))
+    }
+
+    private static func finished(_ webView: WKWebView) -> WKWebView {
         webView.allowsBackForwardNavigationGestures = true
         webView.isFindInteractionEnabled = true
         webView.scrollView.contentInsetAdjustmentBehavior = .always

@@ -1431,6 +1431,26 @@ extension BrowserModel: BrowserTabDelegate {
         close(tab)
     }
 
+    func tab(_ tab: BrowserTab, openedWindow webView: WKWebView, showing url: URL?) {
+        let window = BrowserTab(url: url, isPrivate: tab.isPrivate)
+        if tab.isPrivate { PrivacyLock.shared.opened(window.id) }
+        window.opener = tab.id
+        window.delegate = self
+        window.take(webView)
+        tabs.append(window)
+        select(window)
+        panel = .none
+    }
+
+    func tabClosedItself(_ tab: BrowserTab) {
+        guard tabs.contains(where: { $0.id == tab.id }) else { return }
+        let opener = tab.opener.flatMap { self.tab($0) }
+        // Nothing worth reopening: the sign-in is over.
+        tab.url = nil
+        close(tab)
+        if let opener { select(opener) }
+    }
+
     func tabOpensPeek(_ tab: BrowserTab) {
         openPeek(showing: true)
     }

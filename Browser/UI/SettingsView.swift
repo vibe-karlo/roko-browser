@@ -249,23 +249,102 @@ private struct SavedPage: View {
 private struct SearchSettings: View {
     @AppStorage("searchEngine") private var engine: SearchEngine = .google
     @AppStorage("suggestions") private var suggestions = true
+    @State private var custom = CustomSearchEngine.all
 
     var body: some View {
         Form {
             Section {
                 Picker("Search engine", selection: $engine) {
-                    ForEach(SearchEngine.allCases) { Text($0.name).tag($0) }
+                    ForEach(SearchEngine.builtIn) { Text($0.name).tag($0) }
+                    ForEach(custom) { Text($0.name).tag(SearchEngine.custom($0)) }
                 }
                 .pickerStyle(.inline)
                 .labelsHidden()
             }
             Section {
+                ForEach(custom) { one in
+                    NavigationLink(one.name) { CustomEngineForm(editing: one, onChange: changed) }
+                }
+                NavigationLink("Add a Search Engine") { CustomEngineForm(onChange: changed) }
+            } header: {
+                Text("Your own")
+            }
+            Section {
                 Toggle("Suggestions while typing", isOn: $suggestions)
             } footer: {
-                Text(suggestions ? "What you type is sent to \(engine.name) for suggestions as you type." : "Nothing is sent until you search.")
+                Text(!suggestions || !engine.suggests ? "Nothing is sent until you search." : "What you type is sent to \(engine.name) for suggestions as you type.")
             }
         }
         .settingsPage("Search engine")
+    }
+
+    /// One added, changed or removed: added is chosen, removed goes back to Google.
+    private func changed(to chosen: CustomSearchEngine?) {
+        custom = CustomSearchEngine.all
+        if let chosen {
+            engine = .custom(chosen)
+        } else if SearchEngine(rawValue: engine.rawValue) == nil {
+            engine = .google
+        }
+    }
+}
+
+/// A search engine of your own: its name and where to send the words.
+private struct CustomEngineForm: View {
+    var editing: CustomSearchEngine?
+    /// With the one to use now; nil when it's gone.
+    let onChange: (CustomSearchEngine?) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var address = ""
+
+    private var template: String? { CustomSearchEngine.template(from: address) }
+    private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    var body: some View {
+        Form {
+            Section {
+                TextField("Name", text: $name)
+                    .textInputAutocapitalization(.words)
+                TextField("https://example.com/search?q=%s", text: $address)
+                    .keyboardType(.URL)
+                    .textContentType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            } footer: {
+                Text("Put %s where the words you search for go in the address.")
+            }
+            if let editing {
+                Section {
+                    Button("Remove", role: .destructive) {
+                        CustomSearchEngine.all.removeAll { $0.id == editing.id }
+                        onChange(nil)
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .settingsPage(editing == nil ? "Add a Search Engine" : "Search engine")
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") {
+                    guard let template else { return }
+                    var engine = editing ?? CustomSearchEngine(name: trimmedName, template: template)
+                    engine.name = trimmedName
+                    engine.template = template
+                    var all = CustomSearchEngine.all
+                    if let index = all.firstIndex(where: { $0.id == engine.id }) { all[index] = engine } else { all.append(engine) }
+                    CustomSearchEngine.all = all
+                    onChange(engine)
+                    dismiss()
+                }
+                .disabled(trimmedName.isEmpty || template == nil)
+            }
+        }
+        .onAppear {
+            name = editing?.name ?? ""
+            address = editing?.template ?? ""
+        }
     }
 }
 
@@ -318,7 +397,9 @@ private struct BarSettings: View {
 }
 
 private struct AppearanceSettings: View {
+    @Environment(BrowserModel.self) private var browser
     @AppStorage(Appearance.key) private var appearance: Appearance = .system
+    @AppStorage(ForceDark.key) private var forceDark = false
 
     var body: some View {
         Form {
@@ -329,6 +410,16 @@ private struct AppearanceSettings: View {
                 .pickerStyle(.inline)
                 .labelsHidden()
                 .onChange(of: appearance) { Appearance.apply() }
+            }
+            Section {
+                Toggle("Force dark pages", isOn: $forceDark)
+                    .onChange(of: forceDark) {
+                        // The page behind this sheet shows it now; other tabs on their next page.
+                        ContentBlocker.shared.settingsChanged()
+                        browser.selectedTab?.webView?.reload()
+                    }
+            } footer: {
+                Text("Every site goes dark, using its own dark mode if it has one. Leave a site out in its page menu, under Site Settings.")
             }
         }
         .settingsPage("Appearance")
@@ -667,6 +758,7 @@ struct SitesSettings: View {
             changes[host, default: []].append(reason == .chosen ? "Cookies allowed" : "Cookies accepted, it needed them")
         }
         for (host, what) in ContentBlocker.shared.allowances() { changes[host, default: []] += what }
+        for host in ForceDark.sitesLeftOut() { changes[host, default: []].append("Force dark off") }
         for (host, level) in PageZoom.all() { changes[host, default: []].append("Zoom \(Int((level * 100).rounded()))%") }
         for (host, count) in HiddenItems.shared.all() { changes[host, default: []].append(count == 1 ? "1 item hidden" : "\(count) items hidden") }
         return changes.map { Site(host: $0.key, changes: $0.value) }.sorted { $0.host < $1.host }
@@ -710,6 +802,7 @@ struct SitesSettings: View {
         // Open tabs on it, too: their next page loads with everything blocked.
         ContentBlocker.shared.settingsChanged()
         PageZoom.forget(site.host)
+        ForceDark.leaveOut(site.host, false)
         HiddenItems.shared.forget(site.host)
         withAnimation(.snappy) { sites = Self.sites() }
     }

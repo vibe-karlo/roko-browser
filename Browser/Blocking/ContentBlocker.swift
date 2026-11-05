@@ -230,7 +230,8 @@ final class ContentBlocker {
         // back: the cookie list blocks many of them, and a blocked one can't
         // be accepted. Its pop-up is still answered, with accept.
         let acceptsCookies = host.map { ConsentHandler.shared.acceptance(for: $0) != nil } ?? false
-        let signature = "\(allowed)|\(exempt.map(\.rawValue).joined(separator: ","))|\(acceptsCookies)|\(compiled.count)"
+        let dark = ForceDark.applies(to: host)
+        let signature = "\(allowed)|\(exempt.map(\.rawValue).joined(separator: ","))|\(acceptsCookies)|\(compiled.count)|\(dark)"
         if applied.object(forKey: controller) as String? == signature { return }
         applied.setObject(signature as NSString, forKey: controller)
 
@@ -242,6 +243,7 @@ final class ContentBlocker {
         // Not blocking, so it stays on sites you allow too.
         if let script = BackgroundPlay.script { controller.addUserScript(script) }
         if let script = PageWatch.script { controller.addUserScript(script) }
+        if dark, let script = ForceDark.script { controller.addUserScript(script) }
         guard !allowed else { return }
 
         for category in Category.allCases where isEnabled(category) {

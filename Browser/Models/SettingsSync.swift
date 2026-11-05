@@ -18,10 +18,10 @@ final class SettingsSync {
     private static let sentKey = "sync.sentKeys"
 
     private static let exact: Set<String> = [
-        "searchEngine", "suggestions", "archivePolicy", ClaudeClient.enabledKey, "consent.acceptedHosts", AnswerLanguage.key, AnswerLanguage.keptKey,
+        "searchEngine", "searchEngines.custom", "suggestions", ForceDark.key, "archivePolicy", ClaudeClient.enabledKey, "consent.acceptedHosts", AnswerLanguage.key, AnswerLanguage.keptKey,
         Preferences.voiceLanguagesKey, Preferences.pullToSummarizeKey,
     ]
-    private static let prefixes = ["block.", "zoom."]
+    private static let prefixes = ["block.", "zoom.", "dark.off."]
 
     static func syncs(_ key: String) -> Bool {
         exact.contains(key) || prefixes.contains { key.hasPrefix($0) }

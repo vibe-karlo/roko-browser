@@ -255,7 +255,8 @@ private struct OneBar: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Theme.secondaryInk)
                 HStack(spacing: 0) {
-                    ForEach(SearchEngine.allCases, id: \.self) { option in
+                    // The first four: a row has no room for more; Settings has the rest.
+                    ForEach(SearchEngine.builtIn.prefix(4), id: \.self) { option in
                         Button { withAnimation(.snappy(duration: 0.2)) { engine = option } } label: {
                             Text(option.name.replacingOccurrences(of: " Search", with: ""))
                                 .font(.system(size: 14, weight: engine == option ? .semibold : .regular))

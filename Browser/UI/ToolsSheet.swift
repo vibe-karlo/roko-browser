@@ -12,6 +12,7 @@ struct ToolsSheet: View {
     @State private var rejectingCookies = true
     @State private var cookieReason: ConsentHandler.Reason?
     @State private var siteSettingsOpen = false
+    @State private var darkPages = true
     /// Shown only on a page that publishes a recipe.
     @State private var hasRecipe = false
 
@@ -58,6 +59,7 @@ struct ToolsSheet: View {
                 blockingOn = !(host.map { ContentBlocker.shared.isAllowed(host: $0) } ?? false)
                 popupsOn = !(host.map { ContentBlocker.shared.isAllowed(host: $0, category: .popups) } ?? false)
                 cookieReason = host.flatMap(ConsentHandler.shared.acceptance)
+                darkPages = !(host.map(ForceDark.isLeftOut) ?? false)
                 rejectingCookies = cookieReason == nil
             }
         }
@@ -182,6 +184,15 @@ struct ToolsSheet: View {
             ToolRow(glyph: .split, title: browser.split == nil ? "Split View" : "Close Split View") {
                 // Starting it opens the bar for the second page; it closes this menu itself.
                 if browser.split == nil { browser.startSplit() } else { browser.endSplit(); browser.panel = .none }
+            }
+
+            ToolRow(glyph: .pdf, title: "Save as PDF") {
+                browser.panel = .none
+                guard let webView = tab.webView else { return }
+                Task {
+                    let saved = await PagePDF.save(webView, title: tab.displayTitle)
+                    if !saved { browser.showToast("Couldn't save this page") }
+                }
             }
 
             // Only while something is coming in; otherwise the bar finds it.
@@ -351,6 +362,16 @@ struct ToolsSheet: View {
                         cookieReason = on ? nil : .chosen
                     }))
                     .disabled(!blockingOn || !ContentBlocker.shared.isEnabled(.cookies))
+                if ForceDark.isOn {
+                    toggleRow(glyph: .forceDark, title: "Force dark",
+                              detail: darkPages ? "This site is dark" : "Off on this site", isOn: Binding(
+                        get: { darkPages },
+                        set: { on in
+                            darkPages = on
+                            ForceDark.leaveOut(host, !on)
+                            tab.webView?.reload()
+                        }))
+                }
                 ToolRow(glyph: .hideItems, title: "Hide Distracting Items", detail: hiddenDetail(tab)) {
                     browser.startHidingItems()
                 }

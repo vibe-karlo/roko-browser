@@ -308,7 +308,7 @@ for `Pin` and `HistoryEntry`, and `device.store` for `SavedTab` and `Watch`. Ope
 after every page load with their back and forward history, which would only churn the sync, and
 Notify Me would check and notify on every device. The first launch with sync copies the old
 single `default.store` into the two and keeps it as `before-sync.store`. Settings and per-site
-choices (search engine, blocking, cookies, zoom) sync through the iCloud key-value store
+choices (search engines, force dark, blocking, cookies, zoom) sync through the iCloud key-value store
 (`SettingsSync`); the app icon, the Claude key and caches stay on the device.
 
 Records can't be unique in CloudKit, so two devices can add the same page before they hear
@@ -564,8 +564,10 @@ has saved you (`App/SavedStats.swift`): counts in UserDefaults, bumped where eac
 (the consent bridge's `rokoSaved` message, a summary or Browse for Me answer finishing, the bar
 closing on an answer, once each time it's open), and turned into time by stated estimates.
 
-- **Appearance**, and the app icon (its own page).
-- **Address bar**: search engine, suggestions, the copied link, ticks as rows go by.
+- **Appearance**, force dark pages, and the app icon (its own page).
+- **Search engine**: Google, DuckDuckGo, Kagi, Brave Search, Qwant or your own (a name and an
+  address with %s where the words go), and suggestions.
+- **Address bar**: the copied link, ticks as rows go by.
 - **Voice**: hold + to speak, and which languages it listens for (Croatian and English
   together, or one of them).
 - **Pages**: pull further to summarize (off, a pull only reloads), closing unused tabs, opening
@@ -578,6 +580,33 @@ closing on an answer, once each time it's open), and turned into time by stated 
 Feature switches live in `Preferences` and are read where each feature runs, so turning one off
 takes effect at once. Voice languages and pull to summarize sync with the other settings; the
 haptics and alerts belong to the device.
+
+## Force dark pages
+
+Off by default, and off it costs a page nothing: no script, no style, and a navigation only reads
+one setting (`Web/ForceDark.swift`). On, a site's own dark mode comes first, because the web view
+is told it's in dark mode. A web view normally paints a white canvas before the first paint, so
+it's made see-through on black instead, and nothing white can show. `Resources/Scripts/force-dark.js`
+runs at document start in roko's own script world, where a site's Content Security Policy can't
+refuse it: the page starts inverted with a hue-rotate back to its own hues, pictures and video are
+put back, and on the first frame the page's real colours are known (before anything is drawn) the
+flip comes off a page that was dark already. It's screen only, so paper stays white. It asks for
+no more style work than that frame was doing anyway, and looks again at the end of parsing, on
+load and a second later, for pages built by script.
+
+The status bar and the strip past a page's end read colours from the page before the flip, so
+`BrowserTab` shows them inverted through the same CSS matrix. A background image set in CSS flips
+with the page, and pure saturated blues in a picture shift slightly (filters clamp).
+
+## Windows a page opens
+
+A plain `target="_blank"` link is an ordinary tab on the spare web view. `window.open` is what
+sign-in and payment windows use: they need the window back (nil tells the site its pop-up was
+blocked) and need to reach the page that opened them, so the tab is built on the web view WebKit
+hands over, which keeps that tie. When it closes itself (`webViewDidClose`) the tab goes and roko
+returns to the page that opened it. WebKit still only opens a window after a tap, so pages can't
+open tabs on their own. A new tab that only led to another app closes once the app has been asked
+for, as one that only led to a download does.
 
 ## What pages can ask
 
