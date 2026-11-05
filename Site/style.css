@@ -353,7 +353,7 @@ footer .go{margin-top:clamp(30px,4vw,44px)}
 .doc p{margin:0 0 14px;color:var(--soft)}
 .doc p strong{color:var(--ink);font-weight:600}
 
-/* Changelog: a public build's number stays beside its list. */
+/* Changelog: a public version's number stays beside its list. */
 .changes{position:relative;isolation:isolate}
 .dawn{position:absolute;inset:0 0 auto;z-index:-1;isolation:isolate;height:min(620px,90vh);background:linear-gradient(#251209,var(--floor))}
 .dawn .grain{-webkit-mask-image:linear-gradient(#000,transparent);mask-image:linear-gradient(#000,transparent)}
@@ -361,7 +361,8 @@ footer .go{margin-top:clamp(30px,4vw,44px)}
 .log h1{margin-bottom:clamp(44px,6vw,80px)}
 .rel{display:grid;gap:18px}
 .rel+.rel{margin-top:clamp(88px,11vw,152px)}
-.n{margin-left:-.03em;font:800 clamp(120px,23vw,280px)/.84 var(--display);color:var(--glow)}
+.n{margin-left:-.03em;font:800 clamp(120px,23vw,190px)/.84 var(--display);color:var(--glow);letter-spacing:.03em;white-space:nowrap}
+.log p{max-width:36em;text-wrap:pretty}
 .log h2{margin:0;font:800 clamp(30px,3.6vw,44px)/1.08 var(--display)}
 .log .when{display:flex;align-items:center;gap:9px;margin:14px 0 4px;color:var(--ink);font-weight:500}
 .ecl{flex:none;width:18px;height:18px;color:var(--glow)}
@@ -371,6 +372,6 @@ footer .go{margin-top:clamp(30px,4vw,44px)}
 .log a{text-underline-offset:3px}
 @media(min-width:820px){
   .rel{grid-template-columns:minmax(0,4fr) minmax(0,7fr);gap:clamp(28px,6vw,96px)}
-  .n{position:sticky;top:96px;align-self:start}
+  .n{position:sticky;top:96px;align-self:start;font-size:clamp(132px,13.2vw,190px)}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
