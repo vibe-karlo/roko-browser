@@ -836,11 +836,19 @@ final class BrowserModel {
         let selectedIndex: Int?
     }
 
-    /// Closes every tab at once. Private tabs stay, being the ones that couldn't
-    /// come back, and go only when they're all that's left.
-    func closeAllTabs() -> ClosedGroup {
+    /// The last Close All, while the switcher still offers it back.
+    var closedGroup: ClosedGroup?
+
+    /// Tabs that Close All would close now: private ones stay, being the ones
+    /// that couldn't come back, and go only when they're all that's left.
+    var tabsToCloseAll: [BrowserTab] {
         let ordinary = tabs.filter { !$0.isPrivate }
-        let closing = ordinary.isEmpty ? tabs : ordinary
+        return ordinary.isEmpty ? tabs : ordinary
+    }
+
+    /// Closes them at once and shows the switcher, with Undo.
+    func closeAllTabs() {
+        let closing = tabsToCloseAll
         // Taken before anything closes, so Undo finds every tab's place. The
         // selected one goes last, so no other tab wakes up on the way out.
         let group = ClosedGroup(
@@ -851,11 +859,14 @@ final class BrowserModel {
             selectedIndex: tabs.firstIndex { $0.id == selectedID && !$0.isPrivate })
         for tab in closing where tab.id != selectedID { close(tab) }
         if let selectedTab, closing.contains(where: { $0.id == selectedTab.id }) { close(selectedTab) }
-        return group
+        closedGroup = group.tabs.isEmpty ? nil : group
+        panel = .tabs
     }
 
     /// A Close All taken back: every tab where it was, with its history and picture.
-    func reopen(_ group: ClosedGroup) {
+    func reopenClosedGroup() {
+        guard let group = closedGroup else { return }
+        closedGroup = nil
         recentlyClosed.removeLast(min(group.tabs.count, recentlyClosed.count))
         for (closed, snapshot) in group.tabs {
             let tab = BrowserTab(url: closed.url, title: closed.title, restoreState: closed.state)

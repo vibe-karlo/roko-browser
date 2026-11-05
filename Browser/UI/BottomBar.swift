@@ -41,6 +41,15 @@ struct BottomBar: View {
             }
             .buttonStyle(GlyphButtonStyle())
             .accessibilityLabel("Tabs, \(browser.tabs.count) open")
+            // Hold: close them all, with Undo in the switcher that opens.
+            .contextMenu {
+                let closing = browser.tabsToCloseAll.count
+                if closing > 0 {
+                    Button(role: .destructive) { browser.closeAllTabs() } label: {
+                        Label(closing == 1 ? "Close 1 Tab" : "Close \(closing) Tabs", image: "phosphor/close")
+                    }
+                }
+            }
 
             Spacer(minLength: 8)
 
