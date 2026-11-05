@@ -56,7 +56,8 @@ struct BookView: View {
     }
 }
 
-private enum BookStyle {
+/// The paper and ink of a book, shared with Cook Mode.
+enum BookStyle {
     static let paper = UIColor { $0.userInterfaceStyle == .dark ? UIColor(rgb: 0x1B1915) : UIColor(rgb: 0xF3ECDE) }
     static let ink = UIColor { $0.userInterfaceStyle == .dark ? UIColor(rgb: 0xDCD5C6) : UIColor(rgb: 0x2B2720) }
     static let faint = UIColor { $0.userInterfaceStyle == .dark ? UIColor(rgb: 0x8F897B) : UIColor(rgb: 0x7C7566) }

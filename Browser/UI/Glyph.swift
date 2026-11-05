@@ -31,7 +31,9 @@ struct Glyph: View {
              // Downloads, the mini player, Face ID, Copy as Markdown.
              download, play, pause, pip, lock, skipBack, skipForward, markdown,
              // Split View.
-             swap, split
+             swap, split,
+             // Cook Mode.
+             cook = "topic-food"
     }
 
     let kind: Kind

@@ -37,6 +37,11 @@ final class BrowserModel {
         didSet {
             if [.todos, .command].contains(oldValue), panel != oldValue { refreshLive() }
             if panel == .command { showsLaunchField = false }
+            // On an open Duo Read Later is half the screen, not a panel over it: the page and its controls stay live.
+            if panel == .readLater, uprightFoldOpen, selectedTab != nil, split == nil {
+                readLaterBeside = true
+                panel = .none
+            }
         }
     }
     var commandPrefill = ""
@@ -138,11 +143,30 @@ final class BrowserModel {
         // nobody will read it, so it shouldn't keep searching or spending tokens.
         didSet {
             if oldValue !== browseForMe { oldValue?.cancel() }
-            if browseForMe == nil { answerBeside = false }
+            if browseForMe == nil { pageBeside = false }
         }
     }
-    /// The tab on screen is a source standing beside the answer (BrowseForMeView).
-    var answerBeside = false
+    /// An open iPhone Duo in landscape: the fold runs top to bottom.
+    var uprightFoldOpen = false
+    /// The tab on screen was opened from the answer or the list beside it, and closes back to them.
+    var pageBeside = false
+    /// Read Later has the leading half of an open Duo.
+    var readLaterBeside = false {
+        didSet {
+            guard !readLaterBeside else { return }
+            finishSavedBeside()
+            pageBeside = false
+        }
+    }
+    /// The saved page open beside the list. It keeps its place there until
+    /// another is opened or the list closes, and only then counts as read.
+    private(set) var savedBeside: UUID?
+    /// One of roko's own screens has the leading half of an open Duo, the page the trailing one.
+    var screenBeside: Bool {
+        uprightFoldOpen && selectedTab != nil && split == nil
+            && (pageBeside && browseForMe != nil || readLaterBeside || summary != nil)
+    }
+    var cook: CookModel?
     var reader: ReaderModel?
     /// Summarize all, over Read Later.
     var digest: DigestModel? {
@@ -1086,6 +1110,13 @@ final class BrowserModel {
 
     /// A saved page, in a new tab: it counts as read.
     func openSaved(_ page: ReadLaterPage) {
+        if readLaterBeside, uprightFoldOpen {
+            finishSavedBeside()
+            savedBeside = page.id
+            openBeside(page.url)
+            return
+        }
+        readLaterBeside = false
         ReadLater.shared.markRead(page.id)
         digest = nil
         panel = .none
@@ -1113,6 +1144,23 @@ final class BrowserModel {
         }
     }
 
+    private func finishSavedBeside() {
+        if let savedBeside { ReadLater.shared.markRead(savedBeside) }
+        savedBeside = nil
+    }
+
+    /// The recipe on this page, for the kitchen.
+    func cookThisPage() {
+        guard let webView = selectedTab?.webView else { return }
+        Task {
+            guard let recipe = await RecipeReader.read(webView) else {
+                panel = .none
+                return showToast("No recipe found on this page")
+            }
+            presentAfterPanelCloses { self.cook = CookModel(recipe: recipe) }
+        }
+    }
+
     func openReader() {
         guard let tab = selectedTab, let webView = tab.webView else { return }
         let model = ReaderModel(host: tab.url?.displayHost ?? "")
@@ -1123,16 +1171,17 @@ final class BrowserModel {
     /// A source from Browse for Me, beside the answer on an open Duo. Another
     /// source takes its place, rather than a tab for each.
     func openBeside(_ url: URL) {
-        if answerBeside, let tab = selectedTab {
+        if pageBeside, let tab = selectedTab {
             tab.load(url)
         } else {
             open(url, inNewTab: true)
-            answerBeside = true
+            pageBeside = true
         }
     }
 
     func closeBeside() {
-        answerBeside = false
+        pageBeside = false
+        finishSavedBeside()
         if let tab = selectedTab { close(tab) }
     }
 

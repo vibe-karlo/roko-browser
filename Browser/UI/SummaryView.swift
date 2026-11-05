@@ -62,7 +62,7 @@ struct SummaryView: View {
                                 .modifier(CardFlight(flight: flight))
                                 .offset(y: lift)
                                 .id("card")
-                            content(scroller)
+                            SummaryText(model: model)
                                 .opacity(textShown ? 1 : 0)
                                 .offset(y: textShown || model.isClosing ? 0 : 12)
                         }
@@ -185,10 +185,40 @@ struct SummaryView: View {
         .accessibilityHint(compact ? "Back to the page" : "")
     }
 
-    // MARK: The summary
+    /// The app's bar: back to the page, and a question about it from the middle.
+    private var footer: some View {
+        ContextBar(leading: .init(glyph: .close, label: "Back to the page", action: close),
+                   glyph: .browse, title: "Ask",
+                   launch: { browser.showCommandBar(context: .aboutPage) }, fades: false)
+            .padding(.top, 10)
+            .overlay(alignment: .top) { ReadingLine(progress: readProgress, tint: PageKind.of(model.text).tint) }
+            // See-through while the light is up, so its brightest part shows.
+            // At the light's own pace, so no dark band crosses it as it sinks or floods.
+            .background(Theme.canvas.opacity(edgesClear ? 0 : 1))
+            .background(alignment: .top) { FadeEdge(color: Theme.canvas).opacity(edgesClear ? 0 : 1) }
+    }
 
-    @ViewBuilder
-    private func content(_ scroller: ScrollViewProxy) -> some View {
+    /// The card grows back to exactly the page's size and place; only then is
+    /// it swapped for the live page, in one frame, so the hand-over can't be seen.
+    private func close() {
+        textShown = false  // at once: only the card moves on the way out
+        withAnimation(.easeOut(duration: 0.3)) { model.isClosing = true }
+        withAnimation(.spring(duration: 0.45, bounce: 0)) { settle = 0 } completion: {
+            var swap = Transaction()
+            swap.disablesAnimations = true
+            withTransaction(swap) {
+                browser.summaryCoversPage = false
+                browser.summary = nil
+            }
+        }
+    }
+}
+
+/// The summary itself: what it's doing, then the text, then who wrote it.
+private struct SummaryText: View {
+    let model: SummaryModel
+
+    var body: some View {
         Group {
             switch model.phase {
             case .failed(let message):
@@ -234,40 +264,65 @@ struct SummaryView: View {
         .animation(.smooth(duration: 0.5), value: model.text.isEmpty)
     }
 
-    /// The app's bar: back to the page, and a question about it from the middle.
-    private var footer: some View {
-        ContextBar(leading: .init(glyph: .close, label: "Back to the page", action: close),
-                   glyph: .browse, title: "Ask",
-                   launch: { browser.showCommandBar(context: .aboutPage) }, fades: false)
-            .padding(.top, 10)
-            .overlay(alignment: .top) { ReadingLine(progress: readProgress, tint: PageKind.of(model.text).tint) }
-            // See-through while the light is up, so its brightest part shows.
-            // At the light's own pace, so no dark band crosses it as it sinks or floods.
-            .background(Theme.canvas.opacity(edgesClear ? 0 : 1))
-            .background(alignment: .top) { FadeEdge(color: Theme.canvas).opacity(edgesClear ? 0 : 1) }
-    }
-
-    /// The card grows back to exactly the page's size and place; only then is
-    /// it swapped for the live page, in one frame, so the hand-over can't be seen.
-    private func close() {
-        textShown = false  // at once: only the card moves on the way out
-        withAnimation(.easeOut(duration: 0.3)) { model.isClosing = true }
-        withAnimation(.spring(duration: 0.45, bounce: 0)) { settle = 0 } completion: {
-            var swap = Transaction()
-            swap.disablesAnimations = true
-            withTransaction(swap) {
-                browser.summaryCoversPage = false
-                browser.summary = nil
-            }
-        }
-    }
-
     private static func credit(_ engine: String) -> String {
         switch engine {
         case "Claude": "Written by Claude"
         case "Apple Intelligence": "Written by Apple Intelligence, privately in Apple's cloud"
         default: "Written on this iPhone"
         }
+    }
+}
+
+/// On an open Duo: the summary on one side of the fold and the page itself, still
+/// live, on the other. Read one against the other; nothing shrinks or covers.
+struct SummaryBesideView: View {
+    @Environment(BrowserModel.self) private var browser
+    let model: SummaryModel
+    @State private var readProgress = 0.0
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Theme.canvas.ignoresSafeArea()
+            // roko's light while it works, as on the full screen.
+            WorkingGlow(progress: model.progress, isActive: model.isWorking,
+                        finished: !model.isWorking && !model.phase.isFailure)
+                .ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(model.title)
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(Theme.secondaryInk)
+                            .lineLimit(2)
+                        Text(model.host)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.faintInk)
+                    }
+                    .padding(.horizontal, 22)
+                    .padding(.top, 12)
+                    SummaryText(model: model)
+                }
+                .padding(.bottom, 24)
+            }
+            .scrollIndicators(.hidden)
+            .onScrollGeometryChange(for: Double.self) { ReadingLine.progress($0) } action: { _, progress in
+                readProgress = progress
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            ContextBar(leading: .init(glyph: .close, label: "Close the summary", action: { browser.summary = nil }),
+                       glyph: .browse, title: "Ask",
+                       launch: { browser.showCommandBar(context: .aboutPage) }, fades: false)
+                .padding(.top, 10)
+                .overlay(alignment: .top) { ReadingLine(progress: readProgress, tint: PageKind.of(model.text).tint) }
+                // See-through while the light is up, so no edge cuts across it.
+                .background(Theme.canvas.opacity(model.isWorking ? 0 : 1))
+                .background(alignment: .top) { FadeEdge(color: Theme.canvas).opacity(model.isWorking ? 0 : 1) }
+                .animation(.easeInOut(duration: 0.9), value: model.isWorking)
+        }
+        .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas) }
+        // Turned here from a full-screen summary, the page comes back.
+        .onAppear { browser.summaryCoversPage = false }
     }
 }
 

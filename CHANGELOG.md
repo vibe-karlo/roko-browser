@@ -15,6 +15,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - iPhone search finds your pinned sites and opens your to-do and shopping lists. What's on the lists stays out of search.
 - On iPhone Duo held open sideways, Reader is a book: a page each side of the fold, a real page curl, and text size down the outer edge. Words and paragraphs carry across a turn, and a heading stays with its text.
 - On iPhone Duo held open sideways, a source tapped in Browse for Me opens beside the answer, on the other side of the fold.
+- On iPhone Duo held open sideways, Read Later is a list beside the article, as in Mail: tap a row and it opens across the fold, marked as open and staying in its place until you move on.
+- On iPhone Duo held open sideways, a summary sits beside the page, which stays live, instead of the page shrinking into a card.
+- Cook Mode, on any iPhone: on a page that publishes a recipe, one step at a time in big text with the ingredients to tick off, and the screen stays awake. On iPhone Duo propped open the step stands above the fold and the rest lies below it. From the page menu, or type "cook". Amounts and steps are the site's own, not written by AI.
 
 ### Changed
 - Turned sideways, tab cards sit side by side instead of overlapping.
@@ -22,6 +25,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - On iPhone Duo held open sideways, the bar stands down the outer edge under the clock, as Apple asks, and the page menu opens beside it.
 
 ### Fixed
+- A message on iPhone Duo no longer straddles the fold.
 - No gap under what a page pins to the bottom when the bar folds away above a band, or under YouTube's bar at the screen's edge.
 
 ### Changed

@@ -124,7 +124,7 @@ struct ReadLaterView: View {
     // MARK: A page
 
     private func row(_ page: ReadLaterPage) -> some View {
-        Button { browser.openSaved(page) } label: {
+        Button { withAnimation(.snappy(duration: 0.32)) { browser.openSaved(page) } } label: {
             HStack(alignment: .top, spacing: 14) {
                 SavedPicture(page: page)
                     .frame(width: 68, height: 68)
@@ -149,6 +149,12 @@ struct ReadLaterView: View {
                 Spacer(minLength: 0)
             }
             .contentShape(.rect)
+            // The one open across the fold.
+            .background {
+                if browser.savedBeside == page.id {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Theme.raised).padding(-8)
+                }
+            }
         }
         .buttonStyle(RowButtonStyle())
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -173,6 +179,7 @@ struct ReadLaterView: View {
 
     private func close() {
         browser.panel = .none
+        browser.readLaterBeside = false
     }
 }
 

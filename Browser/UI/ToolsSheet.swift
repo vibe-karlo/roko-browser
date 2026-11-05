@@ -12,6 +12,8 @@ struct ToolsSheet: View {
     @State private var rejectingCookies = true
     @State private var cookieReason: ConsentHandler.Reason?
     @State private var siteSettingsOpen = false
+    /// Shown only on a page that publishes a recipe.
+    @State private var hasRecipe = false
 
     /// What happens to this site's cookie pop-ups, and why.
     private var cookieDetail: String {
@@ -37,6 +39,10 @@ struct ToolsSheet: View {
                 .padding(.bottom, 24)
             }
             .scrollBounceBehavior(.basedOnSize)
+            .task(id: tab.url) {
+                guard let webView = tab.webView else { return }
+                hasRecipe = await RecipeReader.read(webView) != nil
+            }
             // Scrolled rows slip away a little under the grabber, not into it.
             .mask {
                 VStack(spacing: 0) {
@@ -138,6 +144,10 @@ struct ToolsSheet: View {
     private func pageGroup(_ tab: BrowserTab) -> some View {
         VStack(spacing: 0) {
             ToolRow(glyph: .reader, title: "Reader Mode") { browser.openReader() }
+
+            if hasRecipe {
+                ToolRow(glyph: .cook, title: "Cook Mode") { browser.cookThisPage() }
+            }
 
             // Not for private tabs: the list keeps the page and its text.
             if !tab.isPrivate {

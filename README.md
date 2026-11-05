@@ -41,7 +41,7 @@ Reminders, closed tabs a tap from coming back,
 clean links when you share, roko in every share sheet, Home Screen widgets, pages translated into the languages you choose, and a count of
 the time all this has saved you.
 
-**Two at once, and more.** Two tabs at once in Split View, parted at the fold on iPhone Duo, which props up like a small laptop with the page above and a trackpad for it below. Held open sideways, the Duo's bar stands down the outer edge, Reader is a book with a page each side of the fold (`UI/BookView.swift`), and a source opens beside its Browse for Me answer. Touch and hold a link to see its page live, then
+**Two at once, and more.** Two tabs at once in Split View, parted at the fold on iPhone Duo, which props up like a small laptop with the page above and a trackpad for it below. Held open sideways, the Duo's bar stands down the outer edge, Reader is a book with a page each side of the fold (`UI/BookView.swift`), a source opens beside its Browse for Me answer, Read Later is a list beside the article, and a summary sits beside the live page. Cook Mode (`UI/CookView.swift`) shows a page's recipe a step at a time in big text with the screen awake, from the site's own recipe data rather than AI, and on a propped Duo the step stands above the fold. Touch and hold a link to see its page live, then
 open it, open it in the background or add it to Read Later. Forms you're filling in survive a crash.
 Private tabs and history behind Face ID. A mini player for sound in a tab you've left, a real
 download manager (also in Files), Copy as Markdown (type "markdown"), swipe anywhere to go back, pinch for your tabs,

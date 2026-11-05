@@ -120,7 +120,7 @@ struct BrowserView: View {
         .overlay(alignment: .trailing) {
             if sideBar {
                 VStack(spacing: 0) {
-                    if besideFold != nil {
+                    if closesBeside {
                         // Back to the answer alone: first in the column, as Close is.
                         Button { browser.closeBeside() } label: {
                             Glyph(.close, size: 16, weight: 2)
@@ -139,7 +139,7 @@ struct BrowserView: View {
                 .frame(width: max(sideStrip, 56))
                 .frame(maxHeight: .infinity)
                 // On a Duo the clock has the top of the column.
-                .padding(.top, uprightFold == nil ? 0 : besideFold != nil ? 106 : 72)
+                .padding(.top, uprightFold == nil ? 0 : closesBeside ? 106 : 72)
                     .opacity(browser.launcherShown || browser.panel == .tabs || browser.pageBecomingSummary || browser.hidingItems != nil ? 0 : 1)
                     .allowsHitTesting(browser.hidingItems == nil)
                     .animation(.launcher, value: browser.launcherShown)
@@ -211,25 +211,29 @@ struct BrowserView: View {
                     .transition(.move(edge: .bottom))
             }
         }
-        .modifier(ReadLaterScreens(browser: browser))
+        .modifier(ReadLaterScreens(browser: browser, besideFold: besideFold))
         .overlay {
             if let session = browser.browseForMe {
                 // Full screen, rising from the bar where the question was asked.
                 BrowseForMeView(session: session)
-                    .frame(width: besideFold?.minX)
-                    // Not clipped to its frame: it runs on under the home indicator.
-                    .mask { RoundedRectangle(cornerRadius: besideFold != nil ? 16 : 0).ignoresSafeArea() }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .besideFold(besideFold, hidden: browser.panel == .tabs)
                     .transition(.move(edge: .bottom))
             }
         }
         .animation(.spring(duration: 0.42, bounce: 0.06), value: browser.browseForMe?.id)
-        .animation(.snappy(duration: 0.32), value: browser.answerBeside)
+        .animation(.snappy(duration: 0.32), value: browser.pageBeside)
         .overlay {
             if let summary = browser.summary {
-                // Full screen; it animates the page into its card itself.
-                SummaryView(model: summary)
-                    .transition(.identity)
+                if besideFold != nil {
+                    // On an open Duo the page has no need to shrink: it stays, live, across the fold.
+                    SummaryBesideView(model: summary)
+                        .besideFold(besideFold, hidden: browser.panel == .tabs)
+                        .transition(.move(edge: .leading))
+                } else {
+                    // Full screen; it animates the page into its card itself.
+                    SummaryView(model: summary)
+                        .transition(.identity)
+                }
             }
         }
         .overlay {
@@ -250,6 +254,8 @@ struct BrowserView: View {
                     .barSurface(cornerRadius: 14)
                     .compositingGroup()
                     .padding(.bottom, Theme.barHeight + 20 + playerLift)
+                    // Never across the fold of an open Duo.
+                    .keepsOffFold(preferTrailing: true)
                     .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
                                             removal: .opacity.animation(.easeOut(duration: 0.12))))
                     .allowsHitTesting(false)
@@ -360,6 +366,7 @@ struct BrowserView: View {
             SettingsView()
         }
         .modifier(ReaderScreens(browser: browser, asBook: uprightFold != nil))
+        .onChange(of: uprightFold != nil, initial: true) { _, upright in browser.uprightFoldOpen = upright }
         .onAppear {
             LaunchClock.mark("firstAppear")
             browser.start(context: context)
@@ -465,8 +472,11 @@ struct BrowserView: View {
 
     /// A source opened from an answer stands beside it, a side of the fold each.
     private var besideFold: CGRect? {
-        browser.answerBeside && browser.browseForMe != nil ? uprightFold : nil
+        browser.screenBeside ? uprightFold : nil
     }
+
+    /// The tab beside came from the answer or the list, and has a way back to them.
+    private var closesBeside: Bool { browser.pageBeside && besideFold != nil }
 
     /// Propped open on one page: it stands above the fold, the bar lies below.
     /// A split already parts at the fold, a page on each half.
@@ -509,8 +519,8 @@ struct BrowserView: View {
     private var statusBarStyle: UIStatusBarStyle {
         // The summary and Browse for Me sit on the app's own canvas.
         if browser.showsOnboarding { return .lightContent }  // the welcome is always dark
-        if uprightFold != nil && browser.reader != nil { return .default }  // the book's paper follows the theme
-        if splitBesideClock || besideFold != nil { return .lightContent }  // on the black beside the page
+        if browser.cook != nil || uprightFold != nil && browser.reader != nil { return .default }  // the paper follows the theme
+        if splitBesideClock || besideFold != nil && browser.panel != .command { return .lightContent }  // on the black beside the page
         if browser.summary != nil || browser.browseForMe != nil || browser.panel == .todos || browser.panel == .today
             || browser.panel == .shopping || browser.panel == .readLater || browser.digest != nil {
             return .default
@@ -764,8 +774,8 @@ private struct CopiedLinkWatch: ViewModifier {
     }
 }
 
-/// Reader Mode: a sheet, or a book across the fold of an open Duo. Kept apart
-/// so the browser's body stays small enough for the compiler.
+/// Reader Mode, a sheet or a book across the fold of an open Duo, and Cook Mode.
+/// Kept apart so the browser's body stays small enough for the compiler.
 private struct ReaderScreens: ViewModifier {
     @Bindable var browser: BrowserModel
     let asBook: Bool
@@ -785,6 +795,13 @@ private struct ReaderScreens: ViewModifier {
                 }
             }
             .animation(.easeOut(duration: 0.25), value: browser.reader?.id)
+            .overlay {
+                if let cook = browser.cook {
+                    CookView(model: cook)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeOut(duration: 0.25), value: browser.cook?.id)
     }
 }
 
@@ -792,12 +809,14 @@ private struct ReaderScreens: ViewModifier {
 /// browser's body stays small enough for the compiler.
 private struct ReadLaterScreens: ViewModifier {
     let browser: BrowserModel
+    let besideFold: CGRect?
 
     func body(content: Content) -> some View {
         content
             .overlay {
-                if browser.panel == .readLater || browser.panel == .command && browser.launcherReturn == .readLater {
+                if browser.readLaterBeside || browser.panel == .readLater || browser.panel == .command && browser.launcherReturn == .readLater {
                     ReadLaterView()
+                        .besideFold(besideFold, hidden: browser.panel == .tabs)
                         .transition(.move(edge: .bottom))
                 }
             }
@@ -805,10 +824,25 @@ private struct ReadLaterScreens: ViewModifier {
                 if let digest = browser.digest {
                     // Over the list it was asked from, rising from its bar.
                     DigestView(model: digest)
+                        .besideFold(besideFold, hidden: browser.panel == .tabs)
                         .transition(.move(edge: .bottom))
                 }
             }
             .animation(.spring(duration: 0.42, bounce: 0.06), value: browser.digest?.id)
+            .animation(.spring(duration: 0.42, bounce: 0.06), value: browser.readLaterBeside)
+    }
+}
+
+private extension View {
+    /// One of roko's screens, on the leading side of an open Duo's fold with the
+    /// page across it. Out of the way while the tab switcher is up.
+    func besideFold(_ fold: CGRect?, hidden: Bool) -> some View {
+        frame(width: fold?.minX)
+            // Not clipped to its frame: it runs on under the home indicator.
+            .mask { RoundedRectangle(cornerRadius: fold != nil ? 16 : 0).ignoresSafeArea() }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .opacity(hidden ? 0 : 1)
+            .allowsHitTesting(!hidden)
     }
 }
 

@@ -7,7 +7,7 @@ struct CommandItem: Identifiable {
              browse(String), summarize, findOnPage, privateTab, settings, copy(String),
              pasteLink, openCopied(URL), todos, today, openApp(URL), ask(String), askAboutPage(String), addTodo(String, TodoWhen, DateComponents?),
              payParking(city: String, zone: String), extendParking, endParking, shopping, addShopping(String),
-             saveForLater, readLater, askAboutSaved(String), reopenTab, downloads, copyMarkdown, unlockHistory, split
+             saveForLater, readLater, cook, askAboutSaved(String), reopenTab, downloads, copyMarkdown, unlockHistory, split
     }
 
     let id: String
@@ -1010,6 +1010,7 @@ struct CommandBarView: View {
         case .downloads: browser.panel = .downloads
         case .split: if browser.split == nil { browser.startSplit() } else { browser.endSplit(); browser.panel = .none }
         case .copyMarkdown: browser.copyAsMarkdown()
+        case .cook: browser.cookThisPage()
         case .unlockHistory: Task { await PrivacyLock.shared.unlock() }
         case .askAboutSaved(let question):
             if let digest = browser.digest { browser.ask(question, about: digest) } else { browser.panel = .none }
@@ -1385,6 +1386,9 @@ enum CommandRanker {
             (["copy as markdown", "markdown", "copy article"],
              CommandItem(id: "action-markdown", title: "Copy as Markdown", subtitle: "This article, for notes or an AI chat",
                          kind: "Action", icon: .glyph(.markdown), action: .copyMarkdown)),
+            (["cook mode", "cook", "cooking", "recipe", "recept", "kuhanje"],
+             CommandItem(id: "action-cook", title: "Cook Mode", subtitle: "This page's recipe in big text, screen awake",
+                         kind: "Action", icon: .glyph(.cook), action: .cook)),
             (["read later", "reading list", "saved pages", "za kasnije", "spremljeno"],
              CommandItem(id: "action-read-later", title: "Read Later",
                          subtitle: ReadLater.shared.unread.isEmpty ? "Pages you saved" : "\(ReadLater.shared.unread.count) to read",
@@ -1396,7 +1400,7 @@ enum CommandRanker {
                               kind: "Action", icon: .glyph(.reopen), action: .reopenTab))]
             } ?? [])
         for (words, item) in actions where words.contains(where: { $0.hasPrefix(needle) }) {
-            let needsPage = ["action-summarize", "action-find", "action-save-later", "action-markdown", "action-split"].contains(item.id)
+            let needsPage = ["action-summarize", "action-find", "action-save-later", "action-markdown", "action-split", "action-cook"].contains(item.id)
             if needsPage && browser.selectedTab == nil { continue }
             // Typed in full, a place in roko (Settings, To-do) is what's meant,
             // not a web search for the word: it goes first, and Return opens it.
