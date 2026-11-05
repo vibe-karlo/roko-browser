@@ -9,6 +9,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - roko has a site in `Site/`, phone first: a live iPhone in true proportions with the bar and a working keyboard, speed numbers, a draggable summary, a before and after slider, Split View with a divider to drag, a made-up page to tap things away on, a private switch to try, hold to speak to try, a to-do widget and a shopping list that really tick, which AI runs where, iPhone Duo in the questions, a link to the code on GitHub, support and the privacy policy.
 
 ### Changed
+- Turned sideways, tab cards sit side by side instead of overlapping.
+- On iPhone Duo lying flat, the bar's field runs across the screen like the keyboard. Bent open, it still keeps to one side of the fold.
+
+### Fixed
+- No gap under what a page pins to the bottom when the bar folds away above a band, or under YouTube's bar at the screen's edge.
+
+### Changed
 - More ad and tracker hosts blocked, on the ones EasyList and EasyPrivacy miss. `Scripts/compare` tests browsers the same way, against d3ward's public list.
 - Version 1.0. About roko links each credit and the source code, and carries the MIT License text.
 - roko is open source, under GPL-3.0. The README lists the parts that keep their own terms, and the site loads its headline font from Fontshare, whose licence doesn't allow a copy in a public repository.

@@ -9,6 +9,8 @@ extension EnvironmentValues {
     /// Propped open with the fold lying across, like a small laptop: the page
     /// stands on the upper half and the controls lie on the lower.
     @Entry var propped = false
+    /// Bent well short of flat, whichever way it's held.
+    @Entry var foldBent = false
 }
 
 extension View {
@@ -77,6 +79,7 @@ private struct FoldReader: ViewModifier {
                     if old.hinge?.status != new.hinge?.status { hinge += 1 }
                 }
                 .environment(\.fold, fold)
+                .environment(\.foldBent, bent)
                 .environment(\.propped, bent && fold.map { $0.width > $0.height } ?? false)
         } else {
             content

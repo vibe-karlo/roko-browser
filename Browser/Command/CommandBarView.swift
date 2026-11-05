@@ -33,6 +33,7 @@ struct CommandBarView: View {
     @Environment(BrowserModel.self) private var browser
     @Environment(\.modelContext) private var context
     @Environment(\.fold) private var fold
+    @Environment(\.foldBent) private var foldBent
     @Query(sort: \Pin.order) private var pins: [Pin]
     @Query(sort: \Todo.createdAt) private var todos: [Todo]
     /// Ticked in the bar a moment ago: still shown, struck through.
@@ -86,8 +87,9 @@ struct CommandBarView: View {
     /// (the system's, SwiftKey, one that says its size late) can move it.
     private var fieldTarget: CGRect {
         let screen = UIScreen.main.bounds
-        // On an open Duo, the half the field keeps to (as keepsOffFold picks it).
-        if let fold, fold.height > fold.width {
+        // On a Duo bent open, the half the field keeps to (as keepsOffFold picks
+        // it). Lying flat there's no bend to avoid: across, like the keyboard.
+        if let fold, foldBent, fold.height > fold.width {
             let before = fold.minX - Self.safeInsets.left
             let after = screen.width - Self.safeInsets.right - fold.maxX
             return before >= after
@@ -142,7 +144,8 @@ struct CommandBarView: View {
             .padding(.horizontal, 8)
             .padding(.top, 8)
             .padding(.bottom, 4)
-            // On an open Duo, to one side of the fold like the bar it grew from.
+            // On a Duo bent open, to one side of the fold like the bar it grew from.
+            .environment(\.fold, foldBent ? fold : nil)
             .keepsOffFold()
         }
         .onAppear {

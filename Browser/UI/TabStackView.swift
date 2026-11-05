@@ -25,7 +25,8 @@ struct TabStackView: View {
             let cardWidth = sideways ? (cardHeight * 0.62).rounded() : (proxy.size.width * 0.76).rounded()
             // Each card shows this much before the next one covers it.
             // Most of the focused card shows; the next one just overlaps its edge.
-            let stride = (cardWidth * 0.87).rounded()
+            // Sideways there's room for each card whole, side by side.
+            let stride = sideways ? cardWidth + 14 : (cardWidth * 0.87).rounded()
 
             VStack(spacing: 0) {
                 // Pins live above the address field, not here.
@@ -38,7 +39,7 @@ struct TabStackView: View {
                         .frame(height: cardHeight + 40)
                 } else {
                     carousel(cardWidth: cardWidth, stride: stride, cardHeight: cardHeight,
-                             screenWidth: proxy.size.width)
+                             screenWidth: proxy.size.width, stacks: !sideways)
                 }
 
                 Spacer(minLength: 0)
@@ -65,14 +66,14 @@ struct TabStackView: View {
     // MARK: Cards
 
     private func carousel(cardWidth: CGFloat, stride: CGFloat, cardHeight: CGFloat,
-                          screenWidth: CGFloat) -> some View {
+                          screenWidth: CGFloat, stacks: Bool) -> some View {
         ScrollView(.horizontal) {
             LazyHStack(alignment: .top, spacing: stride - cardWidth) {
                 let focusedIndex = browser.tabs.firstIndex { $0.id == focused } ?? 0
                 ForEach(Array(browser.tabs.enumerated()), id: \.element.id) { index, tab in
                     TabCard(tab: tab, width: cardWidth, height: cardHeight,
-                            titleWidth: stride - 16, isFocused: tab.id == focused,
-                            isBehind: index < focusedIndex,
+                            titleWidth: (stacks ? stride : cardWidth) - 16, isFocused: tab.id == focused,
+                            isBehind: stacks && index < focusedIndex, overlaps: stacks,
                             open: { open(tab) },
                             close: { close(tab) },
                             split: canSplit(with: tab) ? { browser.panel = .none; browser.startSplit(with: tab) } : nil)
@@ -81,7 +82,7 @@ struct TabStackView: View {
                     // on the right stays full size, laid over it. Drawn by the
                     // scroll view itself, so it costs nothing per frame in code.
                     .scrollTransition(.interactive, axis: .horizontal) { content, phase in
-                        let back = max(0, -phase.value)
+                        let back = stacks ? max(0, -phase.value) : 0
                         return content
                             .scaleEffect(1 - 0.1 * back, anchor: .trailing)
                             .offset(x: back * stride * 0.55)
@@ -268,6 +269,8 @@ private struct TabCard: View {
     let isFocused: Bool
     /// Left of the focused card, in the stack behind it.
     var isBehind = false
+    /// Laid over its neighbour, rather than beside it.
+    var overlaps = true
     let open: () -> Void
     let close: () -> Void
     /// With the tab on screen, split; nil for the tab on screen itself.
@@ -319,7 +322,7 @@ private struct TabCard: View {
             .clipShape(.rect(cornerRadius: corner))
             .overlay(RoundedRectangle(cornerRadius: corner).strokeBorder(.white.opacity(0.08)))
             // Cast leftward onto the card it overlaps, from one light on the right.
-            .shadow(color: .black.opacity(0.35), radius: 8, x: -5, y: 0)
+            .shadow(color: .black.opacity(overlaps ? 0.35 : 0), radius: 8, x: -5, y: 0)
             .contentShape(.rect(cornerRadius: corner))
             .onTapGesture(perform: open)
             .contextMenu {

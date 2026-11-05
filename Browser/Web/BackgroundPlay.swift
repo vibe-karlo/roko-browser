@@ -67,7 +67,7 @@ enum BackgroundPlay {
         }
     }
 
-    private static func isYouTube(_ url: URL?) -> Bool {
+    static func isYouTube(_ url: URL?) -> Bool {
         guard let host = url?.host()?.lowercased() else { return false }
         return host == "youtube.com" || host.hasSuffix(".youtube.com")
     }

@@ -69,10 +69,26 @@ struct WebViewHost: UIViewRepresentable {
     private func coverBar(_ webView: WKWebView, in container: UIView) {
         guard container.window != nil, barTop > 0 else { return }
         let bottom = container.convert(container.bounds, to: nil).maxY
-        let covered = max(0, (bottom - barTop).rounded())
+        var covered = max(0, (bottom - barTop).rounded())
+        // Folded away, the bar leaves only the strip it floats on, which sites
+        // otherwise paint as a gap under what they pin to the bottom. Above a
+        // band there's no home indicator to clear; at the screen's edge, YouTube's
+        // bar runs down to it and keeps its labels clear itself, as in Safari.
+        let folded = covered < Theme.barHeight
+        let atEdge = container.window.map { bottom >= $0.bounds.maxY - 1 } ?? true
+        let youTube = BackgroundPlay.isYouTube(webView.url)
+        if folded, !atEdge || youTube { covered = 0 }
         if webView.obscuredContentInsets.bottom != covered {
             webView.obscuredContentInsets = UIEdgeInsets(top: 0, left: 0, bottom: covered, right: 0)
+            if youTube { Self.padYouTubeBar(webView, on: folded && atEdge) }
         }
+    }
+
+    private static func padYouTubeBar(_ webView: WKWebView, on: Bool) {
+        // On the element: YouTube's Content Security Policy refuses an added style sheet.
+        webView.evaluateJavaScript("""
+            document.querySelector("ytm-pivot-bar-renderer")?.style.setProperty("padding-bottom", "\(on ? "22px" : "")")
+            """)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
