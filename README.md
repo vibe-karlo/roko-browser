@@ -149,7 +149,7 @@ developer account. Until then the app runs without them and never touches them.
 
 | Feature | Entitlement | Request |
 | --- | --- | --- |
-| Passkeys on websites | `com.apple.developer.web-browser`, `com.apple.developer.web-browser.public-key-credential` | Default-browser entitlement request (developer account) |
+| Passkeys on websites | `com.apple.developer.web-browser` only, on iOS: WKWebView does the rest ([Apple's answer](https://developer.apple.com/forums/thread/837755)). `...web-browser.public-key-credential` is for macOS and Mac Catalyst. | Default-browser entitlement request (developer account) |
 | Saved passwords suggested for the site you're on (without it, iOS offers only the Passwords key and a full list) | `com.apple.developer.web-browser` | Default-browser entitlement request (developer account) |
 | Apple's cloud model for Summarize and Browse for Me | `com.apple.developer.private-cloud-compute` | developer.apple.com/contact/request/private-cloud-compute/ |
 
