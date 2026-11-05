@@ -352,4 +352,25 @@ footer .go{margin-top:clamp(30px,4vw,44px)}
 .doc h2{font:600 21px/1.3 system-ui,-apple-system,sans-serif;margin:40px 0 8px}
 .doc p{margin:0 0 14px;color:var(--soft)}
 .doc p strong{color:var(--ink);font-weight:600}
+
+/* Changelog: a public build's number stays beside its list. */
+.changes{position:relative;isolation:isolate}
+.dawn{position:absolute;inset:0 0 auto;z-index:-1;isolation:isolate;height:min(620px,90vh);background:linear-gradient(#251209,var(--floor))}
+.dawn .grain{-webkit-mask-image:linear-gradient(#000,transparent);mask-image:linear-gradient(#000,transparent)}
+.doc.log{max-width:1040px}
+.log h1{margin-bottom:clamp(44px,6vw,80px)}
+.rel{display:grid;gap:18px}
+.rel+.rel{margin-top:clamp(88px,11vw,152px)}
+.n{margin-left:-.03em;font:800 clamp(120px,23vw,280px)/.84 var(--display);color:var(--glow)}
+.log h2{margin:0;font:800 clamp(30px,3.6vw,44px)/1.08 var(--display)}
+.log .when{display:flex;align-items:center;gap:9px;margin:14px 0 4px;color:var(--ink);font-weight:500}
+.ecl{flex:none;width:18px;height:18px;color:var(--glow)}
+.log h3{margin:clamp(36px,4vw,48px) 0 8px;font-size:22px;line-height:1.2}
+.log li{max-width:36em;padding:6px 0;color:var(--soft);text-wrap:pretty}
+.log li b{color:var(--ink);font-weight:600}
+.log a{text-underline-offset:3px}
+@media(min-width:820px){
+  .rel{grid-template-columns:minmax(0,4fr) minmax(0,7fr);gap:clamp(28px,6vw,96px)}
+  .n{position:sticky;top:96px;align-self:start}
+}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
