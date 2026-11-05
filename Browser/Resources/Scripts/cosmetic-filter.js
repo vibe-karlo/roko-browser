@@ -300,10 +300,10 @@
   if (document.readyState === "complete") armWalls();
   else addEventListener("load", armWalls, { once: true });
 
-  // A page that keeps nothing once it has seen its ads fail (BILD's leaves its
-  // header and footer, and an "adblockwall" frame): there's nothing to hide a wall
-  // from. Known by its wall, a page about a screen tall, and next to no words or
-  // pictures. The app then lets this site's ads through and loads it again.
+  // A page that keeps nothing once it has seen its ads fail: there's nothing to hide
+  // a wall from. Known by its wall, a page about a screen tall, and next to no words or
+  // pictures. Late, as an answered cookie wall can also leave a page empty until it
+  // reloads. The app then tries the page with its ad scripts let through, then its ads.
   const refusesToShow = () => {
     const body = document.body;
     if (!body || (body.innerText || "").trim().length > 1200) return false;
@@ -316,7 +316,7 @@
     reportedRefusal = true;
     handler.postMessage({ host: location.hostname, refused: true }).catch(() => {});
   };
-  const armRefusal = () => { for (const delay of [3500, 7000, 12000]) setTimeout(checkRefusal, delay); };
+  const armRefusal = () => { for (const delay of [8000, 13000, 19000]) setTimeout(checkRefusal, delay); };
   if (document.readyState === "complete") armRefusal();
   else addEventListener("load", armRefusal, { once: true });
 

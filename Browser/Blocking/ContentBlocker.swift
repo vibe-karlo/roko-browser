@@ -58,14 +58,61 @@ final class ContentBlocker {
     var onAdsAllowed: ((_ host: String) -> Void)?
 
     /// A site shows nothing while its ads are blocked (BILD's anti-adblock empties the
-    /// page). A page beats a blocked ad: its ads are let through, here only, and it loads
-    /// again. Trackers, cookies and pop-ups stay handled, and Site Settings can undo it.
-    func allowAds(on host: String, reloading webView: WKWebView) {
+    /// page). Two steps, each followed by a reload, and each only if the last wasn't enough:
+    /// first its ad scripts may load, which is usually all the anti-adblock checks, while the
+    /// ads' pictures, frames and videos stay blocked. Then, since a page beats a blocked ad,
+    /// its ads are let through, here only. Trackers, cookies and pop-ups stay handled, and
+    /// Site Settings can undo it.
+    func pageRefusedToShow(on host: String, reloading webView: WKWebView) async {
         guard !isAllowed(host: host, category: .ads) else { return }
-        setAllowed(host: host, category: .ads, true)
+        if LaunchClock.isEnabled { print("REFUSED \(host) softAlready=\(softHosts.contains(Self.normalize(host)))") }
+        if softHosts.contains(Self.normalize(host)) {
+            setSoft(host: host, false)
+            setAllowed(host: host, category: .ads, true)
+            onAdsAllowed?(host)
+        } else {
+            await compileSoftAds()
+            guard softAds != nil else {
+                setAllowed(host: host, category: .ads, true)
+                onAdsAllowed?(host)
+                apply(to: webView.configuration.userContentController, host: host)
+                webView.reload()
+                return
+            }
+            setSoft(host: host, true)
+        }
         apply(to: webView.configuration.userContentController, host: host)
-        onAdsAllowed?(host)
         webView.reload()
+    }
+
+    private var softHosts: Set<String> { Set(defaults.stringArray(forKey: Self.softKey) ?? []) }
+    private static let softKey = "block.ads.softHosts"
+
+    private func setSoft(host: String, _ soft: Bool) {
+        var hosts = softHosts
+        if soft { hosts.insert(Self.normalize(host)) } else { hosts.remove(Self.normalize(host)) }
+        defaults.set(Array(hosts), forKey: Self.softKey)
+    }
+
+    /// The ads list, with its ad scripts and their requests let through. Few people need it,
+    /// so it's only compiled once a site asks for it, and kept after that.
+    private var softAds: WKContentRuleList?
+
+    private func compileSoftAds() async {
+        guard softAds == nil else { return }
+        let identifier = "ads-soft-\(Self.listsVersion)"
+        if let list = try? await store.contentRuleList(forIdentifier: identifier) {
+            softAds = list
+            return
+        }
+        guard let url = Bundle.main.url(forResource: "ads", withExtension: "json") else { return }
+        let hosts = Bundle.main.url(forResource: "ads-hosts", withExtension: "txt")
+        let json = try? await Task.detached(priority: .userInitiated) { () -> String in
+            let rules = try Self.rules(json: url, hosts: hosts).trimmingCharacters(in: .whitespacesAndNewlines)
+            return rules.dropLast() + #",{"trigger":{"url-filter":".*","resource-type":["script","fetch"]},"action":{"type":"ignore-previous-rules"}}]"#
+        }.value
+        guard let json else { return }
+        softAds = try? await store.compileContentRuleList(forIdentifier: identifier, encodedContentRuleList: json)
     }
 
     func setAllowed(host: String, category: Category? = nil, _ allowed: Bool) {
@@ -86,6 +133,7 @@ final class ContentBlocker {
 
     /// Blocking as everywhere else again, every kind.
     func forgetAllowances(for host: String) {
+        setSoft(host: host, false)
         setAllowed(host: host, false)
         for category in Category.allCases { setAllowed(host: host, category: category, false) }
     }
@@ -185,6 +233,8 @@ final class ContentBlocker {
         isReady = true
 
         // Drop lists left over from older app versions.
+        current.insert("ads-soft-\(Self.listsVersion)")
+        if !softHosts.isEmpty { await compileSoftAds() }
         for identifier in await store.availableIdentifiers() ?? [] where !current.contains(identifier) {
             try? await store.removeContentRuleList(forIdentifier: identifier)
         }
@@ -245,7 +295,8 @@ final class ContentBlocker {
         // be accepted. Its pop-up is still answered, with accept.
         let acceptsCookies = host.map { ConsentHandler.shared.acceptance(for: $0) != nil } ?? false
         let dark = ForceDark.applies(to: host)
-        let signature = "\(allowed)|\(exempt.map(\.rawValue).joined(separator: ","))|\(acceptsCookies)|\(compiled.count)|\(dark)"
+        let softAdsHere = softAds != nil && host.map { softHosts.contains(Self.normalize($0)) } == true
+        let signature = "\(allowed)|\(exempt.map(\.rawValue).joined(separator: ","))|\(acceptsCookies)|\(compiled.count)|\(dark)|\(softAdsHere)"
         if applied.object(forKey: controller) as String? == signature { return }
         applied.setObject(signature as NSString, forKey: controller)
 
@@ -263,6 +314,7 @@ final class ContentBlocker {
         for category in Category.allCases where isEnabled(category) {
             if let host, isAllowed(host: host, category: category) { continue }
             if category == .cookies, acceptsCookies { continue }
+            if category == .ads, softAdsHere, let softAds { controller.add(softAds); continue }
             if let list = compiled[category] { controller.add(list) }
         }
         // Cookie pop-ups are answered, not just hidden: hidden, a site keeps

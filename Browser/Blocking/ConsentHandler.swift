@@ -149,6 +149,16 @@ final class ConsentHandler: NSObject, WKScriptMessageHandlerWithReply {
         case "rokoWall":
             setAccepted(.wall, for: host)
             onAccepted?(host, .wall)
+            // A wall answered by its buttons: a page that was held back behind it
+            // (BILD's) often doesn't fill in until it's loaded with consent.
+            if body["cmp"] as? String == "roko-paid-wall" {
+                Task { [weak webView] in
+                    try? await Task.sleep(for: .seconds(3))
+                    guard let webView else { return }
+                    let words = try? await webView.evaluateJavaScript("document.body ? document.body.innerText.length : 0") as? Int
+                    if (words ?? 0) < 1200 { await recover(webView, host: host) }
+                }
+            }
             return (["type": "optIn"], nil)
 
         case "rokoBlocked":

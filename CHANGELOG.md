@@ -13,7 +13,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ### Fixed
 - Pay-or-consent walls that no rule knows now get answered. The case for "the only other way past it costs money" only ran after a rule had recognised the pop-up, so a site's own wall (Marca's, Corriere's) and Sourcepoint's with a subscribe button (BILD's, Welt's, The Telegraph's) stayed up or were only hidden. roko now knows one by its two buttons, in any of the larger European languages, and says yes, as it does for any wall. Your choice is remembered per site and shown in Site Settings.
 - A pop-up in a frame that covers the page is found on any address, not only a consent platform's, which is how The Telegraph's is served.
-- A page that empties itself because its ads are blocked (BILD's) loads properly: roko lets that one site's ads through, says so, and reloads. Trackers, cookies and pop-ups stay handled, and Site Settings can undo it.
+- A page left empty after its wall is answered (BILD's) reloads with consent and fills in, with its ads still blocked.
+- A page that truly refuses to show while its ads are blocked gets two tries before anything is given up: first its ad scripts may load, which usually satisfies the check, while the ads' pictures, frames and videos stay blocked. Only if the page is still empty are that one site's ads let through, and roko says so. Trackers, cookies and pop-ups stay handled, and Site Settings can undo it.
 - Rules for "everything but this type" in the block lists (`||2mdn.net^$~media`) were dropped when converting them, which let Google's ad images through. About a hundred more rules now apply.
 
 ### Changed

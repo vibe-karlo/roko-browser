@@ -392,8 +392,10 @@ cookies or data and holds both a yes button and a subscribe or pay button. Sourc
 alone on purpose, and its top-level rule only hides them, which is why BILD showed an empty page. A frame on
 any address is sent the rules when it's big enough to cover the page and has a button saying yes.
 
-**A page that refuses to show.** `cosmetic-filter.js` reports a page about a screen tall with next to no words
-and an anti-adblock wall in it. `ContentBlocker.allowAds` then lets that site's ads through and reloads, once.
+**A page that refuses to show.** A page still nearly empty three seconds after its wall was answered reloads
+(BILD's fills in with consent). If `cosmetic-filter.js` later finds a page about a screen tall with next to no
+words and an anti-adblock wall in it, `ContentBlocker.pageRefusedToShow` takes two steps, each with a reload:
+the ads list compiled with scripts and their requests let through, kept for that site, then that site's ads.
 
 ## To-do and Today
 
