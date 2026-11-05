@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>roko: changelog</title><meta name="description" content="What changed in roko, the browser for iPhone, in each public beta."><meta name="theme-color" content="#0f0f0e"><link rel="icon" href="/img/icon-48.png"><link rel="preconnect" href="https://cdn.fontshare.com" crossorigin><link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@500,800&display=swap"><link rel="stylesheet" href="/style.css?36"></head><body class="changes">
+<title>roko: changelog</title><meta name="description" content="What changed in roko, the browser for iPhone, in each public beta."><meta name="theme-color" content="#0f0f0e"><link rel="icon" href="/img/icon-48.png"><link rel="preconnect" href="https://cdn.fontshare.com" crossorigin><link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@500,800&display=swap"><link rel="stylesheet" href="/style.css?38"></head><body class="changes">
 <div class="dawn"><div class="grain"></div></div>
 <nav class="nav" aria-label="Main">
   <a class="mark" href="/"><svg viewBox="0 0 100 100" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M50 2a48 48 0 1 0 0 96a48 48 0 0 0 0-96Zm8.500 24a24 24 0 1 1 0 48a24 24 0 0 1 0-48Z"/></svg>roko</a>
@@ -8,10 +8,62 @@
   <a class="go" href="https://testflight.apple.com/join/M2ZrEUV1">Get the beta <svg class="arr" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 9.5l7-7M4 2.5h5.5V8"/></svg></a>
 </nav><main class="doc log"><h1>Changelog</h1>
 
-<section class="rel" id="v0-1">
-  <div class="n" aria-hidden="true">0.1</div>
+<section class="rel" id="v0-1-1">
+  <div class="n" aria-hidden="true">0.1.1</div>
   <div>
-    <h2>Version 0.1 is on public TestFlight.</h2>
+    <h2>Version 0.1.1 cooks and goes dark.</h2>
+    <p class="when"><svg class="ecl" viewBox="0 0 100 100" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M50 2a48 48 0 1 0 0 96a48 48 0 0 0 0-96Zm8.500 24a24 24 0 1 1 0 48a24 24 0 0 1 0-48Z"/></svg><time datetime="2026-11-05">5 November 2026</time></p>
+    <p>Everything new since the first public version.</p>
+    <h3>Recipes</h3>
+    <ul>
+      <li><b>Cook Mode.</b> On a page that publishes a recipe, one step at a time in big text, with the ingredients to tick off and the screen kept awake. Open it from the page menu. Amounts and steps are the site's own, not written by AI.</li>
+      <li><b>Timers that ring.</b> Tap a time in a step and it counts down on screen, on the Lock Screen and in the Dynamic Island, then rings as an alarm, through silent mode and with roko closed.</li>
+    </ul>
+    <h3>Pages</h3>
+    <ul>
+      <li><b>Force dark pages.</b> Every site goes dark with no white flash first, and a site that's already dark stays as it is. Turn it on in Settings &gt; Appearance, and leave out any site you like.</li>
+      <li><b>Save as PDF.</b> The whole page, from the page menu, kept in Downloads.</li>
+      <li><b>Sign-in and payment windows work.</b> A window a page opens can hand back your sign-in, close itself and return you to that page.</li>
+      <li><b>No blank tab</b> when a link redirects to another app.</li>
+      <li><b>No gap</b> under what a page pins to the bottom when the bar folds away.</li>
+    </ul>
+    <h3>Tabs and search</h3>
+    <ul>
+      <li><b>Close all your tabs at once.</b> Hold the tabs button in the bar. Undo brings them back with their history, and private tabs stay until they're all that's left.</li>
+      <li><b>Search with Qwant, or an engine of your own.</b> A name and an address, in Settings &gt; Search engine.</li>
+      <li><b>iPhone search</b> finds your pinned sites and opens your to-do and shopping lists. What's on the lists stays out of it.</li>
+      <li><b>A search field in the bar</b> when roko opens with your tabs. It turns back into the + once you scroll.</li>
+      <li><b>Turned sideways,</b> tab cards sit side by side.</li>
+    </ul>
+    <h3>Faster and cleaner</h3>
+    <ul>
+      <li><b>Pages load sooner.</b> Cookie rules now load after the page rather than before it, so a known pop-up can show for a moment before it's answered.</li>
+      <li><b>Links that open roko</b> start their page about 80 ms sooner.</li>
+      <li><b>More ads and trackers blocked,</b> including hosts the usual lists miss. In <a href="/#proof">our test</a>, roko stopped 102 of 122.</li>
+      <li><b>The first launch after an update</b> is as quick as any other, unless the block lists changed.</li>
+    </ul>
+    <h3>iPhone Duo</h3>
+    <ul>
+      <li><b>The page fills the screen</b> when you hold it open sideways, with the bar floating over it and folding away as you scroll.</li>
+      <li><b>Reader is a book.</b> A page each side of the fold, a real page curl, and text size down the outer edge.</li>
+      <li><b>Side by side at the fold.</b> A summary beside its live page, a Browse for Me source beside its answer, and Read Later as a list beside the article.</li>
+      <li><b>Tabs are a grid</b> of wide cards, each with its name and a close button under it.</li>
+      <li><b>Propped open,</b> Cook Mode's step stands above the fold and the rest lies below it.</li>
+      <li><b>Lying flat,</b> the bar's field and search run across the screen, and the page menu opens in the middle.</li>
+      <li><b>Messages</b> no longer straddle the fold.</li>
+    </ul>
+    <h3>Also</h3>
+    <ul>
+      <li><b>Open source.</b> The code is <a href="https://github.com/vibe-karlo/roko-browser">on GitHub</a> under GPL-3.0, and About roko links each credit.</li>
+      <li><b>Sharing an answer as a public page is gone.</b> Pages you already shared can still be taken down in Settings.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="rel" id="v0-1">
+  <div class="n" aria-hidden="true">0.1.0</div>
+  <div>
+    <h2>Version 0.1.0 is on public TestFlight.</h2>
     <p class="when"><svg class="ecl" viewBox="0 0 100 100" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M50 2a48 48 0 1 0 0 96a48 48 0 0 0 0-96Zm8.500 24a24 24 0 1 1 0 48a24 24 0 0 1 0-48Z"/></svg><time datetime="2026-11-04">4 November 2026</time></p>
     <p>The first version anyone can install, so this is everything it came with.</p>
     <h3>The bar</h3>

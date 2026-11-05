@@ -372,6 +372,6 @@ footer .go{margin-top:clamp(30px,4vw,44px)}
 .log a{text-underline-offset:3px}
 @media(min-width:820px){
   .rel{grid-template-columns:minmax(0,4fr) minmax(0,7fr);gap:clamp(28px,6vw,96px)}
-  .n{position:sticky;top:96px;align-self:start;font-size:clamp(132px,13.2vw,190px)}
+  .n{position:sticky;top:96px;align-self:start;font-size:clamp(96px,12vw,136px)}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
