@@ -479,7 +479,24 @@ times an hour; each ask reads a few rows.
 
 ## Website
 
-`Site/` is the static site at rokobrowser.vercel.app: the page, `/support` and `/privacy` (written out from `docs/privacy.md`). The phone at the top is live DOM at an iPhone's real 402 by 874 shape, sized in its own width (`cqw`), with a working keyboard so a phone's own doesn't cover it: sums, units, times and days until are worked out in `site.js`, rates come from frankfurter.dev and weather from Open-Meteo. The summary, the before and after and Split View are dragged by the same helper in `site.js`, and the page in the hide section is made up, so nothing on it belongs to another site. The widget and the shopping list in the bar section are live DOM too, with the app's own labels and sizes, and they really tick. Written for a phone first. Vercel deploys it from GitHub on a push that changes `Site/` (root `vercel.json`).
+`Site/` is the static site at rokobrowser.vercel.app: the page, `/support` and `/privacy` (written out from `docs/privacy.md`). The phone at the top is live DOM at an iPhone's real 402 by 874 shape, sized in its own width (`cqw`), with a working keyboard so a phone's own doesn't cover it: sums, units, times and days until are worked out in `site.js`, rates come from frankfurter.dev and weather from Open-Meteo. The summary, the before and after and Split View are dragged by the same helper in `site.js`, and the page in the hide section is made up, so nothing on it belongs to another site. The headline font comes from Fontshare's servers, because its licence doesn't allow a copy in a public repository. The widget and the shopping list in the bar section are live DOM too, with the app's own labels and sizes, and they really tick. Written for a phone first. Vercel deploys it from GitHub on a push that changes `Site/` (root `vercel.json`).
+
+## Licence
+
+roko's own code is free software under the [GNU General Public License, version 3](LICENSE) (GPL-3.0-only), copyright 2026 Karlo Koenig, with no warranty. These parts aren't ours and keep their own terms:
+
+| Part | Where | Terms |
+| --- | --- | --- |
+| Mozilla Readability | `Browser/Resources/Vendor/Readability.js` | Apache 2.0 (see the file) |
+| EasyList, EasyPrivacy and Fanboy's lists, converted to WebKit's format and trimmed | `Browser/Resources/Blocklists` | GPL 3 or later, or CC BY-SA 3.0. Credit: The EasyList authors, [easylist.to](https://easylist.to). The App Store build uses them under CC BY-SA. |
+| Phosphor Icons | `Browser/Resources/Assets.xcassets/phosphor` | MIT (below) |
+| Product names | `Browser/Resources/Shopping/products.txt` | From one shop's published price list, not ours to license |
+| Screenshots | `Site/img`, `docs/screens` | They show other people's pages, such as Wikipedia (CC BY-SA), which stay theirs |
+| Cabinet Grotesk | Not in this repository | Closed-source font: the site loads it from [Fontshare](https://www.fontshare.com), and its licence forbids copies here |
+
+The Raycast extension in `Raycast/` is MIT, as its `package.json` says.
+
+roko also ships through the App Store, whose terms don't fit the GPL. As the copyright holder Karlo can do that with his own code, but not with someone else's, so a contribution needs your agreement that it can ship there too.
 
 ## Credits
 
