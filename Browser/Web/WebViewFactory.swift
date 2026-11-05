@@ -104,9 +104,17 @@ enum WebViewFactory {
 /// below every page, painted in the page background: a light strip under a
 /// dark footer. The bar's own strip is handled by obscuredContentInsets.
 final class EdgeToEdgeWebView: WKWebView {
+    /// An open iPhone Duo in landscape: pages run under the clock's strip too,
+    /// and showing or hiding the clock never changes their width.
+    static var fillsSides = false
+
     override var safeAreaInsets: UIEdgeInsets {
         var insets = super.safeAreaInsets
         insets.bottom = 0
+        if Self.fillsSides {
+            insets.left = 0
+            insets.right = 0
+        }
         return insets
     }
 

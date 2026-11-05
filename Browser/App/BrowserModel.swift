@@ -147,7 +147,13 @@ final class BrowserModel {
         }
     }
     /// An open iPhone Duo in landscape: the fold runs top to bottom.
-    var uprightFoldOpen = false
+    var uprightFoldOpen = false {
+        didSet {
+            guard oldValue != uprightFoldOpen else { return }
+            EdgeToEdgeWebView.fillsSides = uprightFoldOpen
+            for tab in tabs { tab.webView?.setNeedsLayout() }
+        }
+    }
     /// The tab on screen was opened from the answer or the list beside it, and closes back to them.
     var pageBeside = false
     /// Read Later has the leading half of an open Duo.

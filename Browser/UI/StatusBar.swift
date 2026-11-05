@@ -14,7 +14,17 @@ final class StatusBarController: UIViewController {
         }
     }
 
+    /// An open Duo's clock runs down the side of the screen, over a page that fills it.
+    var hidden = false {
+        didSet {
+            guard oldValue != hidden else { return }
+            UIView.animate(withDuration: 0.2) { self.setNeedsStatusBarAppearanceUpdate() }
+        }
+    }
+
     override var preferredStatusBarStyle: UIStatusBarStyle { style }
+    override var prefersStatusBarHidden: Bool { hidden }
+    override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation { .fade }
 
     /// Moves the window's SwiftUI content inside a wrapper. Sheets and safe
     /// areas carry on as before; only the status bar now asks the wrapper.
@@ -35,16 +45,20 @@ final class StatusBarController: UIViewController {
 /// then keeps the status bar style in step with `style`.
 struct StatusBarStyler: UIViewRepresentable {
     let style: UIStatusBarStyle
+    var hidden = false
 
     func makeUIView(context: Context) -> Reader { Reader() }
 
     func updateUIView(_ reader: Reader, context: Context) {
         reader.style = style
+        reader.barHidden = hidden
         StatusBarController.shared?.style = style
+        StatusBarController.shared?.hidden = hidden
     }
 
     final class Reader: UIView {
         var style: UIStatusBarStyle = .default
+        var barHidden = false
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
@@ -53,6 +67,7 @@ struct StatusBarStyler: UIViewRepresentable {
             DispatchQueue.main.async { [weak self] in
                 StatusBarController.install(in: window)
                 if let style = self?.style { StatusBarController.shared?.style = style }
+                if let hidden = self?.barHidden { StatusBarController.shared?.hidden = hidden }
             }
         }
     }

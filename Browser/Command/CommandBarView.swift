@@ -88,7 +88,7 @@ struct CommandBarView: View {
     private var fieldTarget: CGRect {
         let screen = UIScreen.main.bounds
         // On a Duo bent open, the half the field keeps to (as keepsOffFold picks
-        // it). Lying flat there's no bend to avoid: across, like the keyboard.
+        // it). Lying flat there's no bend to avoid: one panel across it.
         if let fold, foldBent, fold.height > fold.width {
             let before = fold.minX - Self.safeInsets.left
             let after = screen.width - Self.safeInsets.right - fold.maxX
@@ -96,8 +96,16 @@ struct CommandBarView: View {
                 ? CGRect(x: Self.safeInsets.left + 8, y: Self.safeTop + 8, width: before - 16, height: 56)
                 : CGRect(x: fold.maxX + 8, y: Self.safeTop + 8, width: after - 16, height: 56)
         }
+        if acrossFold {
+            return CGRect(x: (screen.width - Self.panelWidth) / 2 + 8, y: Self.safeTop + 8, width: Self.panelWidth - 16, height: 56)
+        }
         return CGRect(x: 8, y: Self.safeTop + 8, width: screen.width - 16, height: 56)
     }
+
+    /// An open Duo lying flat: the field and its rows are one panel over the fold.
+    private var acrossFold: Bool { !foldBent && fold.map { $0.height > $0.width } == true }
+    /// About two thirds of the open screen: lines stay readable, the page stays in sight.
+    private static let panelWidth: CGFloat = 640
 
     private static var safeTop: CGFloat { safeInsets.top }
 
@@ -144,9 +152,12 @@ struct CommandBarView: View {
             .padding(.horizontal, 8)
             .padding(.top, 8)
             .padding(.bottom, 4)
-            // On a Duo bent open, to one side of the fold like the bar it grew from.
-            .environment(\.fold, foldBent ? fold : nil)
+            .frame(maxWidth: acrossFold ? Self.panelWidth : nil)
+            .frame(maxWidth: .infinity)
+            // On a Duo bent open, to one side of the bend like the bar it grew from.
             .keepsOffFold()
+            // Centred on the screen, not on what the clock's strip leaves.
+            .ignoresSafeArea(.container, edges: acrossFold ? .horizontal : [])
         }
         .onAppear {
             HitchWatch.note("appeared")

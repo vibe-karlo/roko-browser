@@ -4,6 +4,7 @@ import SwiftUI
 /// The tab switcher, after Arc: your tabs as big overlapping page cards that
 /// scroll sideways, the focused one's name above it. Tap a card to open it,
 /// throw it up to close it. Pull the bottom row up to go back to your page.
+/// On an open iPhone Duo there's room for more: a grid of wide cards, each page's top whole.
 struct TabStackView: View {
     @Environment(BrowserModel.self) private var browser
     @Query private var todos: [Todo]
@@ -27,6 +28,8 @@ struct TabStackView: View {
             // Most of the focused card shows; the next one just overlaps its edge.
             // Sideways there's room for each card whole, side by side.
             let stride = sideways ? cardWidth + 14 : (cardWidth * 0.87).rounded()
+            // No other iPhone is this roomy both ways.
+            let isGrid = min(proxy.size.width, proxy.size.height) >= 600
 
             VStack(spacing: 0) {
                 // Pins live above the address field, not here.
@@ -37,6 +40,8 @@ struct TabStackView: View {
                         .font(.system(size: 15))
                         .foregroundStyle(Theme.secondaryInk)
                         .frame(height: cardHeight + 40)
+                } else if isGrid {
+                    grid(width: proxy.size.width, columns: sideways ? 3 : 2)
                 } else {
                     carousel(cardWidth: cardWidth, stride: stride, cardHeight: cardHeight,
                              screenWidth: proxy.size.width, stacks: !sideways)
@@ -44,7 +49,7 @@ struct TabStackView: View {
 
                 Spacer(minLength: 0)
                 reopenOffer
-                bottomRow
+                bottomRow(compact: isGrid)
                     .padding(.bottom, max(proxy.safeAreaInsets.bottom, 12))
             }
         }
@@ -64,6 +69,42 @@ struct TabStackView: View {
         .animation(.snappy(duration: 0.3), value: closedHere)
         .animation(.snappy(duration: 0.3), value: browser.closedGroup == nil)
         .animation(.snappy(duration: 0.3), value: browser.recentlyClosed.count)
+    }
+
+    // MARK: Grid
+
+    private func grid(width: CGFloat, columns: Int) -> some View {
+        let margin: CGFloat = 16, gap: CGFloat = 18
+        let cardWidth = ((width - margin * 2 - gap * CGFloat(columns - 1)) / CGFloat(columns)).rounded(.down)
+        let cardHeight = (cardWidth * 0.64).rounded()
+        return ScrollViewReader { reader in
+            ScrollView {
+                TileGrid(columns: columns, gap: gap) {
+                    ForEach(browser.tabs) { tab in
+                        TabTile(tab: tab, width: cardWidth, height: cardHeight,
+                                isCurrent: tab.id == browser.selectedID,
+                                open: { open(tab) },
+                                close: { close(tab) },
+                                closeAll: browser.tabs.count > 1 ? { browser.closeAllTabs() } : nil,
+                                split: canSplit(with: tab) ? { browser.panel = .none; browser.startSplit(with: tab) } : nil)
+                        .id(tab.id)
+                    }
+                }
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity)
+            }
+            .scrollIndicators(.hidden)
+            // Cards leaving at either end fade rather than being sliced off.
+            .mask {
+                VStack(spacing: 0) {
+                    LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: 14)
+                    Color.black
+                    LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: 18)
+                }
+            }
+            .onAppear { reader.scrollTo(browser.selectedID, anchor: .center) }
+            .animation(.snappy(duration: 0.3), value: browser.tabs.map(\.id))
+        }
     }
 
     // MARK: Cards
@@ -184,26 +225,27 @@ struct TabStackView: View {
 
     /// The selected page, blurred far out of focus: the switcher takes on the
     /// colour of where you were, the way Arc's does.
-    @ViewBuilder
     private var backdrop: some View {
-        ZStack {
-            Theme.canvas
-            if let snapshot = browser.selectedTab?.snapshot {
-                Image(uiImage: snapshot)
-                    .resizable()
-                    .scaledToFill()
-                    .blur(radius: 60, opaque: true)
-                    // Low enough that a white page tints the dark rather than greying it.
-                    .opacity(0.14)
+        // Over the canvas, not beside it: the picture's own width mustn't size this.
+        Theme.canvas
+            .overlay {
+                if let snapshot = browser.selectedTab?.snapshot {
+                    Image(uiImage: snapshot)
+                        .resizable()
+                        .scaledToFill()
+                        .blur(radius: 60, opaque: true)
+                        // Low enough that a white page tints the dark rather than greying it.
+                        .opacity(0.14)
+                }
             }
-        }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
+            .clipped()
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
     }
 
     // MARK: Bottom row
 
-    private var bottomRow: some View {
+    private func bottomRow(compact: Bool) -> some View {
         HStack(spacing: 0) {
             roundButton(.eyeClosed, "New private tab") {
                 browser.showCommandBar(mode: .privateTab)
@@ -227,6 +269,9 @@ struct TabStackView: View {
         }
         .padding(.horizontal, Theme.gutter + 8)
         .padding(.top, 16)
+        // On the wide grid, together under it rather than flung to the edges.
+        .frame(maxWidth: compact ? 500 : nil)
+        .frame(maxWidth: .infinity)
         .contentShape(.rect)
         .highPriorityGesture(pullUp)
     }
@@ -373,9 +418,17 @@ private struct TabCard: View {
     /// A private tab while it's locked: no picture, no name, no site.
     private var isHidden: Bool { tab.isPrivate && PrivacyLock.shared.hides(tab.id) }
 
-    @ViewBuilder
-    private var preview: some View {
-        if isHidden {
+    private var preview: some View { TabPicture(tab: tab, width: width, height: height) }
+}
+
+/// A tab's picture: the page as it last looked, or what stands in for it.
+private struct TabPicture: View {
+    let tab: BrowserTab
+    let width: CGFloat
+    let height: CGFloat
+
+    var body: some View {
+        if tab.isPrivate && PrivacyLock.shared.hides(tab.id) {
             Theme.raised.overlay {
                 Glyph(.lock, size: 40).foregroundStyle(Theme.secondaryInk)
             }
@@ -392,6 +445,105 @@ private struct TabCard: View {
                 SiteIcon(host: tab.url?.displayHost ?? "", size: 44)
             }
         }
+    }
+}
+
+/// Row under row. One layout for all of them, so a card slides to
+/// its new place when one before it closes.
+private struct TileGrid: Layout {
+    let columns: Int
+    let gap: CGFloat
+    private let rowGap: CGFloat = 16
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let tile = subviews.first?.sizeThatFits(.unspecified) else { return .zero }
+        let rows = CGFloat((subviews.count + columns - 1) / columns)
+        return CGSize(width: tile.width * CGFloat(columns) + gap * CGFloat(columns - 1),
+                      height: tile.height * rows + rowGap * (rows - 1))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let tile = subviews.first?.sizeThatFits(.unspecified) else { return }
+        for (index, subview) in subviews.enumerated() {
+            let x = bounds.minX + CGFloat(index % columns) * (tile.width + gap)
+            let y = bounds.minY + CGFloat(index / columns) * (tile.height + rowGap)
+            subview.place(at: CGPoint(x: x, y: y), proposal: .unspecified)
+        }
+    }
+}
+
+/// One tab in the wide grid: its page's top, and under it its name and the way
+/// to close it, bare on the dark rather than in a chip over the page.
+private struct TabTile: View {
+    let tab: BrowserTab
+    let width: CGFloat
+    let height: CGFloat
+    let isCurrent: Bool
+    let open: () -> Void
+    let close: () -> Void
+    var closeAll: (() -> Void)? = nil
+    var split: (() -> Void)? = nil
+
+    private var isHidden: Bool { tab.isPrivate && PrivacyLock.shared.hides(tab.id) }
+
+    static let labelHeight: CGFloat = 46
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Color.clear
+                .frame(width: width, height: height)
+                .overlay(alignment: .top) { TabPicture(tab: tab, width: width, height: height) }
+                .clipShape(.rect(cornerRadius: 18))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18).strokeBorder(.white.opacity(0.08))
+                }
+                // The tab you were on: a ring clear of the card, which any page's
+                // colour could swallow if it lay on it.
+                .overlay {
+                    if isCurrent {
+                        RoundedRectangle(cornerRadius: 22)
+                            .strokeBorder(Theme.ink.opacity(0.8), lineWidth: 2)
+                            .padding(-4)
+                    }
+                }
+                .contentShape(.rect(cornerRadius: 18))
+                .onTapGesture(perform: open)
+                .contextMenu {
+                    if let split, !isHidden {
+                        Button(action: split) { Label("Open in Split View", image: "phosphor/split") }
+                    }
+                    Button(role: .destructive, action: close) { Label("Close Tab", image: "phosphor/close") }
+                    if let closeAll {
+                        Button(role: .destructive, action: closeAll) { Label("Close All Tabs", image: "phosphor/close") }
+                    }
+                }
+            HStack(spacing: 8) {
+                SiteIcon(host: isHidden ? "" : tab.url?.displayHost ?? "", size: 18)
+                if tab.isPrivate {
+                    Glyph(.eyeClosed, size: 15).foregroundStyle(Theme.secondaryInk)
+                }
+                if !isHidden {
+                    Text(tab.displayTitle)
+                        .font(.system(size: 14, weight: .medium))
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Button(action: close) {
+                    Glyph(.close, size: 14, weight: 2)
+                        .foregroundStyle(Theme.secondaryInk)
+                        .frame(width: 44, height: TabTile.labelHeight - 6)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(GlyphButtonStyle())
+                .accessibilityLabel("Close tab")
+            }
+            .padding(.leading, 4)
+            .frame(width: width)
+            .contentShape(.rect)
+            .onTapGesture(perform: open)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(isHidden ? "Private tab, locked" : tab.displayTitle)
     }
 }
 

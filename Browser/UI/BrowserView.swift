@@ -34,7 +34,7 @@ struct BrowserView: View {
             }
             .animation(.easeOut(duration: 0.2), value: browser.topTab?.topColor)
 
-            if sideBar || splitBesideClock {
+            if sideBar || splitBesideClock || besideFold != nil {
                 Color.black.ignoresSafeArea()
             }
 
@@ -119,27 +119,9 @@ struct BrowserView: View {
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.leading + $0.safeAreaInsets.trailing } action: { sideInsets = $0 }
         .overlay(alignment: .trailing) {
             if sideBar {
-                VStack(spacing: 0) {
-                    if closesBeside {
-                        // Back to the answer alone: first in the column, as Close is.
-                        Button { browser.closeBeside() } label: {
-                            Glyph(.close, size: 16, weight: 2)
-                                .frame(width: 38, height: 38)
-                                .background(Theme.raised, in: .circle)
-                                .frame(width: 56, height: 52)
-                                .contentShape(.rect)
-                        }
-                        .buttonStyle(GlyphButtonStyle())
-                        .environment(\.colorScheme, .dark)
-                        .accessibilityLabel("Close this page")
-                    }
-                    BottomBar(upright: true)
-                        .frame(maxHeight: .infinity)
-                }
-                .frame(width: max(sideStrip, 56))
-                .frame(maxHeight: .infinity)
-                // On a Duo the clock has the top of the column.
-                .padding(.top, uprightFold == nil ? 0 : closesBeside ? 106 : 72)
+                BottomBar(upright: true)
+                    .frame(width: max(sideStrip, 56))
+                    .frame(maxHeight: .infinity)
                     .opacity(browser.launcherShown || browser.panel == .tabs || browser.pageBecomingSummary || browser.hidingItems != nil ? 0 : 1)
                     .allowsHitTesting(browser.hidingItems == nil)
                     .animation(.launcher, value: browser.launcherShown)
@@ -148,9 +130,31 @@ struct BrowserView: View {
         }
         .overlay(alignment: .bottom) {
             // The command bar takes the bar's place rather than stacking on top of it.
-            BottomBar()
-                // On an open Duo, to one side of the fold rather than across it.
-                .keepsOffFold()
+            HStack(spacing: 0) {
+                if closesBeside && !browser.isBarCollapsed {
+                    // Back to the answer or the list alone, beside the bar.
+                    Button { browser.closeBeside() } label: {
+                        Glyph(.close, size: 16, weight: 2)
+                            .frame(width: Theme.barHeight + 8, height: Theme.barHeight + 8)
+                            .barSurface(cornerRadius: (Theme.barHeight + 8) / 2)
+                            .contentShape(.circle)
+                    }
+                    .buttonStyle(GlyphButtonStyle())
+                    .padding(.leading, Theme.gutter)
+                    .padding(.bottom, 4)
+                    .transition(.opacity)
+                    .accessibilityLabel("Close this page")
+                }
+                BottomBar()
+            }
+                .animation(.snappy(duration: 0.28), value: browser.isBarCollapsed)
+                // On an open Duo the normal bar, at a bar's width, not stretched
+                // across the screen. Bent, to one side of the bend; beside an
+                // answer or a list, on the page's side; in a split, under the page it works.
+                .frame(maxWidth: uprightFold != nil ? 480 : nil)
+                .keepsOffFold(prefer: barSide, evenFlat: barSide != nil)
+                .animation(.snappy(duration: 0.28), value: barSide)
+                .ignoresSafeArea(.container, edges: uprightFold != nil ? .horizontal : [])
                 .opacity(sideBar || browser.splitList != nil ? 0 : 1)
                 .allowsHitTesting(!sideBar && browser.splitList == nil)
                 .opacity(browser.launcherShown || browser.panel == .tabs || browser.pageBecomingSummary || browser.hidingItems != nil ? 0 : 1)
@@ -256,7 +260,7 @@ struct BrowserView: View {
                     .compositingGroup()
                     .padding(.bottom, Theme.barHeight + 20 + playerLift)
                     // Never across the fold of an open Duo.
-                    .keepsOffFold(preferTrailing: true)
+                    .keepsOffFold(prefer: .trailing)
                     .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
                                             removal: .opacity.animation(.easeOut(duration: 0.12))))
                     .allowsHitTesting(false)
@@ -358,7 +362,7 @@ struct BrowserView: View {
             activity.title = page.title
             activity.isEligibleForHandoff = true
         }
-        .background(StatusBarStyler(style: statusBarStyle))
+        .background(StatusBarStyler(style: statusBarStyle, hidden: hidesClockOverPage))
         // Every toast confirms something done (copied, pinned, translating): a tick to feel it.
         .sensoryFeedback(.impact(weight: .light), trigger: browser.toast) { _, toast in toast != nil }
         .animation(.snappy(duration: 0.25), value: browser.toast)
@@ -461,9 +465,18 @@ struct BrowserView: View {
 
     /// The mini player shows over the page and the bar, not over a panel or a screen of roko's own.
     /// Turned sideways on a page: the bar leaves the bottom for the strip at the side.
-    /// An open Duo in landscape too, under its clock, where the system puts controls.
+    /// Not on an open Duo: the page fills the screen there, with the normal bar over it.
     private var sideBar: Bool {
-        (verticalSizeClass == .compact || uprightFold != nil) && browser.selectedTab != nil
+        verticalSizeClass == .compact && uprightFold == nil && browser.selectedTab != nil
+    }
+
+    /// On an open Duo in landscape the clock's strip runs down the side, and over a
+    /// page filling the screen it would sit on the site's own menu. So the clock
+    /// goes while a page is on screen, and comes back with roko's own full screens.
+    private var hidesClockOverPage: Bool {
+        guard uprightFold != nil, browser.selectedTab != nil, browser.reader == nil, browser.cook == nil,
+              !browser.showsOnboarding, besideFold != nil || browser.browseForMe == nil else { return false }
+        return [.none, .tools, .downloads, .notifyMe].contains(browser.panel)
     }
 
     /// The fold when it runs top to bottom: an open Duo in landscape.
@@ -476,6 +489,13 @@ struct BrowserView: View {
         browser.screenBeside ? uprightFold : nil
     }
 
+    /// Which half of an open Duo the bar has to keep to, when it does.
+    private var barSide: HorizontalEdge? {
+        if besideFold != nil { return .trailing }
+        guard uprightFold != nil, splitHalves != nil else { return nil }
+        return browser.split?.bottom == browser.selectedID ? .trailing : .leading
+    }
+
     /// The tab beside came from the answer or the list, and has a way back to them.
     private var closesBeside: Bool { browser.pageBeside && besideFold != nil }
 
@@ -486,7 +506,7 @@ struct BrowserView: View {
     }
 
     /// A Duo with its clock at the side, not turned the way the bar moves there.
-    private var clockBeside: Bool { !sideBar && sideInsets > 0 }
+    private var clockBeside: Bool { !sideBar && sideInsets > 0 && uprightFold == nil }
 
     /// Split with the clock at the side: black runs on under it. Turned, with
     /// the clock on top, that band keeps the top page's colour.
@@ -505,14 +525,16 @@ struct BrowserView: View {
         return browser.splitPickingTop.map { ($0, nil) }
     }
 
-    /// The tab on screen, or the two halves of a split.
+    /// The tab on screen, or the two halves of a split. On an open Duo the bar is
+    /// narrower than the page, which runs on under it: told where the bar starts,
+    /// it would stop there, leaving a blank band across the screen either side.
     @ViewBuilder
     private var pages: some View {
         // Picking the second page and showing it are one view, for the same reason.
         if let halves = splitHalves {
-            SplitPages(top: halves.top, bottom: halves.bottom, barTop: sideBar ? .greatestFiniteMagnitude : barTop)
+            SplitPages(top: halves.top, bottom: halves.bottom, barTop: sideBar || uprightFold != nil ? .greatestFiniteMagnitude : barTop)
         } else if let tab = browser.selectedTab {
-            PagePane(tab: tab, barTop: sideBar || standsOnFold ? .greatestFiniteMagnitude : barTop)
+            PagePane(tab: tab, barTop: sideBar || standsOnFold || uprightFold != nil ? .greatestFiniteMagnitude : barTop)
         }
     }
 
@@ -521,15 +543,12 @@ struct BrowserView: View {
         // The summary and Browse for Me sit on the app's own canvas.
         if browser.showsOnboarding { return .lightContent }  // the welcome is always dark
         if browser.cook != nil || uprightFold != nil && browser.reader != nil { return .default }  // the paper follows the theme
-        if splitBesideClock || besideFold != nil && browser.panel != .command { return .lightContent }  // on the black beside the page
+        if splitBesideClock { return .lightContent }  // on the black beside the halves
         if browser.summary != nil || browser.browseForMe != nil || browser.panel == .todos || browser.panel == .today
             || browser.panel == .shopping || browser.panel == .readLater || browser.digest != nil {
             return .default
         }
         if browser.panel == .tabs { return .lightContent }  // the switcher is always dark
-        if sideBar && uprightFold != nil && browser.reader == nil && browser.panel != .command {
-            return .lightContent  // the column beside the page
-        }
         guard let color = browser.topTab?.topColor else { return .default }
         return color.isLight ? .darkContent : .lightContent
     }
@@ -727,8 +746,8 @@ private struct BottomPanel<Content: View>: View {
                         .fill(Theme.panel)
                         .ignoresSafeArea(edges: .bottom)
                 }
-                // On an open Duo it rises on the side of its button, in the column.
-                .keepsOffFold(preferTrailing: true)
+                // On a Duo bent open it rises on one side of the bend. Lying flat, in the middle.
+                .keepsOffFold(prefer: .trailing)
                 .offset(y: max(0, drag))
                 .gesture(DragGesture()
                     .onChanged { drag = $0.translation.height }

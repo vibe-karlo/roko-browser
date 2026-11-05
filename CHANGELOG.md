@@ -29,11 +29,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - On iPhone Duo held open sideways, a summary sits beside the page, which stays live, instead of the page shrinking into a card.
 - Cook Mode, on any iPhone: on a page that publishes a recipe, one step at a time in big text with the ingredients to tick off, and the screen stays awake. On iPhone Duo propped open the step stands above the fold and the rest lies below it. From the page menu, or type "cook". Amounts and steps are the site's own, not written by AI.
 - Timers in Cook Mode: tap a time in a step ("30 mins", "pola sata") and it counts down on screen, on the Lock Screen and in the Dynamic Island, then rings as an alarm through silent mode, even with roko closed. A range counts as its lower end, to look too early rather than burn it.
+- On an open iPhone Duo, the tab switcher is a grid of wide cards, each with its name and a close button under it.
 
 ### Changed
 - Turned sideways, tab cards sit side by side instead of overlapping.
 - On iPhone Duo lying flat, the bar's field runs across the screen like the keyboard. Bent open, it still keeps to one side of the fold.
-- On iPhone Duo held open sideways, the bar stands down the outer edge under the clock, as Apple asks, and the page menu opens beside it.
+- On iPhone Duo held open sideways, the page fills the whole screen, with the normal bar floating over it and folding away as you scroll. The clock shows on roko's own screens, not over a page, where it would sit on the site's menu.
+- On iPhone Duo lying flat, search is one panel across the fold, and the page menu opens in the middle. Bent, each keeps to one side of the bend.
 
 ### Fixed
 - Sign-in and payment windows work. A window a page opens now reaches the page that opened it, so it can hand back the sign-in and close itself, and roko returns to that page. Sites used to be told their pop-up was blocked.

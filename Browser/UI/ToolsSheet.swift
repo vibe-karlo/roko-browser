@@ -50,6 +50,9 @@ struct ToolsSheet: View {
                     LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
                         .frame(height: 6)
                     Color.black
+                    // And dissolve at the foot, where the sheet ends mid-row.
+                    LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 18)
                 }
             }
             .padding(.top, 14)

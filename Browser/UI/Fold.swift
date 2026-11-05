@@ -17,14 +17,19 @@ extension View {
     /// Reads the fold off the screen and hands it down.
     func readsFold() -> some View { modifier(FoldReader()) }
 
-    /// Keeps a control to one half of an open Duo, the roomier one, rather
-    /// than straddling the fold. Unchanged anywhere there's no fold.
-    func keepsOffFold(preferTrailing: Bool = false) -> some View { modifier(OffFold(preferTrailing: preferTrailing)) }
+    /// Keeps a control to one half of a Duo bent open, the roomier one, rather
+    /// than straddling the bend. Lying flat there's no bend to avoid, unless it
+    /// has to stay `evenFlat` on its half. Unchanged anywhere there's no fold.
+    func keepsOffFold(prefer: HorizontalEdge? = nil, evenFlat: Bool = false) -> some View {
+        modifier(OffFold(prefer: prefer, evenFlat: evenFlat))
+    }
 }
 
 private struct OffFold: ViewModifier {
-    var preferTrailing = false
+    var prefer: HorizontalEdge?
+    var evenFlat = false
     @Environment(\.fold) private var fold
+    @Environment(\.foldBent) private var bent
     @State private var room: CGRect = .zero
 
     func body(content: Content) -> some View {
@@ -37,13 +42,18 @@ private struct OffFold: ViewModifier {
     }
 
     /// The wider half beside an upright fold, in this view's own space. Or the
-    /// trailing one if asked and it has the room, nearest the controls down that edge.
+    /// side asked for, if it has the room.
     private var half: CGRect? {
-        guard let fold, fold.height > fold.width, room.width > 0,
+        guard let fold, bent || evenFlat, fold.height > fold.width, room.width > 0,
               fold.minX > room.minX, fold.maxX < room.maxX else { return nil }
         let before = fold.minX - room.minX
         let after = room.maxX - fold.maxX
-        return (preferTrailing ? after < 320 : before >= after)
+        let useLeading = switch prefer {
+        case .leading: before >= 320
+        case .trailing: after < 320
+        case nil: before >= after
+        }
+        return useLeading
             ? CGRect(x: 0, y: 0, width: before, height: room.height)
             : CGRect(x: fold.maxX - room.minX, y: 0, width: after, height: room.height)
     }
