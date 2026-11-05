@@ -5,3 +5,5 @@ DerivedData/
 build/
 Scripts/.cache/
 Scripts/compare/results.jsonl
+Scripts/compare/sites.jsonl
+Scripts/compare/sites-label.txt
