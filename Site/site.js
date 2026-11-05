@@ -316,13 +316,13 @@ const proofData = {
   },
   block: {
     unit: v => v.toFixed(0) + "%", low: false, head: "Blocks more than Brave.",
-    note: "Of the 122 hosts on d3ward's public ad and tracker list that at least one browser reached, the share each browser stopped. One run each, on roko 1.0 (9) and Lens 1.1.",
+    note: "Of the 122 hosts on d3ward's public ad and tracker list that at least one browser reached, the share each browser stopped. One run each, on a roko test build and Lens 1.1.",
     values: { roko: 83.6, brave: 66.4, arc: 64.8, lens: 54.9, safari: 44.3, duckduckgo: 24.6, firefox: 13.9, edge: 7.4, chrome: 0 },
   },
   speed: {
     unit: v => v.toFixed(2) + " s", low: true, head: "Beats Chrome and Safari.",
-    note: "From opening a link to a small test page on local Wi-Fi until it finished loading. Median of 3 or 4 runs, taking browsers in turn, on roko 1.0 (9) and Lens 1.1.",
-    values: { lens: 1.05, roko: 1.15, edge: 1.23, firefox: 1.25, brave: 1.32, chrome: 1.38, arc: 1.41, safari: 1.55, duckduckgo: 1.84 },
+    note: "From opening a link to a small test page on local Wi-Fi until it finished loading. Median of 20 runs each for roko 0.1.1 and Lens 1.1, taken in turn, and 3 or 4 for the others.",
+    values: { roko: 1.04, lens: 1.04, edge: 1.23, firefox: 1.25, brave: 1.32, chrome: 1.38, arc: 1.41, safari: 1.55, duckduckgo: 1.84 },
   },
 };
 const proofMethod = " iPhone 17 Pro, iOS 27.2, 5 November 2026. Safari 27.2, Chrome 157, Firefox 159, Edge 156, Brave 1.98, DuckDuckGo 7.244, Arc Search 1.49. Yours will vary. ";
