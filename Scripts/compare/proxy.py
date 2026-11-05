@@ -3,16 +3,15 @@
 
     Scripts/compare/proxy.py [port]
 
-Point the iPhone's Wi-Fi at it (Settings, Wi-Fi, the network, Configure Proxy,
-Manual: the Mac's address and this port). HTTPS stays encrypted and is only passed
-along: this sees which server each connection goes to and how many bytes moved,
-never the pages. run_sites.sh names what's being tested in sites-label.txt, and
-each connection is written to sites.jsonl under that name.
+A debug build of roko uses it with the launch argument -proxy 127.0.0.1:8766. HTTPS stays
+encrypted and is only passed along: this sees which server each connection goes to and how
+many bytes moved, never the pages. Each connection is written to hosts.jsonl under the name
+in hosts-label.txt, which says what's being tested.
 """
 import json, pathlib, select, socket, sys, threading, time
 
 here = pathlib.Path(__file__).parent
-label_file, out = here / "sites-label.txt", here / "sites.jsonl"
+label_file, out = here / "hosts-label.txt", here / "hosts.jsonl"
 lock = threading.Lock()
 
 

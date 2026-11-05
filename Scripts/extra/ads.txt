@@ -44,3 +44,8 @@ glas-slavonije.hr##.iat-adhesion-bar
 ||adtech.yahooinc.com^$third-party
 ||gemini.yahoo.com^$third-party
 ||unityads.unity3d.com^$third-party
+
+! Found loading on ad-heavy sites through Scripts/compare/proxy.py.
+||cricketleaf.com^
+||ads.thesun.co.uk^
+||snippet.affilimatejs.com^

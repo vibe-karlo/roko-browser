@@ -6,4 +6,5 @@ build/
 Scripts/.cache/
 Scripts/compare/results.jsonl
 Scripts/compare/sites.jsonl
-Scripts/compare/sites-label.txt
+Scripts/compare/hosts.jsonl
+Scripts/compare/hosts-label.txt

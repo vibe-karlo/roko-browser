@@ -411,6 +411,10 @@ Reminders (`Today/DailyReminders.swift`) are local and passive (no sound): 8:30 
 been opened that day, 16:00 if today's to-dos are open. They're worked out again whenever roko
 goes to the background or Today opens, so one never reports something already done.
 
+## Comparing browsers
+
+`Scripts/compare` tests browsers the same way: link to page and hosts blocked on an iPhone (`server.py` and `run_phone.sh`, against d3ward's public list), data used on ad-heavy sites on an iPhone (`run_sites.sh`, which counts the whole phone, so it's noisy) or in the simulator (`run_sim_sites.py`), and which servers a site reaches in roko (`proxy.py`, with a debug build's `-proxy 127.0.0.1:8766`).
+
 ## Sharing answers
 
 The app no longer shares answers: public pages would need reporting and moderation, so the Share

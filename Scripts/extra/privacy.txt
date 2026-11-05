@@ -16,3 +16,6 @@
 ||adfstat.yandex.ru^$third-party
 ||appmetrica.yandex.ru^$third-party
 ||metrika.yandex.ru^$third-party
+
+! Found loading on ad-heavy sites through Scripts/compare/proxy.py.
+||ptr.thesun.co.uk^

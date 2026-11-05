@@ -1,5 +1,8 @@
 import UIKit
 import WebKit
+#if DEBUG
+import Network
+#endif
 
 enum WebViewFactory {
     /// One web view built ahead of time, so the first page skips WebKit's setup cost.
@@ -44,6 +47,16 @@ enum WebViewFactory {
     private static func build(isPrivate: Bool) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = isPrivate ? privateStore : .default()
+        #if DEBUG
+        // Scripts/compare/proxy.py sees which servers a page reaches: -proxy 127.0.0.1:8766
+        let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of: "-proxy"), index + 1 < arguments.count {
+            let parts = arguments[index + 1].split(separator: ":").map(String.init)
+            configuration.websiteDataStore.proxyConfigurations = [
+                ProxyConfiguration(httpCONNECTProxy: .hostPort(host: .init(parts[0]), port: .init(parts[1])!))
+            ]
+        }
+        #endif
         configuration.allowsInlineMediaPlayback = true
         // Video in its own window while you do something else (the mini player's button).
         configuration.allowsPictureInPictureMediaPlayback = true
