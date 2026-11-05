@@ -19,10 +19,11 @@ extension View {
 
     /// Keeps a control to one half of an open Duo, the roomier one, rather
     /// than straddling the fold. Unchanged anywhere there's no fold.
-    func keepsOffFold() -> some View { modifier(OffFold()) }
+    func keepsOffFold(preferTrailing: Bool = false) -> some View { modifier(OffFold(preferTrailing: preferTrailing)) }
 }
 
 private struct OffFold: ViewModifier {
+    var preferTrailing = false
     @Environment(\.fold) private var fold
     @State private var room: CGRect = .zero
 
@@ -35,13 +36,14 @@ private struct OffFold: ViewModifier {
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { room = $0 }
     }
 
-    /// The wider half beside an upright fold, in this view's own space.
+    /// The wider half beside an upright fold, in this view's own space. Or the
+    /// trailing one if asked and it has the room, nearest the controls down that edge.
     private var half: CGRect? {
         guard let fold, fold.height > fold.width, room.width > 0,
               fold.minX > room.minX, fold.maxX < room.maxX else { return nil }
         let before = fold.minX - room.minX
         let after = room.maxX - fold.maxX
-        return before >= after
+        return (preferTrailing ? after < 320 : before >= after)
             ? CGRect(x: 0, y: 0, width: before, height: room.height)
             : CGRect(x: fold.maxX - room.minX, y: 0, width: after, height: room.height)
     }

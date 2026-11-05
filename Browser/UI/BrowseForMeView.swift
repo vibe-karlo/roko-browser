@@ -10,6 +10,7 @@ import WebKit
 /// Full screen, like Summarize. A switch at the bottom flips the whole page to
 /// the search engine's results for the latest question and back, losing nothing.
 struct BrowseForMeView: View {
+    @Environment(\.fold) private var fold
     @Environment(BrowserModel.self) private var browser
     @Bindable var session: BrowseSession
     /// Pairs each site's icon in a reading list with the same icon in its source row.
@@ -152,6 +153,11 @@ struct BrowseForMeView: View {
     }
 
     private func open(_ url: URL) {
+        // On an open Duo it stands beside the answer, which stays where it was.
+        if let fold, fold.height > fold.width {
+            browser.openBeside(url)
+            return
+        }
         browser.browseForMe = nil
         browser.open(url, inNewTab: true)
     }

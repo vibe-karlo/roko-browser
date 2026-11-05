@@ -136,8 +136,13 @@ final class BrowserModel {
     var browseForMe: BrowseSession? {
         // An answer that's closed or replaced stops working on the spot:
         // nobody will read it, so it shouldn't keep searching or spending tokens.
-        didSet { if oldValue !== browseForMe { oldValue?.cancel() } }
+        didSet {
+            if oldValue !== browseForMe { oldValue?.cancel() }
+            if browseForMe == nil { answerBeside = false }
+        }
     }
+    /// The tab on screen is a source standing beside the answer (BrowseForMeView).
+    var answerBeside = false
     var reader: ReaderModel?
     /// Summarize all, over Read Later.
     var digest: DigestModel? {
@@ -1113,6 +1118,22 @@ final class BrowserModel {
         let model = ReaderModel(host: tab.url?.displayHost ?? "")
         presentAfterPanelCloses { self.reader = model }
         Task { await model.load(from: webView) }
+    }
+
+    /// A source from Browse for Me, beside the answer on an open Duo. Another
+    /// source takes its place, rather than a tab for each.
+    func openBeside(_ url: URL) {
+        if answerBeside, let tab = selectedTab {
+            tab.load(url)
+        } else {
+            open(url, inNewTab: true)
+            answerBeside = true
+        }
+    }
+
+    func closeBeside() {
+        answerBeside = false
+        if let tab = selectedTab { close(tab) }
     }
 
     func browse(for query: String) {
