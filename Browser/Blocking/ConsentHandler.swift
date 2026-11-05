@@ -31,11 +31,29 @@ final class ConsentHandler: NSObject, WKScriptMessageHandlerWithReply {
     private let defaults = UserDefaults.standard
     private static let acceptKey = "consent.acceptedHosts"
 
-    lazy var scripts: [WKUserScript] = [("consent-main", true), ("consent-frame", false)].compactMap { name, mainOnly in
-        guard let url = Bundle.main.url(forResource: name, withExtension: "js"),
-              let source = try? String(contentsOf: url, encoding: .utf8) else { return nil }
-        // At the start, so Autoconsent can keep a known pop-up hidden while it answers it.
-        return WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: mainOnly, in: Self.world)
+    /// Half a megabyte of rules: at a page's start it cost every page more time than
+    /// the rest of roko's work on it (measured against Lens on an iPhone). So only this
+    /// small script goes in up front, and asks for the rules once the page has loaded,
+    /// or after 0.4 s on a page still loading.
+    lazy var scripts: [WKUserScript] = [WKUserScript(source: """
+        (() => {
+            let asked = false;
+            const ask = () => {
+                if (asked) return;
+                asked = true;
+                window.webkit.messageHandlers.\(Self.handlerName).postMessage({ type: "rokoLoad" });
+            };
+            if (document.readyState === "complete") return ask();
+            addEventListener("load", ask, { once: true });
+            setTimeout(ask, 400);
+        })();
+        """, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: Self.world)]
+
+    private lazy var mainRules = Self.source("consent-main")
+    private lazy var frameRules = Self.source("consent-frame")
+
+    private static func source(_ name: String) -> String? {
+        Bundle.main.url(forResource: name, withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) }
     }
 
     // MARK: Per-site choice
@@ -75,6 +93,12 @@ final class ConsentHandler: NSObject, WKScriptMessageHandlerWithReply {
         }
 
         switch type {
+        case "rokoLoad":
+            if let rules = message.frameInfo.isMainFrame ? mainRules : frameRules {
+                _ = try? await webView.evaluateJavaScript(rules, in: message.frameInfo, contentWorld: Self.world)
+            }
+            return (nil, nil)
+
         case "popupFound":
             return (["type": acceptance(for: host) == nil ? "optOut" : "optIn"], nil)
 

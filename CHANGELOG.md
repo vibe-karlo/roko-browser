@@ -8,12 +8,18 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ### Website
 - roko has a site in `Site/`, phone first: a live iPhone in true proportions with the bar and a working keyboard, speed numbers, a draggable summary, a before and after slider, Split View with a divider to drag, a made-up page to tap things away on, a private switch to try, hold to speak to try, a to-do widget and a shopping list that really tick, which AI runs where, iPhone Duo in the questions, a link to the code on GitHub, support and the privacy policy.
 
+### Changed
+- Pages load faster: the half-megabyte of cookie pop-up rules now loads after the page rather than before it, and the block lists start loading sooner at launch. A known pop-up can show for a moment before it's answered.
+
 ### Added
 - Pins, to-dos and shopping lists show up in iPhone search. A tap opens the page or the list.
+- On iPhone Duo held open sideways, Reader is a book: a page each side of the fold, a real page curl, and text size down the outer edge. Words and paragraphs carry across a turn, and a heading stays with its text.
+- On iPhone Duo held open sideways, a source tapped in Browse for Me opens beside the answer, on the other side of the fold.
 
 ### Changed
 - Turned sideways, tab cards sit side by side instead of overlapping.
 - On iPhone Duo lying flat, the bar's field runs across the screen like the keyboard. Bent open, it still keeps to one side of the fold.
+- On iPhone Duo held open sideways, the bar stands down the outer edge under the clock, as Apple asks, and the page menu opens beside it.
 
 ### Fixed
 - No gap under what a page pins to the bottom when the bar folds away above a band, or under YouTube's bar at the screen's edge.

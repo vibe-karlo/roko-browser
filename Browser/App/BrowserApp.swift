@@ -12,6 +12,8 @@ struct BrowserApp: App {
 
     init() {
         LaunchClock.mark("appInit")
+        // From the very start: a page asked for at launch waits for the lists.
+        Task { await ContentBlocker.shared.prepare() }
         container = Store.makeContainer()
         // Before launch finishes, so a tap on a notification that opens roko isn't missed.
         UNUserNotificationCenter.current().delegate = NotificationRouter.shared
