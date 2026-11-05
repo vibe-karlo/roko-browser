@@ -74,6 +74,11 @@ final class CosmeticFilter: NSObject, WKScriptMessageHandlerWithReply {
 
     func userContentController(_ userContentController: WKUserContentController,
                                didReceive message: WKScriptMessage) async -> (Any?, String?) {
+        // The page script found and hid a site's own "disable your ad blocker" wall.
+        if let body = message.body as? [String: Any], let wall = body["wall"] as? String {
+            if LaunchClock.isEnabled { print("WALL \(body["host"] ?? "") \(wall)") }
+            return (nil, nil)
+        }
         guard let body = message.body as? [String: Any], let keys = body["keys"] as? [String] else {
             return (nil, nil)
         }

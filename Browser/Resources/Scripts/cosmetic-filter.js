@@ -87,18 +87,20 @@
     const s = getComputedStyle(el);
     return s.overflowY === "hidden" || s.overflow === "hidden" || s.position === "fixed";
   };
+  const unlock = () => {
+    for (const el of [document.documentElement, document.body]) {
+      if (!el) continue;
+      el.style.setProperty("overflow", "auto", "important");
+      if (getComputedStyle(el).position === "fixed") el.style.setProperty("position", "static", "important");
+    }
+  };
   const unlockIfNeeded = () => {
     const root = document.documentElement, body = document.body;
     if (!isLocked(root) && !isLocked(body)) return;
     const hidOne = overlays.some((selector) => {
       try { return document.querySelector(selector) !== null; } catch (_) { return false; }
     });
-    if (!hidOne) return;
-    for (const el of [root, body]) {
-      if (!el) continue;
-      el.style.setProperty("overflow", "auto", "important");
-      if (getComputedStyle(el).position === "fixed") el.style.setProperty("position", "static", "important");
-    }
+    if (hidOne) unlock();
   };
   // Sites often lock scrolling a moment after the pop-up would have appeared.
   for (const delay of [800, 2500, 6000]) setTimeout(() => overlays.length && unlockIfNeeded(), delay);
@@ -223,6 +225,79 @@
     else window.addEventListener("load", begin, { once: true });
   };
 
+  // MARK: Walls
+
+  // A box over the page saying "disable your ad blocker": a site's own wall,
+  // drawn by its own scripts under class names that change with every build,
+  // which is how it slips past the lists (the New York Post's does). Known by
+  // what it says and how it sits: a dialog, or pinned over the page, and big.
+  // Hidden with its backdrop, and scrolling given back. An article about ad
+  // blockers isn't pinned and runs longer than a notice, so it's left alone;
+  // a cookie notice doesn't talk about blockers, and is answered, not hidden.
+  const WALL_WORDS = /ad[\s-]?block|blokator\w* oglasa|blokiranj\w oglasa|werbeblock|bloqueur de pub|bloqueador de (anuncios|publicidad)|blocc\w (degli |della |di )?(annunci|pubblicit)|advertentieblok|blokad\w reklam|allow ads on|ads help keep|whitelist (us|this site|our site)|turn off your ad|disable your ad/i;
+  const WALL = "data-roko-wall";
+  let wallScans = 0, wallTimer = 0, wallStyle = null, pageLoaded = false;
+  const pinned = (el) => {
+    const s = getComputedStyle(el);
+    return s.position === "fixed" || s.position === "sticky";
+  };
+  const wallCandidates = () => {
+    const found = new Set();
+    for (const el of document.querySelectorAll("dialog[open], [role=dialog], [role=alertdialog], [aria-modal=true], [class*=adblock i], [id*=adblock i]")) found.add(el);
+    // Pinned boxes near the top of the tree: a wall is big, so its height is
+    // checked first and the style of only the big ones is asked for.
+    const tall = innerHeight * 0.2;
+    for (const el of document.querySelectorAll("body > *, body > * > *, body > * > * > *")) {
+      if (el.offsetHeight >= tall && pinned(el)) found.add(el);
+    }
+    return found;
+  };
+  const isWall = (el) => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width < innerWidth * 0.5 || rect.height < innerHeight * 0.2) return false;
+    if (typeof el.checkVisibility === "function" && !el.checkVisibility({ checkVisibilityCSS: true })) return false;
+    const text = (el.innerText || "").trim();
+    return text.length >= 20 && text.length <= 1500 && WALL_WORDS.test(text);
+  };
+  const hideWall = (box) => {
+    if (!wallStyle) {
+      wallStyle = document.createElement("style");
+      wallStyle.textContent = `[${WALL}]{display:none!important}`;
+      (document.head || document.documentElement).appendChild(wallStyle);
+    }
+    box.setAttribute(WALL, "");
+    // A backdrop drawn as a box of its own beside it: full-screen, pinned, wordless.
+    for (const sibling of box.parentElement ? box.parentElement.children : []) {
+      if (sibling === box || sibling.hasAttribute(WALL) || (sibling.innerText || "").trim()) continue;
+      const r = sibling.getBoundingClientRect();
+      if (r.width >= innerWidth * 0.9 && r.height >= innerHeight * 0.9 && pinned(sibling)) sibling.setAttribute(WALL, "");
+    }
+    unlock();
+    const name = box.tagName.toLowerCase() + (box.id ? "#" + box.id : "")
+      + (typeof box.className === "string" && box.className.trim() ? "." + box.className.trim().split(/\s+/).slice(0, 3).join(".") : "");
+    handler.postMessage({ host: location.hostname, wall: name }).catch(() => {});
+  };
+  const wallPass = () => {
+    wallTimer = 0;
+    if (!document.body || wallScans++ > 40) return;
+    for (const el of wallCandidates()) {
+      if (el.hasAttribute(WALL) || el.closest(`[${WALL}]`)) continue;
+      if (isWall(el)) hideWall(el);
+    }
+  };
+  const scheduleWallPass = (delay) => {
+    if (wallTimer) return;
+    wallTimer = setTimeout(wallPass, delay);
+  };
+  // A wall comes once the page has seen its ads fail: a few looks after
+  // load, then whenever the page adds to itself.
+  const armWalls = () => {
+    pageLoaded = true;
+    for (const delay of [1200, 3000, 6000, 12000]) setTimeout(() => scheduleWallPass(0), delay);
+  };
+  if (document.readyState === "complete") armWalls();
+  else addEventListener("load", armWalls, { once: true });
+
   // The first request goes with the next frame, for the first paint. Later
   // ones wait for the page to settle a little: a page building itself asked
   // once a frame, and eleven requests in twelve brought nothing back.
@@ -237,11 +312,13 @@
   schedule();
 
   new MutationObserver((records) => {
+    let added = false;
     for (const record of records) {
       if (record.type === "attributes") note(record.target);
-      else for (const node of record.addedNodes) scan(node);
+      else for (const node of record.addedNodes) { scan(node); added = true; }
     }
     if (pending.length) schedule();
+    if (added && pageLoaded) scheduleWallPass(800);
     // New slots appear as the page grows (infinite scroll, lazy sections).
     if (collapsing && lastPass) scheduleCollapse(0);
   }).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "id"] });

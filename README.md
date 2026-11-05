@@ -362,6 +362,14 @@ the app only with `-perf`.
   data once. The site is remembered, and Site Settings → Reject cookies shows and changes it.
 - **Two reloads** of the same page within two minutes offer "Allow cookies", as Arc does.
 
+A site's own "disable your ad blocker" wall is handled by the hiding script rather than the
+lists: its classes change with every build of the site (the New York Post's dialog carries
+twenty-two hashed ones), so no list keeps up. `cosmetic-filter.js` looks, a few times after
+load and when the page adds to itself, for a dialog or a big pinned box whose words are about
+ad blockers (eight languages), hides it with its backdrop, and gives scrolling back. An article
+about ad blockers isn't pinned and runs longer than a notice; a cookie notice doesn't mention
+blockers. With `-perf`, a `WALL` line names what was hidden.
+
 Cookie banners the cosmetic list hides are faded (opacity) for ten seconds before being
 removed, so Autoconsent can still find and answer them. Measured on an iPhone 17 Pro with the
 `-benchmark -benchConsent` harness, the scripts made no measurable difference to page loads:

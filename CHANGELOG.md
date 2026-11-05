@@ -35,6 +35,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Versions go 0.1.x: the number rises only when a build goes to public testing, and private testing moves only the build number. 0.1.1 is on public testing, and the next public version is 0.1.2.
 
 ### Added
+- "Disable your ad blocker" walls are taken down. A site's own anti-blocking wall is drawn by its own scripts under names that change with every build, which is how it slips past the lists (the New York Post's did). roko now knows one by what it says and how it sits: a dialog, or a big box pinned over the page, talking about ad blockers in English, Croatian, German, French, Spanish, Italian, Dutch or Polish. It goes, with its backdrop, and the page scrolls again. An article about ad blockers isn't pinned and runs longer than a notice, so it stays; a cookie notice doesn't talk about blockers, and is answered as before.
 - Force dark pages, in Settings > Appearance: every site goes dark, using its own dark mode if it has one and leaving a site that's already dark alone. No white flash before a page draws. A switch in a page's Site Settings leaves that site out. Off by default, and off it adds nothing to any page.
 - Search with Qwant, or with an engine of your own: a name and an address with %s where the words go, in Settings > Search engine.
 - Save as PDF in the page menu: the whole page, in Downloads, to open, share or print from there.
@@ -56,6 +57,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - A background launch before the first unlock after a restart (Notify Me, Today's morning refresh) can no longer move the store aside as damaged: the files are sealed until the phone is unlocked, so that launch runs in memory and the next one finds everything where it was.
+- A page that fits the screen whole (a sign-in page) ended in a light strip under the bar whatever colour its foot was: the strip takes the footer's colour as the page settles, as it does for pages you scroll to the end of.
 - A page with a video you never played (the Daily Mail's front page) no longer puts itself in the player under the bar when you open another page: only media that has actually played counts.
 - Debug builds compile again: the browser's root view was one expression the type checker gave up on.
 - Sign-in and payment windows work. A window a page opens now reaches the page that opened it, so it can hand back the sign-in and close itself, and roko returns to that page. Sites used to be told their pop-up was blocked.

@@ -96,6 +96,7 @@ struct WebViewHost: UIViewRepresentable {
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var parent: WebViewHost
         private var offsetObservation: NSKeyValueObservation?
+        private var sizeObservation: NSKeyValueObservation?
         private var lastOffset: CGFloat = 0
 
         init(parent: WebViewHost) {
@@ -109,6 +110,11 @@ struct WebViewHost: UIViewRepresentable {
             lastOffset = scrollView.contentOffset.y
             offsetObservation = scrollView.observe(\.contentOffset, options: [.new]) { [weak self] scrollView, _ in
                 MainActor.assumeIsolated { self?.scrolled(scrollView) }
+            }
+            // A page that fits the screen never scrolls: its end is on screen
+            // from the start, so the strip's colour is decided as its size settles.
+            sizeObservation = scrollView.observe(\.contentSize, options: [.new]) { [weak self] scrollView, _ in
+                MainActor.assumeIsolated { self?.updateFooterColor(scrollView) }
             }
         }
 
@@ -409,19 +415,26 @@ struct WebViewHost: UIViewRepresentable {
             }
         }
 
+        /// Within a screen and a half of the end, the strip past the page takes
+        /// the footer's colour. A comparison per frame; the colour itself only
+        /// changes when this flips. Not at the very top, where a pull to refresh
+        /// shows the same strip; a page that fits the screen whole is at its end
+        /// and its top at once, and takes the footer's colour (the login page
+        /// whose dark panel ended in a light strip under the bar).
+        private func updateFooterColor(_ scrollView: UIScrollView) {
+            let height = scrollView.bounds.height
+            let fits = scrollView.contentSize.height <= height + 1
+            let nearEnd = fits || scrollView.contentOffset.y + height >= scrollView.contentSize.height - height * 1.5
+            let resting = !fits && scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 1
+            parent.tab.showFooterColor(nearEnd && !resting)
+        }
+
         private func scrolled(_ scrollView: UIScrollView) {
             if summarizePending, scrollView.contentOffset.y >= -scrollView.adjustedContentInset.top - 0.5 {
                 finishSummarize()
             }
             pulled(scrollView)
-            // Within a screen and a half of the end, the strip past the page
-            // takes the footer's colour. A comparison per frame; the colour
-            // itself only changes when this flips.
-            // Not at the very top, where a pull to refresh shows the same strip.
-            let height = scrollView.bounds.height
-            let nearEnd = scrollView.contentOffset.y + height >= scrollView.contentSize.height - height * 1.5
-            let resting = scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 1
-            parent.tab.showFooterColor(nearEnd && !resting)
+            updateFooterColor(scrollView)
             guard scrollView.isTracking || scrollView.isDecelerating else { return }
             // One pending check at a time, not a new one every frame.
             lastScrollAt = CACurrentMediaTime()
