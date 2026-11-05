@@ -14,6 +14,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Opening a link starts the page about 80 ms sooner: the block lists load while the app sets up rather than after, and tabs' pictures are read when they're wanted rather than for every tab at launch.
 - Pages load faster: the half-megabyte of cookie pop-up rules now loads after the page rather than before it, and the block lists start loading sooner at launch. A known pop-up can show for a moment before it's answered.
 
+### Changed
+- Versions go 0.1.x: the number rises only when a build goes to public testing, and private testing moves only the build number. The next public version is 0.1.1.
+
 ### Added
 - Close all your tabs at once: in the tab switcher, keep swiping left past the last tab and let go, or long-press a card. Undo brings them all back, with their history and pictures. Private tabs stay until they're all that's left, since nothing can bring those back.
 - iPhone search finds your pinned sites and opens your to-do and shopping lists. What's on the lists stays out of search.
@@ -37,7 +40,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Updates that don't change the block lists no longer recompile them, so the first launch after one is as quick as any other.
 - Blocks more on ad-heavy sites: an ad recovery host seen on index.hr, and The Sun's own ad and tracking hosts.
 - More ad and tracker hosts blocked, on the ones EasyList and EasyPrivacy miss. `Scripts/compare` tests browsers the same way, against d3ward's public list.
-- Version 1.0. About roko links each credit and the source code, and carries the MIT License text.
+- About roko links each credit and the source code, and carries the MIT License text.
 - roko is open source, under GPL-3.0. The README lists the parts that keep their own terms, and the site loads its headline font from Fontshare, whose licence doesn't allow a copy in a public repository.
 - roko opens with a search field in the bar when tabs are restored, as Apple asks of a browser. It becomes the + again once you scroll or open the bar.
 - Sharing an answer as a public page is gone. Pages already shared can still be taken down in Settings → Shared pages, and they keep their Report link.
