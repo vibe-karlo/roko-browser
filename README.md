@@ -45,7 +45,7 @@ the time all this has saved you.
 open it, open it in the background or add it to Read Later. Forms you're filling in survive a crash.
 Private tabs and history behind Face ID. A mini player for sound in a tab you've left, a real
 download manager (also in Files), Copy as Markdown (type "markdown"), swipe anywhere to go back, pinch for your tabs,
-New Tab, Private Tab and Ask roko in Control Center, Shortcuts and Siri, and pins, to-dos and shopping lists in iPhone search (`App/SpotlightIndex.swift`; the index stays on the iPhone).
+New Tab, Private Tab and Ask roko in Control Center, Shortcuts and Siri, and pinned sites and a way into the to-do and shopping lists from iPhone search (`App/SpotlightIndex.swift`; what's on the lists isn't indexed, and the index stays on the iPhone).
 
 <p>
   <img src="docs/screens/browse-picks.jpg" width="250" alt="The best options side by side with prices and who each suits">

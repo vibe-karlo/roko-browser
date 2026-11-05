@@ -2,7 +2,8 @@ import CoreSpotlight
 import SwiftData
 import UniformTypeIdentifiers
 
-/// Pins, to-dos and shopping lists in iPhone search. The index stays on the
+/// iPhone search: your pinned sites, and a way straight into the to-do and
+/// shopping lists. What's on those lists stays out of it. The index stays on the
 /// iPhone. Refreshed as roko is left, and only when something in it changed.
 @MainActor
 enum SpotlightIndex {
@@ -14,12 +15,10 @@ enum SpotlightIndex {
         for pin in (try? context.fetch(FetchDescriptor<Pin>())) ?? [] {
             items.append(item(id: "pin|\(pin.url)", title: pin.title.isEmpty ? pin.host : pin.title, detail: pin.host, type: .url))
         }
-        for todo in (try? context.fetch(FetchDescriptor<Todo>(predicate: #Predicate { !$0.done }))) ?? [] {
-            items.append(item(id: "todo|\(todo.createdAt.timeIntervalSinceReferenceDate)", title: todo.title, detail: "To-do", type: .text))
-        }
-        for thing in (try? context.fetch(FetchDescriptor<ShoppingItem>(predicate: #Predicate { !$0.done }))) ?? [] {
-            items.append(item(id: "shopping|\(thing.createdAt.timeIntervalSinceReferenceDate)", title: thing.title, detail: "Shopping", type: .text))
-        }
+        items.append(item(id: "todo", title: ListLanguage.say("To-do list", "Popis zadataka"), detail: "roko", type: .text,
+                          keywords: ["to-do", "todo", "tasks", "zadaci", "popis"]))
+        items.append(item(id: "shopping", title: ListLanguage.say("Shopping list", "Popis za kupovinu"), detail: "roko", type: .text,
+                          keywords: ["shopping", "groceries", "kupovina", "namirnice", "popis"]))
         let fingerprint = items.map { "\($0.uniqueIdentifier)\($0.attributeSet.title ?? "")" }.sorted().joined(separator: "\n")
         guard fingerprint != UserDefaults.standard.string(forKey: key) else { return }
         UserDefaults.standard.set(fingerprint, forKey: key)
@@ -43,11 +42,12 @@ enum SpotlightIndex {
         }
     }
 
-    private static func item(id: String, title: String, detail: String, type: UTType) -> CSSearchableItem {
+    private static func item(id: String, title: String, detail: String, type: UTType, keywords: [String] = []) -> CSSearchableItem {
         let attributes = CSSearchableItemAttributeSet(contentType: type)
         attributes.title = title
         attributes.displayName = title
         attributes.contentDescription = detail
+        attributes.keywords = keywords
         return CSSearchableItem(uniqueIdentifier: id, domainIdentifier: "roko", attributeSet: attributes)
     }
 }
