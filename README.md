@@ -3,6 +3,8 @@
 A fast, private iOS browser in the spirit of Arc Search, with Raycast's command-bar feel.
 SwiftUI around WebKit, no third-party dependencies.
 
+**[Join the TestFlight beta](https://testflight.apple.com/join/M2ZrEUV1)** (iPhone, iOS 27 or later) or see the [website](https://rokobrowser.vercel.app).
+
 <p>
   <img src="docs/screens/one-bar.jpg" width="250" alt="The bar answering 250 usd in eur with €223.77">
   <img src="docs/screens/browse.jpg" width="250" alt="Browse for Me answering best espresso machine for beginners">
