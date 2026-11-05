@@ -3,7 +3,8 @@ import SwiftUI
 
 /// The tab switcher, after Arc: your tabs as big overlapping page cards that
 /// scroll sideways, the focused one's name above it. Tap a card to open it,
-/// throw it up to close it. Pull the bottom row up to go back to your page.
+/// throw it up to close it. Keep swiping past the last card to close them all.
+/// Pull the bottom row up to go back to your page.
 struct TabStackView: View {
     @Environment(BrowserModel.self) private var browser
     @Query private var todos: [Todo]
@@ -13,8 +14,17 @@ struct TabStackView: View {
     @State private var lift: CGFloat = 0
     /// A tab was thrown away while the switcher is open: offer it back.
     @State private var closedHere = false
+    /// A Close All just done: offer every tab back.
+    @State private var closedAll: BrowserModel.ClosedGroup?
+    /// How far past the last card the carousel has been pulled.
+    @State private var pull: CGFloat = 0
+    @State private var isDragging = false
+    /// Far enough that letting go closes them all.
+    @State private var armed = false
 
     private let returnThreshold: CGFloat = 90
+    private let closeAllPull: CGFloat = 64
+    private static let carouselSpace = "tabCarousel"
 
     var body: some View {
         GeometryReader { proxy in
@@ -58,8 +68,11 @@ struct TabStackView: View {
         .onAppear {
             focused = browser.selectedID ?? browser.tabs.last?.id
             closedHere = false
+            closedAll = nil
         }
+        .sensoryFeedback(.impact(weight: .light), trigger: armed) { _, new in new }
         .animation(.snappy(duration: 0.3), value: closedHere)
+        .animation(.snappy(duration: 0.3), value: closedAll == nil)
         .animation(.snappy(duration: 0.3), value: browser.recentlyClosed.count)
     }
 
@@ -76,7 +89,19 @@ struct TabStackView: View {
                             isBehind: stacks && index < focusedIndex, overlaps: stacks,
                             open: { open(tab) },
                             close: { close(tab) },
+                            closeAll: browser.tabs.count > 1 ? { closeAll() } : nil,
                             split: canSplit(with: tab) ? { browser.panel = .none; browser.startSplit(with: tab) } : nil)
+                    // How far the last card has left the middle: the pull past the end.
+                    .background {
+                        if index == browser.tabs.count - 1 {
+                            Color.clear.onGeometryChange(for: CGFloat.self) { proxy in
+                                max(0, screenWidth / 2 - proxy.frame(in: .named(Self.carouselSpace)).midX)
+                            } action: { past in
+                                pull = past
+                                if isDragging { armed = past >= closeAllPull && browser.tabs.count > 1 }
+                            }
+                        }
+                    }
                     // As in Arc: tabs to the left sink back into a stack behind
                     // the focused card, smaller and tucked under it; the next tab
                     // on the right stays full size, laid over it. Drawn by the
@@ -97,8 +122,42 @@ struct TabStackView: View {
         .scrollPosition(id: $focused, anchor: .center)
         .contentMargins(.horizontal, (screenWidth - cardWidth) / 2, for: .scrollContent)
         .scrollClipDisabled()
+        .coordinateSpace(.named(Self.carouselSpace))
+        // Only a finger still on the glass counts: a fling that bounces off the
+        // last card closes nothing.
+        .onScrollPhaseChange { _, phase in
+            isDragging = phase == .interacting
+            if !isDragging {
+                if armed { closeAll() }
+                armed = false
+            }
+        }
         .frame(height: cardHeight + 40)
+        .overlay(alignment: .trailing) {
+            if pull > 0, browser.tabs.count > 1 {
+                closeAllHint(room: (screenWidth - cardWidth) / 2 + pull)
+            }
+        }
         .animation(.snappy(duration: 0.3), value: browser.tabs.map(\.id))
+    }
+
+    /// In the space opening up past the last card: what letting go will do.
+    private func closeAllHint(room: CGFloat) -> some View {
+        // Close All leaves private tabs until they're all that's left.
+        let ordinary = browser.tabs.count { !$0.isPrivate }
+        let count = ordinary > 0 ? ordinary : browser.tabs.count
+        return VStack(spacing: 6) {
+            Glyph(.close, size: 20)
+            Text("Close \(count) \(count == 1 ? "tab" : "tabs")")
+                .font(.system(size: 13, weight: armed ? .semibold : .medium))
+                .multilineTextAlignment(.center)
+        }
+        .foregroundStyle(armed ? Theme.ink : Theme.secondaryInk)
+        .frame(width: 64)
+        .frame(width: room)
+        .opacity(min(1, max(0, (pull - 20) / (closeAllPull - 20))))
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     /// Split with the tab on screen: another tab of the same kind, not already beside it.
@@ -128,38 +187,65 @@ struct TabStackView: View {
             focused = neighbours.min { abs($0 - index) < abs($1 - index) }.map { browser.tabs[$0].id }
         }
         browser.close(tab)
+        closedAll = nil
         if !tab.isPrivate, tab.url != nil { closedHere = true }
+    }
+
+    private func closeAll() {
+        let group = browser.closeAllTabs()
+        closedHere = false
+        closedAll = group.tabs.isEmpty ? nil : group
+        pull = 0
+        focused = browser.selectedID ?? browser.tabs.last?.id
+    }
+
+    private func undoCloseAll(_ group: BrowserModel.ClosedGroup) {
+        browser.reopen(group)
+        closedAll = nil
+        focused = browser.selectedID ?? browser.tabs.last?.id
     }
 
     /// The tab just thrown away, a tap from coming back with its history.
     /// Built like the copied-link offer: what it is, then one word to act.
     @ViewBuilder
     private var reopenOffer: some View {
-        if closedHere, let closed = browser.recentlyClosed.last {
-            HStack(spacing: 14) {
+        if let group = closedAll {
+            offer(action: "Undo", perform: { undoCloseAll(group) }) {
+                Text(group.tabs.count == 1 ? "1 tab closed" : "\(group.tabs.count) tabs closed")
+                    .font(.system(size: 15, weight: .medium))
+            }
+        } else if closedHere, let closed = browser.recentlyClosed.last {
+            offer(action: "Reopen", perform: {
+                browser.reopenClosedTab()
+                closedHere = false
+            }) {
                 HStack(spacing: 10) {
                     SiteIcon(host: closed.url.displayHost, size: 18)
                     Text(closed.url.displayHost)
                         .font(.system(size: 15, weight: .medium))
                 }
-                Button("Reopen") {
-                    browser.reopenClosedTab()
-                    closedHere = false
-                }
+            }
+        }
+    }
+
+    private func offer(action: String, perform: @escaping () -> Void,
+                       @ViewBuilder label: () -> some View) -> some View {
+        HStack(spacing: 14) {
+            label()
+            Button(action, action: perform)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.accentText)
                 .frame(minHeight: 44)
                 .contentShape(.rect)
-            }
-            .lineLimit(1)
-            .padding(.leading, 14)
-            .padding(.trailing, 16)
-            .barSurface(cornerRadius: 14)
-            .compositingGroup()
-            .padding(.horizontal, Theme.gutter)
-            .padding(.bottom, 4)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
         }
+        .lineLimit(1)
+        .padding(.leading, 14)
+        .padding(.trailing, 16)
+        .barSurface(cornerRadius: 14)
+        .compositingGroup()
+        .padding(.horizontal, Theme.gutter)
+        .padding(.bottom, 4)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
     /// The selected page, blurred far out of focus: the switcher takes on the
@@ -273,6 +359,8 @@ private struct TabCard: View {
     var overlaps = true
     let open: () -> Void
     let close: () -> Void
+    /// Nil with only one tab open.
+    var closeAll: (() -> Void)? = nil
     /// With the tab on screen, split; nil for the tab on screen itself.
     var split: (() -> Void)? = nil
 
@@ -291,6 +379,7 @@ private struct TabCard: View {
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(.default, open)
         .accessibilityAction(named: "Close tab", close)
+        .accessibilityAction(named: "Close all tabs") { closeAll?() }
     }
 
     private var header: some View {
@@ -330,6 +419,9 @@ private struct TabCard: View {
                     Button(action: split) { Label("Open in Split View", image: "phosphor/split") }
                 }
                 Button(role: .destructive, action: close) { Label("Close Tab", image: "phosphor/close") }
+                if let closeAll {
+                    Button(role: .destructive, action: closeAll) { Label("Close All Tabs", image: "phosphor/close") }
+                }
             }
             .offset(y: throwOffset)
             .opacity(1 + throwOffset / 700)

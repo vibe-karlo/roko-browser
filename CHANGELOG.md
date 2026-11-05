@@ -12,6 +12,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Pages load faster: the half-megabyte of cookie pop-up rules now loads after the page rather than before it, and the block lists start loading sooner at launch. A known pop-up can show for a moment before it's answered.
 
 ### Added
+- Close all your tabs at once: in the tab switcher, keep swiping left past the last tab and let go, or long-press a card. Undo brings them all back, with their history and pictures. Private tabs stay until they're all that's left, since nothing can bring those back.
 - iPhone search finds your pinned sites and opens your to-do and shopping lists. What's on the lists stays out of search.
 - On iPhone Duo held open sideways, Reader is a book: a page each side of the fold, a real page curl, and text size down the outer edge. Words and paragraphs carry across a turn, and a heading stays with its text.
 - On iPhone Duo held open sideways, a source tapped in Browse for Me opens beside the answer, on the other side of the fold.

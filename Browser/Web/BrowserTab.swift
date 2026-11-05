@@ -125,7 +125,7 @@ final class BrowserTab: NSObject, Identifiable {
 
     /// Shows the image now and writes it to disk in the background, so a
     /// restored tab still has its picture in the tab switcher.
-    private func keep(_ image: UIImage?) {
+    func keep(_ image: UIImage?) {
         guard let image else { return }
         snapshot = image
         guard !isPrivate else { return }

@@ -825,6 +825,43 @@ final class BrowserModel {
         scheduleSave()
     }
 
+    /// Everything one Close All took, ready to come back together.
+    struct ClosedGroup {
+        let tabs: [(closed: ClosedTab, snapshot: UIImage?)]
+        let selectedIndex: Int?
+    }
+
+    /// Closes every tab at once. Private tabs stay, being the ones that couldn't
+    /// come back, and go only when they're all that's left.
+    func closeAllTabs() -> ClosedGroup {
+        let ordinary = tabs.filter { !$0.isPrivate }
+        let closing = ordinary.isEmpty ? tabs : ordinary
+        // Taken before anything closes, so Undo finds every tab's place. The
+        // selected one goes last, so no other tab wakes up on the way out.
+        let group = ClosedGroup(
+            tabs: tabs.enumerated().compactMap { index, tab in
+                guard !tab.isPrivate, let url = tab.url else { return nil }
+                return (ClosedTab(url: url, title: tab.title, state: tab.interactionState, index: index), tab.snapshot)
+            },
+            selectedIndex: tabs.firstIndex { $0.id == selectedID && !$0.isPrivate })
+        for tab in closing where tab.id != selectedID { close(tab) }
+        if let selectedTab, closing.contains(where: { $0.id == selectedTab.id }) { close(selectedTab) }
+        return group
+    }
+
+    /// A Close All taken back: every tab where it was, with its history and picture.
+    func reopen(_ group: ClosedGroup) {
+        recentlyClosed.removeLast(min(group.tabs.count, recentlyClosed.count))
+        for (closed, snapshot) in group.tabs {
+            let tab = BrowserTab(url: closed.url, title: closed.title, restoreState: closed.state)
+            tab.delegate = self
+            tab.keep(snapshot)
+            tabs.insert(tab, at: min(closed.index, tabs.count))
+            if closed.index == group.selectedIndex { select(tab) }
+        }
+        scheduleSave()
+    }
+
     func close(_ tab: BrowserTab) {
         HitchWatch.start("close tab")
         guard let index = tabs.firstIndex(where: { $0.id == tab.id }) else { return }
