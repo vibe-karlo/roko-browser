@@ -954,7 +954,7 @@ struct CommandBarView: View {
         // Private: nothing of yours offered, and no site or search guessed at.
         if browser.commandMode == .privateTab {
             items.removeAll { item in
-                ["pin-", "recent-", "history-", "suggest-", "suggested-", "popular-", "site-"].contains { item.id.hasPrefix($0) }
+                ["pin-", "recent-", "history-", "suggest-", "suggested-", "popular-", "topsite-", "site-"].contains { item.id.hasPrefix($0) }
             }
         }
         // Resolve where Return would go before it's pressed.
@@ -1336,13 +1336,25 @@ enum CommandRanker {
         // Well-known sites, for addresses you haven't visited yet. From three
         // letters the best one beats a search, like address-bar autocomplete.
         if needle.count >= 2, !needle.contains(" ") {
-            for (offset, site) in PopularSites.matching(needle).enumerated() where !offeredHosts.contains(site.host) {
+            let known = PopularSites.matching(needle)
+            for (offset, site) in known.enumerated() where !offeredHosts.contains(site.host) {
                 guard let url = URL(string: "https://\(site.host)") else { continue }
-                // "index.hr/oglasi" wears index.hr's icon.
-                let iconHost = String(site.host.prefix { $0 != "/" })
                 ranked.append(((needle.count >= 3 ? 905 : 870) - offset, CommandItem(
                     id: "popular-\(site.host)", title: site.name, subtitle: site.host,
-                    kind: "Open", icon: .site(iconHost), action: .open(url))))
+                    kind: "Open", icon: .site(site.iconHost), action: .open(url))))
+                offeredHosts.insert(site.host)
+            }
+            // The most visited in this country and the world: under the search,
+            // so Return doesn't go there and nothing starts loading while a word
+            // is typed ("wetter", "mobile"). A dot means an address is being typed.
+            let base = needle.contains(".") ? 905 : needle.count >= 3 ? 880 : 860
+            for (offset, host) in TopSites.matching(needle, limit: max(1, 3 - known.count)).enumerated()
+            where !offeredHosts.contains(host) {
+                guard let url = URL(string: "https://\(host)") else { continue }
+                ranked.append((base - offset, CommandItem(
+                    id: "topsite-\(host)", title: host, subtitle: "",
+                    kind: "Open", icon: .site(host), action: .open(url))))
+                offeredHosts.insert(host)
             }
         }
 
@@ -1444,7 +1456,7 @@ enum CommandRanker {
         // the one nearest the site's front page wins (its title is the site's
         // name, its address the shortest).
         if needle.count >= 4, !ResearchDepth.prefersAnswer(query), !TodoIntent.isLikely(query),
-           let site = Self.siteNamed(needle, in: ranked.map(\.item)),
+           let site = Self.siteNamed(needle, in: ranked.map(\.item).filter { !$0.id.hasPrefix("topsite-") }),
            let index = ranked.firstIndex(where: { $0.item.id == site.id }) {
             ranked[index].score = max(ranked[index].score, 940)
         }

@@ -522,6 +522,7 @@ roko's own code is free software under the [GNU General Public License, version 
 | DuckDuckGo Autoconsent, with Consent-O-Matic's rules | `Browser/Resources/Scripts/consent-*.js` | MPL 2.0 |
 | Phosphor Icons | `Browser/Resources/Assets.xcassets/phosphor` | MIT (below) |
 | Map data | `Browser/Resources/Parking` | © OpenStreetMap contributors, ODbL |
+| Most visited sites per country, filtered and reordered | `Browser/Resources/TopSites` | From the Chrome UX Report by Google, CC BY 4.0 |
 | Product names | `Browser/Resources/Shopping/products.txt` | From one shop's published price list, not ours to license |
 | Screenshots | `Site/img`, `docs/screens` | They show other people's pages, such as Wikipedia (CC BY-SA), which stay theirs |
 | Cabinet Grotesk | Not in this repository | Closed-source font: the site loads it from [Fontshare](https://www.fontshare.com), and its licence forbids copies here |
@@ -581,6 +582,29 @@ scored by its mean segment confidence (Croatian letters tip a close call to Croa
 kept. `VoiceCommand.interpret` turns spoken addresses ("dot", "točka", "slash", "w w w") and
 "open"/"otvori" plus a name into a known host (history first, then `PopularSites`, hyphens ignored)
 and opens it; everything else goes to the bar's own ranking, where `TodoIntent` puts a to-do first.
+
+## Most visited sites
+
+Past what you've visited and the hand-picked `PopularSites`, the bar suggests the most visited sites
+in the phone's country (its Region setting, no location is asked for) and in the world. Chrome's public
+report has a top 1,000 for 238 countries; `Scripts/build_top_sites.py` keeps up to 150 per country and
+160 for the world, about 34,000 addresses in one 229 KB file.
+
+What's in those lists is raw pageloads, so most of the script is taking things out, all at build time:
+adult, gambling, pirate and scam sites (two sets of filter lists, name patterns, then every remaining
+host asked of Cloudflare's family resolver), roko's own blocked hosts, sign-in pages and redirectors,
+and sites on another country's ending. A filter can still miss one, and suggestions only show after
+two letters of a match. Chrome doesn't rank inside its top 1,000, so the order is the script's: the
+country's own ending, then how big a site is worldwide and how many countries have it.
+
+`TopSites` inflates the phone's two lists the first time the bar is typed in, about 310 addresses, and
+checks them by prefix. These suggestions cost a launch nothing and use no network. They rank under
+the search unless what's typed has a dot, because the bar's first row sets what Return does and
+starts loading in the background: a word like "wetter" mustn't begin loading wetter.de. They have no bundled
+icon (one each would be megabytes), so they show the site's own once it's been visited. A shop with a
+site per country takes its place in `PopularSites`: amazon.de for amazon.com in Germany.
+
+Refresh with `python3 -I Scripts/build_top_sites.py 202609`, using the month wanted.
 
 ## Settings
 
