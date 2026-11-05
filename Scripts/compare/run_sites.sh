@@ -1,9 +1,11 @@
 #!/bin/zsh
 # Data each browser pulls from ad-heavy sites, on a real iPhone that's unlocked and otherwise
 # idle. The counters cover the whole phone, not one app, so idle windows give a baseline.
+# SITES="name url ..." replaces the sites. NOIDLE=1 keeps one idle window, NOIDLE=2 none.
 # Writes sites.jsonl. Usage: Scripts/compare/run_sites.sh <device> [seconds] ["safari roko"]
 here=${0:a:h}; device=$1; seconds=${2:-40}; only=${3:-}; tmp=$(mktemp -d)
 sites=(dailymail https://www.dailymail.co.uk/home/index.html thesun https://www.thesun.co.uk/ forbes https://www.forbes.com/)
+[[ -n ${SITES:-} ]] && sites=(${=SITES})
 apps=(safari com.apple.mobilesafari roko com.growthstudio.roko brave com.brave.ios.browser duckduckgo com.duckduckgo.mobile.ios firefox org.mozilla.ios.Firefox chrome com.google.chrome.ios edge com.microsoft.msedge arc company.thebrowser.ArcMobile2 lens com.angelakismax.browser)
 snapshot() {
   rm -rf $tmp/t.trace
@@ -25,10 +27,10 @@ measure() { # browser site url(optional) bundle(optional)
   echo "$1 $2 in=$down out=$up"
   print -r -- "{\"b\":\"$1\",\"site\":\"$2\",\"in\":$down,\"out\":$up}" >> $here/sites.jsonl
 }
-measure idle before
+[[ ${NOIDLE:-} == 2 ]] || measure idle before
 for name bundle in $apps; do
   [[ -n $only && " $only " != *" $name "* ]] && continue
   for site url in $sites; do measure $name $site $url $bundle; done
-  measure idle after-$name
+  [[ -n ${NOIDLE:-} ]] || measure idle after-$name
 done
-measure idle after
+[[ -n ${NOIDLE:-} ]] || measure idle after

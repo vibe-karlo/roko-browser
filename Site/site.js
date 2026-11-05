@@ -303,3 +303,77 @@ if (!still) {
     requestAnimationFrame(tick);
   }, { threshold: .5 }).observe(compare);
 }
+
+// The scoreboard: one set of rows that moves to its new place for each measure.
+const proofData = {
+  data: {
+    unit: v => v.toFixed(2) + " MB", low: true,
+    note: "All the data the iPhone received in the 40 seconds after opening each page, including about 0.7 MB it uses when idle. One run, on an earlier roko build and before Lens 1.1.",
+    sites: {
+      dailymail: { head: "A third of Chrome's data.", values: { roko: 5.27, safari: 5.32, lens: 7.32, brave: 8.52, firefox: 11.92, edge: 13.20, duckduckgo: 15.04, arc: 15.84, chrome: 16.72 } },
+      forbes: { head: "A seventh of Chrome's data.", values: { roko: 0.96, safari: 4.87, lens: 5.88, firefox: 6.15, duckduckgo: 6.29, edge: 6.31, chrome: 6.99, arc: 13.44, brave: 19.09 } },
+    },
+  },
+  block: {
+    unit: v => v.toFixed(0) + "%", low: false, head: "Blocks more than Brave.",
+    note: "Of the 122 hosts on d3ward's public ad and tracker list that at least one browser reached, the share each browser stopped. One run, on an earlier roko build and before Lens 1.1.",
+    values: { roko: 83.6, brave: 66.4, arc: 64.8, lens: 50.0, safari: 44.3, duckduckgo: 24.6, firefox: 13.9, edge: 7.4, chrome: 0 },
+  },
+  speed: {
+    unit: v => v.toFixed(2) + " s", low: true, head: "Beats Chrome and Safari.",
+    note: "From opening a link to a small test page on local Wi-Fi until it finished loading. Median of 3 or 4 runs, taking browsers in turn, on roko 1.0 (9) and Lens 1.1.",
+    values: { lens: 1.05, roko: 1.15, edge: 1.23, firefox: 1.25, brave: 1.32, chrome: 1.38, arc: 1.41, safari: 1.55, duckduckgo: 1.84 },
+  },
+};
+const proofMethod = " iPhone 17 Pro, iOS 27.2, 5 November 2026. Safari 27.2, Chrome 157, Firefox 159, Edge 156, Brave 1.98, DuckDuckGo 7.244, Arc Search 1.49. Yours will vary. ";
+const runs = document.getElementById("runs");
+if (runs) {
+  const rows = [...runs.children], head = document.getElementById("proofHead"), note = document.getElementById("proofNote");
+  const measures = [...document.querySelectorAll(".measures button")], sites = [...document.querySelectorAll(".sites button")], siteRow = document.querySelector(".sites");
+  let measure = "data", site = "dailymail";
+  const fill = (row, width) => { row.querySelector("i").style.width = width; };
+  const show = () => {
+    const m = proofData[measure], view = m.sites ? m.sites[site] : m;
+    const max = Math.max(...Object.values(view.values));
+    const order = Object.keys(view.values).sort((a, b) => m.low ? view.values[a] - view.values[b] : view.values[b] - view.values[a]);
+    runs.style.setProperty("--n", order.length);
+    for (const row of rows) {
+      const at = order.indexOf(row.dataset.b), value = view.values[row.dataset.b];
+      row.hidden = at < 0;
+      if (at < 0) continue;
+      row.style.setProperty("--at", at);
+      row.querySelector(".val").textContent = m.unit(value);
+      fill(row, (value / max * 100) + "%");
+    }
+    head.textContent = view.head;
+    note.innerHTML = "";
+    note.append(m.note + proofMethod);
+    const how = document.createElement("a");
+    how.href = "https://github.com/vibe-karlo/roko-browser/tree/main/Scripts/compare";
+    how.textContent = "Run the test yourself.";
+    note.append(how);
+    for (const b of measures) b.setAttribute("aria-pressed", b.dataset.m === measure);
+    for (const b of sites) b.setAttribute("aria-pressed", b.dataset.s === site);
+    siteRow.classList.toggle("off", measure !== "data");
+    for (const b of sites) b.tabIndex = measure === "data" ? 0 : -1;
+  };
+  runs.classList.add("live");
+  show();
+  for (const b of measures) b.addEventListener("click", () => { measure = b.dataset.m; show(); });
+  for (const b of sites) b.addEventListener("click", () => { site = b.dataset.s; show(); });
+  // Bars run out once as the board comes into view. They empty only just before
+  // it's on screen, and fill on their own if the second signal never arrives.
+  if (!still) {
+    let emptied = false;
+    const run = () => { if (emptied) { emptied = false; show(); } };
+    const before = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting || e.intersectionRatio > 0.02) { if (e.isIntersecting) before.disconnect(); return; }
+      before.disconnect();
+      for (const row of rows) fill(row, "0%");
+      emptied = true;
+      setTimeout(run, 2500);
+    }, { rootMargin: "0px 0px 240px 0px", threshold: [0, 0.02] });
+    before.observe(runs);
+    new IntersectionObserver(([e], o) => { if (e.isIntersecting) { o.disconnect(); run(); } }, { threshold: 0.2 }).observe(runs);
+  }
+}

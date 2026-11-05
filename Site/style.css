@@ -116,6 +116,30 @@ div>.row:has(span){min-height:54px}
 .reasons b{display:block;margin-bottom:4px;color:var(--ink);font:800 22px/1.2 var(--display)}
 .note{width:min(640px,100%);margin:clamp(40px,5vw,64px) auto 0;color:var(--faint);font-size:13px;line-height:1.5}
 
+/* The scoreboard: one list of browsers that re-sorts itself for each measure. */
+.proof{position:relative;isolation:isolate;padding:0 var(--gutter) var(--gap);text-align:center;background:linear-gradient(var(--floor),#170c08 34%,#170c08 62%,var(--floor))}
+.proof .grain{-webkit-mask-image:linear-gradient(transparent,#000 30%,#000 66%,transparent);mask-image:linear-gradient(transparent,#000 30%,#000 66%,transparent)}
+.proof h2{max-width:15ch;min-height:2.04em;margin-inline:auto}
+.board{width:min(640px,100%);margin:clamp(28px,4vw,48px) auto 0;text-align:left}
+.board .shops{justify-content:center;flex-wrap:wrap;padding:0}
+.board .measures button{font-size:clamp(15px,4.2vw,17px)}
+.board .sites{min-height:34px;margin-top:2px;transition:opacity .2s}
+.board .sites.off{opacity:0;pointer-events:none}
+.runs{position:relative;margin-top:clamp(18px,3vw,28px)}
+.run{display:grid;grid-template-columns:1fr auto;gap:7px 12px;align-items:baseline;height:var(--row);padding-top:8px;--row:53px}
+.runs.live{height:calc(var(--n)*53px);transition:height .5s cubic-bezier(.2,.8,.2,1)}
+.runs.live .run{position:absolute;inset:0 0 auto;transform:translateY(calc(var(--at)*53px));transition:transform .55s cubic-bezier(.2,.8,.2,1),opacity .25s}
+.run[hidden]{display:none}
+.who{color:var(--soft);font-size:15px;font-weight:500}
+.val{color:var(--ink);font-size:15px;font-variant-numeric:tabular-nums}
+.track{grid-column:1/-1;display:block;height:8px;border-radius:4px;background:#ffffff0b}
+.track i{display:block;min-width:8px;height:100%;border-radius:4px;background:#6e685f;transition:width .55s cubic-bezier(.2,.8,.2,1)}
+.run.us .who{color:var(--ink);font:800 19px/1 var(--display)}
+.run.us .val{font-weight:600}
+.run.us .track i{background:var(--glow)}
+.proof .note a{color:var(--soft)}
+@media(min-width:760px){.proof h2{max-width:none;min-height:0}}
+
 /* Smart: two screens standing on the seam into the next section. */
 .smart{padding:0 var(--gutter) var(--gap);text-align:center}
 .smart .duo article>p,.bar .duo article>p{margin-inline:auto}
