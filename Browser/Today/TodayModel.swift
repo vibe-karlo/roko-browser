@@ -68,7 +68,8 @@ final class TodayModel {
         defer { isRefreshing = false }
         let started = CFAbsoluteTimeGetCurrent()
 
-        let sources = NewsSite.chosen
+        // Pages that need their scripts run can't be read with roko closed.
+        let sources = NewsSite.chosen.filter { !inBackground || $0.rendered != true }
         let topics = NewsTopics.chosen
         // Topics are looked for in the major Croatian feeds too, not only your own.
         let pool = topics.isEmpty ? [] : TodayNews.topicPool.filter { extra in !sources.contains { $0.id == extra.id } }

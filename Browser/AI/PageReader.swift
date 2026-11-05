@@ -54,14 +54,35 @@ enum PageReader {
         guard let fields = result as? [String: Any] else {
             throw ClaudeError(message: "This page has no readable text.")
         }
-        let text = (fields["text"] as? String ?? "")
+        let text = withoutFurniture((fields["text"] as? String ?? "")
             .replacingOccurrences(of: #"[ \t]+"#, with: " ", options: .regularExpression)
             .replacingOccurrences(of: #"\n\s*\n+"#, with: "\n\n", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: .whitespacesAndNewlines))
         guard text.count > 200 else { throw ClaudeError(message: "This page has too little text to summarize.") }
         return ReadablePage(title: fields["title"] as? String ?? "", site: fields["site"] as? String ?? "",
                             text: String(text.prefix(200_000)), isArticle: fields["isArticle"] as? Bool ?? false,
                             declaredLanguage: (fields["lang"] as? String).flatMap { $0.isEmpty ? nil : $0 })
+    }
+
+    /// What Readability takes for paragraphs and isn't. Anywhere: "Advertisement",
+    /// the NYT's note about checking your access, a photo's credit. Above the
+    /// first real paragraph, short lines that aren't sentences: "44 minutes
+    /// ago", "Daniela RelphRoyal correspondent", "Reuters".
+    nonisolated static func withoutFurniture(_ text: String) -> String {
+        let furniture: Set<String> = ["advertisement", "skip advertisement", "reklama", "oglas", "continue reading", "read more",
+                                      "pročitajte više", "share", "save", "podijeli"]
+        var lines = text.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { line in
+            let plain = line.lowercased()
+            guard !line.isEmpty, !furniture.contains(plain), !plain.hasPrefix("you have a preview view of this article") else { return false }
+            // A newsletter's small print: Reader has its own way to leave the list.
+            if plain.count < 200, plain.contains("unsubscribe") || plain.contains("odjavi") { return false }
+            return plain.count > 40 || plain.firstMatch(of: /\b(getty images|reuters|afp|associated press|pa media|epa|shutterstock|alamy|pixsell|hina)\b/) == nil
+        }
+        if let first = lines.prefix(8).firstIndex(where: { $0.count >= 80 }) {
+            let kept = lines[..<first].filter { $0.count >= 60 || $0.last.map { ".?!:".contains($0) } == true }
+            lines = Array(kept) + lines[first...]
+        }
+        return lines.joined(separator: "\n\n")
     }
 
     /// The article as Markdown, for notes or an AI chat: its title, headings,

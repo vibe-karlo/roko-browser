@@ -117,6 +117,9 @@ final class SummaryModel: Identifiable {
 
     /// The page's address: a summary already written for it is shown at once.
     @ObservationIgnored private var url: URL?
+    /// A story, not a page of anything: Apple's models write it plainly. Given their
+    /// shape to fill, they took a museum's opening for a how-to, "You need" and all.
+    @ObservationIgnored private var isNews = false
 
     func start(webView: WKWebView, url: URL?) {
         self.url = url
@@ -129,6 +132,26 @@ final class SummaryModel: Identifiable {
             return
         }
         task = Task { await run(webView: webView) }
+    }
+
+    /// A summary of text already read (a story in Reader): no page to read it from.
+    func start(page: ReadablePage, url: URL?) {
+        self.url = url
+        isNews = true
+        if let url, let cached = SummaryCache.entry(for: url) {
+            text = cached.text
+            engine = cached.engine
+            note = cached.note
+            pageWords = cached.pageWords
+            phase = .done
+            return
+        }
+        task = Task { await summarize(page) }
+    }
+
+    /// Back once it's written, or has failed.
+    func finished() async {
+        await task?.value
     }
 
     /// Stops reading and writing: the summary was closed, and nobody will read the rest.
@@ -145,6 +168,10 @@ final class SummaryModel: Identifiable {
             if !Task.isCancelled { phase = .failed(error.localizedDescription) }
             return
         }
+        await summarize(page)
+    }
+
+    private func summarize(_ page: ReadablePage) async {
         phase = .writing
         pageWords = SavedStats.words(in: page.text)
 
@@ -195,6 +222,41 @@ final class SummaryModel: Identifiable {
 
     private enum Engine { case appleCloud, onDevice, claude }
 
+    /// Apple's model in plain labelled lines, read into the app's Markdown.
+    private func writePlainly(_ model: some LanguageModel, budget: Int, _ page: ReadablePage, in language: WritingLanguage?) async throws {
+        #if DEBUG
+        // `-noSummaries`: as if the model turned everything down.
+        if ProcessInfo.processInfo.arguments.contains("-noSummaries") {
+            throw ClaudeError(message: "Apple's on-device model couldn't summarize this page.")
+        }
+        #endif
+        let session = LanguageModelSession(model: model, instructions: summaryGuidance(language) + """
+             Answer in lines of exactly this form and nothing else:
+            GIST: what the page says, in one or two plain sentences
+            POINT: one thing worth knowing, at most 25 words
+            One GIST and three to five POINT lines.
+            """)
+        var written = ""
+        for try await snapshot in session.streamResponse(to: "Title: \(page.title)\nSite: \(page.site)\n\n\(page.text.prefix(budget))") {
+            written = snapshot.content
+            var gist: String?
+            var points: [String] = []
+            for line in written.split(separator: "\n") {
+                guard let match = line.firstMatch(of: /^\W*(GIST|POINT)\W*:\s*(.+)$/) else { continue }
+                if match.1 == "GIST" { gist = gist ?? String(match.2) } else { points.append("> - " + match.2) }
+            }
+            if gist != nil || !points.isEmpty {
+                text = (["@ article"] + (gist.map { ["> " + $0] } ?? []) + points).joined(separator: "\n")
+            }
+        }
+        // Nothing in the form asked for: no summary, rather than a broken one.
+        if text.isEmpty { throw ClaudeError(message: "Apple's on-device model couldn't summarize this page.") }
+    }
+
+    private static func thinksAloud(_ text: String) -> Bool {
+        text.contains(/\b(Wait, |Let me (write|rewrite|redo|fix|correct|try)\b|I must not\b|I should not\b)/)
+    }
+
     /// Writes the summary with one engine; false when that engine isn't available here.
     private func write(_ page: ReadablePage, with engine: Engine, in language: WritingLanguage?,
                        appleWritesIt: Bool) async throws -> Bool {
@@ -208,6 +270,10 @@ final class SummaryModel: Identifiable {
             self.engine = "Apple Intelligence"
             let budget = await AppleModels.characterBudget(of: cloud)
             note = Self.note(page.text.count > budget ? longNote : nil, languageNote)
+            if isNews {
+                try await writePlainly(cloud, budget: budget, page, in: appleLanguage)
+                break
+            }
             let prompt = "Title: \(page.title)\nSite: \(page.site)\n\n\(page.text.prefix(budget))"
             for try await snapshot in AppleModels.streamAnswer(cloud, instructions: summaryGuidance(appleLanguage),
                                                                prompt: prompt, titled: false) {
@@ -217,14 +283,27 @@ final class SummaryModel: Identifiable {
         case .onDevice:
             guard OnDeviceSummarizer.isAvailable else { return false }
             self.engine = "On-device"
+            let plainBudget = AppleModels.onDeviceCharacterBudget(reservingTokens: 1_000)
+            if isNews {
+                note = Self.note(page.text.count > plainBudget ? longNote : nil, languageNote)
+                try await writePlainly(AppleModels.summarizing, budget: plainBudget, page, in: appleLanguage)
+                break
+            }
             let (stream, truncated) = OnDeviceSummarizer.summarize(page, in: appleLanguage)
             note = Self.note(truncated ? longNote : nil, languageNote)
             let started = CFAbsoluteTimeGetCurrent()
+            do {
             for try await snapshot in stream {
                 if text.isEmpty, !snapshot.isEmpty, LaunchClock.isEnabled {
                     print(String(format: "SUMMARY first words in %.1fs (%d characters on the page)", CFAbsoluteTimeGetCurrent() - started, page.text.count))
                 }
                 text = snapshot
+            }
+            } catch LanguageModelError.guardrailViolation, LanguageModelError.refusal {
+                // Apple's permissive guardrails only apply to plain text: news filled
+                // into a shape was turned down even for an interest rate rise.
+                text = ""
+                try await writePlainly(AppleModels.summarizing, budget: plainBudget, page, in: appleLanguage)
             }
             if LaunchClock.isEnabled { print(String(format: "SUMMARY finished in %.1fs", CFAbsoluteTimeGetCurrent() - started)) }
 
@@ -237,6 +316,12 @@ final class SummaryModel: Identifiable {
             do {
                 try await stream(client, prompt: prompt, model: .haiku, language: language)
             } catch let error as ClaudeError where error.isRefusal {
+                text = ""
+                try await stream(client, prompt: prompt, model: .sonnet, language: language)
+            }
+            // Haiku now and then thinks aloud in the answer ("Wait, format: I must
+            // not repeat. Let me write correctly."): written again, not shown or kept.
+            if Self.thinksAloud(text) {
                 text = ""
                 try await stream(client, prompt: prompt, model: .sonnet, language: language)
             }

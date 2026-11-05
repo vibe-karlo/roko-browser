@@ -59,7 +59,7 @@ targets:
         # iCloud sync: silent pushes bring other devices' changes.
         # YouTube plays on as sound with roko in the background (BackgroundPlay).
         UIBackgroundModes: [audio, fetch, remote-notification]
-        BGTaskSchedulerPermittedIdentifiers: [com.growthstudio.roko.watch, com.growthstudio.roko.today]
+        BGTaskSchedulerPermittedIdentifiers: [com.growthstudio.roko.watch, com.growthstudio.roko.today, com.growthstudio.roko.feed]
         # Today: the weather where you are, and what's on your calendar.
         NSMicrophoneUsageDescription: Hold + and speak to search, open a site or add a to-do. The microphone is on only while you hold it.
         NSSpeechRecognitionUsageDescription: What you say while holding + is turned into words for the address bar.

@@ -7,7 +7,7 @@ struct CommandItem: Identifiable {
              browse(String), summarize, findOnPage, privateTab, settings, copy(String),
              pasteLink, openCopied(URL), todos, today, openApp(URL), ask(String), askAboutPage(String), addTodo(String, TodoWhen, DateComponents?),
              payParking(city: String, zone: String), extendParking, endParking, shopping, addShopping(String),
-             saveForLater, readLater, cook, askAboutSaved(String), reopenTab, downloads, copyMarkdown, unlockHistory, split
+             saveForLater, readLater, feed, follow, cook, askAboutSaved(String), reopenTab, downloads, copyMarkdown, unlockHistory, split
     }
 
     let id: String
@@ -1017,6 +1017,8 @@ struct CommandBarView: View {
         case .shopping: browser.panel = .shopping
         case .saveForLater: browser.saveForLater()
         case .readLater: browser.panel = .readLater
+        case .feed: browser.panel = .feed
+        case .follow: browser.followPage()
         case .reopenTab: browser.reopenClosedTab()
         case .downloads: browser.panel = .downloads
         case .split: if browser.split == nil { browser.startSplit() } else { browser.endSplit(); browser.panel = .none }
@@ -1400,6 +1402,12 @@ enum CommandRanker {
             (["cook mode", "cook", "cooking", "recipe", "recept", "kuhanje"],
              CommandItem(id: "action-cook", title: "Cook Mode", subtitle: "This page's recipe in big text, screen awake",
                          kind: "Action", icon: .glyph(.cook), action: .cook)),
+            (["follow", "follow site", "follow page", "subscribe", "rss", "prati", "pratite"],
+             CommandItem(id: "action-follow", title: "Follow in News", subtitle: "This site or section, in your news",
+                         kind: "Action", icon: .glyph(.news), action: .follow)),
+            (["news", "my news", "feed", "reader", "vijesti", "novosti"],
+             CommandItem(id: "action-feed", title: "News", subtitle: "What you follow, each story once",
+                         kind: "Action", icon: .glyph(.news), action: .feed)),
             (["read later", "reading list", "saved pages", "za kasnije", "spremljeno"],
              CommandItem(id: "action-read-later", title: "Read Later",
                          subtitle: ReadLater.shared.unread.isEmpty ? "Pages you saved" : "\(ReadLater.shared.unread.count) to read",

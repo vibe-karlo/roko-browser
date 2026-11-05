@@ -42,6 +42,13 @@ in Settings → Shared pages.
 Later then go through roko's server to reach your other devices. You can remove them by turning
 it off and deleting the space.
 
+**News.** Sites you follow are read from your iPhone, so they see a visit as they would from any
+browser. Topics you follow are also sent to Bing's news search, without a cookie or an account.
+
+**Newsletters.** This is off unless you make an address. Mail sent to it passes through roko's
+server and waits there until your iPhone fetches it, then it's deleted, and after 30 days at the
+latest. Ending the address deletes what's waiting. Summaries of it go where other summaries go.
+
 **Parking.** Parking is paid by a text message that you send yourself from the Messages window,
 to the parking operator. roko uses one precise location fix to find your zone, and only when you
 ask for parking. Your plates and parking history stay on your iPhone.

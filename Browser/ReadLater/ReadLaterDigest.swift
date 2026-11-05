@@ -19,7 +19,10 @@ final class DigestModel: Identifiable {
     }
 
     /// The pages it's written from, in the order of their marks: [[1]] is the first.
-    let pages: [ReadLaterPage]
+    private(set) var pages: [ReadLaterPage]
+    /// Several sites' stories about one event, to compare rather than summarize.
+    private let comparing: [NewsStory]?
+    var isComparison: Bool { comparing != nil }
     /// The group's name, for a group's summary; nil for all of them.
     let subject: String?
     private(set) var text = ""
@@ -30,6 +33,26 @@ final class DigestModel: Identifiable {
     init(pages: [ReadLaterPage], subject: String? = nil) {
         self.pages = pages
         self.subject = subject
+        comparing = nil
+    }
+
+    /// One event as several sites report it: at most one story from a site
+    /// unless there's room, six in all. Their text is read when it starts.
+    init(comparing stories: [NewsStory]) {
+        var seen = Set<String>()
+        let firsts = stories.filter { seen.insert($0.host).inserted }
+        let chosen = Array((firsts + stories.filter { story in !firsts.contains { $0.link == story.link } }).prefix(6))
+        comparing = chosen
+        subject = StoryGroups.title(of: stories)
+        pages = chosen.map { story in
+            var page = ReadLaterPage(url: story.link, title: story.title, site: story.host, text: "")
+            page.id = FeedStore.pageID(for: story.link)
+            return page
+        }
+    }
+
+    func story(of page: ReadLaterPage) -> NewsStory? {
+        comparing?.first { $0.link == page.url }
     }
 
     var isWorking: Bool {
@@ -57,7 +80,7 @@ final class DigestModel: Identifiable {
     @ObservationIgnored private var task: Task<Void, Never>?
 
     func start() {
-        if let kept = ReadLater.shared.digest(for: pages) {
+        if let kept = isComparison ? FeedStore.shared.comparison(of: pages) : ReadLater.shared.digest(for: pages) {
             text = kept.text
             engine = kept.engine
             note = kept.note
@@ -86,9 +109,12 @@ final class DigestModel: Identifiable {
     private enum Engine { case appleCloud, claude, onDevice }
 
     private func run() async {
+        if let comparing { await gather(comparing) }
+        if Task.isCancelled { return }
         let readable = pages.filter { $0.text.count > 200 }
         guard !readable.isEmpty else {
-            phase = .failed("None of these pages had text to read when they were saved.")
+            phase = .failed(isComparison ? "Couldn't read any of these articles here."
+                                         : "None of these pages had text to read when they were saved.")
             return
         }
         let sample = readable.map { "\($0.title)\n\($0.text.prefix(600))" }.joined(separator: "\n\n")
@@ -107,9 +133,19 @@ final class DigestModel: Identifiable {
             do {
                 guard try await write(with: engine, language: language, appleWritesIt: appleWritesIt) else { continue }
                 text = Self.keepingMarks(text, upTo: pages.count)
+                if isComparison {
+                    text = Self.provable(text, from: pages)
+                    // Nothing provable isn't "no differences": it's no comparison.
+                    guard text.contains("[[") else {
+                        throw ClaudeError(message: ClaudeClient.configured == nil
+                                          ? "Apple's model couldn't compare these articles. With a Claude API key in Settings, Claude does."
+                                          : "Couldn't compare these articles here. Open one to read it.")
+                    }
+                }
                 phase = .done
                 SavedStats.summary(pageWords: pages.map(\.words).reduce(0, +), summaryWords: SavedStats.words(in: text))
-                ReadLater.shared.keep(.init(pageIDs: pages.map(\.id), text: text, engine: self.engine, note: note, at: .now))
+                let kept = ReadLater.Digest(pageIDs: pages.map(\.id), text: text, engine: self.engine, note: note, at: .now)
+                if isComparison { FeedStore.shared.keep(kept) } else { ReadLater.shared.keep(kept) }
                 return
             } catch is CancellationError {
                 return
@@ -123,13 +159,95 @@ final class DigestModel: Identifiable {
                 phase = .reading
             }
         }
-        phase = .failed(AppleModels.explain(lastError, doing: "summarize these pages") ?? lastError.localizedDescription)
+        phase = .failed(AppleModels.explain(lastError, doing: isComparison ? "compare these articles" : "summarize these pages") ?? lastError.localizedDescription)
+    }
+
+    // MARK: Comparing
+
+    /// Which sites ran one text, said under the comparison; kept across a retry's reading.
+    private var sameText: String?
+    private var headings = ComparisonHeadings.english
+
+    /// Reads each story's text, and leaves out a copy of one already read: it
+    /// would only count as agreement. Three at a time, as each may load a page.
+    private func gather(_ stories: [NewsStory]) async {
+        condensed = 0
+        sameText = nil
+        var texts: [URL: String] = [:]
+        for start in stride(from: 0, to: stories.count, by: 3) {
+            let reading = stories[start..<min(start + 3, stories.count)].map { story in
+                (story.link, Task { await FeedStore.shared.text(of: story) })
+            }
+            for (link, task) in reading {
+                texts[link] = await task.value
+                condensed += 1
+            }
+        }
+        condensed = 0
+        for index in pages.indices { pages[index].text = texts[pages[index].url] ?? "" }
+        var copies: [(of: String, copy: String)] = []
+        for index in pages.indices where pages[index].text.count > 200 {
+            if let original = pages[..<index].first(where: { $0.text.count > 200 && Self.sameWords($0.text, pages[index].text) }) {
+                copies.append((original.site, pages[index].site))
+                pages[index].text = ""
+            }
+        }
+        if !copies.isEmpty {
+            let names = (copies.map(\.of) + copies.map(\.copy)).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+            sameText = "The same text on \(names.formatted(.list(type: .and)))."
+        }
+    }
+
+    /// Nearly every run of five words in one is in the other too.
+    private static func sameWords(_ a: String, _ b: String) -> Bool {
+        func runs(_ text: String) -> Set<String> {
+            let words = text.lowercased().split { !$0.isLetter && !$0.isNumber }
+            guard words.count >= 5 else { return [] }
+            return Set((0...(words.count - 5)).map { words[$0..<($0 + 5)].joined(separator: " ") })
+        }
+        let left = runs(String(a.prefix(6_000))), right = runs(String(b.prefix(6_000)))
+        guard !left.isEmpty, !right.isEmpty else { return false }
+        return Double(left.intersection(right).count) / Double(min(left.count, right.count)) >= 0.8
+    }
+
+    /// Only what can be shown from the articles: a point has to name its
+    /// sources, and every number in it has to be in them. A made-up difference
+    /// would be worse than none. Then a heading left with nothing goes: no
+    /// differences, no section saying so.
+    private static func provable(_ text: String, from pages: [ReadLaterPage]) -> String {
+        func numbers(in text: String) -> Set<String> {
+            Set(text.matches(of: /\d[\d.,]*\d/).map { String($0.0).filter(\.isNumber) })
+        }
+        // "Article 2" means nothing on screen: the site's name does.
+        let named = text.replacing(/\b(?:[Aa]rticle|[Čč]lanak)\s+(\d)\b/) { match -> String in
+            let index = (Int(match.1) ?? 0) - 1
+            return pages.indices.contains(index) ? pages[index].site : String(match.0)
+        }
+        var kept: [String] = []
+        for line in named.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
+            guard line.hasPrefix("- ") else {
+                kept.append(line)
+                continue
+            }
+            guard let mark = line.firstMatch(of: /\[\[([\d,\s]+)\]\]/) else { continue }
+            let cited = mark.1.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+                .compactMap { pages.indices.contains($0 - 1) ? pages[$0 - 1].text : nil }
+            let found = numbers(in: cited.joined(separator: " "))
+            if numbers(in: String(line[..<mark.range.lowerBound])).isSubset(of: found) { kept.append(line) }
+        }
+        var result: [String] = []
+        for (index, line) in kept.enumerated() {
+            if line.hasPrefix("## "), !(kept.indices.contains(index + 1) && kept[index + 1].hasPrefix("- ")) { continue }
+            result.append(line)
+        }
+        return result.joined(separator: "\n")
     }
 
     /// One engine's go; false when it isn't available here.
     private func write(with engine: Engine, language: WritingLanguage?, appleWritesIt: Bool) async throws -> Bool {
         let appleLanguage = appleWritesIt ? language : .english
         let languageNote = appleWritesIt ? nil : language.map { "In English: Apple's models write poor \($0.english)." }
+        headings = ComparisonHeadings.for(engine == .claude ? language : appleLanguage)
         switch engine {
         case .appleCloud:
             guard let cloud = AppleModels.cloudIfAvailable else { return false }
@@ -149,7 +267,7 @@ final class DigestModel: Identifiable {
             // Haiku reads a lot for little: 150,000 characters shared out,
             // each page shortened to its share when they come to more.
             let (prompt, shortened) = Self.prompt(pages, budget: 150_000)
-            note = Self.note(shortened ? "Long pages: their first parts." : nil)
+            note = Self.note(sameText, shortened ? "Long pages: their first parts." : nil)
             phase = .writing
             do {
                 try await stream(client, prompt: prompt, model: .haiku, language: language)
@@ -189,15 +307,29 @@ final class DigestModel: Identifiable {
             }
             prompt = Self.prompt(notes.map { number, points in (number, pages[number - 1], points) }, budget: budget)
         }
-        note = Self.note(shortened ? "Long pages: their first parts." : nil, languageNote)
+        note = Self.note(sameText, shortened ? "Long pages: their first parts." : nil, languageNote)
         phase = .writing
+        if isComparison {
+            // Plain text, not a shape to fill: Apple's permissive guardrails only
+            // apply to plain text, and news filled into a shape was turned down
+            // ("May contain sensitive content") even for an interest rate rise.
+            let session = LanguageModelSession(model: model, instructions: Self.appleComparing(language))
+            var written = ""
+            for try await snapshot in session.streamResponse(to: prompt) {
+                written = snapshot.content
+                text = headings.markdown(fromLines: written)
+            }
+            AITrace.log("compare wrote: \(written)")
+            return
+        }
         let stream = AppleModels.streamAnswer(model, shape: DigestAnswer.self, instructions: Self.appleInstructions(language),
                                               prompt: prompt, titled: false)
         for try await snapshot in stream { text = snapshot }
     }
 
     private func stream(_ client: ClaudeClient, prompt: String, model: ClaudeClient.Model, language: WritingLanguage?) async throws {
-        for try await event in client.stream(system: Self.claudeInstructions(language), prompt: prompt, model: model,
+        let system = isComparison ? Self.claudeComparing(language, headings: headings) : Self.claudeInstructions(language)
+        for try await event in client.stream(system: system, prompt: prompt, model: model,
                                              effort: "low", maxTokens: 4_096) {
             if case .text(let chunk) = event { text += chunk }
         }
@@ -268,6 +400,47 @@ final class DigestModel: Identifiable {
         """
     }
 
+    private static func appleComparing(_ language: WritingLanguage?) -> String {
+        """
+        You compare how several news sites report one event, for a phone. \(language?.instruction ?? "Write in the language of the articles.") \
+        Only what the articles say, each thing once. Never guess why a site wrote something. Answer in lines \
+        of exactly this form, the numbers in brackets being the articles it comes from:
+
+        GIST: what happened, in one or two plain sentences
+        SAME [1,2]: a main fact the articles share
+        DIFF [1,2]: different numbers, names or causes, one disputing another, or a plainly different emphasis, saying what each one says
+        ONLY [2]: something that matters which only one article has
+
+        One GIST. One to four SAME lines. DIFF lines only where they really differ: none if they don't, \
+        and never make a difference up. At most three ONLY lines. Each line at most 30 words. Nothing else.
+        """
+    }
+
+    private static func claudeComparing(_ language: WritingLanguage?, headings: ComparisonHeadings) -> String {
+        """
+        You compare how several news sites report one event, for a phone browser. \(language?.instruction ?? "Write in the language of the articles.") \
+        Only what the articles say, each thing once, in your own words.
+
+        Format, in Markdown (angle brackets mark what you write; keep the headings exactly as they are):
+
+        @ article
+        > <what happened, one or two sentences>
+        ## [check] \(headings.agree)
+        - **<key term>:** <point, one sentence of at most 25 words>[[<article numbers>]]
+        ## [compare] \(headings.differ)
+        - **<key term>:** <what each one says, at most 35 words>[[<article numbers>]]
+        ## [star] \(headings.onlyOne)
+        - **<key term>:** <point, one sentence of at most 25 words>[[<article number>]]
+
+        Rules: where they differ means different numbers, names or causes, one disputing what another \
+        says, or a plainly different emphasis. Leave out that heading if they don't differ, and the \
+        last one if no article adds anything that matters; never make a difference up, and never guess \
+        why a site wrote something. One to four points under a heading. End every point with the numbers \
+        of the articles it comes from in double brackets, as [[2]] or [[1,3]], using the numbers the \
+        articles are given. No "!! " or "%% " lines. No emoji. No preamble, no sign-off.
+        """
+    }
+
     private static func note(_ parts: String?...) -> String? {
         let text = parts.compactMap { $0 }.joined(separator: " ")
         return text.isEmpty ? nil : text
@@ -286,6 +459,46 @@ final class DigestModel: Identifiable {
             result.replaceSubrange(whole, with: numbers.isEmpty ? "" : "[[" + numbers.map(String.init).joined(separator: ",") + "]]")
         }
         return result
+    }
+}
+
+// MARK: A comparison's headings
+
+/// Fixed, so what they mean doesn't depend on the model. Croatian, as roko's
+/// news is, and English for the rest.
+nonisolated struct ComparisonHeadings {
+    let agree, differ, onlyOne: String
+
+    static let english = ComparisonHeadings(agree: "All agree", differ: "Where they differ", onlyOne: "Only one has it")
+    static let croatian = ComparisonHeadings(agree: "Svi se slažu", differ: "Gdje se razlikuju", onlyOne: "Ima samo jedan")
+
+    static func `for`(_ language: WritingLanguage?) -> ComparisonHeadings {
+        language?.code.hasPrefix("hr") == true ? croatian : english
+    }
+
+    /// What Apple's models write ("SAME [1,2]: …"), in the app's Markdown. A
+    /// line that isn't of the form, as one being written isn't yet, is left out.
+    func markdown(fromLines draft: String) -> String {
+        var gist: String?
+        var sections: [String: [String]] = [:]
+        for line in draft.split(separator: "\n") {
+            // The numbers come before the word about as often as after it: "[1,2] SAME:".
+            guard let match = line.firstMatch(of: /^\W*(?:\[([\d,\s]*)\]\W*)?(GIST|SAME|DIFF|ONLY)\W*(?:\[([\d,\s]*)\])?\W*:\s*(.+)$/) else { continue }
+            let kind = String(match.2), body = String(match.4)
+            if kind == "GIST" {
+                gist = gist ?? body
+            } else if let numbers = match.1 ?? match.3 {
+                sections[kind, default: []].append("- \(body)[[\(numbers)]]")
+            }
+        }
+        // Nothing whole yet: empty, so the screen goes on saying it's working.
+        guard gist != nil || !sections.isEmpty else { return "" }
+        var lines = ["@ article"]
+        if let gist { lines.append("> \(gist)") }
+        for (kind, heading, icon) in [("SAME", agree, "check"), ("DIFF", differ, "compare"), ("ONLY", onlyOne, "star")] {
+            if let points = sections[kind] { lines += ["## [\(icon)] \(heading)"] + points }
+        }
+        return lines.joined(separator: "\n")
     }
 }
 

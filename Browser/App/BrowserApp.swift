@@ -44,6 +44,9 @@ struct BrowserApp: App {
                     SpotlightIndex.update(container)
                 }
                 .task {
+                    #if DEBUG
+                    FeedProbe.runIfAsked()
+                    #endif
                     Appearance.apply()
                     // Pages' sound plays on with roko in the background.
                     BackgroundPlay.prepareSession()
@@ -60,6 +63,11 @@ struct BrowserApp: App {
         .backgroundTask(.appRefresh(TodayModel.taskID)) {
             await TodayModel.shared.refresh(inBackground: true)
             await TodayModel.scheduleMorningRefresh()
+        }
+        // News, ready when it's opened.
+        .backgroundTask(.appRefresh(FeedStore.taskID)) {
+            await FeedStore.shared.refresh(inBackground: true)
+            await FeedStore.scheduleRefresh()
         }
     }
 }

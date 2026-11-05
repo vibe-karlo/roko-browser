@@ -14,6 +14,17 @@
         "Site"
       ],
       "port": 4173
+    },
+    {
+      "name": "share-server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "Server/share",
+        "run",
+        "dev"
+      ],
+      "port": 8787
     }
   ]
 }

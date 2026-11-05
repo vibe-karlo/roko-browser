@@ -6,6 +6,7 @@
 	<array>
 		<string>com.growthstudio.roko.watch</string>
 		<string>com.growthstudio.roko.today</string>
+		<string>com.growthstudio.roko.feed</string>
 	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
