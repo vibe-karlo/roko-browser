@@ -8,6 +8,14 @@ enum PopularSites {
     struct Site {
         let host: String
         let name: String
+        /// The name with case and accents folded, once, for matching per keystroke.
+        let foldedName: String
+
+        init(host: String, name: String) {
+            self.host = host
+            self.name = name
+            foldedName = name.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
+        }
     }
 
     /// Sites whose address or name starts with what was typed, most popular
@@ -97,7 +105,6 @@ private extension PopularSites.Site {
         if host.hasPrefix(needle) { return true }
         // "www.index" or a name: "vecernji", "njuskalo", "google maps".
         if needle.hasPrefix("www."), host.hasPrefix(needle.dropFirst(4)) { return true }
-        let folded = name.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
-        return folded.hasPrefix(needle)
+        return foldedName.hasPrefix(needle)
     }
 }

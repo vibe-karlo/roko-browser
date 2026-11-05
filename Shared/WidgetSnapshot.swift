@@ -26,6 +26,14 @@ nonisolated struct WidgetSnapshot: Codable, Equatable {
         let rainChance: Int
         let place: String?
         let fetchedAt: Date
+
+        /// The same weather fetched again within the half hour is the same
+        /// weather: every fetch used to have all the widgets redrawn.
+        static func == (a: Weather, b: Weather) -> Bool {
+            a.temperature == b.temperature && a.condition == b.condition && a.glyph == b.glyph
+                && a.high == b.high && a.low == b.low && a.rainChance == b.rainChance && a.place == b.place
+                && Int(a.fetchedAt.timeIntervalSinceReferenceDate / 1800) == Int(b.fetchedAt.timeIntervalSinceReferenceDate / 1800)
+        }
     }
 
     /// A pinned answer from the bar (the weather somewhere, a rate, days

@@ -102,8 +102,11 @@ final class Downloads: NSObject {
     private func start(_ download: WKDownload, as id: UUID) {
         running[id] = download
         ids[ObjectIdentifier(download)] = id
+        // A few times a second, and at the end: every chunk had the list redrawn.
+        let gate = ProgressGate()
         progress[id] = download.progress.observe(\.completedUnitCount) { [weak self] progress, _ in
             let received = progress.completedUnitCount, total = progress.totalUnitCount
+            guard gate.passes(done: total > 0 && received >= total) else { return }
             Task { @MainActor in self?.update(id) { $0.received = received; $0.total = max(total, 0) } }
         }
         save()
@@ -263,6 +266,8 @@ final class Downloads: NSObject {
 
     private func finish(_ id: UUID) {
         if let download = running.removeValue(forKey: id) { ids.removeValue(forKey: ObjectIdentifier(download)) }
+        // Its web view (and its WebContent process) isn't kept for nothing.
+        if running.isEmpty { spareWebView = nil }
         progress.removeValue(forKey: id)
         if running.isEmpty, background != .invalid, interrupted.isEmpty { endBackground() }
     }
@@ -356,4 +361,19 @@ private final class PreviewSource: NSObject, QLPreviewControllerDataSource {
     init(url: URL) { self.url = url }
     func numberOfPreviewItems(in controller: QLPreviewController) -> Int { 1 }
     func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem { url as NSURL }
+}
+
+/// Lets a progress report through four times a second, and always the last.
+private final class ProgressGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var last = Date.distantPast
+
+    func passes(done: Bool) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        let now = Date.now
+        guard done || now.timeIntervalSince(last) >= 0.25 else { return false }
+        last = now
+        return true
+    }
 }

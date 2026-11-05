@@ -21,7 +21,10 @@ enum BackgroundPlay {
 
     /// At launch, and after voice input has had the session for recording.
     static func prepareSession() {
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+        // A round trip to the audio server, right after the first frame: off the main thread.
+        Task.detached(priority: .utility) {
+            try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+        }
     }
 
     private static var leaving: [WKWebView] = []

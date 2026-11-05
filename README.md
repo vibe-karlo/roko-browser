@@ -77,7 +77,7 @@ they need a Claude API key: paste it in Settings, where it's stored in the Keych
 
 | Area | Where | Notes |
 | --- | --- | --- |
-| Tabs | `Web/BrowserTab.swift`, `App/BrowserModel.swift` | At most 3 live web views; older tabs hibernate to a snapshot plus their back/forward state. Saved after every page load. |
+| Tabs | `Web/BrowserTab.swift`, `App/BrowserModel.swift` | At most 3 live web views; older tabs hibernate to a snapshot plus their back/forward state. Saved after every page load, only the rows that changed. The switcher and the bar draw small copies of the pictures (1200 pixels on the long edge, about 3 MB decoded rather than 10), read off the main thread and kept for the last dozen tabs looked at; the full picture stands in for the restored tab at launch. |
 | Ad, tracker, cookie blocking | `Blocking/`, `Resources/Blocklists/` | Request blocking uses WebKit content rule lists (native, compiled once). Element hiding is served per page by `CosmeticFilter`: a page gets only the selectors whose id or class it contains, instead of WebKit testing ~45k selectors on every page. What you hid yourself (`HiddenItems`) rides on the same first answer, so it costs nothing extra; the picker script (`hide-items.js`) is only put into a page while you're hiding. |
 | Cookie banners | `Resources/Scripts/cookie-consent.js` | Clicks "reject" on the common consent platforms, in an isolated script world; the cookie filter list hides the rest. |
 | Command bar | `Command/` | One ranked list: address, search, Browse for Me, pins, tabs, history, suggestions, actions. Best match sits above the field. |
@@ -306,7 +306,12 @@ Pins and history sync through CloudKit, in the private database of the iCloud ac
 (container `iCloud.com.growthstudio.roko`). `Store` keeps two SwiftData stores: `synced.store`
 for `Pin` and `HistoryEntry`, and `device.store` for `SavedTab` and `Watch`. Open tabs are saved
 after every page load with their back and forward history, which would only churn the sync, and
-Notify Me would check and notify on every device. The first launch with sync copies the old
+Notify Me would check and notify on every device. The tabs are saved from a context of their own,
+signed `tabs`, and only the rows that changed: a save used to delete and insert every tab, and
+SwiftData keeps a change record for each row a save touches, so one phone with two hundred tabs
+had 122,000 of them. The records signed `tabs` and older than a day are pruned after launch
+(`Store.pruneDeviceHistory`); the synced store's records stay, CloudKit reads them. The history
+can be asked for an author but not for a store, which is why the tabs sign theirs. The first launch with sync copies the old
 single `default.store` into the two and keeps it as `before-sync.store`. Settings and per-site
 choices (search engines, force dark, blocking, cookies, zoom) sync through the iCloud key-value store
 (`SettingsSync`); the app icon, the Claude key and caches stay on the device.
@@ -339,8 +344,14 @@ roko answers cookie pop-ups instead of only hiding them, with DuckDuckGo's
 own iOS browser uses: about 1,200 rules for consent platforms and single sites (Consent-O-Matic's
 among them), plus a heuristic that finds a pop-up by its buttons. `Scripts/build_consent.sh`
 bundles it with `Scripts/consent/bridge.js` into `consent-main.js` (pages, every rule) and
-`consent-frame.js` (frames, the frame rules only). They run in their own content world;
-`ConsentHandler` decides each answer.
+`consent-frame.js` (frames, the frame rules only), and writes `consent-frame-gate.json`: which
+frames can hold a pop-up at all (the frame rules' addresses, Sourcepoint's frame, and the two
+banners any frame may hold). Only those frames are sent the frame rules; an ad-heavy page has
+dozens of frames, and each used to get the 190 KB. They run in their own content world;
+`ConsentHandler` decides each answer. Detection tries every rule ten times in a page and five
+in a frame, half a second and a change in the page apart; Autoconsent's scan of the page's
+text for cookie wording is off (nothing read its result), and its step-by-step reports reach
+the app only with `-perf`.
 
 - **Reject** by default. A known pop-up is kept hidden while it's answered.
 - **Through the platform's API** when no rule sees the pop-up: index.hr's anti-adblock scrambles ids and classes for everything but its own scripts, so Didomi is asked in the page itself whether its notice is up, and answered there. Page-script checks get a second each, so one that never answers can't stall detection. Debug builds take `-domProbe <script>` to look at the open tab from the page's world and the consent world.
@@ -353,7 +364,10 @@ bundles it with `Scripts/consent/bridge.js` into `consent-main.js` (pages, every
 
 Cookie banners the cosmetic list hides are faded (opacity) for ten seconds before being
 removed, so Autoconsent can still find and answer them. Measured on an iPhone 17 Pro with the
-`-benchmark -benchConsent` harness, the scripts made no measurable difference to page loads.
+`-benchmark -benchConsent` harness, the scripts made no measurable difference to page loads:
+their work comes after the load event, which is where the harness stops. What it costs there,
+on The Verge: 88 messages to the app per page before the frame gate (five frames getting the
+rules, about fifty reports), 35 after, none of them from frames.
 
 
 Bars a site writes itself, in words Autoconsent's heuristic doesn't recognise, get roko's own
@@ -538,7 +552,10 @@ On the iPhone 17 Pro, Release build (24 October 2026): first screen 160 ms after
 cold; the content blocker ready 0.4 to 1.2 s. From Go to a page you can see: under 0.1 s when the bar's top row
 was preloaded while typing (about 1.3 s before preloading, measured in the simulator on 29 October 2026). In the simulator: every screen (a page, the address
 bar, Today, To-do, an answer) at 0% CPU when nothing is happening, about 80 MB; ranking the
-address bar 1 to 2.5 ms a keystroke, 3.5 ms to open. Nothing polls: waits are one-off pauses or
+address bar 1 to 2.5 ms a keystroke, 3.5 ms to open. The bar searches history in memory
+(`HistoryIndex`: the newest 5,000 pages, title and address folded, built off the main thread
+after launch and refreshed on coming back to the app), so a keystroke costs the same with a
+year of history as with a week; the store's own search read every row. Nothing polls: waits are one-off pauses or
 debounces, the light's breathing and the reading shimmer run only while something is being worked
 on, and the network and location are touched only when what they'd bring is stale (weather ten
 minutes in Today, half an hour pinned; a location fix fifteen minutes). In the background: one

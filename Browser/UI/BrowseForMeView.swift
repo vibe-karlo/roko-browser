@@ -119,7 +119,8 @@ struct BrowseForMeView: View {
                 viewportHeight = height
             }
             .onScrollGeometryChange(for: Double.self) { ReadingLine.progress($0) } action: { _, progress in
-                readProgress = progress
+                // In steps of a hundredth: every frame of a scroll had the whole answer laid out again.
+                if abs(progress - readProgress) >= 0.01 || progress == 0 || progress == 1 { readProgress = progress }
             }
         }
     }

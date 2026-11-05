@@ -28,11 +28,8 @@ enum WebViewFactory {
     static func make(isPrivate: Bool) -> WKWebView {
         if !isPrivate, let webView = prewarmed {
             prewarmed = nil
-            // The next tab gets one too, built once this one's page is under way.
-            Task {
-                try? await Task.sleep(for: .seconds(1))
-                prewarm()
-            }
+            // The next tab's is built once a page has finished loading
+            // (BrowserModel), not a second from now, in the middle of this one.
             return webView
         }
         return build(isPrivate: isPrivate)
@@ -41,10 +38,10 @@ enum WebViewFactory {
     /// For reading a page out of sight (Notify Me): with your cookies, as the
     /// page would be for you, and without taking the spare.
     static func makeOffscreen() -> WKWebView {
-        build(isPrivate: false)
+        build(isPrivate: false, offscreen: true)
     }
 
-    private static func build(isPrivate: Bool) -> WKWebView {
+    private static func build(isPrivate: Bool, offscreen: Bool = false) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = isPrivate ? privateStore : .default()
         #if DEBUG
@@ -66,7 +63,9 @@ enum WebViewFactory {
         // Tabs that aren't on screen freeze completely (no JavaScript, no layout)
         // instead of being merely throttled, so they can't steal time from the
         // page you're looking at. Media playback and loads are exempt.
-        configuration.preferences.inactiveSchedulingPolicy = .suspend
+        // A view never in a window counts as inactive from the start: suspended,
+        // its page's scripts would never fill the page in for Notify Me.
+        configuration.preferences.inactiveSchedulingPolicy = offscreen ? .throttle : .suspend
         // No scanning page text for phone numbers, dates and addresses.
         configuration.dataDetectorTypes = []
 

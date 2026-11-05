@@ -109,6 +109,9 @@ export function start(AutoConsent, filterCompactRules, compactRules) {
     };
 
     const send = async (message) => {
+        // Autoconsent's bookkeeping, a "report" after every step and an "init"
+        // before the rules are in: nothing in roko reads them but the -perf log.
+        if ((message.type === 'report' || message.type === 'init') && !window.__rokoConsentReports) return;
         let reply = await post(message);
         if (message.type === 'popupFound' && reply && payToReject()) {
             if (reply.type === 'optOut') reply = await post({ type: 'rokoWall', cmp: message.cmp });
@@ -234,11 +237,18 @@ export function start(AutoConsent, filterCompactRules, compactRules) {
             enablePrehide: true,
             enableCosmeticRules: true,
             enableGeneratedRules: true,
-            enableHeuristicDetection: true,
+            // Autoconsent's scan of the whole page's text for cookie wording,
+            // on every pass: it only fills in a report nobody reads. The
+            // pop-up heuristic below is a different thing and stays on.
+            enableHeuristicDetection: false,
             // Pop-ups no rule knows: click reject, or a plain "OK" on a notice,
             // never "accept" on a guess.
             heuristicMode: 'tier1',
-            detectRetries: 20,
+            // Each pass tries every rule, then waits half a second and a change
+            // in the page. Ten passes still catch a pop-up drawn five seconds
+            // after the page loaded; roko's own checks below run longer. A
+            // frame has a handful of rules, and its pop-up is its whole content.
+            detectRetries: mainFrame ? 10 : 5,
             isMainWorld: false,
             prehideTimeout: 2000,
             logs: { lifecycle: false, rulesteps: false, detectionsteps: false, evals: false, errors: false, messages: false, waits: false },

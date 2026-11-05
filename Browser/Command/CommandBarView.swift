@@ -1302,7 +1302,7 @@ enum CommandRanker {
         // A site whose address starts with what you typed: the site itself (its
         // front page) is the best guess, ahead of searching for the letters and
         // ahead of any one article on it, however often that was read.
-        var articles: [(entry: HistoryEntry, url: URL)] = []
+        var articles: [(entry: HistoryIndex.Hit, url: URL)] = []
         for entry in browser.history(matching: query, limit: 16) where !openURLs.contains(entry.url) {
             guard let url = URL(string: entry.url) else { continue }
             let host = url.displayHost

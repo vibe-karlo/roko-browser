@@ -259,13 +259,40 @@ final class SummaryModel: Identifiable {
                                              effort: "low", maxTokens: 4_096) {
             if case .text(let chunk) = event {
                 if replacing {
+                    settle()
                     text = chunk
                     replacing = false
                 } else {
-                    text += chunk
+                    take(chunk)
                 }
             }
         }
+        settle()
+    }
+
+    // MARK: Streamed text
+
+    /// What has arrived and isn't on screen yet. Tokens come many times a
+    /// second, and each one shown had the whole page laid out again.
+    @ObservationIgnored private var arriving = ""
+    @ObservationIgnored private var showing: Task<Void, Never>?
+
+    private func take(_ chunk: String) {
+        arriving += chunk
+        guard showing == nil else { return }
+        showing = Task {
+            try? await Task.sleep(for: .milliseconds(40))
+            settle()
+        }
+    }
+
+    /// Everything that has arrived, onto the page now.
+    private func settle() {
+        showing?.cancel()
+        showing = nil
+        guard !arriving.isEmpty else { return }
+        text += arriving
+        arriving = ""
     }
 
     /// The last engine failed partway: its words stay up until these replace them.
@@ -762,14 +789,38 @@ final class BrowseForMeModel: Identifiable {
                 let numbers = pages.compactMap { page in sources.firstIndex { $0.url.displayHost == page.url.displayHost } }
                     .map { $0 + 1 }
                     .reduce(into: [Int]()) { if !$0.contains($1) { $0.append($1) } }
-                if !numbers.isEmpty, !text.isEmpty {
-                    text += "[[" + numbers.prefix(3).map(String.init).joined(separator: ",") + "]]"
+                if !numbers.isEmpty, !text.isEmpty || !arriving.isEmpty {
+                    take("[[" + numbers.prefix(3).map(String.init).joined(separator: ",") + "]]")
                 }
             case .text(let chunk):
-                text += chunk
+                take(chunk)
                 phase = .writing
             }
         }
+        settle()
+    }
+
+    // MARK: Streamed text
+
+    /// As in SummaryModel: tokens shown a few dozen times a second, not each.
+    @ObservationIgnored private var arriving = ""
+    @ObservationIgnored private var showing: Task<Void, Never>?
+
+    private func take(_ chunk: String) {
+        arriving += chunk
+        guard showing == nil else { return }
+        showing = Task {
+            try? await Task.sleep(for: .milliseconds(40))
+            settle()
+        }
+    }
+
+    private func settle() {
+        showing?.cancel()
+        showing = nil
+        guard !arriving.isEmpty else { return }
+        text += arriving
+        arriving = ""
     }
 
     // MARK: Videos

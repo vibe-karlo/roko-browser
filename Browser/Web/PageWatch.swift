@@ -40,7 +40,7 @@ final class PageWatch: NSObject, WKScriptMessageHandler {
         case "formSent":
             tab.noteForm([:], worthKeeping: false)
         case "media":
-            tab.media = BrowserTab.Media(playing: body["playing"] as? Bool ?? false,
+            let media = BrowserTab.Media(playing: body["playing"] as? Bool ?? false,
                                          isVideo: body["video"] as? Bool ?? false,
                                          title: body["title"] as? String ?? "",
                                          artist: body["artist"] as? String ?? "",
@@ -48,6 +48,15 @@ final class PageWatch: NSObject, WKScriptMessageHandler {
                                          time: body["time"] as? Double ?? 0,
                                          duration: body["duration"] as? Double ?? 0,
                                          isFloating: body["floating"] as? Bool ?? false)
+            // Only a change worth drawing: a seek that moved the time alone
+            // would otherwise have every view of the tab's media look again.
+            if var current = tab.media {
+                current.time = media.time
+                current.duration = media.duration
+                current.reportedAt = media.reportedAt
+                if current == media { return }
+            }
+            tab.media = media
         case "mediaGone":
             tab.media = nil
         case "dark":

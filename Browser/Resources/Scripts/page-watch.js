@@ -61,7 +61,10 @@
   // MARK: Media
 
   let current = null;
-  let lastTick = 0;
+  // Only media that has actually played. A page's video that tries to start
+  // by itself and is stopped (playing waits for a tap) fires play and pause
+  // too, and used to put itself in the player of a page you never played.
+  const started = new WeakSet();
   // The largest picture the page gives for what's playing: its media session's
   // artwork, the video's poster, or the page's own share picture.
   const artworkOf = (el, meta) => {
@@ -72,9 +75,8 @@
     try { return url ? new URL(url, location.href).href : ""; } catch (e) { return ""; }
   };
   const report = (el) => {
-    if (!el) return;
+    if (!el || !started.has(el)) return;
     current = el;
-    lastTick = Date.now();
     const meta = navigator.mediaSession && navigator.mediaSession.metadata;
     post({
       kind: "media",
@@ -91,13 +93,12 @@
   for (const name of ["play", "playing", "pause", "ended", "seeked", "webkitpresentationmodechanged",
                       "enterpictureinpicture", "leavepictureinpicture"]) {
     document.addEventListener(name, (event) => {
-      if (event.target instanceof HTMLMediaElement) report(event.target);
+      const el = event.target;
+      if (!(el instanceof HTMLMediaElement)) return;
+      if (name === "playing") started.add(el);
+      report(el);
     }, true);
   }
-  // Where it's got to, for the mini player's line: once a second at most.
-  document.addEventListener("timeupdate", (event) => {
-    if (event.target === current && Date.now() - lastTick > 1000) report(current);
-  }, true);
   document.addEventListener("emptied", (event) => {
     if (event.target === current) { current = null; post({ kind: "mediaGone" }); }
   }, true);

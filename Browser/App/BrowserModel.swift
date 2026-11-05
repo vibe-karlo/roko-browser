@@ -187,6 +187,12 @@ final class BrowserModel {
     }
 
     @ObservationIgnored private var context: ModelContext?
+    /// The bar's history, in memory (see HistoryIndex).
+    @ObservationIgnored let historyIndex = HistoryIndex()
+    /// The open tabs' own context, signed "tabs": their saves are the one thing
+    /// that writes the device store steadily, and the change history they leave
+    /// can be pruned by that name (Store.pruneDeviceHistory).
+    @ObservationIgnored private var tabContext: ModelContext?
 
     var selectedTab: BrowserTab? { tabs.first { $0.id == selectedID } }
 
@@ -288,6 +294,10 @@ final class BrowserModel {
     func start(context: ModelContext) {
         guard self.context == nil else { return }
         self.context = context
+        let tabContext = ModelContext(context.container)
+        tabContext.author = Store.tabsAuthor
+        tabContext.autosaveEnabled = false
+        self.tabContext = tabContext
         NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification,
                                                object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.relieveMemory() }
@@ -322,12 +332,18 @@ final class BrowserModel {
             // Only now start the restored page, so its very first requests are
             // already filtered. Until then its saved snapshot stands in.
             if let tab = selectedTab { select(tab) }
+            historyIndex.rebuild(from: context.container)
+            // Housekeeping, spread out: each piece is a few to a few dozen
+            // milliseconds on the main thread, and all in one go they cost a
+            // frame while the first page was still settling.
             try? await Task.sleep(for: .seconds(1.5))
             WebViewFactory.prewarm()
-            await tidyUp()
+            try? await Task.sleep(for: .seconds(1))
             // Pay the calculator's one-time setup (formatters, unit tables) now,
             // not on the first keystroke.
             _ = Calculator.answer("1 km + 1")
+            try? await Task.sleep(for: .seconds(1.5))
+            await tidyUp()
         }
         // The bar (and its keyboard) waits for the welcome to finish.
         if tabs.isEmpty, !showsOnboarding { panel = .command }
@@ -346,6 +362,9 @@ final class BrowserModel {
         let old = (try? context.fetch(FetchDescriptor<HistoryEntry>(predicate: #Predicate { $0.visitedAt < cutoff }))) ?? []
         old.forEach(context.delete)
         try? context.save()
+        Store.pruneDeviceHistory(in: context.container)
+        // The merge reads all of history: a frame apart from the prune above.
+        try? await Task.sleep(for: .milliseconds(500))
         mergeSyncedDuplicates()
     }
 
@@ -356,6 +375,7 @@ final class BrowserModel {
         if let last = lastMerge, Date.now.timeIntervalSince(last) < 3600 { return }
         lastMerge = .now
         Store.mergeDuplicates(in: context)
+        historyIndex.rebuild(from: context.container)
     }
     @ObservationIgnored private var lastMerge: Date?
 
@@ -372,12 +392,13 @@ final class BrowserModel {
                 tab.releaseSnapshotMemory()
             }
         }
+        BrowserTab.dropThumbnails(except: selectedID)
         WebViewFactory.dropPrewarmed()
         FaviconStore.shared.trimMemory()
     }
 
     private func restoreTabs() {
-        guard let context else { return }
+        guard let context = tabContext else { return }
         let saved = (try? context.fetch(FetchDescriptor<SavedTab>(sortBy: [SortDescriptor(\.order)]))) ?? []
         let cutoff = Date.now.addingTimeInterval(-ArchivePolicy.current.interval)
 
@@ -407,17 +428,39 @@ final class BrowserModel {
         }
     }
 
+    /// Writes only what changed. It used to delete and insert every tab, which
+    /// on a phone with two hundred of them wrote four hundred rows (and as many
+    /// change-history rows) a page, and left the store ten times its data.
     func saveTabs() {
         pendingSave?.cancel()
         pendingSave = nil
-        guard let context else { return }
-        try? context.delete(model: SavedTab.self)
+        guard let context = tabContext else { return }
+        let records = (try? context.fetch(FetchDescriptor<SavedTab>())) ?? []
+        var byID: [UUID: SavedTab] = [:]
+        for record in records {
+            if byID[record.tabID] == nil { byID[record.tabID] = record } else { context.delete(record) }
+        }
+        var open = Set<UUID>()
         for (index, tab) in tabs.enumerated() where !tab.isPrivate {
             guard let url = tab.url else { continue }
-            context.insert(SavedTab(tabID: tab.id, url: url.absoluteString, title: tab.title, order: index,
-                                    lastActive: tab.lastActive, interactionState: tab.interactionState))
+            open.insert(tab.id)
+            let address = url.absoluteString
+            // A live page's state is encoded by WebKit: once per save.
+            let state = tab.interactionState
+            guard let record = byID[tab.id] else {
+                context.insert(SavedTab(tabID: tab.id, url: address, title: tab.title, order: index,
+                                        lastActive: tab.lastActive, interactionState: state))
+                continue
+            }
+            // Assigned only when different: an assignment counts as a change.
+            if record.url != address { record.url = address }
+            if record.title != tab.title { record.title = tab.title }
+            if record.order != index { record.order = index }
+            if record.lastActive != tab.lastActive { record.lastActive = tab.lastActive }
+            if record.interactionState != state { record.interactionState = state }
         }
-        try? context.save()
+        for (id, record) in byID where !open.contains(id) { context.delete(record) }
+        if context.hasChanges { try? context.save() }
     }
 
     // MARK: Tabs
@@ -725,22 +768,22 @@ final class BrowserModel {
 
     /// The to-dos whose time is within the next hour, soonest first.
     func refreshLive() {
-        liveClock = .now
-        guard let context else { return }
+        // Not while roko is away (sound playing on): nothing is looking.
+        guard let context, UIApplication.shared.applicationState != .background else { return }
         let now = Date.now
         let todos = (try? context.fetch(FetchDescriptor<Todo>(predicate: #Predicate { !$0.done && $0.time != nil }))) ?? []
-        dueTodos = todos
+        let due = todos
             .filter { todo in
                 guard let time = todo.time, !dismissedTodos.contains(todo.persistentModelID) else { return false }
                 // From an hour before its time until its time; after that it's overdue, in the strip.
                 return time > now && time < now.addingTimeInterval(60 * 60)
             }
             .sorted { ($0.time ?? .distantFuture) < ($1.time ?? .distantFuture) }
-        let due = Set(dueTodos.map(\.persistentModelID))
+        let dueIDs = Set(due.map(\.persistentModelID))
         let open = (try? context.fetch(FetchDescriptor<Todo>(predicate: #Predicate { !$0.done }))) ?? []
-        todayTodos = open
+        let today = open
             .filter { todo in
-                guard !due.contains(todo.persistentModelID), !dismissedTodos.contains(todo.persistentModelID) else { return false }
+                guard !dueIDs.contains(todo.persistentModelID), !dismissedTodos.contains(todo.persistentModelID) else { return false }
                 let section = TodoSection.of(todo, now: now)
                 return section == .today || section == .overdue
             }
@@ -752,7 +795,16 @@ final class BrowserModel {
                 default: return a.createdAt < b.createdAt
                 }
             }
+        // Assigned only when different: each assignment has the whole screen
+        // look again, and the ticker runs twice a minute for the life of the app.
+        if due.map(\.persistentModelID) != dueTodos.map(\.persistentModelID) { dueTodos = due }
+        if today.map(\.persistentModelID) != todayTodos.map(\.persistentModelID) { todayTodos = today }
+        if Parking.shared.active?.startedAt != lastParking {
+            lastParking = Parking.shared.active?.startedAt
+            liveClock = now
+        }
     }
+    @ObservationIgnored private var lastParking: Date?
 
     func startLiveTicker() {
         liveTicker?.cancel()
@@ -823,6 +875,7 @@ final class BrowserModel {
     /// A tab you closed, kept with its back/forward history so it can come
     /// back as it was. Only while roko is open, and never a private tab.
     struct ClosedTab {
+        let id: UUID
         let url: URL
         let title: String
         let state: Data?
@@ -845,7 +898,7 @@ final class BrowserModel {
 
     /// Everything one Close All took, ready to come back together.
     struct ClosedGroup {
-        let tabs: [(closed: ClosedTab, snapshot: UIImage?)]
+        let tabs: [ClosedTab]
         let selectedIndex: Int?
     }
 
@@ -867,11 +920,12 @@ final class BrowserModel {
         let group = ClosedGroup(
             tabs: tabs.enumerated().compactMap { index, tab in
                 guard !tab.isPrivate, let url = tab.url else { return nil }
-                return (ClosedTab(url: url, title: tab.title, state: tab.interactionState, index: index), tab.snapshot)
+                return ClosedTab(id: tab.id, url: url, title: tab.title, state: tab.interactionState, index: index)
             },
             selectedIndex: tabs.firstIndex { $0.id == selectedID && !$0.isPrivate })
-        for tab in closing where tab.id != selectedID { close(tab) }
-        if let selectedTab, closing.contains(where: { $0.id == selectedTab.id }) { close(selectedTab) }
+        // Their pictures stay on disk for Undo; the next launch sweeps up the rest.
+        for tab in closing where tab.id != selectedID { close(tab, keepingPicture: true) }
+        if let selectedTab, closing.contains(where: { $0.id == selectedTab.id }) { close(selectedTab, keepingPicture: true) }
         closedGroup = group.tabs.isEmpty ? nil : group
         panel = .tabs
     }
@@ -881,24 +935,24 @@ final class BrowserModel {
         guard let group = closedGroup else { return }
         closedGroup = nil
         recentlyClosed.removeLast(min(group.tabs.count, recentlyClosed.count))
-        for (closed, snapshot) in group.tabs {
-            let tab = BrowserTab(url: closed.url, title: closed.title, restoreState: closed.state)
+        for closed in group.tabs {
+            // The same id as before: its picture is still on disk under it.
+            let tab = BrowserTab(id: closed.id, url: closed.url, title: closed.title, restoreState: closed.state)
             tab.delegate = self
-            tab.keep(snapshot)
             tabs.insert(tab, at: min(closed.index, tabs.count))
             if closed.index == group.selectedIndex { select(tab) }
         }
         scheduleSave()
     }
 
-    func close(_ tab: BrowserTab) {
+    func close(_ tab: BrowserTab, keepingPicture: Bool = false) {
         HitchWatch.start("close tab")
         guard let index = tabs.firstIndex(where: { $0.id == tab.id }) else { return }
         if !tab.isPrivate, let url = tab.url {
-            recentlyClosed.append(ClosedTab(url: url, title: tab.title, state: tab.interactionState, index: index))
+            recentlyClosed.append(ClosedTab(id: tab.id, url: url, title: tab.title, state: tab.interactionState, index: index))
             if recentlyClosed.count > 10 { recentlyClosed.removeFirst() }
         }
-        tab.close()
+        tab.close(keepingPicture: keepingPicture)
         tabs.remove(at: index)
         // Half of a split closed: the other half has the screen.
         if let current = split, current.contains(tab.id) {
@@ -1345,18 +1399,24 @@ final class BrowserModel {
             }
         }
         try? context.save()
+        historyIndex.rebuild(from: context.container)
     }
 
-    func history(matching query: String, limit: Int) -> [HistoryEntry] {
+    /// Pages matching what's typed, newest first: from the index in memory,
+    /// or from the store in the moment after launch before it's built.
+    func history(matching query: String, limit: Int) -> [HistoryIndex.Hit] {
         // Locked behind Face ID: nothing to suggest from until it's unlocked.
         guard let context, !PrivacyLock.shared.isLocked else { return [] }
+        if historyIndex.isReady { return historyIndex.search(query, limit: limit) }
         var descriptor = FetchDescriptor<HistoryEntry>(
             predicate: query.isEmpty ? nil : #Predicate {
                 $0.title.localizedStandardContains(query) || $0.url.localizedStandardContains(query)
             },
             sortBy: [SortDescriptor(\.visitedAt, order: .reverse)])
         descriptor.fetchLimit = limit
-        return (try? context.fetch(descriptor)) ?? []
+        return ((try? context.fetch(descriptor)) ?? []).map {
+            HistoryIndex.Hit(url: $0.url, title: $0.title, visitCount: $0.visitCount, visitedAt: $0.visitedAt)
+        }
     }
 
     /// On every device: entry by entry, so the removal syncs.
@@ -1367,6 +1427,7 @@ final class BrowserModel {
         // One by one, so the deletions reach iCloud too (see README, "iCloud sync").
         ((try? context.fetch(descriptor)) ?? []).forEach(context.delete)
         try? context.save()
+        historyIndex.rebuild(from: context.container)
     }
 }
 
@@ -1380,6 +1441,9 @@ extension BrowserModel: BrowserTabDelegate {
         if let webView = tab.webView {
             Task { await FaviconStore.shared.refresh(from: webView) }
         }
+        // The spare web view for the next new tab, now that this page is in:
+        // built a second after the last was taken, it landed mid-load.
+        WebViewFactory.prewarm()
         guard let context, url.scheme?.hasPrefix("http") == true else { return }
         // Save open tabs as pages finish, so a force-quit or crash loses nothing.
         scheduleSave()
@@ -1388,11 +1452,17 @@ extension BrowserModel: BrowserTabDelegate {
         var descriptor = FetchDescriptor<HistoryEntry>(predicate: #Predicate { $0.url == address })
         descriptor.fetchLimit = 1
         if let entry = try? context.fetch(descriptor).first {
+            // Seen again within minutes (a reload, back and forward): not a new
+            // visit, and not another record for iCloud to carry to every device.
+            if entry.visitedAt.timeIntervalSinceNow > -300, title.isEmpty || entry.title == title { return }
             entry.visitedAt = .now
             entry.visitCount += 1
             if !title.isEmpty { entry.title = title }
+            historyIndex.note(url: address, title: entry.title, visitCount: entry.visitCount, visitedAt: entry.visitedAt)
         } else {
-            context.insert(HistoryEntry(url: url, title: title))
+            let entry = HistoryEntry(url: url, title: title)
+            context.insert(entry)
+            historyIndex.note(url: address, title: title, visitCount: 1, visitedAt: entry.visitedAt)
         }
         try? context.save()
     }
@@ -1501,9 +1571,11 @@ extension BrowserModel: BrowserTabDelegate {
     // MARK: Open in app
 
     private func offerApp(for tab: BrowserTab, url: URL) {
+        // Whether the app is installed is asked of iOS last: it's a round trip
+        // to LaunchServices, on every page of a site that has one.
         guard AppLinks.Mode.current == .offer, tab.id == selectedID, panel == .none,
-              let app = AppLinks.installedApp(for: url),
-              appOffersMade.insert(app.scheme).inserted else { return }
+              let app = AppLinks.app(for: url), !appOffersMade.contains(app.scheme),
+              AppLinks.isInstalled(app), appOffersMade.insert(app.scheme).inserted else { return }
         appOffer = (app, url)
         appOfferTask?.cancel()
         appOfferTask = Task {

@@ -13,7 +13,7 @@
   let pending = [];
   let scheduled = false;
   let first = true;
-  let style = null;
+  let flushes = 0;
 
   const note = (el) => {
     if (el.id) {
@@ -41,15 +41,18 @@
     pending = [];
     const isFirst = first;
     first = false;
+    flushes++;
     try {
       const reply = await handler.postMessage({ host: location.hostname, keys, first: isFirst });
       if (reply && reply.collapseAds) startCollapsing();
       if (!reply) return;
       if (reply.faded && reply.faded.length) fade(reply.faded);
       if (!reply.css) return;
-      if (!style) style = document.createElement("style");
-      style.appendChild(document.createTextNode(reply.css + "\n"));
-      if (!style.isConnected) (document.head || document.documentElement).appendChild(style);
+      // A sheet of its own: added to one sheet, each reply had WebKit parse
+      // everything received so far again.
+      const style = document.createElement("style");
+      style.textContent = reply.css;
+      (document.head || document.documentElement).appendChild(style);
       unpushIfHidden();
       if (reply.overlays && reply.overlays.length) {
         overlays.push(...reply.overlays);
@@ -164,13 +167,16 @@
       if (settled.has(el)) continue;
       const height = el.offsetHeight;
       if (height < 30 || height > 1200) continue;
+      // Only a box with an ad-like name, or a small one, can be a slot: the
+      // page's big unnamed containers are left before their text is gathered.
+      const name = el.id + " " + (typeof el.className === "string" ? el.className : "");
+      const named = name.length > 1 && AD_NAME.test(name);
+      if (!named && el.childElementCount > 4) continue;
       const text = el.textContent.trim();
       if (!isLabelOnly(text)) { settled.add(el); continue; }
       if (hasRealMedia(el)) continue;
       // An ad-like name, or (unnamed) an ad label shown as text or drawn by CSS.
-      const name = el.id + " " + (typeof el.className === "string" ? el.className : "");
-      const isSlot = (name.length > 1 && AD_NAME.test(name))
-        || (el.childElementCount <= 4 && height >= 50 && (text ? true : pseudoLabel(el)));
+      const isSlot = named || (height >= 50 && (text ? true : pseudoLabel(el)));
       if (!isSlot) continue;
       // Take the box's empty wrappers with it, so no padded frame is left behind.
       let box = el;
@@ -217,11 +223,14 @@
     else window.addEventListener("load", begin, { once: true });
   };
 
-  // Batch everything noticed within a frame into one request.
+  // The first request goes with the next frame, for the first paint. Later
+  // ones wait for the page to settle a little: a page building itself asked
+  // once a frame, and eleven requests in twelve brought nothing back.
   const schedule = () => {
     if (scheduled) return;
     scheduled = true;
-    requestAnimationFrame(flush);
+    if (flushes === 0) requestAnimationFrame(flush);
+    else setTimeout(flush, flushes < 4 ? 150 : 500);
   };
 
   if (document.documentElement) scan(document.documentElement);

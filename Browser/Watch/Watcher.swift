@@ -272,7 +272,10 @@ enum RenderedPage {
         let loader = Loader()
         webView.navigationDelegate = loader
         webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData))
-        guard await loader.finished(within: 20) else { return nil }
+        guard await loader.finished(within: 20) else {
+            webView.stopLoading()
+            return nil
+        }
         // Loaded is not written: give its scripts a moment to fill it in.
         try? await Task.sleep(for: .seconds(2))
         guard let html = try? await webView.evaluateJavaScript("document.documentElement.outerHTML") as? String else { return nil }

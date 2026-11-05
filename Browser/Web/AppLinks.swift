@@ -79,6 +79,18 @@ enum AppLinks {
     /// The app for this page, if it's on this iPhone.
     @MainActor
     static func installedApp(for url: URL) -> App? {
+        guard let app = app(for: url), isInstalled(app) else { return nil }
+        return app
+    }
+
+    /// Whether the app is on this iPhone: a round trip to LaunchServices.
+    static func isInstalled(_ app: App) -> Bool {
+        guard let probe = URL(string: "\(app.scheme)://") else { return false }
+        return UIApplication.shared.canOpenURL(probe)
+    }
+
+    /// The app a link belongs to, by its host, installed or not.
+    static func app(for url: URL) -> App? {
         guard url.scheme == "https" || url.scheme == "http",
               var host = url.host()?.lowercased() else { return nil }
         // Google Maps lives under google.com/maps as well.
@@ -89,8 +101,7 @@ enum AppLinks {
             app = apps[candidate]
             candidate = String(candidate.drop { $0 != "." }.dropFirst())
         }
-        guard let app, let probe = URL(string: "\(app.scheme)://"),
-              UIApplication.shared.canOpenURL(probe) else { return nil }
+        guard let app else { return nil }
         return app
     }
 

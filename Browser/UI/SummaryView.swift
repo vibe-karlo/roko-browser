@@ -388,7 +388,7 @@ struct StatusBarFade: View {
 /// A soft band of light travelling down the page card: the page is being read.
 private struct ScanLight: View {
     var body: some View {
-        TimelineView(.animation) { context in
+        TimelineView(.animation(minimumInterval: 1 / 30)) { context in
             let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.8) / 1.8
             GeometryReader { proxy in
                 LinearGradient(colors: [.clear, .white.opacity(0.28), .clear], startPoint: .top, endPoint: .bottom)

@@ -11,6 +11,23 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - The site has a changelog at `/changes`, linked from the home page's footer: what each public version brought, in short lines.
 
 ### Changed
+- Cookie pop-ups cost a page less after it has loaded. Only frames that can hold a pop-up (a consent platform's own frame, or one of the few sites whose rules run in a frame) are sent the pop-up rules; the dozens of ad frames on a news page used to get 190 KB each. A page is checked for a pop-up ten times instead of twenty, a frame five, and the scan of the page's whole text on each check is gone (nothing read it). On The Verge that is 35 messages between the page and roko instead of 88.
+- Launch housekeeping (the spare web view, the calculator's warm-up, old pictures and history, the iCloud duplicate check) is spread over the first few seconds rather than done in one go, which cost a frame while the first page was still settling.
+- The working animations (the band over "Reading…" and the light down a page being summarized) run at 30 frames a second instead of the display's 120.
+- The widgets reload when the weather changes, not on every fetch of the same weather; to-do alerts already waiting are left in place rather than taken down and put back on every change; the bar's loading line redraws by itself rather than with the whole bar; well-known sites' names are folded once for matching rather than on every keystroke; a download's spare web view goes with the last download; a watched page that didn't load in time stops loading.
+- The bar's history search no longer grows slower with history: the newest 5,000 pages are kept in memory, title and address folded for matching, built off the main thread after launch; the store's own search had to read every row on each keystroke.
+- A page seen again within five minutes (a reload, back and forward) isn't written as a new visit, so iCloud has less to carry to your other devices.
+- Coming back to the app the first time (launch itself) no longer repeats the widget, notification and band work that launch just did, and the iCloud duplicate check waits five seconds rather than competing with the first page.
+- Notify Me's hidden page checks run their scripts: the web view they read in was suspended as soon as it was made, since it's never on screen.
+- The audio session is set up off the main thread, not right after the first frame.
+- Hiding asks the app less: after the first request, which goes with the first frame, a page building itself asks every 150 ms and then every half second rather than once a frame (eleven requests in twelve brought nothing); each answer goes into a stylesheet of its own instead of having WebKit parse all of them again; and the pass that folds empty ad boxes leaves big containers alone before gathering their text.
+- Answers and summaries are laid out less often: the Markdown is read once per text rather than on every token and every scroll step, each run of text is styled once, streamed words land on the page a few dozen times a second rather than per token, and the reading line moves in steps of a hundredth.
+- The band under the page is recomputed only when what's in it changed, not twice a minute and not every second while a background tab plays, and never while roko is in the background.
+- Reminders sync opens the Reminders store and watches it only when it's turned on.
+- Sync with a Mac asks the server every 4 seconds after a change and stretches to once a minute while nothing changes, and writes nothing when a round brought nothing.
+- Smaller: the spare web view for the next tab is built once a page has finished rather than a second into its load; a site whose icon can't be read isn't asked for it again on every page; download progress redraws four times a second instead of per chunk; whether a site's app is installed is asked of iOS only for a site not offered yet.
+- Saving the open tabs after a page loads writes only the tabs that changed. It used to delete and insert all of them, which on a phone with two hundred tabs wrote four hundred rows (and as many change-history rows, which were never cleared) every page; those change records are now pruned after a day.
+- Tab pictures take a third of the memory: the switcher and the bar draw small copies read off the main thread, kept for the last dozen tabs looked at, instead of every tab's full picture (about 10 MB each) staying in memory for the session. Close All's Undo keeps the pictures on disk rather than in memory.
 - Opening a link starts the page about 80 ms sooner: the block lists load while the app sets up rather than after, and tabs' pictures are read when they're wanted rather than for every tab at launch.
 - Pages load faster: the half-megabyte of cookie pop-up rules now loads after the page rather than before it, and the block lists start loading sooner at launch. A known pop-up can show for a moment before it's answered.
 
@@ -38,6 +55,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - On iPhone Duo lying flat, search is one panel across the fold, and the page menu opens in the middle. Bent, search keeps to one side of the bend, and the page menu and messages to the bar's side.
 
 ### Fixed
+- A background launch before the first unlock after a restart (Notify Me, Today's morning refresh) can no longer move the store aside as damaged: the files are sealed until the phone is unlocked, so that launch runs in memory and the next one finds everything where it was.
+- A page with a video you never played (the Daily Mail's front page) no longer puts itself in the player under the bar when you open another page: only media that has actually played counts.
+- Debug builds compile again: the browser's root view was one expression the type checker gave up on.
 - Sign-in and payment windows work. A window a page opens now reaches the page that opened it, so it can hand back the sign-in and close itself, and roko returns to that page. Sites used to be told their pop-up was blocked.
 - A link that redirects to another app no longer leaves a blank tab behind. Asking to open the app, it now says "This page" rather than the app's raw link.
 - A message on iPhone Duo no longer straddles the fold.

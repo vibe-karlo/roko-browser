@@ -24,8 +24,11 @@ enum RokoSync {
     private static let snapshotKey = "sync.snapshot"
     private static let openedKey = "sync.openedLinks"
     private static let pendingLinksKey = "sync.pendingLinks"
-    /// While open: how often to ask for what changed on the Mac.
-    private static let pollInterval: Duration = .seconds(4)
+    /// While open: how often to ask for what changed on the Mac. Four seconds
+    /// after a change, stretching to a minute while nothing changes, so an
+    /// idle phone isn't asking the server (and holding the radio up) all day.
+    private static var pollInterval: Duration { .seconds(min(60, 4 << min(quietRounds, 4))) }
+    private static var quietRounds = 0
 
     private static var container: ModelContainer?
     private static var running = false
@@ -150,6 +153,7 @@ enum RokoSync {
 
     private static func startPolling() {
         guard isOn, poller == nil else { return }
+        quietRounds = 0
         poller = Task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: pollInterval)
@@ -221,17 +225,27 @@ enum RokoSync {
 
             // Down: what changed on the server since the last round, this
             // iPhone's own changes included (they're already in place).
-            var seq = UserDefaults.standard.integer(forKey: seqKey)
+            let seqBefore = UserDefaults.standard.integer(forKey: seqKey)
+            var seq = seqBefore
             var more = true
+            var received = 0
             while more {
                 let page = try await call(server, key, method: "GET", query: "since=\(seq)")
                 let changes = page["changes"] as? [[String: Any]] ?? []
+                received += changes.count
                 apply(changes, to: &snapshot, in: context)
                 seq = page["seq"] as? Int ?? seq
                 more = page["more"] as? Bool ?? false
             }
-            UserDefaults.standard.set(seq, forKey: seqKey)
-            saveSnapshot(snapshot)
+            // A round that moved nothing writes nothing: the snapshot file and
+            // the defaults (which SettingsSync copies to iCloud) stay as they are.
+            if !outgoing.isEmpty || received > 0 || seq != seqBefore {
+                UserDefaults.standard.set(seq, forKey: seqKey)
+                saveSnapshot(snapshot)
+                quietRounds = 0
+            } else {
+                quietRounds += 1
+            }
             lastSynced = .now
             problem = nil
         } catch let error as SyncError {

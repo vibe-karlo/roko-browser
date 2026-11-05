@@ -106,6 +106,15 @@ enum RemindersSync {
 
     static func start(_ container: ModelContainer) {
         self.container = container
+        // Off, as for most people: no Reminders store opened, nothing watched.
+        // Turned on in Settings, the first round (schedule) sets that up.
+        guard isOn else { return }
+        observe()
+        schedule(after: .seconds(2))
+    }
+
+    private static func observe() {
+        guard observers.isEmpty else { return }
         observers = [
             // Changed in Reminders, here or synced in from another device.
             NotificationCenter.default.addObserver(forName: .EKEventStoreChanged, object: store, queue: .main) { _ in
@@ -124,7 +133,6 @@ enum RemindersSync {
                 MainActor.assumeIsolated { schedule(after: .zero) }
             },
         ]
-        schedule(after: .seconds(2))
     }
 
     /// A round soon; several changes in a row make one.
@@ -133,6 +141,7 @@ enum RemindersSync {
             print("REMINDERS not allowed: \(EKEventStore.authorizationStatus(for: .reminder).rawValue)")
         }
         guard isOn, isAllowed else { return }
+        observe()
         // Just after roko's own changes, their echoes are let pass; anything else
         // is put off until then rather than dropped.
         let wait = force || delay == .zero ? delay : max(delay, .seconds(max(0, quietUntil.timeIntervalSinceNow)))

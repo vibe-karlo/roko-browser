@@ -35,19 +35,42 @@ final class ConsentHandler: NSObject, WKScriptMessageHandlerWithReply {
     /// the rest of roko's work on it (measured against Lens on an iPhone). So only this
     /// small script goes in up front, and asks for the rules once the page has loaded,
     /// or after 0.4 s on a page still loading.
+    ///
+    /// A frame asks only if it can be a pop-up: its address matches a frame rule
+    /// (build_consent.sh writes the patterns to consent-frame-gate.json), or it
+    /// holds one of the banners any frame may hold. An ad-heavy page has dozens
+    /// of frames, and each used to be sent the 190 KB of frame rules.
     lazy var scripts: [WKUserScript] = [WKUserScript(source: """
         (() => {
-            let asked = false;
+            window.__rokoConsentReports = \(LaunchClock.isEnabled);
+            const gate = window.top === window ? null : \(Self.frameGate);
+            let begun = false, asked = false;
             const ask = () => {
                 if (asked) return;
                 asked = true;
                 window.webkit.messageHandlers.\(Self.handlerName).postMessage({ type: "rokoLoad" });
             };
-            if (document.readyState === "complete") return ask();
-            addEventListener("load", ask, { once: true });
-            setTimeout(ask, 400);
+            const wanted = () => !gate
+                || (gate.patterns && new RegExp(gate.patterns).test(location.href))
+                || (gate.selectors && document.querySelector(gate.selectors) !== null);
+            const begin = () => {
+                if (begun) return;
+                begun = true;
+                if (wanted()) return ask();
+                // A frame's banner can be drawn a moment after the frame loads.
+                if (gate && gate.selectors) setTimeout(() => { if (wanted()) ask(); }, 1500);
+            };
+            if (document.readyState === "complete") return begin();
+            addEventListener("load", begin, { once: true });
+            setTimeout(begin, 400);
         })();
         """, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: Self.world)]
+
+    /// The frames that can hold a pop-up, as JSON: {"patterns": ..., "selectors": ...}.
+    /// Without the file (a build that skipped build_consent.sh) every frame asks, as before.
+    private static let frameGate = Bundle.main.url(forResource: "consent-frame-gate", withExtension: "json")
+        .flatMap { try? String(contentsOf: $0, encoding: .utf8) }?
+        .trimmingCharacters(in: .whitespacesAndNewlines) ?? "null"
 
     private lazy var mainRules = Self.source("consent-main")
     private lazy var frameRules = Self.source("consent-frame")

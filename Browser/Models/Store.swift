@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import UIKit
 
 /// Where roko keeps its data. Pins, history and to-dos sync through iCloud, in the
 /// private database of the person signed in; open tabs and Notify Me stay on
@@ -40,10 +41,17 @@ enum Store {
                                            url: folder.appending(path: "synced.store"), cloudKitDatabase: .none)
             if let opened = try? ModelContainer(for: schema, configurations: local, device) {
                 container = opened
+            } else if !UIApplication.shared.isProtectedDataAvailable {
+                // The phone hasn't been unlocked since it started (a background
+                // launch for Notify Me or Today): the files are there but sealed.
+                // Nothing is moved; this launch runs with nothing saved.
+                print("Store sealed until the phone is unlocked: running in memory")
+                let memory = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+                container = try! ModelContainer(for: schema, configurations: memory)
             } else {
-                // Still not: a damaged file, a full disk, or the phone not yet unlocked
-                // (a background launch). Put the files aside, keeping them, and start
-                // afresh; failing that, run with nothing saved rather than not at all.
+                // Still not: a damaged file or a full disk. Put the files aside,
+                // keeping them, and start afresh; failing that, run with nothing
+                // saved rather than not at all.
                 print("Store unavailable, starting a new one: \(error)")
                 let stamp = Int(Date.now.timeIntervalSince1970)
                 for suffix in ["", "-shm", "-wal"] {
@@ -116,6 +124,30 @@ enum Store {
 
     /// Two devices can each add the same page before they hear from each
     /// other: fold those into one, keeping the latest visit and every count.
+    /// The author the open tabs' saves are signed with (BrowserModel.tabContext).
+    nonisolated static let tabsAuthor = "tabs"
+
+    /// SwiftData keeps a change record for every row a save touches, in each
+    /// store, for whoever follows changes: CloudKit, on the synced store. Nothing
+    /// follows the open tabs' saves, which until recently touched every tab, so
+    /// one phone had 122,000 of their records. Those older than a day go, on a
+    /// background context. By author, which the history can be asked for; the
+    /// store can't be, and the synced store's records must stay for CloudKit.
+    static func pruneDeviceHistory(in container: ModelContainer) {
+        let logging = LaunchClock.isEnabled
+        Task.detached(priority: .utility) {
+            let context = ModelContext(container)
+            let cutoff = Date.now.addingTimeInterval(-24 * 3600), author = tabsAuthor
+            do {
+                try context.deleteHistory(HistoryDescriptor<DefaultHistoryTransaction>(
+                    predicate: #Predicate { $0.author == author && $0.timestamp < cutoff }))
+                if logging { print("HISTORY pruned") }
+            } catch {
+                print("History prune failed: \(error)")
+            }
+        }
+    }
+
     static func mergeDuplicates(in context: ModelContext) {
         let entries = (try? context.fetch(FetchDescriptor<HistoryEntry>(sortBy: [SortDescriptor(\.visitedAt, order: .reverse)]))) ?? []
         var kept: [String: HistoryEntry] = [:]

@@ -71,9 +71,13 @@ final class FaviconStore {
         memory.removeAllObjects()
     }
 
+    /// Sites whose icon couldn't be had (none, or one UIImage can't read, an
+    /// SVG say): not asked again until the next launch, rather than on every page.
+    private var failed = Set<String>()
+
     func refresh(from webView: WKWebView) async {
         // A bundled icon doesn't count: the site's own (often sharper) one still replaces it.
-        guard let host = webView.url?.displayHost, !inFlight.contains(host),
+        guard let host = webView.url?.displayHost, !inFlight.contains(host), !failed.contains(host),
               !FileManager.default.fileExists(atPath: directory.appendingPathComponent(host).path) else { return }
         inFlight.insert(host)
         defer { inFlight.remove(host) }
@@ -86,7 +90,10 @@ final class FaviconStore {
         guard let href = try? await webView.callAsyncJavaScript(script, contentWorld: .defaultClient) as? String,
               let url = URL(string: href),
               let (data, _) = try? await URLSession.quick.data(from: url),
-              let full = UIImage(data: data) else { return }
+              let full = UIImage(data: data) else {
+            failed.insert(host)
+            return
+        }
         // Shrunk and encoded off the main thread; only the small one is kept.
         let made = await Task.detached(priority: .utility) { () -> (UIImage, Data)? in
             guard let small = Self.small(full), let png = small.pngData() else { return nil }

@@ -160,7 +160,7 @@ struct BottomBar: View {
         }
         .frame(height: upright ? nil : Theme.barHeight + 8)
         .padding(.vertical, upright ? 18 : 0)
-        .overlay(alignment: upright ? .leading : .bottom) { progressLine }
+        .overlay(alignment: upright ? .leading : .bottom) { ProgressLine(tab: browser.selectedTab, upright: upright) }
         .modifier(BarSurface(on: !upright))
         // Alongside the + capsule's own hold, not over it: as a high-priority
         // gesture it held every touch until it knew it wasn't a swipe, so a
@@ -240,9 +240,16 @@ struct BottomBar: View {
         Array(browser.tabs.sorted { $0.lastActive > $1.lastActive }.prefix(2))
     }
 
-    @ViewBuilder
-    private var progressLine: some View {
-        if let tab = browser.selectedTab, tab.isLoading {
+}
+
+/// The loading line along the bar. A view of its own, so each step of a
+/// page's progress redraws this and not the whole bar.
+private struct ProgressLine: View {
+    let tab: BrowserTab?
+    let upright: Bool
+
+    var body: some View {
+        if let tab, tab.isLoading {
             if upright {
                 // Down the column's inner edge, beside the page it's loading.
                 GeometryReader { proxy in
@@ -269,6 +276,9 @@ struct BottomBar: View {
             }
         }
     }
+}
+
+extension BottomBar {
 
     private var swipes: some Gesture {
         DragGesture(minimumDistance: 24)
@@ -308,23 +318,27 @@ private struct TabThumbnails: View {
     let count: Int
 
     var body: some View {
-        let shots = tabs.compactMap(\.snapshot)
-        if shots.isEmpty {
-            TabsGlyph(count: count)
-        } else {
-            ZStack {
-                ForEach(Array(shots.prefix(2).enumerated().reversed()), id: \.offset) { index, shot in
-                    Image(uiImage: shot)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 22, height: 30, alignment: .top)
-                        .clipShape(.rect(cornerRadius: 5))
-                        .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Theme.edge, lineWidth: 1))
-                        .rotationEffect(.degrees(index == 0 ? 7 : -9))
-                        .offset(x: index == 0 ? 5 : -5, y: index == 0 ? -1 : 2)
+        let shots = tabs.compactMap(\.thumbnail)
+        Group {
+            if shots.isEmpty {
+                TabsGlyph(count: count)
+            } else {
+                ZStack {
+                    ForEach(Array(shots.prefix(2).enumerated().reversed()), id: \.offset) { index, shot in
+                        Image(uiImage: shot)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 22, height: 30, alignment: .top)
+                            .clipShape(.rect(cornerRadius: 5))
+                            .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Theme.edge, lineWidth: 1))
+                            .rotationEffect(.degrees(index == 0 ? 7 : -9))
+                            .offset(x: index == 0 ? 5 : -5, y: index == 0 ? -1 : 2)
+                    }
                 }
             }
         }
+        // Small pictures, read off the main thread: the full ones are ten megabytes each.
+        .task(id: tabs.map(\.id)) { for tab in tabs { await tab.loadThumbnail() } }
     }
 }
 

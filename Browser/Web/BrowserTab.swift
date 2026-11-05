@@ -1,3 +1,4 @@
+import ImageIO
 import UIKit
 import WebKit
 
@@ -48,11 +49,17 @@ final class BrowserTab: NSObject, Identifiable {
     /// the pages you open next in the tab, until you show the original.
     private(set) var translation: TranslationTarget?
     var lastActive: Date
-    /// The tab's picture: the one taken this run, else the one saved last run,
-    /// read from disk the first time it's wanted rather than for every tab at launch.
+    /// The tab's picture at full size, standing in for the page before it's live
+    /// (the restored tab at launch): as just taken, until its file is written,
+    /// then read from disk the first time it's wanted rather than for every tab.
     var snapshot: UIImage? { taken ?? saved }
     private var taken: UIImage?
     @ObservationIgnored private lazy var saved: UIImage? = isPrivate ? nil : UIImage(contentsOfFile: snapshotFile.path)
+    /// A small copy for the tab switcher and the bar: about 3 MB decoded rather
+    /// than 10, made off the main thread, kept for the last dozen tabs looked at.
+    /// Nil until `loadThumbnail` has read it.
+    private(set) var thumbnail: UIImage?
+    @ObservationIgnored private var loadingThumbnail = false
     private(set) var isLive = false
     /// The colour the page wants around its top edge: its theme-color, else its
     /// background. The status bar band takes it, as in Safari.
@@ -133,16 +140,94 @@ final class BrowserTab: NSObject, Identifiable {
     }
 
     /// Shows the image now and writes it to disk in the background, so a
-    /// restored tab still has its picture in the tab switcher.
+    /// restored tab still has its picture in the tab switcher. Once written,
+    /// the file stands for it: decoded, a picture is ten megabytes a tab.
     func keep(_ image: UIImage?) {
         guard let image else { return }
         taken = image
-        guard !isPrivate else { return }
-        let file = snapshotFile
-        // Compressing a JPEG takes a few milliseconds: never on the main thread.
-        Task.detached(priority: .utility) {
-            try? image.jpegData(compressionQuality: 0.7)?.write(to: file)
+        let file = snapshotFile, isPrivate = isPrivate
+        // Compressing a JPEG and shrinking the picture take a few milliseconds
+        // each: never on the main thread.
+        Task.detached(priority: .utility) { [weak self] in
+            let small = Self.shrink(image)
+            if !isPrivate { try? image.jpegData(compressionQuality: 0.7)?.write(to: file) }
+            await MainActor.run { [weak self] in
+                guard let self, self.taken === image else { return }
+                self.showThumbnail(small)
+                // A private tab has no file: its picture stays as taken.
+                if !isPrivate {
+                    self.taken = nil
+                    self.saved = UIImage(contentsOfFile: file.path)
+                }
+            }
         }
+    }
+
+    // MARK: Thumbnails
+
+    /// The long edge of a small picture, in pixels: a card in the switcher is
+    /// about 300 points by 500, so this is close to one pixel per pixel there.
+    nonisolated private static let thumbnailLongEdge: CGFloat = 1200
+    private struct WeakTab { weak var tab: BrowserTab? }
+    /// Which tabs have a small picture in memory, oldest first.
+    private static var warm: [WeakTab] = []
+    private static let warmLimit = 12
+
+    /// Reads the small picture, off the main thread, for a card about to show it.
+    func loadThumbnail() async {
+        guard thumbnail == nil, !loadingThumbnail else { return }
+        loadingThumbnail = true
+        defer { loadingThumbnail = false }
+        let image: UIImage?
+        if let taken {
+            image = await Task.detached(priority: .userInitiated) { Self.shrink(taken) }.value
+        } else if isPrivate {
+            return
+        } else {
+            let file = snapshotFile
+            image = await Task.detached(priority: .userInitiated) { Self.readThumbnail(at: file) }.value
+        }
+        showThumbnail(image)
+    }
+
+    private func showThumbnail(_ image: UIImage?) {
+        thumbnail = image
+        guard image != nil else { return }
+        Self.warm.removeAll { $0.tab === self || $0.tab == nil }
+        Self.warm.append(WeakTab(tab: self))
+        while Self.warm.count > Self.warmLimit {
+            Self.warm.removeFirst().tab?.thumbnail = nil
+        }
+    }
+
+    /// Low memory: every small picture but the tab on screen's goes; they're
+    /// read again when wanted.
+    static func dropThumbnails(except kept: UUID?) {
+        for entry in warm where entry.tab?.id != kept { entry.tab?.thumbnail = nil }
+        warm.removeAll { $0.tab?.id != kept }
+    }
+
+    nonisolated private static func shrink(_ image: UIImage) -> UIImage {
+        let pixels = CGSize(width: image.size.width * image.scale, height: image.size.height * image.scale)
+        let scale = min(1, thumbnailLongEdge / max(pixels.width, pixels.height, 1))
+        let size = CGSize(width: (pixels.width * scale).rounded(), height: (pixels.height * scale).rounded())
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: size))
+        }
+    }
+
+    /// Decodes the saved picture straight to the small size: ImageIO reads
+    /// only what it needs, instead of the whole picture and then shrinking.
+    nonisolated private static func readThumbnail(at file: URL) -> UIImage? {
+        guard let source = CGImageSourceCreateWithURL(file as CFURL, nil) else { return nil }
+        let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
+                                        kCGImageSourceThumbnailMaxPixelSize: thumbnailLongEdge,
+                                        kCGImageSourceCreateThumbnailWithTransform: true,
+                                        kCGImageSourceShouldCacheImmediately: true]
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary).map { UIImage(cgImage: $0) }
     }
 
     /// Deletes saved pictures of tabs that no longer exist (closed while the
@@ -160,6 +245,7 @@ final class BrowserTab: NSObject, Identifiable {
     /// Swaps the decoded picture (about 10 MB at full resolution) for one read
     /// lazily from disk, which iOS can drop and reload as needed.
     func releaseSnapshotMemory() {
+        thumbnail = nil
         guard !isPrivate, snapshot != nil, FileManager.default.fileExists(atPath: snapshotFile.path),
               let light = UIImage(contentsOfFile: snapshotFile.path) else { return }
         saved = light
@@ -228,11 +314,13 @@ final class BrowserTab: NSObject, Identifiable {
         tearDown(webView)
     }
 
-    /// Closed: the page goes at once, with no picture taken of it.
-    func close() {
+    /// Closed: the page goes at once, with no picture taken of it. Its saved
+    /// picture goes too, unless the tab may come back (Close All's Undo).
+    func close(keepingPicture: Bool = false) {
         hibernation += 1
         if let webView { tearDown(webView) }
-        discardSnapshot()
+        thumbnail = nil
+        if !keepingPicture { discardSnapshot() }
     }
 
     private func tearDown(_ webView: WKWebView) {

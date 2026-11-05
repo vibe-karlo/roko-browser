@@ -64,9 +64,13 @@ enum TodoAlerts {
         laying = Task {
             await previous?.value
             guard !Task.isCancelled else { return }
-            let old = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(prefix) }
-            center.removePendingNotificationRequests(withIdentifiers: old)
-            for (title, time, at, id) in due {
+            // Only what changed: an id carries the to-do's time and title, so one
+            // already waiting stays, rather than every alert being taken down and put back.
+            let pending = Set(await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(prefix) })
+            let wanted = Set(due.map(\.3))
+            let gone = Array(pending.subtracting(wanted))
+            if !gone.isEmpty { center.removePendingNotificationRequests(withIdentifiers: gone) }
+            for (title, time, at, id) in due where !pending.contains(id) {
                 guard !Task.isCancelled else { return }
                 let content = UNMutableNotificationContent()
                 content.title = title

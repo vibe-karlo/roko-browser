@@ -117,7 +117,19 @@ struct MarkdownText: View {
     /// What kind of page this is, said or guessed: for its colour.
     var kind: PageKind { page.kind }
 
+    /// Read once per text: the view is remade on every change around it (a
+    /// token arriving, the page scrolling), and reading is a dozen passes of
+    /// regular expressions over the whole text.
     private var page: Page {
+        if let known = Self.pages[markdown] { return known }
+        let read = Self.read(markdown)
+        if Self.pages.count >= 8 { Self.pages.removeAll(keepingCapacity: true) }
+        Self.pages[markdown] = read
+        return read
+    }
+    private static var pages: [String: Page] = [:]
+
+    private static func read(_ markdown: String) -> Page {
         var page = Page()
         func add(_ item: Line) {
             if page.sections.isEmpty { page.sections.append(Section(id: 0)) }
@@ -787,7 +799,19 @@ struct MarkdownText: View {
     /// Inline emphasis, links and source marks; numbers and prices in full
     /// ink, so they can be found at a glance. The last piece of text carries
     /// the caret while streaming.
+    /// Each run of text, styled once: a long answer has dozens, and the view
+    /// comes round again on every token and every scroll step.
     private func inline(_ text: String, last: Bool) -> AttributedString {
+        let key = "\(kind.rawValue)|\(last && isStreaming)|\(sources.count)|\(text)"
+        if let known = Self.runs[key] { return known }
+        let styled = style(text, last: last)
+        if Self.runs.count >= 400 { Self.runs.removeAll(keepingCapacity: true) }
+        Self.runs[key] = styled
+        return styled
+    }
+    private static var runs: [String: AttributedString] = [:]
+
+    private func style(_ text: String, last: Bool) -> AttributedString {
         var text = Self.withoutEchoes(text)
         if last && isStreaming {
             // A bold term still arriving: closed for now, so it reads bold as it
@@ -996,7 +1020,9 @@ struct StatusLine: View {
             .overlay {
                 // The same words in full ink, revealed by a moving band. Drawn
                 // as an overlay, so the plain line shows even if this never runs.
-                TimelineView(.animation) { context in
+                // Thirty times a second is smooth for a band this soft; the
+                // display's own 120 kept a core busy while an answer was written.
+                TimelineView(.animation(minimumInterval: 1 / 30)) { context in
                     let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.6) / 1.6
                     Text(text)
                         .font(font)

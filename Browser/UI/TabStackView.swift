@@ -229,8 +229,8 @@ struct TabStackView: View {
         // Over the canvas, not beside it: the picture's own width mustn't size this.
         Theme.canvas
             .overlay {
-                if let snapshot = browser.selectedTab?.snapshot {
-                    Image(uiImage: snapshot)
+                if let picture = browser.selectedTab?.thumbnail {
+                    Image(uiImage: picture)
                         .resizable()
                         .scaledToFill()
                         .blur(radius: 60, opaque: true)
@@ -238,6 +238,7 @@ struct TabStackView: View {
                         .opacity(0.14)
                 }
             }
+            .task(id: browser.selectedID) { await browser.selectedTab?.loadThumbnail() }
             .clipped()
             .ignoresSafeArea()
             .allowsHitTesting(false)
@@ -428,23 +429,28 @@ private struct TabPicture: View {
     let height: CGFloat
 
     var body: some View {
-        if tab.isPrivate && PrivacyLock.shared.hides(tab.id) {
-            Theme.raised.overlay {
-                Glyph(.lock, size: 40).foregroundStyle(Theme.secondaryInk)
-            }
-        } else if let snapshot = tab.snapshot {
-            Image(uiImage: snapshot)
-                .resizable()
-                .scaledToFill()
-                // From the left: a sideways picture in a narrow card keeps the
-                // site's logo, where the middle of the page wouldn't.
-                .frame(width: width, height: height, alignment: .topLeading)
-                .clipped()
-        } else {
-            Theme.raised.overlay {
-                SiteIcon(host: tab.url?.displayHost ?? "", size: 44)
+        Group {
+            if tab.isPrivate && PrivacyLock.shared.hides(tab.id) {
+                Theme.raised.overlay {
+                    Glyph(.lock, size: 40).foregroundStyle(Theme.secondaryInk)
+                }
+            } else if let picture = tab.thumbnail {
+                Image(uiImage: picture)
+                    .resizable()
+                    .scaledToFill()
+                    // From the left: a sideways picture in a narrow card keeps the
+                    // site's logo, where the middle of the page wouldn't.
+                    .frame(width: width, height: height, alignment: .topLeading)
+                    .clipped()
+            } else {
+                Theme.raised.overlay {
+                    SiteIcon(host: tab.url?.displayHost ?? "", size: 44)
+                }
+                // The picture is read off the main thread as the card comes up.
+                .task { await tab.loadThumbnail() }
             }
         }
+        .animation(.easeOut(duration: 0.15), value: tab.thumbnail == nil)
     }
 }
 

@@ -6,6 +6,8 @@ struct BrowserView: View {
     @Environment(BrowserModel.self) private var browser
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
+    /// How many times the app has become active: the first is launch itself.
+    @State private var activations = 0
     @State private var barTop: CGFloat = 0
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.fold) private var fold
@@ -20,7 +22,7 @@ struct BrowserView: View {
     var body: some View {
         @Bindable var browser = browser
 
-        ZStack {
+        let page = ZStack {
             // Behind the page: the site's top colour in the status-bar strip
             // only (as in Safari), and its own background below, so no header
             // colour ever shows at the bottom of the screen.
@@ -240,6 +242,13 @@ struct BrowserView: View {
                 }
             }
         }
+        screens(offers(page))
+    }
+
+    /// The launcher and the offers above the bar. Apart from `body` so neither
+    /// is one expression the type checker gives up on in a Debug build.
+    private func offers<Content: View>(_ page: Content) -> some View {
+        page
         .overlay {
             if browser.panel == .command {
                 // Over whatever screen it was opened from, which stays under it.
@@ -353,6 +362,11 @@ struct BrowserView: View {
             }
         }
         .animation(.snappy(duration: 0.3), value: browser.appOffer?.url)
+    }
+
+    /// The screens over the page, and the scene's plumbing.
+    private func screens<Content: View>(_ page: Content) -> some View {
+        page
         .modifier(PageExtras(browser: browser, showsPlayer: showsPlayer, playerLift: playerLift))
         .modifier(CopiedLinkWatch(browser: browser))
         .modifier(WelcomeCover(browser: browser))
@@ -418,7 +432,11 @@ struct BrowserView: View {
             }
             if phase == .active {
                 checkWatches(after: .seconds(2))
-                browser.mergeSyncedDuplicates()
+                // Reads all of history on the main thread: not while the first page is coming in.
+                Task {
+                    try? await Task.sleep(for: .seconds(5))
+                    browser.mergeSyncedDuplicates()
+                }
             }
         }
         // Launch: Notify Me catches up once the first page has had its moment.
@@ -428,9 +446,14 @@ struct BrowserView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             // To-dos ticked off in a widget meanwhile, and changes from other devices.
             WidgetBridge.applyTicks()
-            WidgetBridge.update()
-            TodoAlerts.update()
-            browser.refreshLive()
+            activations += 1
+            // Launch itself did these a moment ago.
+            if activations > 1 {
+                WidgetBridge.update()
+                TodoAlerts.update()
+                browser.refreshLive()
+                browser.historyIndex.rebuild(from: context.container, ifOlderThan: 300)
+            }
             if browser.isBarCollapsed { browser.isBarCollapsed = false }
             // The first time on a new day: Today first.
             if !browser.showsOnboarding, TodayModel.shouldOpenNow(), browser.panel == .none, browser.summary == nil, browser.browseForMe == nil {
