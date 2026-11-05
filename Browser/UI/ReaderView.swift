@@ -18,8 +18,9 @@ final class ReaderModel: Identifiable {
     /// Written the first time it's asked for, and kept while the article's open.
     private(set) var summary: SummaryModel?
     /// Whether Summary is on offer. Nothing says beforehand what Apple's guardrails
-    /// will turn down: without a Claude key, the summary is tried as the article
-    /// opens, on the device, and the choice goes if it can't be written.
+    /// will turn down, and trying on every story would cost battery for summaries
+    /// nobody asked for. So it's tried when tapped; if it can't be written it says
+    /// so, and the choice goes once you leave, for this story from then on.
     private(set) var offersSummary: Bool
 
     init(host: String, story: NewsStory? = nil) {
@@ -34,7 +35,7 @@ final class ReaderModel: Identifiable {
         if let found = await FeedStore.shared.readable(story) {
             page = found
             if !found.isArticle { show(.page) }
-            if side == .summary || (offersSummary && ClaudeClient.configured == nil) { startSummary() }
+            if side == .summary { startSummary() }
         } else {
             failure = "Couldn't read this article here."
             offersSummary = false
@@ -57,10 +58,7 @@ final class ReaderModel: Identifiable {
             await model.finished()
             guard model.phase.isFailure else { return }
             FeedStore.shared.noteNoSummary(for: story.link)
-            withAnimation(.snappy(duration: 0.28)) {
-                offersSummary = false
-                if side == .summary { side = .reader }
-            }
+            withAnimation(.snappy(duration: 0.28)) { offersSummary = false }
         }
     }
 
@@ -217,7 +215,7 @@ struct ReaderView: View {
             Spacer(minLength: 0)
             HStack(spacing: 2) {
                 switchWord("Reader", isOn: model.side == .reader) { model.show(.reader) }
-                if model.offersSummary {
+                if model.offersSummary || model.side == .summary {
                     switchWord("Summary", isOn: model.side == .summary) { model.show(.summary) }
                 }
                 switchWord(story.isMail ? "Email" : "Page", isOn: model.side == .page) { model.show(.page) }

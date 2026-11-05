@@ -298,18 +298,6 @@ enum RenderedPage {
         return try? await PageReader.read(webView)
     }
 
-    /// The page as its scripts leave it, for following a site that needs them.
-    static func html(of url: URL) async -> String? {
-        let webView = WebViewFactory.makeOffscreen()
-        let loader = Loader()
-        webView.navigationDelegate = loader
-        webView.load(URLRequest(url: url))
-        let finished = await loader.finished(within: 15)
-        if finished { try? await Task.sleep(for: .seconds(2)) }
-        defer { webView.stopLoading() }
-        return try? await webView.evaluateJavaScript("document.documentElement.outerHTML") as? String
-    }
-
     /// The article on a page, by Readability, off screen: its scripts run, and
     /// the app's blocking applies. Still read if the page never quite finishes.
     static func readable(of url: URL) async -> ReadablePage? {

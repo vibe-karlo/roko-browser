@@ -18,7 +18,7 @@ enum FeedProbe {
                     print("FIND \(site): nothing")
                     continue
                 }
-                let route = found.feed != nil ? "feed" : found.sitemap != nil ? "sitemap" : found.rendered == true ? "rendered" : "page"
+                let route = found.feed != nil ? "feed" : found.sitemap != nil ? "sitemap" : "page"
                 let stories = await TodayNews.stories(of: found)
                 print("FIND \(site): \(route) \(found.feed?.absoluteString ?? found.sitemap?.absoluteString ?? ""), \(stories.count) stories")
                 for story in stories.prefix(3) {

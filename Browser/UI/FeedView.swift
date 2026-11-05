@@ -207,6 +207,8 @@ struct FeedView: View {
         }
         .buttonStyle(RowButtonStyle())
         .feedSwipes(item, store: store, browser: browser)
+        .onAppear { store.wantCheck(item.stories) }
+        .onDisappear { store.dropCheck(item.stories) }
     }
 
     /// Half the page. Headlines hold three lines' room, so the pair's end level.
@@ -281,6 +283,8 @@ struct FeedView: View {
         }
         .buttonStyle(RowButtonStyle())
         .feedSwipes(item, store: store, browser: browser)
+        .onAppear { store.wantCheck(item.stories) }
+        .onDisappear { store.dropCheck(item.stories) }
     }
 
     /// Stories as lines, under a heading, in a panel of their own: a few, and the rest a tap away.

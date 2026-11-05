@@ -69,8 +69,6 @@ final class FeedStore {
     private static let memory: TimeInterval = 7 * 24 * 3600
     /// How long a newsletter stays: it isn't news that's over in a day or two.
     private static let mailReach: TimeInterval = 14 * 24 * 3600
-    /// Models asked in a go: the biggest groups first, the rest next time.
-    private static let checksPerRefresh = 20
 
     private nonisolated struct Saved: Codable {
         var stories: [FeedStory]
@@ -89,6 +87,7 @@ final class FeedStore {
     /// Stories no model here would summarize: Summary isn't offered for them again.
     @ObservationIgnored private var unsummarized = Set<URL>()
     @ObservationIgnored private var isChecking = false
+    @ObservationIgnored private var pendingChecks: [[NewsStory]] = []
     @ObservationIgnored private var isReading = false
     /// Articles' own pictures, sharper than their feeds' thumbnails, for those shown large.
     @ObservationIgnored private var largePictures: [URL: URL] = [:]
@@ -159,8 +158,7 @@ final class FeedStore {
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
-        // Pages that need their scripts run can't be read with roko closed.
-        let sources = NewsSite.chosen.filter { !inBackground || $0.rendered != true }
+        let sources = NewsSite.chosen
         let topics = NewsTopics.chosen
         // Topics are looked for in the major feeds too, as in Today.
         let pool = topics.isEmpty ? [] : TodayNews.topicPool.filter { extra in !sources.contains { $0.id == extra.id } }
@@ -189,7 +187,6 @@ final class FeedStore {
         await regroup()
         publish()
         persist()
-        if inBackground { rebuild() } else { await check() }
     }
 
     private func merge(_ read: [NewsStory]) {
@@ -234,9 +231,10 @@ final class FeedStore {
     private func regroup() async {
         let reading = recent.map { ($0.story, Self.textFile(for: $0.id)) }
         let terms = NewsBlocks.chosen
-        // Off the main thread: it reads each story's kept text for what it mentions.
+        // Off the main thread: with words to block, it reads each story's kept text.
         (blocked, candidates) = await Task.detached(priority: .userInitiated) {
-            let blocked = Set(reading.filter { story, file in
+            // Nothing to look for: no story's text needs reading.
+            let blocked = terms.isEmpty ? Set<URL>() : Set(reading.filter { story, file in
                 let text = (try? String(contentsOf: file, encoding: .utf8)) ?? ""
                 return NewsBlocks.mention(terms, in: [story.title, story.summary ?? "", text].joined(separator: " "))
             }.map(\.0.link))
@@ -255,19 +253,56 @@ final class FeedStore {
         }
     }
 
-    /// Has a model look at the groups it hasn't seen, one at a time, each
-    /// showing in the list as soon as it's settled.
-    private func check() async {
-        guard !isChecking, StoryGroups.canConfirm else { return }
+    /// A group has come on screen: a model looks at it, if none has. Only these:
+    /// groups nobody scrolled to cost nothing, on the battery or a Claude key.
+    func wantCheck(_ stories: [FeedStory]) {
+        guard stories.count >= 2, StoryGroups.canConfirm, let candidate = candidate(of: stories),
+              verdicts[Self.key(candidate)] == nil, !pendingChecks.contains(where: { Self.key($0) == Self.key(candidate) }) else { return }
+        pendingChecks.append(candidate)
+        Task { await runChecks() }
+    }
+
+    /// Scrolled past before its turn came.
+    func dropCheck(_ stories: [FeedStory]) {
+        guard let candidate = candidate(of: stories) else { return }
+        pendingChecks.removeAll { Self.key($0) == Self.key(candidate) }
+    }
+
+    private func candidate(of stories: [FeedStory]) -> [NewsStory]? {
+        guard let first = stories.first?.id else { return nil }
+        return candidates.first { $0.contains { $0.link == first } }
+    }
+
+    /// One at a time, the one that came on screen last first.
+    private func runChecks() async {
+        guard !isChecking else { return }
         isChecking = true
         defer { isChecking = false }
-        let unseen = candidates.filter { verdicts[Self.key($0)] == nil }.sorted { $0.count > $1.count }
-        for group in unseen.prefix(Self.checksPerRefresh) {
-            let kept = await StoryGroups.confirm(group)
-            verdicts[Self.key(group)] = kept.map(\.link)
-            if !isReading { rebuild() }
+        while let group = pendingChecks.popLast() {
+            let kept = await StoryGroups.confirm(group).map(\.link)
+            verdicts[Self.key(group)] = kept
+            settle(group, keeping: Set(kept))
+            persist()
         }
-        if !unseen.isEmpty { persist() }
+    }
+
+    /// A group the model split, put right where it is. Those it took out come
+    /// back on their own the next time the page is laid out.
+    private func settle(_ group: [NewsStory], keeping kept: Set<URL>) {
+        let members = Set(group.map(\.link))
+        func settled(_ item: FeedItem) -> FeedItem {
+            guard case .group(let stories) = item, stories.contains(where: { members.contains($0.id) }) else { return item }
+            let left = stories.filter { kept.contains($0.id) }
+            if StoryGroups.spansSites(left.map(\.story)) { return .group(left) }
+            return left.first.map(FeedItem.story) ?? item
+        }
+        blocks = blocks.map { block in
+            switch block {
+            case .lead(let item): .lead(settled(item))
+            case .row(let item): .row(settled(item))
+            default: block
+            }
+        }
     }
 
     private static func key(_ group: [NewsStory]) -> String {

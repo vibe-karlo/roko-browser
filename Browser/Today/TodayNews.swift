@@ -17,8 +17,6 @@ nonisolated struct NewsSite: Codable, Equatable, Hashable, Identifiable, Sendabl
     var name: String? = nil
     /// A sitemap to read, when the site has no feed and nothing in its page to read.
     var sitemap: URL? = nil
-    /// The page only says what's on it once its scripts have run.
-    var rendered: Bool? = nil
     /// The feed is the whole site's, and only what's under `path` is wanted.
     var filtersToPath: Bool? = nil
 
@@ -193,11 +191,8 @@ nonisolated enum TodayNews {
         if let map = await SiteRoutes.sitemap(for: url, path: isSection ? "/" + path : nil) {
             return NewsSite(host: host, feed: nil, path: isSection ? "/" + path : nil, name: name, sitemap: map)
         }
-        // Or the page with its scripts run, for sites that turn away anything
-        // but a browser, or build the page in it.
-        if let rendered = await RenderedPage.html(of: url), SiteRoutes.stories(in: rendered, page: url, host: host).count >= 3 {
-            return NewsSite(host: host, feed: nil, path: isSection ? "/" + path : nil, page: url, name: name, rendered: true)
-        }
+        // Not the page with its scripts run: up to 17 seconds in a hidden web view,
+        // per source, per refresh, for the few sites that need it.
         return nil
     }
 
@@ -238,8 +233,7 @@ nonisolated enum TodayNews {
         }
         if let map = source.sitemap { return await SiteRoutes.stories(fromSitemap: map, host: source.host, path: source.path) }
         guard let page = source.page else { return [] }
-        let html = source.rendered == true ? await RenderedPage.html(of: page) : await text(at: page)
-        guard let html else { return [] }
+        guard let html = await text(at: page) else { return [] }
         return await Task.detached(priority: .utility) { SiteRoutes.stories(in: html, page: page, host: source.host) }.value
     }
 
