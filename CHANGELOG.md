@@ -32,7 +32,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Pages load faster: the half-megabyte of cookie pop-up rules now loads after the page rather than before it, and the block lists start loading sooner at launch. A known pop-up can show for a moment before it's answered.
 
 ### Changed
-- Versions go 0.1.x: the number rises only when a build goes to public testing, and private testing moves only the build number. The next public version is 0.1.1.
+- Versions go 0.1.x: the number rises only when a build goes to public testing, and private testing moves only the build number. 0.1.1 is on public testing, and the next public version is 0.1.2.
 
 ### Added
 - Force dark pages, in Settings > Appearance: every site goes dark, using its own dark mode if it has one and leaving a site that's already dark alone. No white flash before a page draws. A switch in a page's Site Settings leaves that site out. Off by default, and off it adds nothing to any page.
