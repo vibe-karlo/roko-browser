@@ -17,7 +17,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Reader no longer starts with a byline, a picture credit or "44 minutes ago".
 
 ### Website
-- The scoreboard now shows the real-site test: speed, ads and trackers reached, clean pages and data on a first visit, across ten browsers, with the method under each.
+- The scoreboard now shows the real-site test: speed, ads and trackers reached and pages without ads, pop-ups or walls, across ten browsers, with the method under each.
 - A scoreboard beside the speed section: nine browsers on one iPhone, re-sorting themselves for data used, trackers blocked and time to page, with the method, date and versions under it and a link to the test in `Scripts/compare`.
 - roko has a site in `Site/`, phone first: a live iPhone in true proportions with the bar and a working keyboard, speed numbers, a draggable summary, a before and after slider, Split View with a divider to drag, a made-up page to tap things away on, a private switch to try, hold to speak to try, a to-do widget and a shopping list that really tick, which AI runs where, iPhone Duo in the questions, a link to the code on GitHub, support and the privacy policy.
 - The site has a changelog at `/changes`, linked from the home page's footer: what each public version brought, in short lines.
@@ -29,6 +29,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Muted videos that loop by themselves wait until they're near the screen before they download. Blocking autoplay in WebKit doesn't stop muted video, and CNN's front page used 8 MB or more on them before you scrolled; it now takes about 2 MB.
 
 ### Fixed
+- Pay-or-consent walls are recognised in more languages and wordings ("Rifiuta e abbonati", "Deny & surf ad-free"), so roko no longer presses a no that leads to a payment page. It presses the wall's real yes button, not a word "consent" linked in its text.
 - A link from another app no longer lands under the day's first Today, or any other panel. Today waits for your next return.
 - A page locked behind a wall still standing isn't unlocked by roko any more. Lists hide plain page parts too, which was taken as proof an overlay had gone, and Corriere, let go while its wall was up, ran out of memory in a second.
 - A page that crashes twice in a row gets one more try without what roko changes on it, its requests still blocked, before "This page keeps stopping".

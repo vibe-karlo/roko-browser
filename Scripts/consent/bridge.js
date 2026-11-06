@@ -38,17 +38,23 @@ const REJECT = /^(reject|reject all|reject cookies|decline|decline all|deny|deny
 const ACCEPT = /^(accept|accept all|accept cookies|i accept|allow|allow all|agree|i agree|ok|okay|got it|prihvati|prihvati sve|prihvaćam|prihvacam|slažem se|slazem se|akzeptieren|alle akzeptieren|accepter|tout accepter|accetta|accetta tutto|aceptar|aceptar todo|accepteren|přijmout|akceptuję)$/i;
 const COOKIE_WORDS = /cookie|kolačić|kolacic|kolačiće|keks|galleta|biscott/i;
 
-// A pop-up whose only no costs money ("Reject and Pay", "Pay to Reject",
-// "Reject and Purchase ..."): rejecting means paying, so it's a wall, and
-// pressing reject would only lead to the payment page.
-const PAY_TO_REJECT = /\b(reject|refuse|decline)\b.{0,12}\b(pay|purchase|subscribe)|\bpay to (reject|refuse|decline)\b/i;
+// A pop-up whose only no costs money ("Reject and Pay", "Rifiuta e abbonati", "Deny & surf
+// ad-free"): rejecting means paying, so it's a wall, and pressing reject would only lead
+// to the payment page. In any of the languages below, a word for no and a word for paying.
+const SAY_NO = /\b(reject|refuse|decline|deny)\b|rifiut|rechaz|ablehn|refus|rejeit|recus|odbij|weiger|odrzu|odmít/i;
+const payToRejectLabel = (words) => (SAY_NO.test(words) && WALL_PAY.test(words)) || /\bpay to (reject|refuse|decline)\b/i.test(words);
 const shown = (el) => typeof el.checkVisibility !== 'function' || el.checkVisibility({ checkVisibilityCSS: true });
 const buttonsOnPage = () => [...document.querySelectorAll('button, a, [role="button"], input[type="button"]')]
     .filter((b) => label(b).length <= 60 && shown(b));
-const payToReject = () => buttonsOnPage().some((b) => PAY_TO_REJECT.test(label(b)));
+const payToReject = () => buttonsOnPage().some((b) => payToRejectLabel(label(b)));
 // Its accept button, pressed directly: a platform's rule can miss a site's
 // own variant of the pop-up ("I Accept" beside "Reject and Pay").
-const acceptBeside = () => buttonsOnPage().find((b) => ACCEPT.test(label(b)));
+const isYes = (words) => ACCEPT.test(words) || (WALL_YES.test(words) && !WALL_NOT_YES.test(words) && !WALL_PAY.test(words));
+// The biggest first: a yes is a button, and the word "consent" in a line of text can be a
+// link beside it (as.com's opens an explanation).
+const area = (el) => { const r = el.getBoundingClientRect(); return r.width * r.height; };
+const biggestFirst = (buttons) => [...buttons].sort((a, b) => area(b) - area(a));
+const acceptBeside = () => biggestFirst(buttonsOnPage().filter((b) => isYes(label(b))))[0];
 
 // A wall that no rule answers: a site's own (Marca's, Corriere's), or a platform's
 // that Autoconsent leaves alone on purpose (Sourcepoint's with a subscribe button).
@@ -58,7 +64,7 @@ const acceptBeside = () => buttonsOnPage().find((b) => ACCEPT.test(label(b)));
 // and an "accept only necessary" isn't a yes.
 const WALL_YES = /\b(accept|agree|consent|allow)\b|acept|aceit|accett|accept|akzept|zustimm|einverstanden|prihvać|prihvac|slažem|slazem|akkoord|zgadzam|souhlas/i;
 const WALL_NOT_YES = /necess|essential|notwendig|erforderlich|nužn|nuzn|only|solo|nur\b|manag|setting|prefer|einstell|option|custom|personal|gestion|ajust|configur|detail|learn|more/i;
-const WALL_PAY = /subscri|suscri|abonn|abbon|\babo\b|\bpay\b|\bpaga|\bpago\b|bezahl|kaufen|\bbuy\b|purchase|\bpur\b|pretplat|assin/i;
+const WALL_PAY = /subscri|suscri|abonn|abbon|\babo\b|\bpay\b|\bpaga|\bpago\b|bezahl|kaufen|\bbuy\b|purchase|\bpur\b|pretplat|assin|ad[- ]?free|werbefrei|sans pub|sin (anuncios|publi)|senza pubbl|contentpass/i;
 const WALL_WORDS = /cookie|kolačić|kolacic|consent|tracking|privacy|partner|personal|datos|daten|données|donnees|dati\b|podat|werbung|publicidad|pubblicit|publicité|adverts/i;
 const WALL_BUTTONS = 'button, a, [role="button"], input[type="button"], input[type="submit"]';
 
@@ -84,7 +90,7 @@ const paidWall = (mainFrame) => {
     });
     const pay = buttons.filter((b) => WALL_PAY.test(label(b)));
     if (!pay.length) return null;
-    for (const yes of buttons) {
+    for (const yes of biggestFirst(buttons)) {
         const words = label(yes);
         if (!WALL_YES.test(words) || WALL_NOT_YES.test(words) || WALL_PAY.test(words)) continue;
         for (const box of mainFrame ? pinnedBoxes(yes) : [document.body]) {
