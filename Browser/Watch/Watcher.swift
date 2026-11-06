@@ -163,8 +163,8 @@ nonisolated enum PageLines {
     }()
 
     /// Bumped when the way pages are read changes (2: link text on pages of
-    /// boxes), so a watch re-reads instead of announcing the change as news.
-    static let version = 2
+    /// boxes; 3: no dialogs), so a watch re-reads instead of announcing the change as news.
+    static let version = 3
 
     @concurrent static func fetch(_ url: URL) async -> [String]? {
         guard let (data, response) = try? await session.data(from: url),
@@ -286,9 +286,21 @@ enum RenderedPage {
             if (webView.isLoading && loader.isMoving) || parsing == true { still = .now }
             try? await Task.sleep(for: .milliseconds(250))
         }
-        guard let html = try? await webView.evaluateJavaScript("document.documentElement.outerHTML") as? String else { return nil }
+        guard let html = try? await webView.evaluateJavaScript(withoutDialogs) as? String else { return nil }
         return await PageLines.parse(html)
     }
+
+    /// The page without its dialogs, shut or showing. A cookie notice or a sign-in box
+    /// isn't the page, and comes and goes: nytimes.com's consent script writes its
+    /// notice in stages, hidden, so one reading had none of it and the next had it all,
+    /// which was announced as news.
+    private static let withoutDialogs = """
+    (() => {
+      const page = document.documentElement.cloneNode(true);
+      for (const dialog of page.querySelectorAll("dialog,[role=dialog],[role=alertdialog],[aria-modal=true]")) dialog.remove();
+      return page.outerHTML;
+    })()
+    """
 
     /// A newsletter's text, by Readability. Nothing it points at is loaded and none
     /// of its scripts run: a tracking pixel doesn't fire from being read here.

@@ -29,6 +29,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - The microphone stops after 8 seconds with no words and after a minute in all, and whenever the launcher closes or roko leaves the screen. A microphone with no usable format can't stop the app.
 - Newsletters stay on the server until they're saved here, so closing roko mid-refresh can't lose one.
 - News keeps the longer copy of an article, and read marks can't be undone by an older save landing late.
+- Notify Me could announce a cookie notice as news ("New: How cookies work and their uses"): on a page read with its scripts running, a hidden consent dialog was there at one reading and not at the next. Dialogs no longer count as the page. Watches take a fresh reading the next time they're checked.
 - News' lead picture could turn into a strange zoomed crop moments after it appeared, a tail fin and a red band where there had been a whole plane. The article's share picture was replacing the feed's, and a second picture of another shape drew too large and off centre. Both are fixed: pictures now fill their frame on their own, and the share picture only replaces a feed's thumbnail, as on BBC. The same goes for the picture above an article in Reader.
 - A story you've read in News showed its site's icon through its dimmed picture.
 - When something goes wrong roko says so, and for long enough to read: a look that found nothing says it couldn't reach your sites rather than that there's no news, and a refused microphone or notification offers Settings.
