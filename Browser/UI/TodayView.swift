@@ -8,6 +8,8 @@ import SwiftUI
 /// down to freshen it; it freshens itself when it's over an hour old.
 struct TodayView: View {
     @Environment(BrowserModel.self) private var browser
+    /// Read only so the screen redraws when the iPhone's Text Size changes: `Font.scaled` picks it up then.
+    @Environment(\.dynamicTypeSize) private var textSize
     @Environment(\.modelContext) private var context
     @Query(sort: \Todo.createdAt) private var todos: [Todo]
     @State private var today = TodayModel.shared
@@ -33,16 +35,14 @@ struct TodayView: View {
                 ForEach(today.followed) { section in followedView(section) }
                 HStack(spacing: 22) {
                     if !today.newsSites.isEmpty || !NewsTopics.chosen.isEmpty {
-                        Button("News sites and topics") { choosingSites = true }
+                        quietButton("Sources") { choosingSites = true }
                     }
                     if calendarAllowed {
-                        Button("Calendars") { choosingCalendars = true }
+                        quietButton("Calendars") { choosingCalendars = true }
                     }
                 }
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Theme.secondaryInk)
                 Text("Weather by Open-Meteo.com")
-                    .font(.system(size: 12))
+                    .font(.scaled(12))
                     .foregroundStyle(Theme.faintInk)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -61,7 +61,7 @@ struct TodayView: View {
             ContextBar(leading: .init(glyph: .close, label: "Close") { browser.panel = .none },
                        glyph: .search, title: "Search",
                        launch: { browser.showCommandBar(over: .today) },
-                       trailing: .init(glyph: .reload, label: "Refresh") { Task { await today.refresh() } })
+                       trailing: .init(glyph: .reload, label: "Refresh", spins: today.isRefreshing) { Task { await today.refresh() } })
         }
         // Morning light, low at the bottom edge. It only rises, as you read down.
         .onScrollGeometryChange(for: Double.self) { geometry in
@@ -97,41 +97,29 @@ struct TodayView: View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(Date.now.formatted(.dateTime.weekday(.wide)))
-                    .font(.system(size: 34, weight: .bold))
+                    .font(.scaled(34, weight: .bold))
                 Text(Date.now.formatted(.dateTime.day().month(.wide)))
-                    .font(.system(size: 20))
+                    .font(.scaled(20))
                     .foregroundStyle(Theme.secondaryInk)
-                // Pulling down closes Today, so freshening it is a tap here.
-                Button {
-                    Task { await today.refresh() }
-                } label: {
-                    HStack(spacing: 6) {
-                        Glyph(.reload, size: 12, weight: 1.8)
-                            .rotationEffect(.degrees(today.isRefreshing ? 360 : 0))
-                            .animation(today.isRefreshing ? .linear(duration: 1).repeatForever(autoreverses: false) : .default,
-                                       value: today.isRefreshing)
-                        if today.isRefreshing {
-                            Text("Refreshing…")
-                        } else if let refreshed = today.refreshedAt {
-                            Text("Updated \(refreshed.formatted(date: .omitted, time: .shortened))")
-                        } else {
-                            Text("Refresh")
-                        }
+                // Refreshing is the bar's right-hand button; this says how it went.
+                Group {
+                    if today.isRefreshing {
+                        Text("Refreshing…")
+                    } else if today.refreshFailed {
+                        Text("Couldn't update. Tap Refresh to try again")
+                    } else if let refreshed = today.refreshedAt {
+                        Text("Updated \(refreshed.formatted(date: .omitted, time: .shortened))")
                     }
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.secondaryInk)
-                    .frame(minHeight: 32)
-                    .contentShape(.rect)
                 }
-                .buttonStyle(.plain)
-                .disabled(today.isRefreshing)
-                .accessibilityLabel("Refresh Today")
+                .font(.scaled(13))
+                .foregroundStyle(Theme.secondaryInk)
+                .frame(minHeight: 32)
             }
             if let weather = today.weather {
                 weatherView(weather)
             } else if TodayLocation.shared.isDenied && WeatherPlace.fixed == nil {
                 Button("Choose a town for the weather") { choosingPlace = true }
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.scaled(16, weight: .medium))
                     .foregroundStyle(Theme.accentText)
             }
         }
@@ -150,14 +138,14 @@ struct TodayView: View {
                         .scaledToFit()
                         .frame(width: 40, height: 40)
                     Text("\(Int(weather.temperature.rounded()))°")
-                        .font(.system(size: 44, weight: .semibold).monospacedDigit())
+                        .font(.scaled(44, weight: .semibold).monospacedDigit())
                         .fixedSize()
                     VStack(alignment: .leading, spacing: 2) {
                         Text(weather.condition + (weather.place.map { " in \($0)" } ?? ""))
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.scaled(16, weight: .medium))
                             .foregroundStyle(Theme.ink)
                         Text(weather.dayLine)
-                            .font(.system(size: 14))
+                            .font(.scaled(14))
                             .foregroundStyle(Theme.secondaryInk)
                     }
                     .lineLimit(1)
@@ -177,14 +165,14 @@ struct TodayView: View {
                 ForEach(Array(hours.enumerated()), id: \.element.id) { index, hour in
                     VStack(spacing: 8) {
                         Text(hour.time.formatted(.dateTime.hour(.twoDigits(amPM: .omitted))))
-                            .font(.system(size: 13).monospacedDigit())
+                            .font(.scaled(13).monospacedDigit())
                             .foregroundStyle(Theme.secondaryInk)
                         Image("phosphor/\(TodayWeather.glyph(hour.code, isDay: hour.isDay))")
                             .resizable()
                             .scaledToFit()
                             .frame(width: 22, height: 22)
                         Text("\(Int(hour.temperature.rounded()))°")
-                            .font(.system(size: 15, weight: .medium).monospacedDigit())
+                            .font(.scaled(15, weight: .medium).monospacedDigit())
                     }
                     .fixedSize()
                     if index < hours.count - 1 { Spacer(minLength: 0) }
@@ -201,12 +189,12 @@ struct TodayView: View {
                 Button("Show today's calendar") {
                     Task { calendarAllowed = await TodayCalendar.requestAccess(); today.appeared() }
                 }
-                .font(.system(size: 16, weight: .medium))
+                .font(.scaled(16, weight: .medium))
                 .foregroundStyle(Theme.accentText)
             } else if today.events.isEmpty {
                 Button { open("calshow:\(Int(Date.now.timeIntervalSinceReferenceDate))") } label: {
                     Text("Nothing else on your calendar today.")
-                        .font(.system(size: 16))
+                        .font(.scaled(16))
                         .foregroundStyle(Theme.secondaryInk)
                 }
                 .buttonStyle(.plain)
@@ -216,14 +204,14 @@ struct TodayView: View {
                     Button { open("calshow:\(Int(event.start.timeIntervalSinceReferenceDate))") } label: {
                         HStack(alignment: .firstTextBaseline, spacing: 14) {
                             Text(event.isAllDay ? "All day" : event.start.formatted(date: .omitted, time: .shortened))
-                                .font(.system(size: 15).monospacedDigit())
+                                .font(.scaled(15).monospacedDigit())
                                 .foregroundStyle(Theme.secondaryInk)
                                 .frame(width: 64, alignment: .leading)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(event.title).font(.system(size: 17))
+                                Text(event.title).font(.scaled(17))
                                 if let location = event.location {
                                     Text(location)
-                                        .font(.system(size: 13))
+                                        .font(.scaled(13))
                                         .foregroundStyle(Theme.secondaryInk)
                                         .lineLimit(1)
                                 }
@@ -236,6 +224,18 @@ struct TodayView: View {
                 }
             }
         }
+    }
+
+    /// A word to tap, quiet on the page and as easy to hit as the rows around it.
+    private func quietButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.scaled(15, weight: .medium))
+                .foregroundStyle(Theme.secondaryInk)
+                .frame(minHeight: 44)
+                .contentShape(.rect)
+        }
+        .buttonStyle(RowButtonStyle())
     }
 
     /// Hands over to Apple's own app: Weather, or Calendar at a moment.
@@ -259,26 +259,23 @@ struct TodayView: View {
                     .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 6 }
                     .padding(.leading, -11)
                     Text(todo.title)
-                        .font(.system(size: 17))
+                        .font(.scaled(17))
                         .foregroundStyle(todo.done ? Theme.secondaryInk : Theme.ink)
                         .strikethrough(todo.done, color: Theme.secondaryInk)
                     Spacer(minLength: 0)
                     if let time = todo.timeLabel, TodoSection.of(todo) == .today {
                         Text(time)
-                            .font(.system(size: 15).monospacedDigit())
+                            .font(.scaled(15).monospacedDigit())
                             .foregroundStyle(Theme.secondaryInk)
                     } else if TodoSection.of(todo) == .overdue {
                         Text("Overdue")
-                            .font(.system(size: 13))
+                            .font(.scaled(13))
                             .foregroundStyle(Theme.accentText)
                     }
                 }
                 .transition(.opacity)
             }
-            Button("All to-dos") { browser.panel = .todos }
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Theme.secondaryInk)
-                .padding(.top, 2)
+            quietButton("All to-dos") { browser.panel = .todos }
         }
     }
 
@@ -305,17 +302,17 @@ struct TodayView: View {
         if today.newsSites.isEmpty && NewsTopics.chosen.isEmpty {
             section("Top stories") {
                 Text("Choose the news sites you read, sections of them, or topics to follow, and they show up here each morning.")
-                    .font(.system(size: 16))
+                    .font(.scaled(16))
                     .foregroundStyle(Theme.secondaryInk)
-                Button("Choose news") { choosingSites = true }
-                    .font(.system(size: 16, weight: .medium))
+                Button("Choose sources") { choosingSites = true }
+                    .font(.scaled(16, weight: .medium))
                     .foregroundStyle(Theme.accentText)
             }
         } else if !sites.isEmpty {
             section("Top stories") {
                 if today.top.isEmpty {
-                    Text(today.isRefreshing ? "Reading your news sites…" : "No stories yet. Pull down to try again.")
-                        .font(.system(size: 16))
+                    Text(today.isRefreshing ? "Reading your news sites…" : today.refreshFailed ? "Couldn't reach your news sites." : "No stories yet. Tap Refresh to try again.")
+                        .font(.scaled(16))
                         .foregroundStyle(Theme.secondaryInk)
                 }
                 ForEach(today.top) { story in storyRow(story) }
@@ -329,12 +326,12 @@ struct TodayView: View {
             HStack(spacing: 8) {
                 if let host = followed.host { SiteIcon(host: host, size: 16, remote: true) }
                 Text(followed.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.scaled(15, weight: .semibold))
                     .foregroundStyle(Theme.secondaryInk)
             }
             if followed.stories.isEmpty {
                 Text(today.isRefreshing ? "Looking…" : "Nothing new in the last two days.")
-                    .font(.system(size: 16))
+                    .font(.scaled(16))
                     .foregroundStyle(Theme.secondaryInk)
             }
             ForEach(followed.stories) { story in storyRow(story) }
@@ -348,12 +345,12 @@ struct TodayView: View {
                     .padding(.top, 2)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(story.title)
-                        .font(.system(size: 17))
+                        .font(.scaled(17))
                         .foregroundStyle(Theme.ink)
                         .multilineTextAlignment(.leading)
                         .lineLimit(3)
                     Text(story.host + (story.published.map { " · " + Self.when($0) } ?? ""))
-                        .font(.system(size: 13))
+                        .font(.scaled(13))
                         .foregroundStyle(Theme.secondaryInk)
                 }
                 Spacer(minLength: 0)
@@ -401,7 +398,7 @@ struct TodayView: View {
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.scaled(15, weight: .semibold))
                 .foregroundStyle(Theme.secondaryInk)
             content()
         }
@@ -651,28 +648,37 @@ struct NewsSitesSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background(Theme.panel)
-            .navigationTitle("News")
+            .navigationTitle("Sources")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
-                        // Typed and not added yet: what was typed was meant.
-                        addTopic()
-                        addBlock()
-                        if chosen != NewsSite.chosen || topics != NewsTopics.chosen || blocks != NewsBlocks.chosen || less != NewsLess.chosen || hiddenSites != NewsHiddenSites.chosen {
-                            // Taken off the list: followed again if hiding it stopped that.
-                            let back = NewsHiddenSites.takeBack(NewsHiddenSites.chosen.filter { !hiddenSites.contains($0) })
-                            chosen += back.filter { !chosen.contains($0) }
-                            // Before the sites: one followed here comes off this list.
-                            NewsHiddenSites.chosen = hiddenSites
-                            NewsSite.chosen = chosen
-                            NewsTopics.chosen = topics
-                            NewsBlocks.chosen = blocks
-                            NewsLess.chosen = less
-                            changed()
+                        Task {
+                            // Typed and not added yet: what was typed was meant. A site it
+                            // can't find stays open, saying so, with what was typed.
+                            guard await addTypedSite() else { return }
+                            addTopic()
+                            addBlock()
+                            if chosen != NewsSite.chosen || topics != NewsTopics.chosen || blocks != NewsBlocks.chosen || less != NewsLess.chosen || hiddenSites != NewsHiddenSites.chosen {
+                                // Taken off the list: followed again if hiding it stopped that.
+                                let back = NewsHiddenSites.takeBack(NewsHiddenSites.chosen.filter { !hiddenSites.contains($0) })
+                                chosen += back.filter { !chosen.contains($0) }
+                                // Before the sites: one followed here comes off this list.
+                                NewsHiddenSites.chosen = hiddenSites
+                                NewsSite.chosen = chosen
+                                NewsTopics.chosen = topics
+                                NewsBlocks.chosen = blocks
+                                NewsLess.chosen = less
+                                changed()
+                            }
+                            dismiss()
                         }
-                        dismiss()
                     }
+                    .disabled(finding)
+                }
+                // The lists below that swipe to remove: the same, for anyone who can't or didn't guess.
+                if !topics.isEmpty || !blocks.isEmpty || !less.isEmpty || !hiddenSites.isEmpty {
+                    ToolbarItem(placement: .cancellationAction) { EditButton() }
                 }
             }
         }
@@ -740,17 +746,24 @@ struct NewsSitesSheet: View {
     }
 
     private func add() {
+        Task { _ = await addTypedSite() }
+    }
+
+    /// What's typed in the site field, found and added. False when it can't be found.
+    private func addTypedSite() async -> Bool {
         let typed = address
-        guard !typed.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        guard !typed.trimmingCharacters(in: .whitespaces).isEmpty else { return true }
         finding = true
         notFound = false
-        Task {
-            let site = await TodayNews.find(typed)
-            finding = false
-            guard let site else { notFound = true; return }
-            if !chosen.contains(where: { $0.id == site.id }) { chosen.append(site) }
-            address = ""
+        let site = await TodayNews.find(typed)
+        finding = false
+        guard let site else {
+            notFound = true
+            return false
         }
+        if !chosen.contains(where: { $0.id == site.id }) { chosen.append(site) }
+        address = ""
+        return true
     }
 
     private func addBlock() {

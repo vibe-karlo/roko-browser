@@ -206,8 +206,7 @@ struct BrowserView: View {
                 // Arrives from below; leaves upward, continuing the pull that uncovers the page.
                 // Full screen: its own bottom row replaces the bar it would sit above.
                 TabStackView()
-                    .transition(.asymmetric(insertion: .move(edge: .bottom),
-                                            removal: .move(edge: .top).combined(with: .opacity)))
+                    .transition(.switcher)
             }
         }
         .overlay {
@@ -228,20 +227,20 @@ struct BrowserView: View {
         .overlay {
             if browser.panel == .today || browser.panel == .command && browser.launcherReturn == .today {
                 TodayView()
-                    .transition(.move(edge: .bottom))
+                    .transition(.rises)
             }
         }
         .overlay {
             if browser.panel == .todos || browser.panel == .command && browser.launcherReturn == .todos, browser.splitList == nil {
                 // Full screen, rising from the bar like Browse for Me.
                 TodoView()
-                    .transition(.move(edge: .bottom))
+                    .transition(.rises)
             }
         }
         .overlay {
             if browser.panel == .shopping, browser.splitList == nil {
                 ShoppingView()
-                    .transition(.move(edge: .bottom))
+                    .transition(.rises)
             }
         }
         .modifier(ReadLaterScreens(browser: browser, besideFold: besideFold))
@@ -250,7 +249,7 @@ struct BrowserView: View {
                 // Full screen, rising from the bar where the question was asked.
                 BrowseForMeView(session: session)
                     .besideFold(besideFold, hidden: browser.panel == .tabs)
-                    .transition(.move(edge: .bottom))
+                    .transition(.rises)
             }
         }
         .animation(.spring(duration: 0.42, bounce: 0.06), value: browser.browseForMe?.id)
@@ -289,11 +288,13 @@ struct BrowserView: View {
             if let toast = browser.toast {
                 Text(toast)
                     .font(.system(size: 15, weight: .medium))
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
                     .padding(.horizontal, 18)
                     .padding(.vertical, 11)
                     .barSurface(cornerRadius: 14)
                     .compositingGroup()
+                    .padding(.horizontal, Theme.gutter)
                     .padding(.bottom, Theme.barHeight + 20 + playerLift)
                     // Never across the bend of an open Duo.
                     .staysWithBar(browser)
@@ -307,15 +308,19 @@ struct BrowserView: View {
                 HStack(spacing: 14) {
                     Text(offer.text)
                         .font(.system(size: 15, weight: .medium))
-                    Button("Undo") { browser.takeUndo() }
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Theme.accentText)
-                        .frame(minHeight: 44)
-                        .contentShape(.rect)
+                        .lineLimit(offer.isProblem ? 2 : 1)
+                    if let action = offer.action {
+                        Button(action) { browser.takeUndo() }
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Theme.accentText)
+                            .lineLimit(1)
+                            .fixedSize()
+                            .contentShape(.rect)
+                    }
                 }
-                .lineLimit(1)
+                .frame(minHeight: 44)
                 .padding(.leading, 18)
-                .padding(.trailing, 16)
+                .padding(.trailing, offer.action == nil ? 18 : 16)
                 .barSurface(cornerRadius: 14)
                 .compositingGroup()
                 .padding(.horizontal, Theme.gutter)
@@ -431,6 +436,8 @@ struct BrowserView: View {
         .background(StatusBarStyler(style: statusBarStyle, hidden: hidesClockOverPage))
         // Every toast confirms something done (copied, pinned, translating): a tick to feel it.
         .sensoryFeedback(.impact(weight: .light), trigger: browser.toast) { _, toast in toast != nil }
+        // Something went wrong: not the tick of something done.
+        .sensoryFeedback(.warning, trigger: browser.undoOffer?.id) { _, _ in browser.undoOffer?.isProblem == true }
         .animation(.snappy(duration: 0.25), value: browser.toast)
         .animation(.snappy(duration: 0.3), value: browser.panel)
         .sheet(isPresented: panelBinding(.settings)) {
@@ -896,7 +903,7 @@ private struct BottomPanel<Content: View>: View {
                             withAnimation(.spring(duration: 0.3, bounce: 0.2)) { drag = 0 }
                         }
                     })
-                .transition(.move(edge: .bottom))
+                .transition(.rises)
             }
         }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { room = $0 }
@@ -986,13 +993,13 @@ private struct ReadLaterScreens: ViewModifier {
                 if browser.readLaterBeside || browser.panel == .readLater || browser.panel == .command && browser.launcherReturn == .readLater {
                     ReadLaterView()
                         .besideFold(besideFold, hidden: browser.panel == .tabs)
-                        .transition(.move(edge: .bottom))
+                        .transition(.rises)
                 }
             }
             .overlay {
                 if browser.panel == .feed || browser.panel == .command && browser.launcherReturn == .feed {
                     FeedView()
-                        .transition(.move(edge: .bottom))
+                        .transition(.rises)
                 }
             }
             .overlay {
@@ -1000,7 +1007,7 @@ private struct ReadLaterScreens: ViewModifier {
                     // Over the list it was asked from, rising from its bar.
                     DigestView(model: digest)
                         .besideFold(besideFold, hidden: browser.panel == .tabs)
-                        .transition(.move(edge: .bottom))
+                        .transition(.rises)
                 }
             }
             .animation(.spring(duration: 0.42, bounce: 0.06), value: browser.digest?.id)

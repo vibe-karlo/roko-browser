@@ -21,6 +21,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ### Fixed
 - News' lead picture could turn into a strange zoomed crop moments after it appeared, a tail fin and a red band where there had been a whole plane. The article's share picture was replacing the feed's, and a second picture of another shape drew too large and off centre. Both are fixed: pictures now fill their frame on their own, and the share picture only replaces a feed's thumbnail, as on BBC. The same goes for the picture above an article in Reader.
 - A story you've read in News showed its site's icon through its dimmed picture.
+- When something goes wrong roko says so, and for long enough to read: a look that found nothing says it couldn't reach your sites rather than that there's no news, and a refused microphone or notification offers Settings.
+- Done in News sources adds a site you'd typed but not added, or stays open saying it couldn't find it. Edit removes topics, words and hidden sites without a swipe.
+- Swiping the bar now follows the finger, stops with a tick at the first and last tab, and a second swipe up just after opening the tabs can't close one by accident. The page menu closes when pulled down from inside it.
+- News, Saved, To-do, Today and the launcher's rows follow the iPhone's Text Size, up to half as large again. With Reduce Motion on, screens fade in rather than slide.
+- A mic in the launcher's field, for those who haven't found that holding + listens. Refresh is on News' bar, and Today has just the one. News sources is called Sources wherever it's opened, and the page menu says Save for Later.
 - An unsafe page has a way out: Go back, or Close this tab. Reader and a summary that fail offer Try again, and Reader the page itself, instead of grey text.
 - Sideways, To-do's list ended in a fade with hard edges, and its last row showed under the bar.
 - The "Today" strip above the bar sat a little high: it's now midway between the page and the bar.

@@ -25,6 +25,8 @@ final class TodayModel {
     private(set) var events: [TodayEvent] = []
     private(set) var refreshedAt: Date?
     private(set) var isRefreshing = false
+    /// The last refresh, asked for here, brought nothing back from anywhere.
+    private(set) var refreshFailed = false
     private var isFresheningWeather = false
 
     /// After this long, opening Today freshens it (there's no pull to refresh).
@@ -109,6 +111,7 @@ final class TodayModel {
         let newStories = everything
 
         if !inBackground { events = TodayCalendar.events() }
+        if !inBackground { refreshFailed = !(sources + pool).isEmpty && newWeather == nil && newStories.isEmpty }
         // Only a refresh that brought something counts as one.
         if newWeather != nil || !newStories.isEmpty {
             refreshedAt = .now

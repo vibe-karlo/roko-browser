@@ -9,6 +9,8 @@ struct ContextBar: View {
     struct Slot {
         let glyph: Glyph.Kind
         let label: String
+        /// Working on it: the glyph turns while this is true.
+        var spins = false
         let action: () -> Void
     }
 
@@ -95,6 +97,8 @@ struct ContextBar: View {
         if let slot {
             Button(action: slot.action) {
                 Glyph(slot.glyph, size: 16, weight: 2)
+                    .rotationEffect(.degrees(slot.spins && !UIAccessibility.isReduceMotionEnabled ? 360 : 0))
+                    .animation(slot.spins ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: slot.spins)
                     .frame(width: 38, height: 38)
                     .frame(width: 64, height: Theme.barHeight)
                     .contentShape(.rect)
@@ -144,12 +148,13 @@ private struct ScreenBarSurface: ViewModifier {
 extension View {
     /// Pulled down past the top, the screen closes as the finger lifts: moved back
     /// first, it stays. It says so past the line, and ticks there.
-    func pullsDownToClose(_ close: @escaping () -> Void) -> some View {
-        modifier(PullToClose(close: close))
+    func pullsDownToClose(distance: CGFloat = 90, _ close: @escaping () -> Void) -> some View {
+        modifier(PullToClose(distance: distance, close: close))
     }
 }
 
 private struct PullToClose: ViewModifier {
+    let distance: CGFloat
     let close: () -> Void
     @State private var pastLine = false
     @State private var held = false
@@ -157,7 +162,7 @@ private struct PullToClose: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onScrollGeometryChange(for: Bool.self) { geometry in
-                geometry.contentOffset.y < -geometry.contentInsets.top - 90
+                geometry.contentOffset.y < -geometry.contentInsets.top - distance
             } action: { _, past in
                 pastLine = past
             }

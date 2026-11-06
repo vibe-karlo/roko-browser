@@ -33,6 +33,14 @@ enum Theme {
     static let gutter: CGFloat = 16
 }
 
+extension Font {
+    /// A size as designed at the standard text size, following the iPhone's Text Size
+    /// setting up to half as large again: past that, these layouts stop reading well.
+    static func scaled(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .system(size: min(UIFontMetrics.default.scaledValue(for: size), size * 1.5), weight: weight)
+    }
+}
+
 /// Settings → Appearance: follow iOS, or stay light or dark.
 enum Appearance: String, CaseIterable, Identifiable {
     case system, light, dark

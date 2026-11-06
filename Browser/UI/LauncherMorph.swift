@@ -12,6 +12,17 @@ extension Animation {
     static let launcherRowsOut = Animation.easeOut(duration: 0.08)
 }
 
+extension AnyTransition {
+    /// A screen coming up over the page: a fade, with Reduce Motion on.
+    static var rises: AnyTransition { UIAccessibility.isReduceMotionEnabled ? .opacity : .move(edge: .bottom) }
+
+    /// The tab switcher: arrives from below, leaves upward.
+    static var switcher: AnyTransition {
+        UIAccessibility.isReduceMotionEnabled ? .opacity
+            : .asymmetric(insertion: .move(edge: .bottom), removal: .move(edge: .top).combined(with: .opacity))
+    }
+}
+
 /// The launcher's field appearing where it lives, at the top: it fades in and
 /// settles the last few points down into place (and back up on close). It
 /// used to fly up from the bar's capsule, which read as the field travelling
@@ -24,7 +35,7 @@ struct LauncherMorph: ViewModifier {
     func body(content: Content) -> some View {
         content
             .opacity(opened ? 1 : 0)
-            .scaleEffect(opened ? 1 : 0.98, anchor: .top)
-            .offset(y: opened ? 0 : -6)
+            .scaleEffect(opened || UIAccessibility.isReduceMotionEnabled ? 1 : 0.98, anchor: .top)
+            .offset(y: opened || UIAccessibility.isReduceMotionEnabled ? 0 : -6)
     }
 }
