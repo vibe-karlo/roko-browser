@@ -9,6 +9,9 @@ struct BottomBar: View {
     /// top, + in the middle, the page menu at the foot. It has its own strip,
     /// so it stays while you scroll.
     var upright = false
+    /// Exploration: lying in the band under the page, on its colour, with no
+    /// surface of its own. The band folds it away; the card's edge shows loading.
+    var docked = false
     /// Where the + capsule is on screen, for the launcher to grow out of.
     @State private var capsuleFrame: CGRect = .zero
     /// Tabs switched by swiping the bar; each one ticks.
@@ -23,8 +26,11 @@ struct BottomBar: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .padding(.horizontal, upright ? 0 : Theme.gutter)
-        .padding(.bottom, upright ? 0 : 4)
+        .padding(.horizontal, upright || docked ? 0 : Theme.gutter)
+        .padding(.bottom, upright || docked ? 0 : 4)
+        // Clear of the card by what it leaves above the home indicator; a live row
+        // above has its own air.
+        .padding(.top, docked && browser.liveItems.isEmpty ? 5 : 0)
         .animation(.snappy(duration: 0.28), value: browser.isBarCollapsed)
         .animation(.snappy(duration: 0.28), value: browser.showsLaunchField)
     }
@@ -35,8 +41,12 @@ struct BottomBar: View {
         let layout = upright ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
         return layout {
             Button { browser.showTabs() } label: {
-                TabThumbnails(tabs: recentTabs, count: browser.tabs.count)
-                    .frame(width: upright ? 56 : 64, height: upright ? 64 : Theme.barHeight)
+                TabThumbnails(tabs: recentTabs, count: browser.tabs.count, quiet: docked)
+                    // Docked, the two ends sit the same visible distance from the edges,
+                    // whatever their widths: the fan's ink is 32 wide, the chevron's 16.
+                    .frame(width: docked ? 32 : nil)
+                    .padding(.leading, docked ? Self.dockedInset : 0)
+                    .frame(width: upright ? 56 : 64, height: upright ? 64 : Theme.barHeight, alignment: docked ? .leading : .center)
                     .contentShape(.rect)
             }
             .buttonStyle(GlyphButtonStyle())
@@ -106,7 +116,8 @@ struct BottomBar: View {
                         // and only on a page (a screen over it has its own bar).
                         // Hidden while the launcher's field stands in its place.
                         if browser.panel != .command || !onPage {
-                            Capsule().fill(Theme.raised)
+                            // Docked, the band's colour shows through it.
+                            Capsule().fill(docked ? AnyShapeStyle(.white.opacity(0.14)) : AnyShapeStyle(Theme.raised))
                                 // Held: roko's orange fills it from the left as the hold
                                 // counts, so it's clear something is about to happen.
                                 .overlay(alignment: .leading) {
@@ -148,26 +159,34 @@ struct BottomBar: View {
             Spacer(minLength: 8)
 
             Button { browser.panel = .tools } label: {
-                Glyph(.chevronUp, size: 18, weight: 2)
+                Glyph(.chevronUp, size: docked ? 20 : 18, weight: 2)
                     .frame(width: 38, height: 38)
-                    .background(Theme.raised, in: .circle)
-                    .frame(width: upright ? 56 : 64, height: upright ? 64 : Theme.barHeight)
+                    .background(docked ? AnyShapeStyle(.clear) : AnyShapeStyle(Theme.raised), in: .circle)
+                    // The glyph's ink is 11 inside its 38-point circle.
+                    .padding(.trailing, docked ? Self.dockedInset - 11 : 0)
+                    .frame(width: upright ? 56 : 64, height: upright ? 64 : Theme.barHeight, alignment: docked ? .trailing : .center)
                     .contentShape(.rect)
             }
             .buttonStyle(GlyphButtonStyle())
             .disabled(browser.selectedTab == nil)
             .accessibilityLabel("Page menu")
         }
-        .frame(height: upright ? nil : Theme.barHeight + 8)
+        .frame(height: upright ? nil : docked ? Theme.barHeight : Theme.barHeight + 8)
         .padding(.vertical, upright ? 18 : 0)
-        .overlay(alignment: upright ? .leading : .bottom) { ProgressLine(tab: browser.selectedTab, upright: upright) }
-        .modifier(BarSurface(on: !upright))
+        .overlay(alignment: upright ? .leading : .bottom) {
+            if !docked { ProgressLine(tab: browser.selectedTab, upright: upright) }
+        }
+        .modifier(BarSurface(on: !upright && !docked))
+        // With no surface, the gaps between the keys take the swipes too.
+        .contentShape(.rect)
         // Alongside the + capsule's own hold, not over it: as a high-priority
         // gesture it held every touch until it knew it wasn't a swipe, so a
         // hold on + never reached the capsule.
         .simultaneousGesture(swipes)
         .sensoryFeedback(.selection, trigger: switches)
     }
+
+    private static let dockedInset: CGFloat = 22
 
     @State private var pressedAt: Date?
     @GestureState private var touching = false
@@ -316,6 +335,9 @@ private struct BarSurface: ViewModifier {
 private struct TabThumbnails: View {
     let tabs: [BrowserTab]
     let count: Int
+    /// Docked: a size smaller, the back card a step down, so it stays behind the
+    /// front one and the fan doesn't outweigh the capsule.
+    var quiet = false
 
     var body: some View {
         let shots = tabs.compactMap(\.thumbnail)
@@ -328,7 +350,8 @@ private struct TabThumbnails: View {
                         Image(uiImage: shot)
                             .resizable()
                             .scaledToFill()
-                            .frame(width: 22, height: 30, alignment: .top)
+                            .frame(width: quiet ? 20 : 22, height: quiet ? 27 : 30, alignment: .top)
+                            .brightness(quiet && index == 1 ? -0.35 : 0)
                             .clipShape(.rect(cornerRadius: 5))
                             .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Theme.edge, lineWidth: 1))
                             .rotationEffect(.degrees(index == 0 ? 7 : -9))

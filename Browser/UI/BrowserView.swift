@@ -87,26 +87,45 @@ struct BrowserView: View {
                                                               bottomLeadingRadius: sideBar || standsOnFold ? 16 : showsBand ? 22 : 0,
                                                               bottomTrailingRadius: sideBar || standsOnFold ? 16 : showsBand ? 22 : 0,
                                                               topTrailingRadius: sideBar ? 16 : 0))
+                            .overlay {
+                                if barInBand && showsBand {
+                                    CardEdgeLip(radius: 22).allowsHitTesting(false)
+                                    CardEdgeProgress(tab: browser.selectedTab, radius: 22)
+                                        .allowsHitTesting(false)
+                                }
+                            }
                             .frame(maxHeight: .infinity, alignment: .top)
                         if showsBand {
                             VStack(spacing: 0) {
                                 if !browser.liveItems.isEmpty {
                                     LiveBand()
+                                        .environment(\.liveBandOverBar, barInBand)
                                         .transition(.move(edge: .bottom).combined(with: .opacity))
                                 }
                                 if barInBand && !browser.isBarCollapsed {
-                                    BandBar()
+                                    BottomBar(docked: true)
+                                        .opacity(browser.launcherShown || browser.panel == .tabs || browser.pageBecomingSummary || browser.hidingItems != nil ? 0 : 1)
+                                        .allowsHitTesting(browser.hidingItems == nil)
+                                        .animation(.easeOut(duration: 0.2), value: browser.pageBecomingSummary)
+                                        .animation(.launcher, value: browser.launcherShown)
                                         .transition(.move(edge: .bottom).combined(with: .opacity))
                                 }
                             }
-                            // Down into the home indicator's strip: on the black band it has room,
+                            // Down into the home indicator's strip: on the dark band it has room,
                             // and keeping clear of all of it left a tall empty gap.
-                            .padding(.bottom, max(proxy.safeAreaInsets.bottom - 18, 4))
+                            // With the bar folded the row is last, and its dots need to clear the indicator.
+                            .padding(.bottom, max(proxy.safeAreaInsets.bottom - 21, 4) + (barInBand && browser.isBarCollapsed && !browser.bandShowsStrip ? 9 : 0))
                             .transition(.move(edge: .bottom))
                         }
                     }
                     // Only below: the status bar's strip keeps the page's colour.
-                    .background { (showsBand ? Color.black : Color.clear).ignoresSafeArea(edges: .bottom) }
+                    .background {
+                        if barInBand && showsBand {
+                            BandGround(color: browser.selectedTab?.topColor).ignoresSafeArea(edges: .bottom)
+                        } else {
+                            (showsBand ? Color.black : Color.clear).ignoresSafeArea(edges: .bottom)
+                        }
+                    }
                     .ignoresSafeArea(edges: .bottom)
                     .animation(.snappy(duration: 0.3), value: browser.liveItems.isEmpty)
                     .animation(.snappy(duration: 0.25), value: browser.bandShowsStrip)
@@ -158,7 +177,8 @@ struct BrowserView: View {
                     .transition(.opacity)
                     .accessibilityLabel("Close this page")
                 }
-                BottomBar()
+                // Exploration: on an upright phone's page the bar is in the band.
+                if !barInBand { BottomBar() }
             }
                 .animation(.snappy(duration: 0.28), value: browser.isBarCollapsed)
                 // On an open Duo the normal bar, at a bar's width, not stretched
@@ -168,9 +188,8 @@ struct BrowserView: View {
                 .staysWithBar(browser)
                 .animation(.snappy(duration: 0.28), value: browser.barSide)
                 .ignoresSafeArea(.container, edges: uprightFold != nil ? .horizontal : [])
-                // Exploration: on an upright phone's page the bar is in the band.
-                .opacity(sideBar || barInBand || browser.splitList != nil ? 0 : 1)
-                .allowsHitTesting(!sideBar && !barInBand && browser.splitList == nil)
+                .opacity(sideBar || browser.splitList != nil ? 0 : 1)
+                .allowsHitTesting(!sideBar && browser.splitList == nil)
                 .opacity(browser.launcherShown || browser.panel == .tabs || browser.pageBecomingSummary || browser.hidingItems != nil ? 0 : 1)
                 .allowsHitTesting(browser.hidingItems == nil)
                 // Faded, not folded: folding changes the page's insets, which stops a pull dead.
@@ -398,6 +417,7 @@ struct BrowserView: View {
         }
         .modifier(ReaderScreens(browser: browser, asBook: uprightFold != nil))
         .onChange(of: uprightFold != nil, initial: true) { _, upright in browser.uprightFoldOpen = upright }
+        .onChange(of: barInBand, initial: true) { _, inBand in browser.barInBand = inBand }
         .onAppear {
             LaunchClock.mark("firstAppear")
             browser.start(context: context)
@@ -560,7 +580,7 @@ struct BrowserView: View {
     private var playerLift: CGFloat {
         let live = showsPlayer ? LiveBand.height(minimized: browser.bandShowsStrip) : 0
         guard barInBand else { return live }
-        return live + (browser.isBarCollapsed ? 0 : BandBar.height) - Theme.barHeight - 8
+        return live + (browser.isBarCollapsed ? 0 : Theme.barHeight) - Theme.barHeight - 8
     }
 
     private var splitHalves: (top: BrowserTab, bottom: BrowserTab?)? {
