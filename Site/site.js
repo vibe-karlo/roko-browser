@@ -317,8 +317,8 @@ const proofData = {
     values: { roko: 0.7, arc: 0.9, brave: 1.7, duckduckgo: 2.7, quiche: 4.2, firefox: 5.7, safari: 5.7, edge: 9.8, lens: 16.4, chrome: 16.4 },
   },
   clean: {
-    unit: v => v.toFixed(0) + " of 6", low: false, head: "No ads left to scroll past.",
-    note: "Pages with no visible ad, pop-up or wall after five swipes, on CNN, Daily Mail, The Guardian, The Independent, the New York Post and The Sun. One run each, judged by eye.",
+    unit: v => v.toFixed(0) + " of 6", low: false, head: "No ads, pop-ups or walls.",
+    note: "How many of six ad-heavy sites showed no ad, pop-up or wall in five swipes down the page: CNN, Daily Mail, The Guardian, The Independent, the New York Post and The Sun. One run each, judged by eye.",
     values: { roko: 6, brave: 3, duckduckgo: 3, lens: 3, quiche: 2, arc: 2, firefox: 1, safari: 0, chrome: 0, edge: 0 },
   },
   data: {
