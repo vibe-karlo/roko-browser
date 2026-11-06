@@ -5,6 +5,7 @@ import Foundation
 /// in the app's own WebKit, in a Debug build. Also `-searchProbe topic,topic`, and
 /// `-readProbe address,address`: what Readability finds there, and its links. And
 /// `-backgroundProbe`: what iOS's wake-up runs, timed, as simulators never wake an app.
+/// `-mailProbe id,id`: a kept mail's original read again, with long numbers hidden.
 enum FeedProbe {
     static func runIfAsked() {
         let arguments = ProcessInfo.processInfo.arguments
@@ -14,8 +15,18 @@ enum FeedProbe {
         }
         let sites = list("-findProbe"), topics = list("-searchProbe"), pages = list("-readProbe")
         let background = arguments.contains("-backgroundProbe")
-        guard !sites.isEmpty || !topics.isEmpty || !pages.isEmpty || background else { return }
+        let mails = list("-mailProbe")
+        guard !sites.isEmpty || !topics.isEmpty || !pages.isEmpty || !mails.isEmpty || background else { return }
         Task {
+            for id in mails {
+                guard let link = URL(string: "roko-mail://mail/\(id)"), let html = Newsletters.original(of: link) else { continue }
+                let read = await RenderedPage.readable(html: html)
+                print("MAIL \(id): \(read?.text.count ?? -1) characters, \(read?.links.count ?? 0) links")
+                for line in (read?.text ?? "").components(separatedBy: "\n") where !line.isEmpty {
+                    print("   | \(line.prefix(90).replacing(/\d{5,}/, with: "#####"))")
+                }
+                for link in read?.links.prefix(6) ?? [] { print("   LINK \(link.words.prefix(40)) -> \(link.url.host() ?? "")") }
+            }
             if background {
                 let before = FeedStore.shared.unreadCount, started = Date.now
                 await FeedStore.shared.refresh(inBackground: true)

@@ -77,14 +77,17 @@ enum Newsletters {
             guard (try? original.write(to: file(for: link), atomically: true, encoding: .utf8)) != nil else { continue }
             var text = mail.text ?? ""
             if text.isEmpty, let html = mail.html { text = plainText(html) }
-            if !inBackground, let html = mail.html, let read = await RenderedPage.readable(html: html), read.text.count > text.count / 2 {
+            // The sender's own plain version keeps headings and lines Readability drops
+            // from a table of a mail. Readability's for when that's thin or mostly addresses.
+            if !inBackground, !isGoodPlainText(text), let html = mail.html,
+               let read = await RenderedPage.readable(html: html), read.text.count > text.count / 2 {
                 text = read.text
             }
             var story = NewsStory(title: mail.subject, link: link, host: domain(of: mail.sender),
                                   published: Date(timeIntervalSince1970: mail.received / 1000))
             story.from = mail.sender_name ?? mail.sender
             story.unsubscribe = mail.unsubscribe.flatMap(URL.init(string:))
-            story.content = PageReader.withoutFurniture(text)
+            story.content = PageReader.withoutFurniture(text, forMail: true)
             stories.append(story)
             var done = URLRequest(url: server.appending(path: "api/inbox/\(mail.id)"), timeoutInterval: 15)
             done.httpMethod = "DELETE"
@@ -114,6 +117,11 @@ enum Newsletters {
 
     private static func file(for link: URL) -> URL {
         folder.appending(path: link.lastPathComponent + ".html")
+    }
+
+    private static func isGoodPlainText(_ text: String) -> Bool {
+        let addresses = text.matches(of: /https?:\/\/\S+/).map(\.0.count).reduce(0, +)
+        return text.count >= 200 && Double(addresses) / Double(text.count) < 0.15
     }
 
     /// An HTML-only mail's words, for one too short for Readability or read with roko closed.
