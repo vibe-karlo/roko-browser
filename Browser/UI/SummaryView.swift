@@ -189,7 +189,7 @@ struct SummaryView: View {
     private var footer: some View {
         ContextBar(leading: .init(glyph: .close, label: "Back to the page", action: close),
                    glyph: .browse, title: "Ask",
-                   launch: { browser.showCommandBar(context: .aboutPage) }, fades: false)
+                   launch: { browser.showCommandBar(context: .aboutPage) })
             .padding(.top, 10)
             .overlay(alignment: .top) { ReadingLine(progress: readProgress, tint: PageKind.of(model.text).tint) }
             // See-through while the light is up, so its brightest part shows.
@@ -314,7 +314,7 @@ struct SummaryBesideView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             ContextBar(leading: .init(glyph: .close, label: "Close the summary", action: { browser.summary = nil }),
                        glyph: .browse, title: "Ask",
-                       launch: { browser.showCommandBar(context: .aboutPage) }, fades: false)
+                       launch: { browser.showCommandBar(context: .aboutPage) })
                 .padding(.top, 10)
                 .overlay(alignment: .top) { ReadingLine(progress: readProgress, tint: PageKind.of(model.text).tint) }
                 // See-through while the light is up, so no edge cuts across it.

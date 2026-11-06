@@ -148,6 +148,9 @@ struct LiveBand: View {
             .foregroundStyle(.white.opacity(0.8))
             .lineLimit(1)
             .padding(.horizontal, 40)
+            // Midway between the card's edge and the bar's capsule, not in its own frame:
+            // the capsule is inset in its row, and measured, the line sat 3.5 points high.
+            .offset(y: overBar && !browser.isBarCollapsed ? 3.5 : 0)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(.rect)
         }

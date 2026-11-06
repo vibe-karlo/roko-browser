@@ -17,8 +17,6 @@ struct ContextBar: View {
     let title: String
     let launch: () -> Void
     var trailing: Slot? = nil
-    /// Off where the screen draws its own edge above the bar.
-    var fades = true
     /// The launcher opens out of this bar's capsule (not To-do's, which types in place).
     var morphs = true
     /// Where the capsule widens into a field of the screen's own (To-do's), if any.
@@ -34,18 +32,7 @@ struct ContextBar: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var capsuleFrame: CGRect = .zero
 
-    /// In a band as the page's bar is, on a phone either way up.
-    /// On an open Duo, where these screens are columns, it floats.
-    private var docked: Bool { !browser.uprightFoldOpen }
-
-    @ViewBuilder
-    private var capsule: some View {
-        if docked {
-            Capsule().fill(.white.opacity(0.14))
-        } else {
-            Capsule().fill(Theme.raised)
-        }
-    }
+    private var capsule: some View { Capsule().fill(.white.opacity(0.14)) }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -92,13 +79,13 @@ struct ContextBar: View {
                 place(trailing)
             }
         }
-        .frame(height: docked ? Theme.barHeight : Theme.barHeight + 8)
-        // Sideways, a bar's width in the middle of the band, as a page's bar is.
-        .frame(maxWidth: docked && verticalSizeClass == .compact ? 480 : nil)
-        .frame(maxWidth: .infinity)
-        .modifier(ScreenBarSurface(docked: docked, sideways: verticalSizeClass == .compact))
-        // What scrolls under the floating bar dissolves above it rather than being sliced by its edge.
-        .background(alignment: .top) { if fades && !docked { FadeEdge(color: Theme.canvas, height: 40).offset(y: 12) } }
+        .frame(height: Theme.barHeight)
+        // On a wide screen, a bar's width, as a page's bar is: in the middle of the
+        // screen, whichever side the clock is, and on one half of a bent Duo.
+        .frame(maxWidth: verticalSizeClass == .compact || browser.uprightFoldOpen ? 480 : nil)
+        .keepsOffFold()
+        .ignoresSafeArea(.container, edges: .horizontal)
+        .modifier(ScreenBarSurface(sideways: verticalSizeClass == .compact))
     }
 
     /// A round button as the page bar's ⌃ is, or the same space kept empty,
@@ -109,47 +96,38 @@ struct ContextBar: View {
             Button(action: slot.action) {
                 Glyph(slot.glyph, size: 16, weight: 2)
                     .frame(width: 38, height: 38)
-                    .background(docked ? AnyShapeStyle(.clear) : AnyShapeStyle(Theme.raised), in: .circle)
                     .frame(width: 64, height: Theme.barHeight)
                     .contentShape(.rect)
                     // Its ends on the same line as a page's bar.
-                    .padding(.horizontal, docked ? 6 : 0)
+                    .padding(.horizontal, 6)
             }
             .buttonStyle(GlyphButtonStyle())
             .accessibilityLabel(slot.label)
         } else {
-            Color.clear.frame(width: docked ? 76 : 64, height: Theme.barHeight)
+            Color.clear.frame(width: 76, height: Theme.barHeight)
         }
     }
 }
 
-/// The floating bar's surface, or the band: the same place on screen as a page's
-/// bar, down into the home indicator's strip, on the band's graphite.
+/// The band: the same place on screen as a page's bar, down into the home
+/// indicator's strip, on the band's graphite.
 private struct ScreenBarSurface: ViewModifier {
-    let docked: Bool
     var sideways = false
 
     func body(content: Content) -> some View {
-        if docked {
-            content
-                .foregroundStyle(Theme.ink)
-                .environment(\.colorScheme, .dark)
-                .padding(.top, 5)
-                .background(alignment: .top) {
-                    LinearGradient(colors: [Color(uiColor: UIColor(hex: 0x131211)), Color(uiColor: UIColor(hex: 0x201E1C))],
-                                   startPoint: .top, endPoint: .bottom)
-                        .clipShape(BandFloor())
-                        .padding(.top, -BandFloor.lip)
-                        .ignoresSafeArea(edges: [.bottom, .horizontal])
-                        .allowsHitTesting(false)
-                }
-                // Sideways the strip is shallower: as far into it would sit on the home indicator.
-                .padding(.bottom, sideways ? -12 : -20)
-        } else {
-            content
-                .barSurface(cornerRadius: Theme.barRadius)
-                .padding(.horizontal, Theme.gutter)
-                .padding(.bottom, 4)
-        }
+        content
+            .foregroundStyle(Theme.ink)
+            .environment(\.colorScheme, .dark)
+            .padding(.top, 5)
+            .background(alignment: .top) {
+                LinearGradient(colors: [Color(uiColor: UIColor(hex: 0x131211)), Color(uiColor: UIColor(hex: 0x201E1C))],
+                               startPoint: .top, endPoint: .bottom)
+                    .clipShape(BandFloor())
+                    .padding(.top, -BandFloor.lip)
+                    .ignoresSafeArea(edges: [.bottom, .horizontal])
+                    .allowsHitTesting(false)
+            }
+            // Sideways the strip is shallower: as far into it would sit on the home indicator.
+            .padding(.bottom, sideways ? -12 : -20)
     }
 }

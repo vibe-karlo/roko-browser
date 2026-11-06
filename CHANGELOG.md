@@ -16,6 +16,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - Sideways, To-do's list ended in a fade with hard edges, and its last row showed under the bar.
+- The "Today" strip above the bar sat a little high: it's now midway between the page and the bar.
 - On iPhone Duo, the switcher's bottom row sat off-centre and touched the home indicator.
 - Stories from feeds that give two dates, The Guardian's among them, had no date.
 - An answer with a big number at the top could crash roko as it was shown.
@@ -47,6 +48,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 - Turned sideways, the new bar is under the page there too, in place of the column beside it. The page is a rounded card with the band's colour around it, and the bar folds away as you scroll. To-do, Today, Saved and roko's other screens have the same band.
+- On iPhone Duo slightly open, the new bar replaces the floating one: the band runs across and its controls stay on one half. To-do, Today, Saved and the other screens have it on any open Duo too, and the switcher's row keeps off the bend.
 - The tab switcher has less on it. Its bottom row is the page's bar: private, + and a menu, in the same places. Today, To-do and Settings moved into the menu, with Close All Tabs. The card in front has its name and a close button, the icons floating over its neighbours are gone, and "3 of 12" says where you are.
 - The bar now lies in a band under the page, on a dim shade of the site's colour, and the page is a rounded card above it. To-do, Shopping, News and Today dock the same way, Split View parts on the same surface, and the loading line grows from the middle of the card's edge.
 - The live row waits as a strip while the bar is up and opens when it folds away; the bar's field says Search, and the tab card always shows the page on screen.

@@ -15,7 +15,6 @@ struct BrowserView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.fold) private var fold
     @Environment(\.propped) private var propped
-    @Environment(\.foldBent) private var foldBent
     /// Once it's been dragged, the lower half's hint has done its job.
     @State private var trackpadUsed = false
     /// The strip beside the page, turned sideways, where the bar stands upright.
@@ -564,12 +563,13 @@ struct BrowserView: View {
         !browser.liveItems.isEmpty && browser.selectedTab != nil
     }
 
-    /// The bar lives in the band under a page: on a phone either way up and
-    /// on a Duo lying open. Bent, split or with a screen beside the page,
-    /// a Duo keeps the bar on one half, floating.
+    /// The bar lives in the band under a page: on a phone either way up and on
+    /// a Duo open, flat or bent, where the band runs across and its controls keep
+    /// off the bend. Split or with a screen beside the page, a Duo keeps the bar on
+    /// one half, floating.
     private var barInBand: Bool {
         guard browser.selectedTab != nil, !standsOnFold else { return false }
-        return uprightFold == nil || (!foldBent && besideFold == nil && splitHalves == nil)
+        return uprightFold == nil || (besideFold == nil && splitHalves == nil)
     }
 
     /// The band under the page: the bar while it isn't folded away, and what's live.
@@ -595,11 +595,13 @@ struct BrowserView: View {
                 LiveBand()
                     .environment(\.liveBandOverBar, barInBand)
                     .frame(maxWidth: barInBand ? bandBarWidth : nil)
+                    .keepsOffFold()
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             if barInBand && !browser.isBarCollapsed {
                 BottomBar(docked: true)
                     .frame(maxWidth: bandBarWidth)
+                    .keepsOffFold()
                     .opacity(browser.splitList != nil || browser.launcherShown || browser.panel == .tabs || browser.pageBecomingSummary || browser.hidingItems != nil ? 0 : 1)
                     .allowsHitTesting(browser.hidingItems == nil && browser.splitList == nil)
                     .animation(.easeOut(duration: 0.2), value: browser.pageBecomingSummary)

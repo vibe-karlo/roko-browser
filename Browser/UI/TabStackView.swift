@@ -327,9 +327,10 @@ struct TabStackView: View {
             .accessibilityLabel("More")
         }
         .padding(.top, 16)
-        // Sideways and on the wide grid, together in the middle of the screen, as the bar is.
+        // Sideways and on the wide grid, together in the middle of the screen, as the bar
+        // is. On a bent Duo, on one half: in the middle the + sat right on the bend.
         .frame(maxWidth: wide ? 480 : nil)
-        .frame(maxWidth: .infinity)
+        .keepsOffFold()
         .contentShape(.rect)
         .highPriorityGesture(pullUp)
         // Centred on the screen and its home indicator, whichever side the clock is.

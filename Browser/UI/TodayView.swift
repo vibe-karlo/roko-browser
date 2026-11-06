@@ -64,9 +64,7 @@ struct TodayView: View {
             ContextBar(leading: .init(glyph: .close, label: "Close") { browser.panel = .none },
                        glyph: .search, title: "Search",
                        launch: { browser.showCommandBar(over: .today) },
-                       trailing: .init(glyph: .reload, label: "Refresh") { Task { await today.refresh() } },
-                       // A dark edge would cut across the morning light.
-                       fades: false)
+                       trailing: .init(glyph: .reload, label: "Refresh") { Task { await today.refresh() } })
         }
         .background {
             ZStack {

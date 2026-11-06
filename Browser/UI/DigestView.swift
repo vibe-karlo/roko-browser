@@ -144,8 +144,7 @@ struct DigestView: View {
     private var footer: some View {
         ContextBar(leading: .init(glyph: .close, label: "Close", action: close),
                    glyph: .browse, title: "Ask",
-                   launch: { browser.showCommandBar(context: .aboutSaved, over: model.isComparison ? .feed : .readLater) },
-                   fades: false)
+                   launch: { browser.showCommandBar(context: .aboutSaved, over: model.isComparison ? .feed : .readLater) })
             .padding(.top, 10)
             .overlay(alignment: .top) { ReadingLine(progress: readProgress, tint: PageKind.of(model.text).tint) }
             .background(Theme.canvas.opacity(edgesClear ? 0 : 1))

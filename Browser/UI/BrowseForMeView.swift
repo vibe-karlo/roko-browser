@@ -134,7 +134,6 @@ struct BrowseForMeView: View {
         ContextBar(leading: .init(glyph: .close, label: "Close", action: close),
                    glyph: .browse, title: "Ask",
                    launch: { browser.showCommandBar(context: .followUp) },
-                   fades: false,
                    accessory: AnyView(AnswerOrSearch(showsSearch: $session.showsSearch)),
                    accessoryWidth: AnswerOrSearch.width)
             .padding(.top, 10)

@@ -73,7 +73,7 @@ struct FeedView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             ContextBar(leading: .init(glyph: .close, label: "Close", action: close),
                        glyph: .news, title: "Sources",
-                       launch: { showsSources = true }, fades: false, morphs: false)
+                       launch: { showsSources = true }, morphs: false)
                 .padding(.top, 10)
                 // Stories end at the bar: none carries on below it.
                 .background(Theme.canvas)
