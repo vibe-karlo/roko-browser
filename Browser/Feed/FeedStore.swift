@@ -509,8 +509,11 @@ final class FeedStore {
 
     func comparison(of pages: [ReadLaterPage]) -> ReadLater.Digest? {
         let ids = Set(pages.map(\.id))
-        // Not one in the old shape, led by what they agree on: it's written again in the new.
-        return comparisons.last { Set($0.pageIDs) == ids && !$0.text.contains("All agree") && !$0.text.contains("Svi se slažu") }
+        // Not one in an old shape, led by what they agree on or translated by Apple's
+        // models, which turned "arrested" into "killed": it's done again in the new.
+        return comparisons.last { digest in
+            Set(digest.pageIDs) == ids && !digest.text.contains("All agree") && !digest.text.contains("Svi se slažu") && digest.note?.contains("In English") != true
+        }
     }
 
     func keep(_ comparison: ReadLater.Digest) {

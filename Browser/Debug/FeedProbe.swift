@@ -7,6 +7,7 @@ import Foundation
 /// `-backgroundProbe`: what iOS's wake-up runs, timed, as simulators never wake an app.
 /// `-mailProbe id,id`: a kept mail's original read again, with long numbers hidden.
 /// `-compareProbe count`: the first events in the feed, compared as the screen would.
+/// `-summaryProbe address,address`: pages summarized as Reader's Summary would.
 enum FeedProbe {
     static func runIfAsked() {
         let arguments = ProcessInfo.processInfo.arguments
@@ -18,8 +19,20 @@ enum FeedProbe {
         let background = arguments.contains("-backgroundProbe")
         let mails = list("-mailProbe")
         let comparisons = list("-compareProbe").first.flatMap { Int($0) } ?? 0
-        guard !sites.isEmpty || !topics.isEmpty || !pages.isEmpty || !mails.isEmpty || background || comparisons > 0 else { return }
+        let summaries = list("-summaryProbe")
+        guard !sites.isEmpty || !topics.isEmpty || !pages.isEmpty || !mails.isEmpty || background || comparisons > 0 || !summaries.isEmpty else { return }
         Task {
+            for address in summaries {
+                guard let url = URL(string: address), let page = await RenderedPage.readable(of: url) else {
+                    print("SUMMARY \(address): not read")
+                    continue
+                }
+                let model = SummaryModel(title: page.title, host: url.host() ?? "", snapshot: nil)
+                let started = Date.now
+                model.start(page: page, url: nil)
+                await model.finished()
+                print("SUMMARY \(page.title.prefix(70)) | \(page.text.count) characters, \(model.engine), \(String(format: "%.1f", Date.now.timeIntervalSince(started))) s, \(model.note ?? "no note")\n\(model.phase.isFailure ? "FAILED \(model.phase)" : model.text)\nEND")
+            }
             if comparisons > 0 {
                 await FeedStore.shared.opened()
                 let groups = FeedStore.shared.blocks.compactMap { block -> [NewsStory]? in

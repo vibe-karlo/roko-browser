@@ -1,4 +1,5 @@
 import FoundationModels
+import NaturalLanguage
 import UIKit
 
 /// "Summarize all": one summary across every unread saved page, grouped by
@@ -107,6 +108,7 @@ final class DigestModel: Identifiable {
     // MARK: Writing
 
     private enum Engine { case appleCloud, claude, onDevice }
+    static let pickedOnDevice = "Picked on-device", pickedInCloud = "Picked in the cloud"
 
     private func run() async {
         if let comparing { await gather(comparing) }
@@ -134,7 +136,8 @@ final class DigestModel: Identifiable {
                 guard try await write(with: engine, language: language, appleWritesIt: appleWritesIt) else { continue }
                 text = Self.keepingMarks(text, upTo: pages.count)
                 if isComparison {
-                    text = Self.provable(text, from: pages)
+                    // A name no article has is made up. Not across languages: there it may be a translation.
+                    text = Self.provable(text, from: pages, checkingNames: AnswerLanguage.chosen == nil && !(language?.code.hasPrefix("de") ?? true))
                     // Nothing provable isn't "no differences": it's no comparison.
                     guard text.contains("[[") else {
                         throw ClaudeError(message: ClaudeClient.configured == nil
@@ -214,7 +217,17 @@ final class DigestModel: Identifiable {
     /// sources, and every number in it has to be in them. A made-up difference
     /// would be worse than none. Then a heading left with nothing goes: no
     /// differences, no section saying so.
-    private static func provable(_ text: String, from pages: [ReadLaterPage]) -> String {
+    private static func provable(_ text: String, from pages: [ReadLaterPage], checkingNames: Bool) -> String {
+        let known = checkingNames ? Set(pages.flatMap { TodayNews.words(of: $0.title + " " + $0.site + " " + $0.text) }.map { String($0.prefix(4)) }) : []
+        func namesSomethingElse(_ line: Substring) -> Bool {
+            guard checkingNames else { return false }
+            // Past a point's key term and first word, a capital is a name. Months and days get written out.
+            let body = line.replacing(/^- (\*\*[^*]+\*\*)?/, with: "")
+            return body.split(whereSeparator: { !$0.isLetter }).dropFirst().contains { word in
+                guard word.first?.isUppercase == true, word.count >= 4, !calendarWords.contains(word.lowercased()) else { return false }
+                return !known.contains(String(TodayNews.words(of: String(word)).first?.prefix(4) ?? ""))
+            }
+        }
         func numbers(in text: String) -> Set<String> {
             Set(text.matches(of: /\d[\d.,]*\d/).map { String($0.0).filter(\.isNumber) })
         }
@@ -228,7 +241,8 @@ final class DigestModel: Identifiable {
             let cited = mark.1.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
                 .compactMap { pages.indices.contains($0 - 1) ? pages[$0 - 1].text : nil }
             let found = numbers(in: cited.joined(separator: " "))
-            if numbers(in: String(line[..<mark.range.lowerBound])).isSubset(of: found) { kept.append(line) }
+            let point = line[..<mark.range.lowerBound]
+            if numbers(in: String(point)).isSubset(of: found), !namesSomethingElse(point) { kept.append(line) }
         }
         var result: [String] = []
         for (index, line) in kept.enumerated() {
@@ -237,6 +251,10 @@ final class DigestModel: Identifiable {
         }
         return result.joined(separator: "\n")
     }
+
+    private static let calendarWords: Set<String> = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+                                                     "january", "february", "march", "april", "june", "july", "august",
+                                                     "september", "october", "november", "december"]
 
     /// "Article 2" means nothing on screen: the site's name does. "Articles 1 and 2"
     /// keep their "and". Not when the articles say it themselves: "Article 2 of the
@@ -269,12 +287,22 @@ final class DigestModel: Identifiable {
         switch engine {
         case .appleCloud:
             guard let cloud = AppleModels.cloudIfAvailable else { return false }
+            if isComparison, !appleWritesIt {
+                self.engine = Self.pickedInCloud
+                try await pickSentences(with: cloud, budget: await AppleModels.characterBudget(of: cloud, reservingTokens: 1_000), language: language)
+                return true
+            }
             self.engine = "Apple Intelligence"
             let budget = await AppleModels.characterBudget(of: cloud, reservingTokens: 3_000)
             try await writeWithApple(cloud, budget: budget, language: appleLanguage, languageNote: languageNote)
 
         case .onDevice:
             guard AppleModels.onDeviceAvailable else { return false }
+            if isComparison, !appleWritesIt {
+                self.engine = Self.pickedOnDevice
+                try await pickSentences(with: AppleModels.summarizing, budget: AppleModels.onDeviceCharacterBudget(reservingTokens: 800), language: language)
+                return true
+            }
             self.engine = "On-device"
             try await writeWithApple(AppleModels.summarizing, budget: AppleModels.onDeviceCharacterBudget(reservingTokens: 1_800),
                                      language: appleLanguage, languageNote: languageNote)
@@ -345,6 +373,30 @@ final class DigestModel: Identifiable {
         let stream = AppleModels.streamAnswer(model, shape: DigestAnswer.self, instructions: Self.appleInstructions(language),
                                               prompt: prompt, titled: false)
         for try await snapshot in stream { text = snapshot }
+    }
+
+    /// A comparison in a language Apple's models write badly: tested on a day's news,
+    /// "uhićeno" came out as "killed" and Dijana as "Diane", in English and with broken
+    /// endings in Croatian. They read it well enough to choose from, though, and a
+    /// site's own sentence can't be wrong about what the site says. Should the model
+    /// not answer, what the articles have most in common is chosen without it.
+    private func pickSentences(with model: some LanguageModel, budget: Int, language: WritingLanguage?) async throws {
+        note = Self.note(sameText)
+        phase = .writing
+        let offered = OwnWords.offered(pages.enumerated().filter { $0.element.text.count > 200 }.map { ($0.offset + 1, $0.element.text) }, budget: budget)
+        var answer = ""
+        do {
+            let session = LanguageModelSession(model: model, instructions: OwnWords.instructions)
+            answer = try await session.respond(to: OwnWords.numbered(offered), options: GenerationOptions(sampling: .greedy)).content
+            AITrace.log("picked: \(answer)")
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            AITrace.log("picking failed: \(error)")
+        }
+        try Task.checkCancellation()
+        let picked = OwnWords.picked(answer, from: offered, about: pages.map(\.title).joined(separator: " "))
+        text = OwnWords.markdown(picked, heading: ComparisonHeadings.for(language).story)
     }
 
     private func stream(_ client: ClaudeClient, prompt: String, model: ClaudeClient.Model, language: WritingLanguage?) async throws {
@@ -501,7 +553,7 @@ nonisolated struct ComparisonHeadings {
     static let croatian = ComparisonHeadings(story: "Što pišu", differ: "Gdje se razlikuju")
 
     static func `for`(_ language: WritingLanguage?) -> ComparisonHeadings {
-        language?.code.hasPrefix("hr") == true ? croatian : english
+        ["hr", "bs", "sr-Latn"].contains(language?.code ?? "") ? croatian : english
     }
 
     /// What Apple's models write ("POINT [1,2]: …"), in the app's Markdown. A
@@ -522,11 +574,14 @@ nonisolated struct ComparisonHeadings {
                 (kind, before, after, written) = (String(match.2), match.1, match.3, match.4)
             } else if let match = line.firstMatch(of: /^\W*((?:\[[\d,\s]*\]\W*)+)(.+)$/) {
                 (kind, before, after, written) = ("POINT", match.1, "", match.2)
+            } else if let match = line.firstMatch(of: /^\s*(?:\d+[.)]|[-•])\s+(.+)$/) {
+                // Or a plain list, with numbers of its own.
+                (kind, before, after, written) = ("POINT", "", "", match.1)
             } else {
                 continue
             }
             // Its sources again, in words: "(index.hr) Osam policajaca … (1,2)".
-            let body = written.replacing(/^\([^)]*\)\s*/, with: "").replacing(/\s*\([\d,\s]+\)\.?\s*$/, with: "").trimmingCharacters(in: .whitespaces)
+            let body = written.replacing(/^\([^)]*\)\s*/, with: "").replacing(/\s*\((?:[\d,\s]+|[^()]*\.[a-z]{2,}[^()]*)\)(?=\.?\s*$)/, with: "").trimmingCharacters(in: .whitespaces)
             // Only its numbers so far, as it's being written.
             guard body.contains(where: \.isLetter) else { continue }
             let opening = body.prefix(1).uppercased() + body.dropFirst()
@@ -544,6 +599,11 @@ nonisolated struct ComparisonHeadings {
             let numbers = (before + "," + after).matches(of: /\d+/).map { String($0.0) }
             sections[kind, default: []].append("- \(opening)[[\(numbers.isEmpty ? allOfThem : numbers.joined(separator: ","))]]")
         }
+        // No summing up: the first point is the nearest to one.
+        if gist == nil, let first = sections["POINT"]?.first, sections["POINT", default: []].count > 1 {
+            gist = first.replacing(/^-\s/, with: "").replacing(/\[\[[\d,\s]*\]\]$/, with: "")
+            sections["POINT"]?.removeFirst()
+        }
         // Nothing whole yet: empty, so the screen goes on saying it's working.
         guard gist != nil || !sections.isEmpty else { return "" }
         var lines = ["@ article"]
@@ -552,6 +612,128 @@ nonisolated struct ComparisonHeadings {
             if let points = sections[kind] { lines += ["## [\(icon)] \(heading)"] + points }
         }
         return lines.joined(separator: "\n")
+    }
+}
+
+// MARK: A comparison in the sites' own words
+
+/// Sentences taken whole from the articles, for `pickSentences`.
+nonisolated enum OwnWords {
+    struct Sentence {
+        let page: Int
+        let text: String
+        let words: Set<String>
+    }
+
+    private static let wanted = 5
+    /// Fewer than this to choose from, and there's no choosing.
+    static let fewest = 4
+    private static let offeredAtMost = 40
+
+    static let instructions = """
+        You pick sentences from news articles about one event. Pick the five that together best tell \
+        what happened: who, what, where, when and what follows. No two saying the same thing. Answer \
+        only with their numbers, most important first, separated by commas.
+        """
+
+    static let instructionsForOne = """
+        You pick sentences from a web page. Pick the five that together best tell what it says. No two \
+        saying the same thing. Answer only with their numbers, most important first, separated by commas.
+        """
+
+    static func numbered(_ offered: [Sentence]) -> String {
+        offered.enumerated().map { "\($0.offset + 1). \($0.element.text)" }.joined(separator: "\n")
+    }
+
+    /// Each article's first sentences, in equal shares, as many as the model can read.
+    static func offered(_ articles: [(page: Int, text: String)], budget: Int) -> [Sentence] {
+        var result: [Sentence] = []
+        var length = 0
+        for article in articles {
+            for sentence in sentences(of: article.text, page: article.page).prefix(offeredAtMost / max(articles.count, 1)) {
+                length += sentence.text.count + 5
+                if length > budget { return result }
+                result.append(sentence)
+            }
+        }
+        return result
+    }
+
+    /// Whole sentences that stand alone: no half a quote, no subheading, and not shouting.
+    private static func sentences(of text: String, page: Int) -> [Sentence] {
+        let tokenizer = NLTokenizer(unit: .sentence)
+        tokenizer.string = text
+        return tokenizer.tokens(for: text.startIndex..<text.endIndex).compactMap { range in
+            let tidied = withoutShouting(text[range].trimmingCharacters(in: .whitespacesAndNewlines).replacing(/^[-–—•]\s*/, with: ""))
+            guard (40...320).contains(tidied.count), tidied.contains(" "), let last = tidied.last, ".!?\"”“'’…".contains(last),
+                  tidied.filter({ "\"“”„".contains($0) }).count % 2 == 0, tidied.filter({ "'‘’".contains($0) }).count % 2 == 0,
+                  tidied.first?.isLowercase == false else { return nil }
+            return Sentence(page: page, text: tidied, words: stems(tidied))
+        }
+    }
+
+    /// index.hr opens in capitals: "U SRBIJI je", "CRISTIANO RONALDO (41) u". "KBC" alone stays.
+    private static func withoutShouting(_ sentence: String) -> String {
+        let words = sentence.split(separator: " ", omittingEmptySubsequences: false)
+        func shouted(_ word: Substring) -> Bool { word.contains(where: \.isLetter) && word == word.uppercased() }
+        let run = words.prefix(while: shouted).count
+        guard run >= 2 || (run == 1 && words[0].count >= 5) else { return sentence }
+        return words.enumerated().map { index, word in
+            index < run ? word.prefix(1) + word.dropFirst().lowercased() : word
+        }.joined(separator: " ")
+    }
+
+    private static func stems(_ text: String) -> Set<String> {
+        Set(TodayNews.words(of: text).filter { $0.count >= 4 }.map { String($0.prefix(5)) })
+    }
+
+    /// An article's opening first, the one nearest the headlines: a sentence from further
+    /// down leans on what came before ("Another incident at the prison…"). Then what the
+    /// model chose, new things only, topped up from what the articles share, in the articles' order.
+    static func picked(_ answer: String, from offered: [Sentence], about headlines: String) -> [Sentence] {
+        var chosen: [Sentence] = []
+        func take(_ sentence: Sentence) {
+            guard chosen.count < wanted, !chosen.contains(where: { $0.words.intersection(sentence.words).count * 5 >= sentence.words.count * 3 }) else { return }
+            chosen.append(sentence)
+        }
+        let subject = stems(headlines)
+        let openings = Dictionary(grouping: offered, by: \.page).values.compactMap(\.first)
+        if let opening = openings.max(by: { $0.words.intersection(subject).count < $1.words.intersection(subject).count }) { take(opening) }
+        // Asked for numbers, it sometimes writes the sentences out under numbers of its own.
+        let written = answer.split(separator: "\n").filter { $0.filter(\.isLetter).count > 20 }
+        if written.isEmpty {
+            for number in answer.matches(of: /\d+/).compactMap({ Int($0.0) }) where offered.indices.contains(number - 1) { take(offered[number - 1]) }
+        } else {
+            for line in written {
+                let words = stems(String(line))
+                if let best = offered.max(by: { $0.words.intersection(words).count < $1.words.intersection(words).count }),
+                   best.words.intersection(words).count * 10 >= best.words.count * 7 { take(best) }
+            }
+        }
+        if chosen.count < 3 { central(offered).forEach(take) }
+        func place(_ sentence: Sentence) -> Int { offered.firstIndex { $0.text == sentence.text } ?? 0 }
+        return chosen.prefix(1) + chosen.dropFirst().sorted { place($0) < place($1) }
+    }
+
+    /// Sentences saying most of what the other articles say too, the opening ones a little ahead.
+    private static func central(_ sentences: [Sentence]) -> [Sentence] {
+        let byPage = Dictionary(grouping: sentences, by: \.page).mapValues { $0.reduce(into: Set<String>()) { $0.formUnion($1.words) } }
+        return sentences.enumerated().map { position, sentence in
+            let others = byPage.filter { $0.key != sentence.page }.values
+            let shared = sentence.words.reduce(0) { sum, word in sum + others.filter { $0.contains(word) }.count }
+            return (score: Double(shared) / Double(max(sentence.words.count, 4)).squareRoot() * (1 - Double(position) / Double(sentences.count * 3)), sentence: sentence)
+        }.enumerated().sorted { ($0.element.score, $1.offset) > ($1.element.score, $0.offset) }.map(\.element.sentence)
+    }
+
+    /// One page's, as a summary is laid out: nothing to say which site, there's only the one.
+    static func summary(_ sentences: [Sentence]) -> String {
+        guard let first = sentences.first else { return "" }
+        return (["@ article", "> \(first.text)"] + sentences.dropFirst().map { "> - \($0.text)" }).joined(separator: "\n")
+    }
+
+    static func markdown(_ sentences: [Sentence], heading: String) -> String {
+        guard let first = sentences.first else { return "" }
+        return (["@ article", "> \(first.text)", "## [news] \(heading)"] + sentences.dropFirst().map { "- \($0.text)[[\($0.page)]]" }).joined(separator: "\n")
     }
 }
 

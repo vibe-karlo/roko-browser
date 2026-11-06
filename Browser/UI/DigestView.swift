@@ -156,6 +156,8 @@ struct DigestView: View {
         switch model.engine {
         case "Claude": "Written by Claude"
         case "Apple Intelligence": "Written by Apple Intelligence, privately in Apple's cloud"
+        case DigestModel.pickedOnDevice: "The sites' own sentences, picked on this iPhone"
+        case DigestModel.pickedInCloud: "The sites' own sentences, picked privately in Apple's cloud"
         default: "Written on this iPhone"
         }
     }

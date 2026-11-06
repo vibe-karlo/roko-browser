@@ -267,8 +267,9 @@ final class SummaryModel: Identifiable {
         switch engine {
         case .appleCloud:
             guard let cloud = AppleModels.cloudIfAvailable else { return false }
-            self.engine = "Apple Intelligence"
             let budget = await AppleModels.characterBudget(of: cloud)
+            if !appleWritesIt, try await pickSentences(with: cloud, budget: budget, from: page, engine: DigestModel.pickedInCloud, longNote: longNote) { break }
+            self.engine = "Apple Intelligence"
             note = Self.note(page.text.count > budget ? longNote : nil, languageNote)
             if isNews {
                 try await writePlainly(cloud, budget: budget, page, in: appleLanguage)
@@ -282,8 +283,9 @@ final class SummaryModel: Identifiable {
 
         case .onDevice:
             guard OnDeviceSummarizer.isAvailable else { return false }
-            self.engine = "On-device"
             let plainBudget = AppleModels.onDeviceCharacterBudget(reservingTokens: 1_000)
+            if !appleWritesIt, try await pickSentences(with: AppleModels.summarizing, budget: plainBudget, from: page, engine: DigestModel.pickedOnDevice, longNote: longNote) { break }
+            self.engine = "On-device"
             if isNews {
                 note = Self.note(page.text.count > plainBudget ? longNote : nil, languageNote)
                 try await writePlainly(AppleModels.summarizing, budget: plainBudget, page, in: appleLanguage)
@@ -328,6 +330,28 @@ final class SummaryModel: Identifiable {
         }
         // Cancelled, a stream just ends: closed, not done.
         try Task.checkCancellation()
+        return true
+    }
+
+    /// A language Apple's models write badly: not a translation, which turned "arrested"
+    /// into "killed", but the page's own sentences, as for a comparison. False for a
+    /// page with too few sentences to choose from, a shop's say: there, English it is.
+    private func pickSentences(with model: some LanguageModel, budget: Int, from page: ReadablePage, engine: String, longNote: String) async throws -> Bool {
+        let offered = OwnWords.offered([(1, page.text)], budget: budget)
+        guard offered.count >= OwnWords.fewest else { return false }
+        self.engine = engine
+        note = Self.note(page.text.count > budget ? longNote : nil)
+        var answer = ""
+        do {
+            let session = LanguageModelSession(model: model, instructions: OwnWords.instructionsForOne)
+            answer = try await session.respond(to: OwnWords.numbered(offered), options: GenerationOptions(sampling: .greedy)).content
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            AITrace.log("picking failed: \(error)")
+        }
+        try Task.checkCancellation()
+        text = OwnWords.summary(OwnWords.picked(answer, from: offered, about: page.title))
         return true
     }
 
@@ -484,7 +508,9 @@ enum SummaryCache {
     }
 
     static func entry(for url: URL) -> Entry? {
-        guard let entry = entries[key(for: url)], Date.now.timeIntervalSince(entry.at) < lifetime else { return nil }
+        guard let entry = entries[key(for: url)], Date.now.timeIntervalSince(entry.at) < lifetime,
+              // A translation from before sentences were picked: done again.
+              entry.note?.contains("In English") != true else { return nil }
         return entry
     }
 

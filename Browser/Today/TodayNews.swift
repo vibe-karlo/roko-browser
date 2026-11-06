@@ -636,6 +636,13 @@ nonisolated enum PageHeadlines {
         ("&quot;", "\""), ("&apos;", "'"), ("&nbsp;", " "), ("&lt;", "<"), ("&gt;", ">"),
         ("&rsquo;", "\u{2019}"), ("&lsquo;", "\u{2018}"), ("&rdquo;", "\u{201D}"), ("&ldquo;", "\u{201C}"),
         ("&ndash;", "\u{2013}"), ("&mdash;", "\u{2014}"), ("&hellip;", "\u{2026}"),
+        ("&bdquo;", "\u{201E}"), ("&sbquo;", "\u{201A}"), ("&laquo;", "\u{00AB}"), ("&raquo;", "\u{00BB}"), ("&euro;", "\u{20AC}"), ("&deg;", "\u{00B0}"),
+        // tportal writes "pi&scaron;e".
+        ("&scaron;", "š"), ("&Scaron;", "Š"), ("&zcaron;", "ž"), ("&Zcaron;", "Ž"), ("&ccaron;", "č"), ("&Ccaron;", "Č"),
+        ("&cacute;", "ć"), ("&Cacute;", "Ć"), ("&dstrok;", "đ"), ("&Dstrok;", "Đ"),
+        ("&auml;", "ä"), ("&Auml;", "Ä"), ("&ouml;", "ö"), ("&Ouml;", "Ö"), ("&uuml;", "ü"), ("&Uuml;", "Ü"), ("&szlig;", "ß"),
+        ("&aacute;", "á"), ("&eacute;", "é"), ("&iacute;", "í"), ("&oacute;", "ó"), ("&uacute;", "ú"),
+        ("&agrave;", "à"), ("&egrave;", "è"), ("&ccedil;", "ç"), ("&ntilde;", "ñ"),
     ]
 }
 

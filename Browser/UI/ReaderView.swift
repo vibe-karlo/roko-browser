@@ -284,6 +284,8 @@ struct ReaderView: View {
         switch engine {
         case "Claude": "Written by Claude"
         case "Apple Intelligence": "Written by Apple Intelligence, privately in Apple's cloud"
+        case DigestModel.pickedOnDevice: "The page's own sentences, picked on this iPhone"
+        case DigestModel.pickedInCloud: "The page's own sentences, picked privately in Apple's cloud"
         default: "Written on this iPhone"
         }
     }

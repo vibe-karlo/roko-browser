@@ -161,18 +161,6 @@ nonisolated enum WebResearcher {
     }
 
     private static func decodeEntities(_ text: String) -> String {
-        guard text.contains("&") else { return text }
-        var result = text
-        for (entity, character) in ["&amp;": "&", "&quot;": "\"", "&#39;": "'", "&#x27;": "'", "&apos;": "'",
-                                    "&lt;": "<", "&gt;": ">", "&nbsp;": " ", "&#x2F;": "/"] {
-            result = result.replacingOccurrences(of: entity, with: character)
-        }
-        // Numeric entities: &#8217; and &#x2019;
-        for match in matches(#"&#(x?)([0-9a-fA-F]+);"#, in: result).reversed() {
-            let value = match[0].isEmpty ? UInt32(match[1]) : UInt32(match[1], radix: 16)
-            guard let value, let scalar = Unicode.Scalar(value) else { continue }
-            result = result.replacingOccurrences(of: "&#\(match[0])\(match[1]);", with: String(Character(scalar)))
-        }
-        return result
+        PageHeadlines.decode(text)
     }
 }
