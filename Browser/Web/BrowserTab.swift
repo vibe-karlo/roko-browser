@@ -185,7 +185,16 @@ final class BrowserTab: NSObject, Identifiable {
     private struct WeakTab { weak var tab: BrowserTab? }
     /// Which tabs have a small picture in memory, oldest first.
     private static var warm: [WeakTab] = []
-    private static let warmLimit = 12
+    static let usualPictures = 12
+    private static var warmLimit = usualPictures
+
+    /// How many small pictures to hold, the oldest going first.
+    static func keepPictures(_ count: Int) {
+        warmLimit = count
+        while warm.count > warmLimit {
+            warm.removeFirst().tab?.thumbnail = nil
+        }
+    }
 
     /// Reads the small picture, off the main thread, for a card about to show it.
     func loadThumbnail() async {
