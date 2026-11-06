@@ -3,7 +3,7 @@
 A fast, private iOS browser in the spirit of Arc Search, with Raycast's command-bar feel.
 SwiftUI around WebKit, no third-party dependencies.
 
-**[Join the TestFlight beta](https://testflight.apple.com/join/M2ZrEUV1)** (iPhone, iOS 27 or later) or see the [website](https://rokobrowser.vercel.app).
+**[Join the TestFlight beta](https://testflight.apple.com/join/M2ZrEUV1)** (iPhone, iOS 27 or later) or see the [website](https://rokobrowser.com).
 
 <p>
   <img src="docs/screens/one-bar.jpg" width="250" alt="The bar answering 250 usd in eur with €223.77">
@@ -566,7 +566,7 @@ times an hour; each ask reads a few rows.
 
 ## Website
 
-`Site/` is the static site at rokobrowser.vercel.app: the page, `/support` and `/privacy` (written out from `docs/privacy.md`). The phone at the top is live DOM at an iPhone's real 402 by 874 shape, sized in its own width (`cqw`), with a working keyboard so a phone's own doesn't cover it: sums, units, times and days until are worked out in `site.js`, rates come from frankfurter.dev and weather from Open-Meteo. The summary, the before and after and Split View are dragged by the same helper in `site.js`, and the page in the hide section is made up, so nothing on it belongs to another site. The headline font comes from Fontshare's servers, because its licence doesn't allow a copy in a public repository. The hold to speak demo plays written words and never touches the microphone. The widget and the shopping list in the bar section are live DOM too, with the app's own labels and sizes, and they really tick. Written for a phone first. Vercel deploys it from GitHub on a push that changes `Site/` (root `vercel.json`).
+`Site/` is the static site at rokobrowser.com: the page, `/support` and `/privacy` (written out from `docs/privacy.md`). The phone at the top is live DOM at an iPhone's real 402 by 874 shape, sized in its own width (`cqw`), with a working keyboard so a phone's own doesn't cover it: sums, units, times and days until are worked out in `site.js`, rates come from frankfurter.dev and weather from Open-Meteo. The summary, the before and after and Split View are dragged by the same helper in `site.js`, and the page in the hide section is made up, so nothing on it belongs to another site. The headline font comes from Fontshare's servers, because its licence doesn't allow a copy in a public repository. The hold to speak demo plays written words and never touches the microphone. The widget and the shopping list in the bar section are live DOM too, with the app's own labels and sizes, and they really tick. Written for a phone first. Vercel deploys it from GitHub on a push that changes `Site/` (root `vercel.json`).
 
 ## Licence
 

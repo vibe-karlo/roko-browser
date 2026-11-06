@@ -29,7 +29,7 @@
     "REPORT_EMAIL": "karlo@growthstudio.hr",
     // The domain newsletter addresses are on, with Email Routing's catch-all sent
     // to this Worker. Empty: newsletters are off on this server.
-    "MAIL_DOMAIN": "",
+    "MAIL_DOMAIN": "rokobrowser.com",
     // "true" lets search engines list shared pages. Link previews work either way.
     "INDEXABLE": "false"
   }
