@@ -176,16 +176,31 @@ function drag(box, name, axis, min, max, area, onUse, onSet) {
   const set = v => { v = Math.max(min, Math.min(max, v)); box.style.setProperty(name, v + "%"); range.value = v; onSet?.(v); };
   range.addEventListener("input", () => { onUse?.(); set(+range.value); });
   let on = false;
-  const at = e => { const r = box.getBoundingClientRect(); set(axis === "x" ? (e.clientX - r.left) / r.width * 100 : (e.clientY - r.top) / r.height * 100); };
+  const at = e => { const r = box.getBoundingClientRect(); set((typeof axis === "function" ? axis() : axis) === "x" ? (e.clientX - r.left) / r.width * 100 : (e.clientY - r.top) / r.height * 100); };
   area.addEventListener("pointerdown", e => { if (e.pointerType === "mouse") e.preventDefault(); on = true; onUse?.(); area.setPointerCapture(e.pointerId); at(e); });
   area.addEventListener("pointermove", e => { if (on) at(e); });
   for (const end of ["pointerup", "pointercancel"]) area.addEventListener(end, () => { on = false; });
   return set;
 }
 drag(puller, "--p", "y", 6, 100, puller.querySelector(".grip"), () => { pulled = true; });
-const shade = v => { labA.style.opacity = .5 + .5 * Math.min(1, v / 50); labB.style.opacity = .5 + .5 * Math.min(1, (100 - v) / 50); };
+const shade = v => { labA.style.opacity = .5 + .5 * Math.min(1, v / 50); labB.style.opacity = .5 + .5 * Math.min(1, (100 - v) / 50); compare.classList.toggle("end", v < .5 || v > 99.5); };
 const setCompare = drag(compare, "--p", "x", 0, 100, compare, () => { compared = true; }, shade);
-const splitter = document.getElementById("splitter"); drag(splitter, "--s", "y", 28, 76, splitter.querySelector(".grip"));
+const splitter = document.getElementById("splitter"), splitSection = document.getElementById("split");
+const splitShots = [[splitter.querySelector(".one img"), 0], [splitter.querySelector(".two img"), -.136]];
+let turned = 0, split = 50, splitW = 0, splitH = 0, splitTaken = false, turning = false;
+// The screen turns and each page stays upright: its picture swings around the middle of its pane,
+// just large enough at every angle that no corner of the pane comes uncovered.
+const layPages = () => {
+  if (!turning) return;
+  const angle = turned * Math.PI / 2, cos = Math.cos(angle), sin = Math.sin(angle);
+  [split / 100, 1 - split / 100 - .03].forEach((part, i) => {
+    const [img, lift] = splitShots[i], tall = part * splitH, wx = splitW / 2, hy = tall / 2;
+    const y = -lift * splitW + hy + (wx * splitW / tall - hy) * turned;
+    const size = Math.max((wx * cos + hy * sin) / wx, (wx * sin + hy * cos) / y);
+    img.style.transform = `translate(${wx}px,${hy}px) rotate(${90 * turned}deg) scale(${size}) translate(${-wx}px,${-y}px)`;
+  });
+};
+const setSplit = drag(splitter, "--s", () => turned > .5 ? "x" : "y", 28, 76, splitter.querySelector(".grip"), () => { splitTaken = true; }, v => { split = v; layPages(); });
 
 // The same tap-tap as the app: the first marks it, the second hides it.
 {
@@ -304,6 +319,39 @@ hold.addEventListener("keyup", spEnd);
 hold.addEventListener("blur", spEnd);
 
 if (!still) {
+  const cleanPin = document.getElementById("cleanPin"), splitPin = document.getElementById("splitPin"), splitDevice = splitter.closest(".device");
+  let splitFit = 1, pinned = false;
+  // A pinned phone needs the height to stand in. Too short, and both scenes stay in plain flow.
+  const pinTo = on => {
+    if (on === pinned) return;
+    pinned = turning = on;
+    cleanPin.classList.toggle("on", on); splitPin.classList.toggle("on", on); splitSection.classList.toggle("scrub", on);
+    splitter.querySelector(".two img").style.top = on ? "0" : "";
+    if (on) return;
+    turned = 0;
+    splitDevice.style.transform = "";
+    for (const [img] of splitShots) img.style.transform = "";
+    if (!compared) setCompare(50);
+    if (!splitTaken) setSplit(50);
+  };
+  // Measured once and on resize, never while scrolling.
+  const measure = () => {
+    pinTo(innerHeight >= 620);
+    if (!pinned) return;
+    splitW = splitter.offsetWidth; splitH = splitter.offsetHeight;
+    const tall = splitDevice.offsetHeight;
+    splitFit = Math.min(1, (innerWidth - 32) / tall);
+    const line = splitSection.querySelector("h2"), [a, b] = line.querySelectorAll("span"), wide = innerWidth >= 1100;
+    const air = b.offsetLeft - a.offsetLeft - a.offsetWidth, half = splitDevice.offsetWidth / 2 + 44;
+    splitSection.style.setProperty("--lx", wide ? (air + b.offsetWidth - a.offsetWidth) / 2 - half + "px" : "0px");
+    splitSection.style.setProperty("--rx", wide ? half + (b.offsetWidth - a.offsetWidth - air) / 2 + "px" : "0px");
+    splitSection.style.setProperty("--lc", wide ? half + b.offsetWidth / 2 + "px" : "0px");
+    splitSection.style.setProperty("--dy", wide ? innerHeight / 2 - line.offsetTop - line.offsetHeight / 2 + "px" : "0px");
+    layPages();
+  };
+  measure();
+  addEventListener("resize", () => { measure(); frame(); });
+  document.fonts?.ready.then(() => { measure(); frame(); });
   // The summary comes down over the page as it scrolls in, until someone takes it.
   let queued = false;
   const frame = () => {
@@ -313,22 +361,25 @@ if (!still) {
       const r = puller.getBoundingClientRect();
       puller.style.setProperty("--p", 6 + 56 * Math.max(0, Math.min(1, (vh * .8 - r.top) / (vh * .55))) + "%");
     }
+    if (!pinned) return;
+    // Each scene plays by scroll position alone, so scrolling back plays it backwards.
+    const along = pin => { const r = pin.getBoundingClientRect(); return r.bottom < -vh || r.top > vh * 2 ? null : Math.max(0, Math.min(1, -r.top / (r.height - vh))); };
+    const ease = v => { v = Math.max(0, Math.min(1, v)); return v * v * (3 - 2 * v); };
+    const wiped = along(cleanPin);
+    if (wiped !== null && !compared) setCompare(100 - 100 * ease((wiped - .1) / .74));
+    const k = along(splitPin);
+    if (k !== null) {
+      turned = ease((k - .42) / .4);
+      splitSection.style.setProperty("--t", turned);
+      splitSection.style.setProperty("--mid", Math.min(1, Math.sin(Math.PI * turned) * 2.4));
+      splitSection.classList.toggle("side", turned > .5);
+      splitDevice.style.transform = `translateY(${(innerWidth >= 1100 ? vh * .05 : 0) * turned}px) rotate(${-90 * turned}deg) scale(${1 + (splitFit - 1) * turned})`;
+      if (!splitTaken) setSplit(50 + 13 * Math.sin(Math.PI * ease(k / .36)));
+      else layPages();
+    }
   };
   addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(frame); } }, { passive: true });
   frame();
-  // Once, the first time it's seen: the line shows it moves.
-  new IntersectionObserver((seen, io) => {
-    if (!seen[0].isIntersecting) return;
-    io.disconnect();
-    const start = performance.now();
-    const tick = t => {
-      if (compared) return;
-      const k = Math.min(1, (t - start) / 1800);
-      setCompare(50 + 28 * Math.sin(k * Math.PI * 2) * (1 - k * .2) * (k < 1 ? 1 : 0));
-      if (k < 1) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }, { threshold: .5 }).observe(compare);
 }
 
 // The scoreboard: one set of rows that moves to its new place for each measure.
