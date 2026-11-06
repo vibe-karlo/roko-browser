@@ -1,8 +1,9 @@
 import Foundation
 
 /// Well-known sites to suggest while typing an address, before you have any
-/// history: the world's most visited, and Croatia's. Picked by hand rather than
-/// taken from a ranking list, since those are full of ad and CDN domains.
+/// history: the world's most visited, and Croatia's. Picked by hand, with a
+/// proper name and a bundled icon, so these may beat a search; TopSites has the
+/// rest of the world's and every other country's, as plain addresses.
 /// A few hundred prefix checks per keystroke: microseconds.
 enum PopularSites {
     struct Site {
@@ -10,10 +11,14 @@ enum PopularSites {
         let name: String
         /// The name with case and accents folded, once, for matching per keystroke.
         let foldedName: String
+        /// The address its bundled icon is under: "index.hr/oglasi" wears
+        /// index.hr's, and amazon.de amazon.com's.
+        let iconHost: String
 
-        init(host: String, name: String) {
+        init(host: String, name: String, iconHost: String? = nil) {
             self.host = host
             self.name = name
+            self.iconHost = iconHost ?? String(host.prefix { $0 != "/" })
             foldedName = name.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
         }
     }
@@ -42,7 +47,15 @@ enum PopularSites {
         }
     }
 
-    private static let ordered: [Site] = Locale.current.region?.identifier == "HR" ? croatia + world : world + croatia
+    private static let ordered: [Site] = Locale.current.region?.identifier == "HR" ? croatia + localized(world) : localized(world) + croatia
+
+    /// Shops with a site per country: this country's, under the same name.
+    private static func localized(_ sites: [Site]) -> [Site] {
+        sites.map { site in
+            guard ["amazon.com", "ebay.com"].contains(site.host), let own = TopSites.ownVersion(of: site.host) else { return site }
+            return Site(host: own, name: site.name, iconHost: site.host)
+        }
+    }
 
     private static func sites(_ list: [(String, String)]) -> [Site] {
         list.map { Site(host: $0.0, name: $0.1) }
