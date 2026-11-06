@@ -9,7 +9,10 @@ const units = { km: ["mi", .621371], mi: ["km", 1.60934], kg: ["lb", 2.20462], l
 const rates = {};
 let asked = 0;
 
+const askEnd = document.getElementById("askEnd");
 function show(big, note, kind, small) {
+  askEnd.classList.toggle("clear", !!input.value);
+  askEnd.setAttribute("aria-label", input.value ? "Clear" : "Private search");
   const b = out.querySelector("b");
   b.textContent = big; b.className = small ? "small" : "";
   out.querySelector("span").textContent = note;
@@ -111,6 +114,15 @@ function answer(raw) {
   show(text, "Search Google", "Search", true);
 }
 input.addEventListener("input", () => { stopped = true; chosen = false; answer(input.value); });
+
+askEnd.addEventListener("click", e => {
+  e.preventDefault();
+  if (input.value) { stopped = true; input.value = ""; answer(""); return input.focus({ preventScroll: true }); }
+  const on = askEnd.getAttribute("aria-pressed") !== "true";
+  askEnd.setAttribute("aria-pressed", on);
+  input.placeholder = on ? "Private search or address" : "Search or enter address";
+  input.closest(".field").querySelector("use").setAttribute("href", on ? "#i-eyeClosed" : "#i-search");
+});
 
 // On a touch screen the keyboard on the page is the keyboard: nothing jumps.
 if (matchMedia("(pointer: coarse)").matches) input.setAttribute("inputmode", "none");
