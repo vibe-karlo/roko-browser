@@ -646,7 +646,7 @@ struct BrowserView: View {
     private var pages: some View {
         // Picking the second page and showing it are one view, for the same reason.
         if let halves = splitHalves {
-            SplitPages(top: halves.top, bottom: halves.bottom, barTop: barInBand ? coveredFrom : sideBar || uprightFold != nil ? .greatestFiniteMagnitude : barTop)
+            SplitPages(top: halves.top, bottom: halves.bottom, barTop: barInBand ? coveredFrom : sideBar || uprightFold != nil ? .greatestFiniteMagnitude : barTop, onBand: barInBand)
         } else if let tab = browser.selectedTab {
             PagePane(tab: tab, barTop: barInBand ? coveredFrom : sideBar || standsOnFold || uprightFold != nil ? .greatestFiniteMagnitude : barTop)
         }
@@ -1154,6 +1154,8 @@ private struct SplitPages: View {
     /// Nil while the bottom half is still to be chosen.
     let bottom: BrowserTab?
     let barTop: CGFloat
+    /// The bar lies in the band: the halves part on its ground, one surface with it.
+    var onBand = false
     @Environment(\.fold) private var fold
     @State private var drag: CGFloat = 0
 
@@ -1198,9 +1200,15 @@ private struct SplitPages: View {
         .onChange(of: browser.splitList) { _, list in
             if list != nil, browser.selectedID != top.id { browser.select(top) }
         }
-        // Black between and under the cards, not behind the status bar: that
-        // band keeps the top page's colour, so the clock stays readable.
-        .background(Color.black.ignoresSafeArea(edges: .bottom))
+        // Between and under the cards, not behind the status bar: that band keeps
+        // the top page's colour, so the clock stays readable.
+        .background {
+            if onBand {
+                BandGround(color: browser.selectedTab?.topColor).ignoresSafeArea(edges: .bottom)
+            } else {
+                Color.black.ignoresSafeArea(edges: .bottom)
+            }
+        }
         .ignoresSafeArea(edges: .bottom)
     }
 
