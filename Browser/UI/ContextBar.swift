@@ -34,9 +34,9 @@ struct ContextBar: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var capsuleFrame: CGRect = .zero
 
-    /// In a band as the page's bar is, on an upright phone. Sideways
-    /// and on an open Duo, where these screens are columns, it floats.
-    private var docked: Bool { verticalSizeClass != .compact && !browser.uprightFoldOpen }
+    /// In a band as the page's bar is, on a phone either way up.
+    /// On an open Duo, where these screens are columns, it floats.
+    private var docked: Bool { !browser.uprightFoldOpen }
 
     @ViewBuilder
     private var capsule: some View {
@@ -93,7 +93,10 @@ struct ContextBar: View {
             }
         }
         .frame(height: docked ? Theme.barHeight : Theme.barHeight + 8)
-        .modifier(ScreenBarSurface(docked: docked))
+        // Sideways, a bar's width in the middle of the band, as a page's bar is.
+        .frame(maxWidth: docked && verticalSizeClass == .compact ? 480 : nil)
+        .frame(maxWidth: .infinity)
+        .modifier(ScreenBarSurface(docked: docked, sideways: verticalSizeClass == .compact))
         // What scrolls under the floating bar dissolves above it rather than being sliced by its edge.
         .background(alignment: .top) { if fades && !docked { FadeEdge(color: Theme.canvas, height: 40).offset(y: 12) } }
     }
@@ -124,6 +127,7 @@ struct ContextBar: View {
 /// bar, down into the home indicator's strip, on the band's graphite.
 private struct ScreenBarSurface: ViewModifier {
     let docked: Bool
+    var sideways = false
 
     func body(content: Content) -> some View {
         if docked {
@@ -136,10 +140,11 @@ private struct ScreenBarSurface: ViewModifier {
                                    startPoint: .top, endPoint: .bottom)
                         .clipShape(BandFloor())
                         .padding(.top, -BandFloor.lip)
-                        .ignoresSafeArea(edges: .bottom)
+                        .ignoresSafeArea(edges: [.bottom, .horizontal])
                         .allowsHitTesting(false)
                 }
-                .padding(.bottom, -20)
+                // Sideways the strip is shallower: as far into it would sit on the home indicator.
+                .padding(.bottom, sideways ? -12 : -20)
         } else {
             content
                 .barSurface(cornerRadius: Theme.barRadius)

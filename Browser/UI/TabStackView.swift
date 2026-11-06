@@ -2,8 +2,9 @@ import SwiftData
 import SwiftUI
 
 /// The tab switcher, after Arc: your tabs as big overlapping page cards that
-/// scroll sideways, the focused one's name above it. Tap a card to open it,
-/// throw it up to close it. Pull the bottom row up to go back to your page.
+/// scroll sideways, the focused one's name and close above it. Tap a card to open it,
+/// throw it up to close it. The bottom row is the page's bar, its three places where they
+/// were: private, +, and a menu. Pull it up to go back to your page.
 /// On an open iPhone Duo there's room for more: a grid of wide cards, each page's top whole.
 struct TabStackView: View {
     @Environment(BrowserModel.self) private var browser
@@ -22,7 +23,9 @@ struct TabStackView: View {
             // Turned sideways the cards stay upright and narrow: several at
             // once to swipe through, rather than one wide strip of a page.
             let sideways = proxy.size.width > proxy.size.height
-            let cardHeight = sideways ? proxy.size.height - 130 : min((proxy.size.width * 0.76).rounded() * 1.95, proxy.size.height - 230)
+            let bottomInset = proxy.safeAreaInsets.bottom
+            let height = proxy.size.height + bottomInset
+            let cardHeight = sideways ? height - 124 : min((proxy.size.width * 0.76).rounded() * 1.95, height - 230)
             let cardWidth = sideways ? (cardHeight * 0.62).rounded() : (proxy.size.width * 0.76).rounded()
             // Each card shows this much before the next one covers it.
             // Most of the focused card shows; the next one just overlaps its edge.
@@ -48,10 +51,14 @@ struct TabStackView: View {
                 }
 
                 Spacer(minLength: 0)
+                // Where you are, among more than the eye can count. Sideways they show for themselves.
+                if !sideways && !isGrid && browser.tabs.count > 1 { position }
                 reopenOffer
-                bottomRow(compact: isGrid)
-                    .padding(.bottom, max(proxy.safeAreaInsets.bottom, 12))
+                bottomRow(wide: isGrid || sideways)
+                    // Into the home indicator's strip, as the page's bar goes.
+                    .padding(.bottom, max(bottomInset - 20, 9))
             }
+            .ignoresSafeArea(.container, edges: .bottom)
         }
         .background { backdrop }
         .foregroundStyle(Theme.ink)
@@ -85,8 +92,8 @@ struct TabStackView: View {
                                 isCurrent: tab.id == browser.selectedID,
                                 open: { open(tab) },
                                 close: { close(tab) },
-                                closeAll: browser.tabs.count > 1 ? { browser.closeAllTabs() } : nil,
-                                split: canSplit(with: tab) ? { browser.panel = .none; browser.startSplit(with: tab) } : nil)
+                                closeAll: closeAllAction,
+                                split: splitAction(with: tab))
                         .id(tab.id)
                     }
                 }
@@ -116,12 +123,13 @@ struct TabStackView: View {
                 let focusedIndex = browser.tabs.firstIndex { $0.id == focused } ?? 0
                 ForEach(Array(browser.tabs.enumerated()), id: \.element.id) { index, tab in
                     TabCard(tab: tab, width: cardWidth, height: cardHeight,
-                            titleWidth: (stacks ? stride : cardWidth) - 16, isFocused: tab.id == focused,
+                            titleWidth: (stacks ? stride : cardWidth) - 8, isFocused: tab.id == focused,
                             isBehind: stacks && index < focusedIndex, overlaps: stacks,
+                            showsNeighbourIcon: !stacks,
                             open: { open(tab) },
                             close: { close(tab) },
-                            closeAll: browser.tabs.count > 1 ? { browser.closeAllTabs(); focused = browser.selectedID ?? browser.tabs.last?.id } : nil,
-                            split: canSplit(with: tab) ? { browser.panel = .none; browser.startSplit(with: tab) } : nil)
+                            closeAll: closeAllAction,
+                            split: splitAction(with: tab))
                     // As in Arc: tabs to the left sink back into a stack behind
                     // the focused card, smaller and tucked under it; the next tab
                     // on the right stays full size, laid over it. Drawn by the
@@ -144,6 +152,20 @@ struct TabStackView: View {
         .scrollClipDisabled()
         .frame(height: cardHeight + 40)
         .animation(.snappy(duration: 0.3), value: browser.tabs.map(\.id))
+    }
+
+    /// Nil with only one tab open.
+    private var closeAllAction: (() -> Void)? {
+        guard browser.tabs.count > 1 else { return nil }
+        return { closeAllTabs() }
+    }
+
+    private func splitAction(with tab: BrowserTab) -> (() -> Void)? {
+        guard canSplit(with: tab) else { return nil }
+        return {
+            browser.panel = .none
+            browser.startSplit(with: tab)
+        }
     }
 
     /// Split with the tab on screen: another tab of the same kind, not already beside it.
@@ -246,63 +268,83 @@ struct TabStackView: View {
 
     // MARK: Bottom row
 
-    private func bottomRow(compact: Bool) -> some View {
+    /// "3 of 12", under the cards. Digits that hold their place as you swipe.
+    private var position: some View {
+        let index = (browser.tabs.firstIndex { $0.id == focused } ?? 0) + 1
+        return Text("\(index) of \(browser.tabs.count)")
+            .font(.system(size: 13, weight: .medium))
+            .monospacedDigit()
+            .foregroundStyle(Theme.secondaryInk)
+            .contentTransition(.numericText())
+            .animation(.snappy(duration: 0.2), value: index)
+            .padding(.bottom, 2)
+    }
+
+    /// The page's bar: the same three places at the same distances, so the + doesn't
+    /// move as you come here, on no surface of its own. What isn't about tabs is in the menu.
+    private func bottomRow(wide: Bool) -> some View {
         HStack(spacing: 0) {
-            roundButton(.eyeClosed, "New private tab") {
-                browser.showCommandBar(mode: .privateTab)
+            Button { browser.showCommandBar(mode: .privateTab) } label: {
+                Glyph(.eyeClosed, size: 22)
+                    .padding(.leading, BottomBar.dockedInset)
+                    .frame(width: 72, height: Theme.barHeight, alignment: .leading)
+                    .contentShape(.rect)
             }
-            Spacer(minLength: 8)
-            roundButton(.today, "Today") { browser.panel = .today }
+            .buttonStyle(GlyphButtonStyle())
+            .accessibilityLabel("New private tab")
             Spacer(minLength: 8)
             Button { browser.showCommandBar() } label: {
                 Glyph(.plus, size: 22, weight: 2)
-                    .frame(width: 104, height: 48)
-                    .background(Theme.raised, in: .capsule)
-                    .overlay(Capsule().strokeBorder(Theme.edge))
-                    .contentShape(.capsule)
+                    .frame(width: 104, height: 38)
+                    .background(.white.opacity(0.14), in: .capsule)
+                    .frame(height: Theme.barHeight)
+                    .contentShape(.rect)
             }
             .buttonStyle(GlyphButtonStyle())
             .accessibilityLabel("New tab")
             Spacer(minLength: 8)
-            todoButton
-            Spacer(minLength: 8)
-            roundButton(.settings, "Settings") { browser.panel = .settings }
+            Menu {
+                Button { browser.panel = .today } label: { Label("Today", image: "phosphor/today") }
+                Button { browser.panel = .todos } label: { Label(todosLabel, image: "phosphor/todo") }
+                Button { browser.panel = .settings } label: { Label("Settings", image: "phosphor/settings") }
+                if browser.tabs.count > 1 {
+                    Divider()
+                    Button(role: .destructive) { closeAllTabs() } label: {
+                        Label("Close All Tabs", image: "phosphor/close")
+                    }
+                }
+            } label: {
+                Glyph(.chevronUp, size: 20, weight: 2)
+                    // The glyph's ink is 11 inside its 38-point circle on the page's bar.
+                    .frame(width: 38, height: 38)
+                    .padding(.trailing, BottomBar.dockedInset - 11)
+                    .frame(width: 72, height: Theme.barHeight, alignment: .trailing)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(GlyphButtonStyle())
+            // Its icons in the ink of the words beside them, not roko's orange.
+            .tint(Theme.ink)
+            .accessibilityLabel("More")
         }
-        .padding(.horizontal, Theme.gutter + 8)
         .padding(.top, 16)
-        // On the wide grid, together under it rather than flung to the edges.
-        .frame(maxWidth: compact ? 500 : nil)
+        // Sideways and on the wide grid, together in the middle of the screen, as the bar is.
+        .frame(maxWidth: wide ? 480 : nil)
         .frame(maxWidth: .infinity)
         .contentShape(.rect)
         .highPriorityGesture(pullUp)
+        // Centred on the screen and its home indicator, whichever side the clock is.
+        .ignoresSafeArea(.container, edges: .horizontal)
     }
 
-    private func roundButton(_ glyph: Glyph.Kind, _ label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Glyph(glyph, size: 20)
-                .frame(width: 48, height: 48)
-                .background(Theme.raised, in: .circle)
-                .overlay(Circle().strokeBorder(Theme.edge))
-                .contentShape(.circle)
-        }
-        .buttonStyle(GlyphButtonStyle())
-        .accessibilityLabel(label)
-    }
-
-    /// To-do, with how many are left today on its corner while any are.
-    private var todoButton: some View {
+    /// To-do, with how many are left today while any are.
+    private var todosLabel: String {
         let left = todos.filter(\.isDueNow).count
-        return Button { browser.panel = .todos } label: {
-            Group {
-                if left > 0 { TodoIcon(left: left, size: 22) } else { Glyph(.todo, size: 20) }
-            }
-            .frame(width: 48, height: 48)
-            .background(Theme.raised, in: .circle)
-            .overlay(Circle().strokeBorder(Theme.edge))
-            .contentShape(.circle)
-        }
-        .buttonStyle(GlyphButtonStyle())
-        .accessibilityLabel(left > 0 ? "To-do, \(left) left for today" : "To-do")
+        return left > 0 ? "To-do, \(left) left" : "To-do"
+    }
+
+    private func closeAllTabs() {
+        browser.closeAllTabs()
+        focused = browser.selectedID ?? browser.tabs.last?.id
     }
 
     private var pullUp: some Gesture {
@@ -337,6 +379,8 @@ private struct TabCard: View {
     var isBehind = false
     /// Laid over its neighbour, rather than beside it.
     var overlaps = true
+    /// Side by side, each card keeps its icon; laid over each other, only the focused one has a header.
+    var showsNeighbourIcon = false
     let open: () -> Void
     let close: () -> Void
     /// Nil with only one tab open.
@@ -364,8 +408,10 @@ private struct TabCard: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            SiteIcon(host: isHidden ? "" : tab.url?.displayHost ?? "", size: 20)
-            if tab.isPrivate {
+            if isFocused || showsNeighbourIcon {
+                SiteIcon(host: isHidden ? "" : tab.url?.displayHost ?? "", size: 20)
+            }
+            if isFocused, tab.isPrivate {
                 Glyph(.eyeClosed, size: 15).foregroundStyle(Theme.secondaryInk)
             }
             if isFocused, !isHidden {
@@ -374,10 +420,23 @@ private struct TabCard: View {
                     .lineLimit(1)
                     .transition(.opacity)
             }
+            Spacer(minLength: 0)
+            if isFocused {
+                Button(action: close) {
+                    Glyph(.close, size: 14, weight: 2)
+                        .foregroundStyle(Theme.secondaryInk)
+                        .frame(width: 44, height: 44)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(GlyphButtonStyle())
+                // Its ink on the line of the part of the card you can see.
+                .padding(.trailing, -15)
+                .accessibilityLabel("Close tab")
+                .transition(.opacity)
+            }
         }
-        // The focused title is centred over the part of its card you can see;
-        // a neighbour shows just its icon. Tabs stacked behind show nothing.
-        .frame(width: titleWidth, height: 28, alignment: isFocused ? .center : .leading)
+        // Over the part of its card you can see, from the card's own edge.
+        .frame(width: titleWidth, height: 28, alignment: .leading)
         .padding(.leading, 4)
         .animation(.easeOut(duration: 0.18), value: isFocused)
         .opacity(isBehind ? 0 : 1 + throwOffset / 200)

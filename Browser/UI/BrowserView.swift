@@ -19,7 +19,6 @@ struct BrowserView: View {
     /// Once it's been dragged, the lower half's hint has done its job.
     @State private var trackpadUsed = false
     /// The strip beside the page, turned sideways, where the bar stands upright.
-    @State private var sideStrip: CGFloat = 0
     /// Both sides' insets: held upright, only a Duo has any, for its clock.
     @State private var sideInsets: CGFloat = 0
 
@@ -40,7 +39,7 @@ struct BrowserView: View {
             }
             .animation(.easeOut(duration: 0.2), value: browser.topTab?.topColor)
 
-            if sideBar || splitBesideClock || besideFold != nil {
+            if splitSideways || splitBesideClock || besideFold != nil {
                 Color.black.ignoresSafeArea()
             }
 
@@ -94,12 +93,10 @@ struct BrowserView: View {
                             .padding(.leading, besideFold?.maxX ?? 0)
                             // Propped open, the page ends at the fold.
                             .frame(height: standsOnFold ? fold.map { max($0.minY - proxy.frame(in: .global).minY, 0) } : nil)
-                            // Sideways, a card: rounded just enough to read as one, as
-                            // Split View's side-by-side cards are, so every corner matches.
-                            .clipShape(UnevenRoundedRectangle(topLeadingRadius: sideBar ? 16 : 0,
-                                                              bottomLeadingRadius: sideBar || standsOnFold ? 16 : showsBand && !barInBand ? 22 : 0,
-                                                              bottomTrailingRadius: sideBar || standsOnFold ? 16 : showsBand && !barInBand ? 22 : bandWrapsClock && !showsBand ? 22 : 0,
-                                                              topTrailingRadius: sideBar ? 16 : bandWrapsClock ? 22 : 0))
+                            .clipShape(UnevenRoundedRectangle(topLeadingRadius: sideways && barInBand ? 22 : 0,
+                                                              bottomLeadingRadius: standsOnFold ? 16 : showsBand && !barInBand ? 22 : sideways && !showsBand ? 22 : 0,
+                                                              bottomTrailingRadius: standsOnFold ? 16 : showsBand && !barInBand ? 22 : bandWrapsClock && !showsBand ? 22 : 0,
+                                                              topTrailingRadius: bandWrapsClock ? 22 : 0))
                             .frame(maxHeight: .infinity, alignment: .top)
                         if showsBand && !barInBand {
                             band(bottomInset: proxy.safeAreaInsets.bottom)
@@ -144,10 +141,11 @@ struct BrowserView: View {
                 // Typing into a page, the keyboard covers the band, as it does the floating
                 // bar: its padding reads the safe area, which would lift it over the keyboard.
                 .ignoresSafeArea(.keyboard, edges: .bottom)
-                // Turned sideways the page is a card between two black strips:
-                // the Dynamic Island's on one side, the bar's on the other.
+                // Turned sideways the page is a card with the band's colour around it, clear of
+                // the Dynamic Island on one side and the same on the other: left to the web view's
+                // own insets, a page could sit against one edge with a strip down the other.
                 // On a Duo, open or shut, the clock runs down the side: the page keeps clear of it.
-                .ignoresSafeArea(edges: sideBar || clockBeside ? [] : .horizontal)
+                .ignoresSafeArea(edges: sideways || clockBeside ? [] : .horizontal)
             } else {
                 StartView()
                     // The bar floats over the page; the start page keeps clear of it.
@@ -159,19 +157,7 @@ struct BrowserView: View {
         // it left a strip of the page's background under it, and when the bar
         // folded away while scrolling, a blank band above the home indicator.
         // The page learns which strip the bar covers from barTop (WebViewHost).
-        .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.trailing } action: { sideStrip = $0 }
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.leading + $0.safeAreaInsets.trailing } action: { sideInsets = $0 }
-        .overlay(alignment: .trailing) {
-            if sideBar {
-                BottomBar(upright: true)
-                    .frame(width: max(sideStrip, 56))
-                    .frame(maxHeight: .infinity)
-                    .opacity(browser.launcherShown || browser.panel == .tabs || browser.pageBecomingSummary || browser.hidingItems != nil ? 0 : 1)
-                    .allowsHitTesting(browser.hidingItems == nil)
-                    .animation(.launcher, value: browser.launcherShown)
-                    .ignoresSafeArea(edges: .trailing)
-            }
-        }
         .overlay(alignment: .bottom) {
             // The command bar takes the bar's place rather than stacking on top of it.
             HStack(spacing: 0) {
@@ -200,8 +186,8 @@ struct BrowserView: View {
                 .staysWithBar(browser)
                 .animation(.snappy(duration: 0.28), value: browser.barSide)
                 .ignoresSafeArea(.container, edges: uprightFold != nil ? .horizontal : [])
-                .opacity(sideBar || browser.splitList != nil ? 0 : 1)
-                .allowsHitTesting(!sideBar && browser.splitList == nil)
+                .opacity(browser.splitList != nil ? 0 : 1)
+                .allowsHitTesting(browser.splitList == nil)
                 .opacity(browser.launcherShown || browser.panel == .tabs || browser.pageBecomingSummary || browser.hidingItems != nil ? 0 : 1)
                 .allowsHitTesting(browser.hidingItems == nil)
                 // Faded, not folded: folding changes the page's insets, which stops a pull dead.
@@ -221,7 +207,6 @@ struct BrowserView: View {
                 // Arrives from below; leaves upward, continuing the pull that uncovers the page.
                 // Full screen: its own bottom row replaces the bar it would sit above.
                 TabStackView()
-                    .ignoresSafeArea(.container, edges: .bottom)
                     .transition(.asymmetric(insertion: .move(edge: .bottom),
                                             removal: .move(edge: .top).combined(with: .opacity)))
             }
@@ -534,9 +519,11 @@ struct BrowserView: View {
     /// The mini player shows over the page and the bar, not over a panel or a screen of roko's own.
     /// Turned sideways on a page: the bar leaves the bottom for the strip at the side.
     /// Not on an open Duo: the page fills the screen there, with the normal bar over it.
-    private var sideBar: Bool {
+    private var sideways: Bool {
         verticalSizeClass == .compact && uprightFold == nil && browser.selectedTab != nil
     }
+
+    private var splitSideways: Bool { sideways && splitHalves != nil }
 
     /// On an open Duo in landscape the clock's strip runs down the side, and over a
     /// page filling the screen it would sit on the site's own menu. So the clock
@@ -567,7 +554,7 @@ struct BrowserView: View {
     }
 
     /// A Duo with its clock at the side, not turned the way the bar moves there.
-    private var clockBeside: Bool { !sideBar && sideInsets > 0 && uprightFold == nil }
+    private var clockBeside: Bool { !sideways && sideInsets > 0 && uprightFold == nil }
 
     /// Split with the clock at the side: black runs on under it. Turned, with
     /// the clock on top, that band keeps the top page's colour.
@@ -577,11 +564,11 @@ struct BrowserView: View {
         !browser.liveItems.isEmpty && browser.selectedTab != nil
     }
 
-    /// The bar lives in the band under a page: on an upright phone and
-    /// on a Duo lying open. Sideways on a phone it has its strip; bent, split or with a
-    /// screen beside the page, a Duo keeps the bar on one half, floating.
+    /// The bar lives in the band under a page: on a phone either way up and
+    /// on a Duo lying open. Bent, split or with a screen beside the page,
+    /// a Duo keeps the bar on one half, floating.
     private var barInBand: Bool {
-        guard browser.selectedTab != nil, !sideBar, !standsOnFold else { return false }
+        guard browser.selectedTab != nil, !standsOnFold else { return false }
         return uprightFold == nil || (!foldBent && besideFold == nil && splitHalves == nil)
     }
 
@@ -590,7 +577,10 @@ struct BrowserView: View {
         return showsPlayer || barInBand && !browser.isBarCollapsed
     }
 
-    private var bandWrapsClock: Bool { clockBeside && barInBand }
+    private var bandWrapsClock: Bool { (clockBeside || sideways) && barInBand }
+
+    /// On a wide screen, a bar's width in the middle of the band, not stretched across it.
+    private var bandBarWidth: CGFloat? { uprightFold != nil || sideways ? 480 : nil }
 
     /// With the band up, it covers the page from its top; with it gone, nothing is covered.
     private var coveredFrom: CGFloat { showsBand ? bandTop : .greatestFiniteMagnitude }
@@ -604,13 +594,12 @@ struct BrowserView: View {
             if !browser.liveItems.isEmpty {
                 LiveBand()
                     .environment(\.liveBandOverBar, barInBand)
-                    // Lying open, a bar's width, not stretched across the screen.
-                    .frame(maxWidth: barInBand && uprightFold != nil ? 480 : nil)
+                    .frame(maxWidth: barInBand ? bandBarWidth : nil)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             if barInBand && !browser.isBarCollapsed {
                 BottomBar(docked: true)
-                    .frame(maxWidth: uprightFold != nil ? 480 : nil)
+                    .frame(maxWidth: bandBarWidth)
                     .opacity(browser.splitList != nil || browser.launcherShown || browser.panel == .tabs || browser.pageBecomingSummary || browser.hidingItems != nil ? 0 : 1)
                     .allowsHitTesting(browser.hidingItems == nil && browser.splitList == nil)
                     .animation(.easeOut(duration: 0.2), value: browser.pageBecomingSummary)
@@ -646,9 +635,9 @@ struct BrowserView: View {
     private var pages: some View {
         // Picking the second page and showing it are one view, for the same reason.
         if let halves = splitHalves {
-            SplitPages(top: halves.top, bottom: halves.bottom, barTop: barInBand ? coveredFrom : sideBar || uprightFold != nil ? .greatestFiniteMagnitude : barTop, onBand: barInBand)
+            SplitPages(top: halves.top, bottom: halves.bottom, barTop: barInBand ? coveredFrom : uprightFold != nil ? .greatestFiniteMagnitude : barTop, onBand: barInBand)
         } else if let tab = browser.selectedTab {
-            PagePane(tab: tab, barTop: barInBand ? coveredFrom : sideBar || standsOnFold || uprightFold != nil ? .greatestFiniteMagnitude : barTop)
+            PagePane(tab: tab, barTop: barInBand ? coveredFrom : standsOnFold || uprightFold != nil ? .greatestFiniteMagnitude : barTop)
         }
     }
 

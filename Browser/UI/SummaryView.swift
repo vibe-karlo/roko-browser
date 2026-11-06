@@ -360,6 +360,8 @@ struct FadeEdge: View {
         }, startPoint: .top, endPoint: .bottom)
         .frame(height: height)
         .offset(y: -height)
+        // Sideways, across the whole screen: stopping at the safe area drew a box's sides.
+        .ignoresSafeArea(.container, edges: .horizontal)
         .allowsHitTesting(false)
     }
 }

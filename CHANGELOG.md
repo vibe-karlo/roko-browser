@@ -15,6 +15,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Saved's bar now searches the list, since it holds what you keep as well as what you mean to read. Summarize all moved to the button on its right, and shows while there's something unread.
 
 ### Fixed
+- Sideways, To-do's list ended in a fade with hard edges, and its last row showed under the bar.
+- On iPhone Duo, the switcher's bottom row sat off-centre and touched the home indicator.
 - Stories from feeds that give two dates, The Guardian's among them, had no date.
 - An answer with a big number at the top could crash roko as it was shown.
 - In Croatian, Serbian and Bosnian, comparisons and Summary now use the sites' own sentences, picked by the model, rather than an English translation or a rewrite, which had turned "arrested" into "killed". The credit line says so.
@@ -44,6 +46,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Sites' own anti-adblock walls are beaten before they come up, on about 8,200 sites, with uBlock Origin's site rules (GPL-3.0): a small change to the page before it runs, such as BILD's `"adBlockWallEnabled":true` turned false. Only a site with a rule pays for it. Its ads stay blocked, where before the page went blank and its ads were let through.
 
 ### Changed
+- Turned sideways, the new bar is under the page there too, in place of the column beside it. The page is a rounded card with the band's colour around it, and the bar folds away as you scroll. To-do, Today, Saved and roko's other screens have the same band.
+- The tab switcher has less on it. Its bottom row is the page's bar: private, + and a menu, in the same places. Today, To-do and Settings moved into the menu, with Close All Tabs. The card in front has its name and a close button, the icons floating over its neighbours are gone, and "3 of 12" says where you are.
 - The bar now lies in a band under the page, on a dim shade of the site's colour, and the page is a rounded card above it. To-do, Shopping, News and Today dock the same way, Split View parts on the same surface, and the loading line grows from the middle of the card's edge.
 - The live row waits as a strip while the bar is up and opens when it folds away; the bar's field says Search, and the tab card always shows the page on screen.
 - The bar puts first what you open most and have opened lately, typing or not. Every match counts, so a page you often open is no longer lost behind newer ones that also match.

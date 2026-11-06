@@ -5,10 +5,6 @@ import SwiftUI
 /// back as soon as you scroll up.
 struct BottomBar: View {
     @Environment(BrowserModel.self) private var browser
-    /// Turned sideways: a column in the strip beside the page, tabs at the
-    /// top, + in the middle, the page menu at the foot. It has its own strip,
-    /// so it stays while you scroll.
-    var upright = false
     /// Lying in the band under the page, on its colour, with no
     /// surface of its own. The band folds it away; the card's edge shows loading.
     var docked = false
@@ -19,15 +15,13 @@ struct BottomBar: View {
 
     var body: some View {
         Group {
-            if upright {
-                expanded
-            } else if !browser.isBarCollapsed || browser.selectedTab == nil {
+            if !browser.isBarCollapsed || browser.selectedTab == nil {
                 expanded
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .padding(.horizontal, upright || docked ? 0 : Theme.gutter)
-        .padding(.bottom, upright || docked ? 0 : 4)
+        .padding(.horizontal, docked ? 0 : Theme.gutter)
+        .padding(.bottom, docked ? 0 : 4)
         // Clear of the card by what it leaves above the home indicator; a live row
         // above has its own air.
         .padding(.top, docked && browser.liveItems.isEmpty ? 5 : 0)
@@ -38,8 +32,7 @@ struct BottomBar: View {
     /// Arc's layout: the bar is about starting something new. Tabs on the left,
     /// a wide + in the middle, and everything about the current page behind ⌃.
     private var expanded: some View {
-        let layout = upright ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
-        return layout {
+        HStack(spacing: 0) {
             // On a page opened from Saved, back: through the tab's pages, then to the list.
             // Swipe up still has the tabs.
             Button {
@@ -62,7 +55,7 @@ struct BottomBar: View {
                     // whatever their widths: the fan's ink is 32 wide, the chevron's 16.
                     .frame(width: docked ? 32 : nil, alignment: .leading)
                     .padding(.leading, docked ? Self.dockedInset : 0)
-                    .frame(width: upright ? 56 : docked ? 72 : 64, height: upright ? 64 : Theme.barHeight, alignment: docked ? .leading : .center)
+                    .frame(width: docked ? 72 : 64, height: Theme.barHeight, alignment: docked ? .leading : .center)
                     .contentShape(.rect)
             }
             .buttonStyle(GlyphButtonStyle())
@@ -84,7 +77,7 @@ struct BottomBar: View {
                 ZStack {
                     // On a private tab it says so, as what tapping does: a private search.
                     Group {
-                        if launchField && !upright {
+                        if launchField {
                             HStack(spacing: 8) {
                                 Glyph(isPrivate ? .eyeClosed : .search, size: 17)
                                 Text(isPrivate ? "Private search" : "Search")
@@ -97,12 +90,6 @@ struct BottomBar: View {
                             .foregroundStyle(docked ? Color.white.opacity(0.72) : Theme.secondaryInk)
                             .padding(.horizontal, 14)
                             .transition(.opacity)
-                        } else if isPrivate && upright {
-                            Glyph(.eyeClosed, size: 19)
-                                .transition(.opacity)
-                        } else if launchField {
-                            Glyph(.search, size: 19)
-                                .transition(.opacity)
                         } else if isPrivate {
                             HStack(spacing: 6) {
                                 // Centred on the word's lowercase letters, not its
@@ -126,8 +113,8 @@ struct BottomBar: View {
                         .opacity(browser.voiceListening ? 1 : 0)
                 }
                 .animation(.snappy(duration: 0.15), value: browser.voiceListening)
-                    .frame(width: upright ? 44 : launchField ? nil : 104, height: upright ? 96 : 38)
-                    .frame(maxWidth: launchField && !upright ? .infinity : nil)
+                    .frame(width: launchField ? nil : 104, height: 38)
+                    .frame(maxWidth: launchField ? .infinity : nil)
                     .background {
                         // Becomes the launcher's field: there only while the launcher isn't,
                         // and only on a page (a screen over it has its own bar).
@@ -183,19 +170,18 @@ struct BottomBar: View {
                     .background(docked ? AnyShapeStyle(.clear) : AnyShapeStyle(Theme.raised), in: .circle)
                     // The glyph's ink is 11 inside its 38-point circle.
                     .padding(.trailing, docked ? Self.dockedInset - 11 : 0)
-                    .frame(width: upright ? 56 : docked ? 72 : 64, height: upright ? 64 : Theme.barHeight, alignment: docked ? .trailing : .center)
+                    .frame(width: docked ? 72 : 64, height: Theme.barHeight, alignment: docked ? .trailing : .center)
                     .contentShape(.rect)
             }
             .buttonStyle(GlyphButtonStyle())
             .disabled(browser.selectedTab == nil)
             .accessibilityLabel("Page menu")
         }
-        .frame(height: upright ? nil : docked ? Theme.barHeight : Theme.barHeight + 8)
-        .padding(.vertical, upright ? 18 : 0)
-        .overlay(alignment: upright ? .leading : .bottom) {
-            if !docked { ProgressLine(tab: browser.selectedTab, upright: upright) }
+        .frame(height: docked ? Theme.barHeight : Theme.barHeight + 8)
+        .overlay(alignment: .bottom) {
+            if !docked { ProgressLine(tab: browser.selectedTab) }
         }
-        .modifier(BarSurface(on: !upright && !docked))
+        .modifier(BarSurface(on: !docked))
         // With no surface, the gaps between the keys take the swipes too.
         .contentShape(.rect)
         // Alongside the + capsule's own hold, not over it: as a high-priority
@@ -292,34 +278,20 @@ struct BottomBar: View {
 /// page's progress redraws this and not the whole bar.
 private struct ProgressLine: View {
     let tab: BrowserTab?
-    let upright: Bool
 
     var body: some View {
         if let tab, tab.isLoading {
-            if upright {
-                // Down the column's inner edge, beside the page it's loading.
-                GeometryReader { proxy in
-                    Capsule()
-                        .fill(Theme.accent.opacity(0.75))
-                        .frame(width: 2, height: max(6, proxy.size.height * tab.progress))
-                        .animation(.easeOut(duration: 0.25), value: tab.progress)
-                }
-                .frame(width: 2)
-                .padding(.vertical, 22)
-                .transition(.opacity)
-            } else {
-                GeometryReader { proxy in
-                    let track = proxy.size.width
-                    Capsule()
-                        .fill(Theme.accent.opacity(0.75))
-                        .frame(width: max(6, track * tab.progress), height: 2)
-                        .animation(.easeOut(duration: 0.25), value: tab.progress)
-                }
-                .frame(height: 2)
-                .padding(.horizontal, 22)
-                .padding(.bottom, 5)
-                .transition(.opacity)
+            GeometryReader { proxy in
+                let track = proxy.size.width
+                Capsule()
+                    .fill(Theme.accent.opacity(0.75))
+                    .frame(width: max(6, track * tab.progress), height: 2)
+                    .animation(.easeOut(duration: 0.25), value: tab.progress)
             }
+            .frame(height: 2)
+            .padding(.horizontal, 22)
+            .padding(.bottom, 5)
+            .transition(.opacity)
         }
     }
 }
@@ -329,9 +301,8 @@ extension BottomBar {
     private var swipes: some Gesture {
         DragGesture(minimumDistance: 24)
             .onEnded { value in
-                // Upright, the axes turn: along the column switches tabs, off it opens them.
-                let dx = upright ? -value.translation.height : value.translation.width
-                let dy = upright ? value.translation.width : value.translation.height
+                let dx = value.translation.width
+                let dy = value.translation.height
                 if dy < -40, abs(dy) > abs(dx) {
                     browser.showTabs()
                 } else if abs(dx) > 60, abs(dx) > abs(dy) {
@@ -343,7 +314,7 @@ extension BottomBar {
     }
 }
 
-/// The floating bar's panel; upright, the column sits straight on the dark strip.
+/// The floating bar's panel; docked, it sits straight on the band.
 private struct BarSurface: ViewModifier {
     let on: Bool
 
