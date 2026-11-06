@@ -76,6 +76,7 @@ enum Newsletters {
             let original = mail.html ?? "<pre style=\"white-space:pre-wrap;font:17px -apple-system\">\(escaped(mail.text ?? ""))</pre>"
             guard (try? original.write(to: file(for: link), atomically: true, encoding: .utf8)) != nil else { continue }
             var text = mail.text ?? ""
+            if text.isEmpty, let html = mail.html { text = plainText(html) }
             if !inBackground, let html = mail.html, let read = await RenderedPage.readable(html: html), read.text.count > text.count / 2 {
                 text = read.text
             }
@@ -97,12 +98,32 @@ enum Newsletters {
         try? String(contentsOf: file(for: link), encoding: .utf8)
     }
 
+    /// The words in a mail that link to a page, from its original. Its text may be
+    /// the plain version, whose paragraphs differ: there, they go wherever they're said.
+    static func links(of link: URL, in text: String) -> [PageLink] {
+        guard let html = original(of: link) else { return [] }
+        let paragraphs = Set(text.components(separatedBy: "\n"))
+        return PageLink.anywhere(in: html).map { link in
+            link.block.map(paragraphs.contains) == true ? link : PageLink(words: link.words, url: link.url)
+        }
+    }
+
     static func forget(_ link: URL) {
         try? FileManager.default.removeItem(at: file(for: link))
     }
 
     private static func file(for link: URL) -> URL {
         folder.appending(path: link.lastPathComponent + ".html")
+    }
+
+    /// An HTML-only mail's words, for one too short for Readability or read with roko closed.
+    private static func plainText(_ html: String) -> String {
+        var body = html
+        for tag in ["head", "style", "script"] {
+            body = body.replacingOccurrences(of: "<\(tag)\\b[\\s\\S]*?</\(tag)>", with: " ", options: [.regularExpression, .caseInsensitive])
+        }
+        return body.replacingOccurrences(of: "(?i)</(p|div|tr|li|h[1-6])>|<br[^>]*>", with: "\n", options: .regularExpression)
+            .components(separatedBy: "\n").map(WebResearcher.plain).filter { !$0.isEmpty }.joined(separator: "\n")
     }
 
     private static func domain(of sender: String) -> String {

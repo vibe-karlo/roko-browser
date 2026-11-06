@@ -9,6 +9,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - News: what you follow, each event once, on one composed page that ends. Stories several sites covered open as a comparison of what they agree on and where they differ. A story has Reader, Summary and the page itself in one switch.
 - Follow in News from any page's tools, or "follow" in the bar: the section you're on or the whole site. Sites without a feed are followed from their sitemap, their page's data or their page.
 - Newsletters in News: by their feed, or a private address to subscribe with or forward to.
+- Links work in Reader, written-out addresses and linked words alike, in newsletters and articles. They open in a tab.
 - Words to keep out of News, whichever site a story is from. Topics also look across the web through Bing.
 
 ### Fixed

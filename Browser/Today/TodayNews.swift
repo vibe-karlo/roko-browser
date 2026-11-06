@@ -112,6 +112,8 @@ nonisolated struct NewsStory: Codable, Equatable, Hashable, Identifiable, Sendab
     var from: String? = nil
     /// A newsletter's own way to leave its list.
     var unsubscribe: URL? = nil
+    /// The words in `content` that link somewhere. Like it, kept beside the story, not in it.
+    var links: [PageLink]? = nil
     var isMail: Bool { link.scheme == "roko-mail" }
     var id: URL { link }
 }
@@ -639,6 +641,7 @@ nonisolated final class FeedParser: NSObject, XMLParserDelegate {
                 if keepingBodies {
                     let text = WebResearcher.articleText(body, limit: 200_000)
                     story.content = text.isEmpty ? nil : text
+                    story.links = text.isEmpty ? nil : PageLink.inBlocks(of: body)
                     story.image = Self.picture(named: image, in: body)
                 }
                 stories.append(story)

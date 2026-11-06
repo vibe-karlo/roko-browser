@@ -191,10 +191,11 @@ final class FeedStore {
 
     private func merge(_ read: [NewsStory]) {
         var known = Dictionary(stories.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        var bodies: [(URL, String)] = []
+        var bodies: [(URL, String, [PageLink])] = []
         for var story in read {
-            if let body = story.content { bodies.append((story.link, body)) }
+            if let body = story.content { bodies.append((story.link, body, story.links ?? [])) }
             story.content = nil
+            story.links = nil
             if var existing = known[story.link] {
                 existing.story = story
                 known[story.link] = existing
@@ -209,13 +210,16 @@ final class FeedStore {
             if story.firstSeen > limit || story.when > limit { result.0.append(story) } else { result.1.append(story) }
         }
         stories = kept.sorted { $0.when > $1.when }
-        let goneFiles = gone.map { Self.textFile(for: $0.id) }
+        let goneFiles = gone.flatMap { [Self.textFile(for: $0.id), Self.linksFile(for: $0.id)] }
         for story in gone where story.story.isMail { Newsletters.forget(story.id) }
-        let writes = bodies.map { (Self.textFile(for: $0.0), $0.1) }
+        let writes = bodies.map { (Self.textFile(for: $0.0), $0.1, Self.linksFile(for: $0.0), $0.2) }
         let folder = Self.textFolder
         Task.detached(priority: .utility) {
             try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            for (file, body) in writes { try? body.write(to: file, atomically: true, encoding: .utf8) }
+            for (file, body, linksFile, links) in writes {
+                try? body.write(to: file, atomically: true, encoding: .utf8)
+                try? JSONEncoder().encode(links).write(to: linksFile, options: .atomic)
+            }
             for file in goneFiles { try? FileManager.default.removeItem(at: file) }
         }
     }
@@ -363,6 +367,15 @@ final class FeedStore {
         return textFolder.appending(path: String(hash.prefix(32)) + ".txt")
     }
 
+    /// The words in a kept text that link somewhere, beside it.
+    private static func linksFile(for link: URL) -> URL {
+        textFile(for: link).deletingPathExtension().appendingPathExtension("links")
+    }
+
+    private func keptLinks(of link: URL) -> [PageLink] {
+        (try? Data(contentsOf: Self.linksFile(for: link))).flatMap { try? JSONDecoder().decode([PageLink].self, from: $0) } ?? []
+    }
+
     func keptText(of link: URL) -> String? {
         try? String(contentsOf: Self.textFile(for: link), encoding: .utf8)
     }
@@ -372,18 +385,21 @@ final class FeedStore {
     func readable(_ story: NewsStory) async -> ReadablePage? {
         let kept = keptText(of: story.link).map(PageReader.withoutFurniture)
         // A newsletter's text is whatever came with it: there's no page to go and read.
-        if story.isMail { return ReadablePage(title: story.title, site: story.from ?? story.host, text: kept ?? "", isArticle: true) }
+        if story.isMail {
+            return ReadablePage(title: story.title, site: story.from ?? story.host, text: kept ?? "", isArticle: true, links: Newsletters.links(of: story.link, in: kept ?? ""))
+        }
         if let kept, kept.count >= Self.wholeArticle {
-            return ReadablePage(title: story.title, site: story.host, text: kept, isArticle: true)
+            return ReadablePage(title: story.title, site: story.host, text: kept, isArticle: true, links: keptLinks(of: story.link))
         }
         guard let found = await RenderedPage.readable(of: story.link) else {
-            return kept.map { ReadablePage(title: story.title, site: story.host, text: $0, isArticle: true) }
+            return kept.map { ReadablePage(title: story.title, site: story.host, text: $0, isArticle: true, links: keptLinks(of: story.link)) }
         }
         let page = found
         if page.isArticle {
             let file = Self.textFile(for: story.link)
             try? FileManager.default.createDirectory(at: Self.textFolder, withIntermediateDirectories: true)
             try? page.text.write(to: file, atomically: true, encoding: .utf8)
+            try? JSONEncoder().encode(page.links).write(to: Self.linksFile(for: story.link), options: .atomic)
         }
         return page
     }

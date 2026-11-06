@@ -8,7 +8,11 @@ final class ReaderModel: Identifiable {
     /// A story from the feed, which has no tab behind it: its picture and
     /// headline show at once, and it can be saved or opened as a page.
     let story: NewsStory?
-    private(set) var page: ReadablePage?
+    private(set) var page: ReadablePage? {
+        didSet { paragraphs = page.map(Self.paragraphs(of:)) ?? [] }
+    }
+    /// The page's text to show, with its links on.
+    private(set) var paragraphs: [AttributedString] = []
     private(set) var failure: String?
     /// A story's three sides: its text, its summary, and the page it came from.
     enum Side { case reader, summary, page }
@@ -69,6 +73,47 @@ final class ReaderModel: Identifiable {
             failure = error.localizedDescription
         }
     }
+
+    /// Each link goes where it was: in its own paragraph, whole words only, so
+    /// "here" doesn't land inside "where". One that knows no paragraph goes on the
+    /// first place it's said. Then addresses written out; a bare "index.hr" in a
+    /// sentence stays a word.
+    private static func paragraphs(of page: ReadablePage) -> [AttributedString] {
+        let lines = page.text.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        var result = lines.map { AttributedString($0) }
+        func put(_ url: URL, on range: Range<String.Index>, line: Int) -> Bool {
+            guard let range = Range(range, in: result[line]), result[line][range].runs.allSatisfy({ $0.link == nil }) else { return false }
+            result[line][range].link = url
+            result[line][range].underlineStyle = .single
+            return true
+        }
+        func place(_ link: PageLink, line: Int) -> Bool {
+            let text = lines[line]
+            let whole = #"(?<![\p{L}\p{N}])"# + NSRegularExpression.escapedPattern(for: link.words) + #"(?![\p{L}\p{N}])"#
+            var from = text.startIndex
+            while let range = text.range(of: whole, options: .regularExpression, range: from..<text.endIndex) {
+                if put(link.url, on: range, line: line) { return true }
+                from = range.upperBound
+            }
+            return false
+        }
+        let linesOfText = Dictionary(grouping: lines.indices) { lines[$0] }
+        for link in page.links {
+            let lineNumbers = link.block.map { linesOfText[$0] ?? [] } ?? Array(lines.indices)
+            _ = lineNumbers.first { place(link, line: $0) }
+        }
+        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+        for (line, text) in lines.enumerated() {
+            for match in detector?.matches(in: text, range: NSRange(text.startIndex..., in: text)) ?? [] {
+                guard let url = match.url, url.scheme == "http" || url.scheme == "https", let range = Range(match.range, in: text) else { continue }
+                let written = text[range].lowercased()
+                if written.hasPrefix("http") || written.hasPrefix("www.") { _ = put(url, on: range, line: line) }
+            }
+        }
+        return result
+    }
 }
 
 struct ReaderView: View {
@@ -80,7 +125,7 @@ struct ReaderView: View {
         ZStack {
             article.opacity(model.side == .page ? 0 : 1)
             if model.pageOpened, let story = model.story {
-                ArticlePage(url: story.link, html: story.isMail ? Newsletters.original(of: story.link) : nil)
+                ArticlePage(url: story.link, html: story.isMail ? Newsletters.original(of: story.link) : nil, openLink: browser.openPage)
                     .opacity(model.side == .page ? 1 : 0)
                     .allowsHitTesting(model.side == .page)
             }
@@ -117,13 +162,18 @@ struct ReaderView: View {
                         }
                     .padding(.bottom, 6)
 
-                    ForEach(Array(paragraphs(page.text).enumerated()), id: \.offset) { _, paragraph in
+                    ForEach(Array(model.paragraphs.enumerated()), id: \.offset) { _, paragraph in
                         Text(paragraph)
                             .font(.system(size: 19))
                             .lineSpacing(6)
                             .foregroundStyle(Theme.ink)
+                            .tint(Theme.ink)
                             .textSelection(.enabled)
                     }
+                    .environment(\.openURL, OpenURLAction { url in
+                        browser.openPage(url)
+                        return .handled
+                    })
                     if let leave = model.story?.unsubscribe {
                         Button("Unsubscribe") { browser.openPage(leave) }
                             .font(.system(size: 15, weight: .medium))
@@ -267,29 +317,28 @@ struct ReaderView: View {
         .buttonStyle(GlyphButtonStyle())
         .accessibilityLabel(label)
     }
-
-    private func paragraphs(_ text: String) -> [String] {
-        text.components(separatedBy: "\n")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-    }
 }
 
 /// The story's own page, in place: it stays as it is while the others show.
-/// Its links open here, a new window's too: this isn't a tab.
+/// Its links open here, a new window's too: this isn't a tab. A newsletter's go to
+/// a tab: scripts are off in here, and the page they lead to may need them.
 private struct ArticlePage: UIViewRepresentable {
     let url: URL
     /// A newsletter's original, in place of the address: its images load, its scripts don't run.
     var html: String?
+    let openLink: (URL) -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeCoordinator() -> Coordinator { Coordinator(openLink: html == nil ? nil : openLink) }
 
     func makeUIView(context: Context) -> WKWebView {
         let webView = WebViewFactory.makeOffscreen()
         webView.uiDelegate = context.coordinator
+        webView.navigationDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
         if let html {
             webView.configuration.defaultWebpagePreferences.allowsContentJavaScript = false
+            // A mail's first line starts at the top: clear of the sheet's rounded corners.
+            webView.scrollView.contentInset.top = 20
             webView.loadHTMLString(html, baseURL: nil)
         } else {
             webView.load(URLRequest(url: url))
@@ -299,11 +348,31 @@ private struct ArticlePage: UIViewRepresentable {
 
     func updateUIView(_ webView: WKWebView, context: Context) {}
 
-    final class Coordinator: NSObject, WKUIDelegate {
+    final class Coordinator: NSObject, WKUIDelegate, WKNavigationDelegate {
+        private let openLink: ((URL) -> Void)?
+
+        init(openLink: ((URL) -> Void)?) {
+            self.openLink = openLink
+        }
+
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                      for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-            webView.load(navigationAction.request)
+            if let openLink, let url = navigationAction.request.url {
+                openLink(url)
+            } else {
+                webView.load(navigationAction.request)
+            }
             return nil
+        }
+
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+                     decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
+            if let openLink, navigationAction.navigationType == .linkActivated, let url = navigationAction.request.url {
+                openLink(url)
+                decisionHandler(.cancel)
+            } else {
+                decisionHandler(.allow)
+            }
         }
     }
 }
