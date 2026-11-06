@@ -177,9 +177,19 @@ function drag(box, name, axis, min, max, area, onUse, onSet) {
   range.addEventListener("input", () => { onUse?.(); set(+range.value); });
   let on = false;
   const at = e => { const r = box.getBoundingClientRect(); set((typeof axis === "function" ? axis() : axis) === "x" ? (e.clientX - r.left) / r.width * 100 : (e.clientY - r.top) / r.height * 100); };
-  area.addEventListener("pointerdown", e => { if (e.pointerType === "mouse") e.preventDefault(); on = true; onUse?.(); area.setPointerCapture(e.pointerId); at(e); });
-  area.addEventListener("pointermove", e => { if (on) at(e); });
-  for (const end of ["pointerup", "pointercancel"]) area.addEventListener(end, () => { on = false; });
+  // A finger on the whole picture may only be on its way down the page: it takes the divider once it moves sideways.
+  let from = null;
+  const take = e => { on = true; from = null; onUse?.(); area.setPointerCapture(e.pointerId); at(e); };
+  area.addEventListener("pointerdown", e => {
+    if (e.pointerType === "mouse") e.preventDefault();
+    if (e.pointerType === "touch" && area === box) from = [e.clientX, e.clientY];
+    else take(e);
+  });
+  area.addEventListener("pointermove", e => {
+    if (from) { const x = Math.abs(e.clientX - from[0]), y = Math.abs(e.clientY - from[1]); if (x > 8 && x > y) take(e); return; }
+    if (on) at(e);
+  });
+  for (const end of ["pointerup", "pointercancel"]) area.addEventListener(end, () => { on = false; from = null; });
   return set;
 }
 drag(puller, "--p", "y", 6, 100, puller.querySelector(".grip"), () => { pulled = true; });
@@ -203,6 +213,8 @@ const layPages = () => {
 const setSplit = drag(splitter, "--s", () => turned > .5 ? "x" : "y", 28, 76, splitter.querySelector(".grip"), () => { splitTaken = true; }, v => { split = v; layPages(); });
 
 // The same tap-tap as the app: the first marks it, the second hides it.
+// Until someone taps, the scroll does the tapping: offer, newsletter, then app banner.
+let playHide = () => {};
 {
   const demo = document.getElementById("demo");
   const title = document.getElementById("hTitle"), sub = document.getElementById("hSub"), undo = document.getElementById("hUndo"), done = document.getElementById("hDone");
@@ -216,14 +228,27 @@ const setSplit = drag(splitter, "--s", () => turned > .5 ? "x" : "y", 28, 76, sp
     else { title.textContent = "Tap something to hide"; sub.textContent = hidden.length ? `${hidden.length} hidden` : "Tap it again to hide it"; }
   };
   const mark = el => { marked?.classList.remove("marked"); marked = el; el?.classList.add("marked"); };
+  const queue = [document.getElementById("adbox"), demo.querySelector(".news"), demo.querySelector(".app")];
+  let tapped = false, stage = 0;
+  const hideNow = el => { el.style.height = el.offsetHeight + "px"; el.offsetHeight; el.classList.add("gone"); hidden.push(el); };
+  const bring = el => { el.classList.remove("gone"); hidden.splice(hidden.indexOf(el), 1); setTimeout(() => { if (!el.classList.contains("gone")) el.style.height = ""; }, 340); };
+  playHide = next => {
+    if (tapped || next === stage) return;
+    stage = next;
+    queue.forEach((el, i) => {
+      const gone = el.classList.contains("gone");
+      if (i < next && !gone) hideNow(el);
+      if (i >= next && gone) bring(el);
+    });
+    mark(queue[next] || null);
+    say();
+  };
+  demo.addEventListener("pointerdown", e => { if (e.target.closest("button")) tapped = true; });
   demo.addEventListener("click", e => {
     const el = e.target.closest(".h"); if (!el || finished) return;
     if (el !== marked) { mark(el); return say(); }
     mark(null);
-    el.style.height = el.offsetHeight + "px";
-    el.offsetHeight;
-    el.classList.add("gone");
-    hidden.push(el);
+    hideNow(el);
     say();
   });
   undo.addEventListener("click", () => {
@@ -319,13 +344,18 @@ hold.addEventListener("keyup", spEnd);
 hold.addEventListener("blur", spEnd);
 
 if (!still) {
-  const cleanPin = document.getElementById("cleanPin"), splitPin = document.getElementById("splitPin"), splitDevice = splitter.closest(".device");
-  let splitFit = 1, pinned = false;
+  const cleanPin = document.getElementById("cleanPin"), hidePin = document.getElementById("hidePin"), splitPin = document.getElementById("splitPin"), splitDevice = splitter.closest(".device");
+  let splitFit = 1, splitUp = 0, pinned = false;
+  // The tall height, which Safari's toolbar coming and going doesn't change: scenes measure from this alone.
+  const stable = Object.assign(document.createElement("div"), { style: "position:fixed;top:0;width:0;height:100vh;visibility:hidden;pointer-events:none" });
+  stable.setAttribute("aria-hidden", "true");
+  document.body.append(stable);
+  let vh0 = stable.offsetHeight, vw0 = innerWidth;
   // A pinned phone needs the height to stand in. Too short, and both scenes stay in plain flow.
   const pinTo = on => {
     if (on === pinned) return;
     pinned = turning = on;
-    cleanPin.classList.toggle("on", on); splitPin.classList.toggle("on", on); splitSection.classList.toggle("scrub", on);
+    for (const pin of [cleanPin, hidePin, splitPin]) pin.classList.toggle("on", on); splitSection.classList.toggle("scrub", on);
     splitter.querySelector(".two img").style.top = on ? "0" : "";
     if (on) return;
     turned = 0;
@@ -333,30 +363,116 @@ if (!still) {
     for (const [img] of splitShots) img.style.transform = "";
     if (!compared) setCompare(50);
     if (!splitTaken) setSplit(50);
+    playHide(0);
+    for (const held of [cleanPin, hidePin]) held.firstElementChild.style.top = "";
   };
   // Measured once and on resize, never while scrolling.
   const measure = () => {
-    pinTo(innerHeight >= 620);
+    vh0 = stable.offsetHeight;
+    pinTo(vh0 >= 620);
     if (!pinned) return;
+    // Each held scene stops in the middle of the screen, clear of the nav.
+    for (const held of [cleanPin, hidePin]) {
+      const scene = held.firstElementChild;
+      const stop = Math.max(72, (innerHeight - scene.offsetHeight) / 2);
+      scene.style.top = stop + "px";
+      held.stop = stop - parseFloat(getComputedStyle(scene).marginTop);
+    }
     splitW = splitter.offsetWidth; splitH = splitter.offsetHeight;
     const tall = splitDevice.offsetHeight;
     splitFit = Math.min(1, (innerWidth - 32) / tall);
+    splitUp = innerWidth >= 1100 ? 0 : Math.max(0, (tall - splitDevice.offsetWidth * splitFit) / 2 * .7);
     const line = splitSection.querySelector("h2"), [a, b] = line.querySelectorAll("span"), wide = innerWidth >= 1100;
     const air = b.offsetLeft - a.offsetLeft - a.offsetWidth, half = splitDevice.offsetWidth / 2 + 44;
     splitSection.style.setProperty("--lx", wide ? (air + b.offsetWidth - a.offsetWidth) / 2 - half + "px" : "0px");
     splitSection.style.setProperty("--rx", wide ? half + (b.offsetWidth - a.offsetWidth - air) / 2 + "px" : "0px");
     splitSection.style.setProperty("--lc", wide ? half + b.offsetWidth / 2 + "px" : "0px");
-    splitSection.style.setProperty("--dy", wide ? innerHeight / 2 - line.offsetTop - line.offsetHeight / 2 + "px" : "0px");
+    splitSection.style.setProperty("--dy", wide ? vh0 / 2 - line.offsetTop - line.offsetHeight / 2 + "px" : "0px");
     layPages();
   };
   measure();
-  addEventListener("resize", () => { measure(); frame(); });
+  addEventListener("resize", () => {
+    if (coarse && innerWidth === vw0) return;
+    vw0 = innerWidth;
+    lightDirty = true;
+    measure();
+    frame();
+  });
   document.fonts?.ready.then(() => { measure(); frame(); });
+  // A scene's pictures are ready before it arrives, so none of them pops in mid-scroll.
+  new IntersectionObserver((near, io) => {
+    for (const { isIntersecting, target } of near) if (isIntersecting) {
+      io.unobserve(target);
+      for (const img of target.querySelectorAll("img")) { img.loading = "eager"; img.decode?.().catch(() => {}); }
+    }
+  }, { rootMargin: "200% 0px" }).observe(cleanPin);
   // The summary comes down over the page as it scrolls in, until someone takes it.
   let queued = false;
+  // The light, as the app has it: two pictures drawn once and only moved, so a still page does no work.
+  // It sits low, comes up with the pop-up going, and at the foot its crest catches and it carries the page off.
+  const rise = document.createElement("div"), dome = document.createElement("canvas"), crest = document.createElement("i");
+  const lightBox = document.createElement("div");
+  lightBox.className = "sky"; lightBox.setAttribute("aria-hidden", "true"); rise.className = "rise";
+  rise.append(dome, crest); lightBox.append(rise); document.body.append(lightBox);
+  document.documentElement.classList.add("lit");
+  let drawn = null, riseOffset = 0;
+  const drawDome = round => {
+    if (drawn === round) return;
+    drawn = round;
+    const w = round ? 512 : 640, h = round ? 512 : 400, edge = .62, soft = round ? 1.6 : 1;
+    dome.width = w; dome.height = h;
+    const body = new ImageData(w, h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const u = x / w * 2 - 1, v = round ? 1 - y / h * 2 : 1 - y / h, d = Math.hypot(u, v) - edge, at = (x + y * w) * 4, n = Math.random() * 2 - 1;
+      const inside = Math.min(1, Math.max(0, -d / .5));
+      const alpha = d > 0 ? .5 * Math.exp(-d / (.09 * soft)) : .5 + .5 * (1 - Math.exp(d / (.07 * soft)));
+      // Opaque over the page's own black: a see-through picture rounds its dim colours into visible rings.
+      const n2 = Math.random() * 2 - 1, n3 = Math.random() * 2 - 1;
+      body.data[at] = 15 + (124 + 57 * inside - 15) * alpha + n;
+      body.data[at + 1] = 15 + (47 + 25 * inside - 15) * alpha + n2;
+      body.data[at + 2] = 14 + (20 + 8 * inside - 14) * alpha + n3;
+      body.data[at + 3] = 255;
+    }
+    dome.getContext("2d").putImageData(body, 0, 0);
+  };
+  let levels = [], footTop = 0, lightDirty = true, lastY = scrollY, lift = 0, navY = scrollY;
+  const navBar = document.querySelector(".nav");
+  const foot = document.querySelector("footer");
+  const mapLight = () => {
+    lightDirty = false;
+    drawDome(vw0 <= 600);
+    riseOffset = vw0 <= 600 ? rise.offsetHeight * .19 : vh0 * .008;
+    const top = el => el.getBoundingClientRect().top + scrollY, vh = vh0;
+    const clean = document.getElementById("cleanPin"), held = document.getElementById("hidePin"), turn = document.getElementById("splitPin");
+    levels = [
+      [0, .2, .9], [top(document.getElementById("fast")), .26, .8], [top(document.getElementById("smart")), .3, .75],
+      [top(clean), .34, .75], [top(clean) + vh * 1.3, .6, 1], [top(held) - vh * .2, .36, .75], [top(held) + vh * 1.1, .46, .85],
+      [top(turn), .36, .75], [top(turn) + turn.offsetHeight - vh, .54, .95], [top(document.getElementById("rest")), .34, .75],
+      [top(foot) - vh, .4, .85],
+    ].sort((a, b) => a[0] - b[0]);
+    footTop = top(foot);
+  };
+  const moveLight = vh => {
+    if (lightDirty) mapLight();
+    const y = scrollY;
+    lift = Math.max(lift * .9, Math.min(1, Math.abs(y - lastY) / 160));
+    if (vw0 <= 600 && Math.abs(y - navY) > 6) { navBar.classList.toggle("away", y > navY && y > vh * .4); navY = y; }
+    lastY = y;
+    let at = 1;
+    while (at < levels.length - 1 && levels[at][0] < y) at++;
+    const [a, b] = [levels[at - 1], levels[at]], k = Math.max(0, Math.min(1, (y - a[0]) / (b[0] - a[0] || 1))), s = k * k * (3 - 2 * k);
+    const free = vh * (1 - (a[1] + (b[1] - a[1]) * s) * (vw0 <= 600 ? .8 : 1) - .035 * lift), line = footTop - y;
+    const caught = Math.max(0, Math.min(1, 1 - (line - free) / (vh * .5)));
+    rise.style.transform = `translateY(${Math.min(free, line) - riseOffset}px)`;
+    dome.style.opacity = (a[2] + (b[2] - a[2]) * s) * (1 - caught) + caught;
+    crest.style.opacity = caught;
+  };
+  new ResizeObserver(() => { lightDirty = true; if (!queued) { queued = true; requestAnimationFrame(frame); } }).observe(document.body);
   const frame = () => {
     queued = false;
-    const vh = innerHeight;
+    const vh = vh0;
+    moveLight(vh);
+    if (lift > .004 && !queued) { queued = true; requestAnimationFrame(frame); }
     if (!pulled) {
       const r = puller.getBoundingClientRect();
       puller.style.setProperty("--p", 6 + 56 * Math.max(0, Math.min(1, (vh * .8 - r.top) / (vh * .55))) + "%");
@@ -365,7 +481,10 @@ if (!still) {
     // Each scene plays by scroll position alone, so scrolling back plays it backwards.
     const along = pin => { const r = pin.getBoundingClientRect(); return r.bottom < -vh || r.top > vh * 2 ? null : Math.max(0, Math.min(1, -r.top / (r.height - vh))); };
     const ease = v => { v = Math.max(0, Math.min(1, v)); return v * v * (3 - 2 * v); };
-    const wiped = along(cleanPin);
+    const heldFor = (pin, travel) => { const r = pin.getBoundingClientRect(); return r.bottom < -vh || r.top > vh * 2 ? null : Math.max(0, Math.min(1, (pin.stop - r.top) / (travel * vh))); };
+    const wiped = heldFor(cleanPin, 1.3);
+    const tidied = heldFor(hidePin, 1.1);
+    if (tidied !== null) playHide(tidied < .16 ? 0 : tidied < .44 ? 1 : tidied < .72 ? 2 : 3);
     if (wiped !== null && !compared) setCompare(100 - 100 * ease((wiped - .1) / .74));
     const k = along(splitPin);
     if (k !== null) {
@@ -373,8 +492,8 @@ if (!still) {
       splitSection.style.setProperty("--t", turned);
       splitSection.style.setProperty("--mid", Math.min(1, Math.sin(Math.PI * turned) * 2.4));
       splitSection.classList.toggle("side", turned > .5);
-      splitDevice.style.transform = `translateY(${(innerWidth >= 1100 ? vh * .05 : 0) * turned}px) rotate(${-90 * turned}deg) scale(${1 + (splitFit - 1) * turned})`;
-      if (!splitTaken) setSplit(50 + 13 * Math.sin(Math.PI * ease(k / .36)));
+      splitDevice.style.transform = `translateY(${(innerWidth >= 1100 ? vh * .05 : -splitUp) * turned}px) rotate(${-90 * turned}deg) scale(${1 + (splitFit - 1) * turned})`;
+      if (!splitTaken && !coarse) setSplit(50 + 13 * Math.sin(Math.PI * ease(k / .36)));
       else layPages();
     }
   };
