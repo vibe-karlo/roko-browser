@@ -40,11 +40,10 @@ roko was the fastest browser in 15 of the 24 site rounds. Its median per site, a
 
 A fourth round, on a later build and four browsers: roko 0.90, Quiche 1.46, Brave 3.30, Safari 3.62.
 
-**Where roko didn't lead.** On a first visit to eight other sites, most behind cookie walls, roko's median was
-3.68 s, behind Safari (2.65), Lens (2.84), Quiche (2.88), Chrome (3.12), Firefox (3.20) and Arc (3.31). A browser
-counts as drawn once its wall shows, which favours those that leave the wall up, and two of roko's runs were
-the failures since fixed. It still means the speed result is for return visits. On a second visit to those
-sites roko led with 1.80 s (Quiche 2.59, Firefox 3.15, Lens 3.83, Safari 3.98).
+**Where roko didn't lead.** On a first visit to eight other sites, most behind cookie walls, roko's median was 3.68 s on build 12,
+behind Safari (2.65), Lens (2.84), Quiche (2.88), Chrome (3.12), Firefox (3.20) and Arc (3.31), with four failures since looked into. The three
+later first-visit tests can't settle this: a browser counts as drawn once its wall shows, and many read as 0 s, drawn as soon as they
+appear. No first-visit speed is claimed. On a second visit to those eight sites roko led with 1.80 s (Quiche 2.59, Firefox 3.15, Lens 3.83, Safari 3.98).
 
 ## Ad and tracker servers reached
 
@@ -66,19 +65,54 @@ Chrome 0, Edge 0. One pass, one person's eye, and a walled browser can't be judg
 
 ## Cookie walls
 
-First visit to eight European sites, scored by eye. Past the wall: Brave 6, roko 4, Arc 1, the others 0. In roko's
-other two runs the page broke. Those failures are fixed and all eight now get past the wall on the phone, but on
-visits with an answer already stored, so this hasn't been measured again from a true first visit. Where the only
-other way past a wall costs money, roko accepts it, with ads and trackers still blocked.
+First visits to sites no browser had opened, 20 s each, scored by eye from the final screen: is the real page there, with no
+wall on it? Three tests of eight sites each, 6 November, with roko's fixes going in between them, so the last is the final build.
+
+| Browser | Test 1 | Test 2 | Test 3 (final build) | Of 24 |
+|---|---|---|---|---|
+| Brave | 7 | 6 | 7 | 20 |
+| roko | 6 | 6 | 6 | 18 |
+| DuckDuckGo | 2 | 4 | 2 | 8 |
+| Arc | 0 | 3 | 2 | 5 |
+| Quiche | 2 | 1 | 1 | 4 |
+| Lens | 1 | 0 | 1 | 2 |
+| Chrome | 0 | 0 | 1 | 1 |
+| Safari | 0 | 0 | 1 | 1 |
+| Edge | 0 | 0 | 1 | 1 |
+| Firefox | 0 | 0 | 0 | 0 |
+
+Sites: Repubblica, Le Figaro, FAZ, Süddeutsche, AS, Mirror, Gazzetta, Ouest-France; La Stampa, Il Messaggero, Cadena SER, 20minutos,
+Stern, Focus, BFM TV, Express; ANSA, Corriere dello Sport, t-online, Computer Bild, L'Express, ABC, The Standard, De Telegraaf.
+Cadena SER showed five browsers a bot check, and no browser reached its page. The Standard showed no cookie wall, so only Firefox missed it,
+at an anti-adblock wall. Only Computer Bild had roko past where Brave wasn't, and roko's other misses are logged as failures.
+
+So roko isn't first here. Getting past a wall also isn't blocking cookies: where the only other way past costs money, roko accepts,
+with ads and trackers still blocked.
+
+An earlier first-visit round on eight other sites, on build 12: Brave 6, roko 4, Arc 1, the others 0.
 
 ## Data
 
 All the data the iPhone received in 20 s. The counters are for the whole phone, and iOS was downloading an update during
 part of the test, so these are rough.
 
-First visit to eight news sites, added up, one run each: roko 32.6 MB, Quiche 37.5, Firefox 39.2, Lens 47.1, DuckDuckGo 52.7,
-Chrome 56.0, Safari 56.4, Arc 63.4, Brave 63.8, Edge 64.5. A browser stopped at a wall loads less. One of roko's eight was
-Corriere's crash (4.8 MB); without Corriere roko still has the least, at 27.7 MB against Quiche's 30.0.
+First visits, added up, one run each per site:
+
+| Browser | 8 sites, build 12 | Test 1 | Test 2 | Test 3 (final build) | The 3 tests |
+|---|---|---|---|---|---|
+| Safari | 56.4 | 24.5 | 20.1 | 27.3 | 71.9 |
+| Lens | 47.1 | 29.2 | 8.8 | 35.3 | 73.3 |
+| roko | 32.6 | 36.0 | 17.9 | 20.7 | 74.6 |
+| Quiche | 37.5 | 27.3 | 31.9 | 29.6 | 88.8 |
+| Chrome | 56.0 | 33.6 | 27.0 | 30.1 | 90.7 |
+| DuckDuckGo | 52.7 | 46.6 | 27.3 | 34.1 | 108.0 |
+| Edge | 64.5 | 32.5 | 45.7 | 36.5 | 114.7 |
+| Firefox | 39.2 | 30.8 | 66.1 | 33.9 | 130.8 |
+| Brave | 63.8 | 36.8 | 54.1 | 43.3 | 134.2 |
+| Arc | 63.4 | 41.3 | 71.0 | 36.7 | 149.0 |
+
+A browser stopped at a wall loads less, so Safari and Lens are low for that reason. Of the two that got past most walls, roko used
+about 45% less than Brave. roko's total includes 13.6 MB on the Mirror (Ad-Shield, failure 15).
 
 Return visits, median per run: Quiche 0.4, Firefox 1.2, roko 1.4, Brave 1.5, DuckDuckGo 1.8, Lens 2.0, Edge 2.0, Chrome 2.0,
 Arc 2.3, Safari 2.4. roko's extra was nearly all on CNN (8.8 against 2.1 for Chrome), from decorative looping videos, which
