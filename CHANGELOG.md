@@ -6,6 +6,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Website
+- The page is recomposed around one light: it rises as you scroll, peaks behind "Nothing in your way" and ends in the footer, and the headline passes behind the phone. The bar's jobs are a grid of different tiles, and the scoreboard sits beside its claim.
+- On a phone, tapping the bar brings its keys into view, without zooming. On a computer, a QR code carries the beta link to your iPhone.
+- The keyboard reaches every demo and nothing hidden, whole FAQ rows open, and the demo's bar answers Enter and replaces a suggestion when you type. There's a 404 page, and the contact address is karlo@rokobrowser.com.
 - The scoreboard now shows the real-site test: speed, ads and trackers reached, clean pages and data on a first visit, across ten browsers, with the method under each.
 - A scoreboard beside the speed section: nine browsers on one iPhone, re-sorting themselves for data used, trackers blocked and time to page, with the method, date and versions under it and a link to the test in `Scripts/compare`.
 - roko has a site in `Site/`, phone first: a live iPhone in true proportions with the bar and a working keyboard, speed numbers, a draggable summary, a before and after slider, Split View with a divider to drag, a made-up page to tap things away on, a private switch to try, hold to speak to try, a to-do widget and a shopping list that really tick, which AI runs where, iPhone Duo in the questions, a link to the code on GitHub, support and the privacy policy.
