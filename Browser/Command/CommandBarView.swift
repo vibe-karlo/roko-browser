@@ -206,6 +206,8 @@ struct CommandBarView: View {
             withAnimation(.snappy(duration: 0.18)) { previewing = index > 0 || query.isEmpty }
         }
         .onChange(of: CurrencyRates.shared.date) { rebuild() }
+        // Worked out at launch from the newest pages, before the index was there.
+        .onChange(of: browser.historyIndex.isReady) { rebuild() }
         .onChange(of: TodayModel.shared.weather) { rebuild() }
         // Speaking: the words come into the field as they're heard, and the rows follow.
         .onChange(of: VoiceInput.shared.partial) { _, heard in
@@ -869,7 +871,7 @@ struct CommandBarView: View {
         }
         // Nothing typed yet: a link copied a moment ago, here or on a Mac,
         // today's to-dos while any are left, your pins (as Arc lists them),
-        // then the last pages you were on, to scroll through and pick.
+        // then the pages you open most, to scroll through and pick.
         if query.isEmpty {
             var rows: [CommandItem] = []
             // Paid parking running: the time left comes before anything else.
@@ -942,7 +944,7 @@ struct CommandBarView: View {
                                         subtitle: "Unlock with \(PrivacyLock.method)", kind: "",
                                         icon: .glyph(.lock), action: .unlockHistory))
             }
-            for entry in browser.history(matching: "", limit: 30) {
+            for entry in browser.mostUsedHistory(limit: 30) {
                 guard rows.count - firstRecent < 8, let url = URL(string: entry.url), !browser.isCurrentPage(url),
                       seen.insert(entry.url).inserted,
                       seenPages.insert("\(url.displayHost)|\(entry.title.isEmpty ? url.path : entry.title)").inserted else { continue }
@@ -1263,12 +1265,12 @@ enum CommandRanker {
         // Typing for a private tab, a normal tab isn't offered: Return would
         // switch to it and leave private browsing.
         // Sites whose address starts with what's typed, front page first (below).
-        var sites: [String: (url: URL, title: String?, visits: Int)] = [:]
-        func noteSite(_ url: URL, title: String?, visits: Int) -> Bool {
+        var sites: [String: (url: URL, title: String?, use: Double)] = [:]
+        func noteSite(_ url: URL, title: String?, use: Double) -> Bool {
             let host = url.displayHost
             guard needle.count >= 2, host.lowercased().hasPrefix(needle) else { return false }
             var site = sites[host] ?? (URL(string: "\(url.scheme ?? "https")://\(url.host() ?? host)/") ?? url, nil, 0)
-            site.visits += visits
+            site.use += use
             if url.path.count <= 1, let title { site.title = title }
             sites[host] = site
             return true
@@ -1280,7 +1282,7 @@ enum CommandRanker {
             guard tabPages.insert(tab.url?.absoluteString ?? tab.id.uuidString).inserted else { continue }
             // Locked private tabs aren't named here either.
             if tab.isPrivate, PrivacyLock.shared.hides(tab.id) { continue }
-            let onSite = tab.url.map { noteSite($0, title: tab.displayTitle, visits: 1) } ?? false
+            let onSite = tab.url.map { noteSite($0, title: tab.displayTitle, use: 1) } ?? false
             // An article open in a tab comes after its site, as in history.
             let base = onSite && (tab.url?.path.count ?? 0) > 1 ? 560 : 760
             if let value = score(title: tab.displayTitle, host: onSite && base == 560 ? "" : tab.url?.displayHost ?? "", base: base)
@@ -1305,10 +1307,10 @@ enum CommandRanker {
         // front page) is the best guess, ahead of searching for the letters and
         // ahead of any one article on it, however often that was read.
         var articles: [(entry: HistoryIndex.Hit, url: URL)] = []
-        for entry in browser.history(matching: query, limit: 16) where !openURLs.contains(entry.url) {
+        for entry in browser.history(matching: query, limit: 40) where !openURLs.contains(entry.url) {
             guard let url = URL(string: entry.url) else { continue }
             let host = url.displayHost
-            if noteSite(url, title: entry.title, visits: entry.visitCount), url.path.count <= 1 { continue }
+            if noteSite(url, title: entry.title, use: entry.use), url.path.count <= 1 { continue }
             if openPages.contains("\(host)|\(entry.title.isEmpty ? host : entry.title)") { continue }
             articles.append((entry, url))
         }
@@ -1320,7 +1322,7 @@ enum CommandRanker {
                 }
                 continue
             }
-            ranked.append((910 + min(site.visits, 40), CommandItem(
+            ranked.append((910 + HistoryIndex.points(site.use, atMost: 40), CommandItem(
                 id: "site-\(host)", title: site.title.flatMap { $0.isEmpty ? nil : $0 } ?? host,
                 subtitle: host, kind: "Open", icon: .site(host), action: .open(site.url))))
             offeredHosts.insert(host)
@@ -1329,7 +1331,7 @@ enum CommandRanker {
         // own title is what's being typed.
         for (entry, url) in articles.prefix(8) {
             let value = score(title: entry.title, host: sites[url.displayHost] == nil ? url.displayHost : "", base: 600) ?? 560
-            ranked.append((value + min(entry.visitCount, 20), CommandItem(
+            ranked.append((value + HistoryIndex.points(entry.use, atMost: 20), CommandItem(
                 id: "history-\(entry.url)", title: entry.title.isEmpty ? url.displayHost : entry.title,
                 subtitle: url.displayHost, kind: "History", icon: .site(url.displayHost), action: .open(url))))
             offeredHosts.insert(url.displayHost)

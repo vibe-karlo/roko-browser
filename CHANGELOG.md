@@ -31,6 +31,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Sites' own anti-adblock walls are beaten before they come up, on about 8,200 sites, with uBlock Origin's site rules (GPL-3.0): a small change to the page before it runs, such as BILD's `"adBlockWallEnabled":true` turned false. Only a site with a rule pays for it. Its ads stay blocked, where before the page went blank and its ads were let through.
 
 ### Changed
+- The bar puts first what you open most and have opened lately, typing or not. Every match counts, so a page you often open is no longer lost behind newer ones that also match.
 - Muted videos that loop by themselves wait until they're near the screen before they download. Blocking autoplay in WebKit doesn't stop muted video, and CNN's front page used 8 MB or more on them before you scrolled; it now takes about 2 MB.
 
 ### Fixed

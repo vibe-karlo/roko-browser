@@ -1498,6 +1498,13 @@ final class BrowserModel {
         }
     }
 
+    /// What you open most, for a bar with nothing typed. The first moment after launch,
+    /// before the index is built, it's simply the newest.
+    func mostUsedHistory(limit: Int) -> [HistoryIndex.Hit] {
+        guard !PrivacyLock.shared.isLocked else { return [] }
+        return historyIndex.isReady ? historyIndex.mostUsed(limit: limit) : history(matching: "", limit: limit)
+    }
+
     /// On every device: entry by entry, so the removal syncs.
     /// Pages visited since `since` (all of them by default), gone from history.
     func clearHistory(since: Date = .distantPast) {
