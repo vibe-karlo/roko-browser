@@ -96,6 +96,72 @@ nonisolated enum NewsBlocks {
     }
 }
 
+/// Stories asked to be shown less of: that story goes, one sharing two of its rarer
+/// words goes with it, and one sharing a single word sinks to the end of the page.
+/// Forgotten after two months: a passing wish, not a rule like a blocked word.
+nonisolated enum NewsLess {
+    struct Entry: Codable, Equatable, Identifiable, Sendable {
+        let title: String
+        let links: [URL]
+        let words: Set<String>
+        var date = Date.now
+        var id: String { title }
+    }
+
+    static let key = "feed.less"
+    private static let memory: TimeInterval = 60 * 24 * 3600
+    private static let wordsKept = 5
+
+    static var chosen: [Entry] {
+        get {
+            let saved = UserDefaults.standard.data(forKey: key).flatMap { try? JSONDecoder().decode([Entry].self, from: $0) } ?? []
+            return saved.filter { $0.date > .now.addingTimeInterval(-memory) }
+        }
+        set { UserDefaults.standard.set(try? JSONEncoder().encode(newValue), forKey: key) }
+    }
+
+    /// What says what a story, or an event's stories, is about: the words of its
+    /// headline that few of the day's others have. For an event, those most of its headlines share.
+    static func entry(for stories: [NewsStory], among titles: [String]) -> Entry {
+        var day: [String: Int] = [:]
+        for title in titles { for word in stems(title) { day[word, default: 0] += 1 } }
+        var own: [String: Int] = [:]
+        for story in stories { for word in stems(story.title) { own[word, default: 0] += 1 } }
+        let common = max(3, titles.count / 25)
+        // Rare, but not only here: a word no other headline has today says nothing of what's like it.
+        func rank(_ word: String) -> (Int, Int, String) {
+            let others = day[word, default: 0] - own[word, default: 0]
+            return (others > 0 ? 0 : 1, others, word)
+        }
+        let telling = own.filter { $0.value * 2 >= stories.count && day[$0.key, default: 0] <= common + stories.count }.keys
+            .sorted { rank($0) < rank($1) }
+        return Entry(title: StoryGroups.title(of: stories), links: stories.map(\.link), words: Set(telling.prefix(wordsKept)))
+    }
+
+    /// Shorter than the feed's own stems: "goriva" has to meet "gorivo".
+    private static func stems(_ title: String) -> Set<String> {
+        Set(TodayNews.stems(title).map { String($0.prefix(5)) })
+    }
+
+    /// Gone from the page: asked about, or sharing two of its telling words.
+    static func hides(_ story: NewsStory, in entries: [Entry]) -> Bool {
+        entries.contains { $0.links.contains(story.link) } || closeness(of: story.title, to: entries) >= 2
+    }
+
+    /// Not gone, but not to lead: one telling word in common. Those last, the rest as they were.
+    static func sunk(_ stories: [NewsStory], in entries: [Entry]) -> [NewsStory] {
+        guard !entries.isEmpty else { return stories }
+        let kept = stories.filter { !hides($0, in: entries) }
+        return kept.filter { closeness(of: $0.title, to: entries) == 0 } + kept.filter { closeness(of: $0.title, to: entries) > 0 }
+    }
+
+    /// How many telling words a headline shares with the entry closest to it.
+    static func closeness(of title: String, to entries: [Entry]) -> Int {
+        let words = stems(title)
+        return entries.map { $0.words.intersection(words).count }.max() ?? 0
+    }
+}
+
 /// One story from a feed or a page.
 nonisolated struct NewsStory: Codable, Equatable, Hashable, Identifiable, Sendable {
     let title: String
@@ -395,24 +461,34 @@ nonisolated enum TodayNews {
     /// What a club's name starts with: NK (nogometni klub), HNK, KK (košarka), RK (rukomet)…
     private static let clubMarks: Set<String> = ["nk", "hnk", "gnk", "snk", "kk", "rk", "vk", "hk", "ok", "fc", "afc", "sc", "sk", "ac"]
 
+    /// Its headline or its site says the topic's most telling word, cut to a stem:
+    /// "Osijek" finds "Osijeka" and "Osijeku" too. Not its summary: a summary's aside
+    /// put a piece on England's squad under Real Madrid, and Bernie Sanders under Formula 1.
+    static func names(_ topic: String, _ story: NewsStory) -> Bool {
+        guard let key = words(of: topic).max(by: { $0.count < $1.count }) else { return false }
+        let stem = key.count > 5 ? key.dropLast() : key
+        return words(of: story.title + " " + story.host).contains { $0.hasPrefix(stem) }
+    }
+
     @MainActor static func about(_ topic: String, in stories: [NewsStory], count: Int = 4) async -> [NewsStory] {
-        // The topic's most telling word, cut to a stem: "Osijek" finds "Osijeka" and "Osijeku" too.
         let words = folded(topic).split { !$0.isLetter && !$0.isNumber }.map(String.init)
         guard let key = words.max(by: { $0.count < $1.count }) else { return [] }
-        let stem = key.count > 5 ? String(key.dropLast()) : key
         // "NK Osijek" is a club: the city's news shares its name, so only the
         // sport pages, or a headline naming the club itself.
         let isClub = words.count > 1 && clubMarks.contains(words[0])
-        let named = folded(topic)
+        let named = words.joined(separator: " ")
         let matching = varied(recent(stories, hours: 48).filter { story in
-            let text = folded(story.title + " " + (story.summary ?? ""))
-            guard text.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).contains(where: { $0.hasPrefix(stem) }) else { return false }
+            guard names(topic, story) else { return false }
+            let text = self.words(of: story.title + " " + story.host).joined(separator: " ")
             return !isClub || text.contains(named) || story.link.path.lowercased().contains("sport")
         }, count: 20, perSite: 20)
-        guard words.count > 1 || key.count < 6, AppleModels.onDeviceAvailable, !matching.isEmpty else {
+        // Says the whole name: nothing for a model to doubt, and it turned down some of these.
+        func saysItAll(_ story: NewsStory) -> Bool { self.words(of: story.title).joined(separator: " ").contains(named) }
+        let doubtful = matching.filter { !saysItAll($0) }
+        guard words.count > 1 || key.count < 6, AppleModels.onDeviceAvailable, !doubtful.isEmpty else {
             return Array(matching.prefix(count))
         }
-        let numbered = matching.enumerated().map { "\($0.offset + 1). \($0.element.title)" }
+        let numbered = doubtful.enumerated().map { "\($0.offset + 1). \($0.element.title)" }
         let session = LanguageModelSession(model: AppleModels.summarizing, instructions: """
             You sort news headlines for someone who follows one subject. Keep only the headlines that are \
             about that subject itself, not about something else that shares a word with it: following a \
@@ -422,8 +498,8 @@ nonisolated enum TodayNews {
         guard let picks = try? await session.respond(to: prompt, generating: TopicMatch.self).content.numbers else {
             return Array(matching.prefix(count))
         }
-        let kept = Set(picks)
-        return Array(matching.enumerated().filter { kept.contains($0.offset + 1) }.map(\.element).prefix(count))
+        let kept = Set(picks.compactMap { doubtful.indices.contains($0 - 1) ? doubtful[$0 - 1].link : nil })
+        return Array(matching.filter { saysItAll($0) || kept.contains($0.link) }.prefix(count))
     }
 
     // MARK: Fetching

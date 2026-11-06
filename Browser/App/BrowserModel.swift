@@ -1042,12 +1042,15 @@ final class BrowserModel {
         }
     }
 
-    /// A link from another app is what you came for, so it goes over whatever panel is up.
+    /// A link from another app is what you came for, so it goes over whatever is up, sheets too.
     /// That includes the day's first Today, which then waits for your next return.
     private func openFromOutside(_ page: URL) {
         lastOutsideLink = .now
         if panel == .today { TodayModel.forgetIfJustShown() }
         panel = .none
+        reader = nil
+        summary = nil
+        browseForMe = nil
         open(page, inNewTab: true)
     }
 
@@ -1404,8 +1407,9 @@ final class BrowserModel {
     /// SwiftUI drops a sheet presented while another is still sliding away, so
     /// when a sheet panel is open, wait for it to finish closing first.
     private func presentAfterPanelCloses(_ present: @escaping () -> Void) {
-        let wasSheet = panel == .settings
+        let wasSheet = panel == .settings || reader != nil
         panel = .none
+        reader = nil
         guard wasSheet else { return present() }
         Task {
             try? await Task.sleep(for: .milliseconds(450))
@@ -1507,6 +1511,13 @@ final class BrowserModel {
         return ((try? context.fetch(descriptor)) ?? []).map {
             HistoryIndex.Hit(url: $0.url, title: $0.title, visitCount: $0.visitCount, visitedAt: $0.visitedAt)
         }
+    }
+
+    /// What you open most, for a bar with nothing typed. The first moment after launch,
+    /// before the index is built, it's simply the newest.
+    func mostUsedHistory(limit: Int) -> [HistoryIndex.Hit] {
+        guard !PrivacyLock.shared.isLocked else { return [] }
+        return historyIndex.isReady ? historyIndex.mostUsed(limit: limit) : history(matching: "", limit: limit)
     }
 
     /// On every device: entry by entry, so the removal syncs.

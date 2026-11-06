@@ -75,7 +75,7 @@ nonisolated enum FeedLayout {
     private static let listEvery = 4
     private static let briefLength = 4
 
-    static func compose(_ everything: [FeedItem]) -> [FeedBlock] {
+    static func compose(_ everything: [FeedItem], neverLeading: Set<String> = []) -> [FeedBlock] {
         // Newsletters together, near the top: they're what you asked to be sent.
         let mail = everything.flatMap(\.stories).filter(\.story.isMail)
         let items = everything.filter { !$0.stories.contains(where: \.story.isMail) }
@@ -121,7 +121,7 @@ nonisolated enum FeedLayout {
         while index < run.count {
             let item = run[index]
             let next = run.indices.contains(index + 1) ? run[index + 1] : nil
-            if item.picture != nil, sinceLead >= leadEvery || (item.sites >= 3 && sinceLead >= 2) {
+            if item.picture != nil, !neverLeading.contains(item.id), sinceLead >= leadEvery || (item.sites >= 3 && sinceLead >= 2) {
                 blocks.append(.lead(item))
                 sinceLead = 0
             } else if sinceLead == 2, case .story(let first) = item, case .story(let second)? = next {

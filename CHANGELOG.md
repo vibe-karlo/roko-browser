@@ -17,6 +17,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Reader no longer starts with a byline, a picture credit or "44 minutes ago".
 
 ### Website
+- A black page with the app's own light: a dome rising from the bottom edge, drawn once and only moved, whose crest catches at the footer. It replaces the page-long gradient.
+- "Still see it?" is a scene too: scrolling taps the page clean, and a real tap takes over. "Smart when you ask" lines its titles, text and phones up across the pair.
+- Phones scroll cleanly: a swipe on a demo no longer grabs its divider, Safari's toolbar no longer jumps the scenes, and the nav is a full-width bar that folds away going down.
 - One gradient now runs the whole page, near-black at the top and ember at the footer, in place of a gradient per section, so no section can seam against the next. Content has a maximum width on big screens. The clean-page comparison uses a new pair of real captures: Allrecipes' pancake recipe with roko's blocking off and on.
 - "Nothing in your way" is now a scene: the cookie wall wipes away to the pancakes as you scroll, and the light comes up with it. "Two pages at once" turns the phone sideways as you scroll, with each page staying upright, and the divider can still be dragged either way.
 - The page is recomposed around one light: it rises as you scroll, peaks behind "Nothing in your way" and ends in the footer, and the headline passes behind the phone. The bar's jobs are a grid of different tiles, and the scoreboard sits beside its claim.
@@ -31,11 +34,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Sites' own anti-adblock walls are beaten before they come up, on about 8,200 sites, with uBlock Origin's site rules (GPL-3.0): a small change to the page before it runs, such as BILD's `"adBlockWallEnabled":true` turned false. Only a site with a rule pays for it. Its ads stay blocked, where before the page went blank and its ads were let through.
 
 ### Changed
+- The bar puts first what you open most and have opened lately, typing or not. Every match counts, so a page you often open is no longer lost behind newer ones that also match.
 - Muted videos that loop by themselves wait until they're near the screen before they download. Blocking autoplay in WebKit doesn't stop muted video, and CNN's front page used 8 MB or more on them before you scrolled; it now takes about 2 MB.
 
 ### Fixed
-- Pay-or-consent walls are recognised in more languages and wordings ("Rifiuta e abbonati", "Deny & surf ad-free"), so roko no longer presses a no that leads to a payment page. It presses the wall's real yes button, not a word "consent" linked in its text, and presses again where a wall asks twice.
-- A link from another app no longer lands under the day's first Today, or any other panel. Today waits for your next return.
+- Pay-or-consent walls are recognised in more languages and wordings ("Rifiuta e abbonati", "Deny & surf ad-free"), so roko no longer presses a no that leads to a payment page. It presses the wall's real yes button, not a word "consent" linked in its text, and presses again where a wall asks twice. A no that leads to an account form counts too ("Disagree and create account"), and a no that lands on a page of its own, accept or pay, gets its accept pressed.
+- An ad strip pinned along the bottom, one picture with no words or links, folds away, as on Focus, whose ad server also has its photos and can't be blocked.
+- A link or question from another app no longer lands under the day's first Today, or any other panel or sheet. Today waits for your next return.
 - A page locked behind a wall still standing isn't unlocked by roko any more. Lists hide plain page parts too, which was taken as proof an overlay had gone, and Corriere, let go while its wall was up, ran out of memory in a second.
 - A page that crashes twice in a row gets one more try without what roko changes on it, its requests still blocked, before "This page keeps stopping".
 - Pay-or-consent walls whose buttons sit in a tall pinned footer are answered on smaller iPhones too. On a 17 Pro, Corriere's footer counted as the wall.

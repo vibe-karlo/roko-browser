@@ -439,6 +439,9 @@ cookies or data and holds both a yes button and a subscribe or pay button. Sourc
 alone on purpose, and its top-level rule only hides them, which is why BILD showed an empty page. A frame on
 any address is sent the rules when it's big enough to cover the page and has a button saying yes.
 
+A no with a catch is read from its words (a word for no and one for paying or signing up), and `pressUntilGone` presses a
+wall's yes again while it's still there. A no that lands on a short page of its own, with a yes and a price, is answered by `wholePageWall`.
+
 **Anti-adblock walls.** `site-scripts.js` changes a page before it runs so its wall never comes up, with
 uBlock Origin's `##+js` rules (GPL-3.0), about 8,200 sites. BILD's page reads `"adBlockWallEnabled":true`;
 turned false, there's no wall, with its ads still blocked. `Scripts/build_scriptlets.py` keeps the scripts
@@ -670,6 +673,10 @@ host asked of Cloudflare's family resolver), roko's own blocked hosts, sign-in p
 and sites on another country's ending. A filter can still miss one, and suggestions only show after
 two letters of a match. Chrome doesn't rank inside its top 1,000, so the order is the script's: the
 country's own ending, then how big a site is worldwide and how many countries have it.
+
+**What you use comes first.** `HistoryIndex` keeps a `use` for each page: its visits, counted at full weight for four days and down to a
+tenth after three months. The bar's search takes the best-used matches rather than the newest, and points from `use` lift a site or page
+in the ranking. With nothing typed, the bar lists the pages you use most. A reload or a visit within five minutes isn't a new visit.
 
 `TopSites` inflates the phone's two lists the first time the bar is typed in, about 310 addresses, and
 checks them by prefix. These suggestions cost a launch nothing and use no network. They rank under

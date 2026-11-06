@@ -206,6 +206,7 @@ struct FeedView: View {
             .contentShape(.rect)
         }
         .buttonStyle(RowButtonStyle())
+        .storyMenu { menu(item) }
         .feedSwipes(item, store: store, browser: browser)
         .onAppear { store.wantCheck(item.stories) }
         .onDisappear { store.dropCheck(item.stories) }
@@ -242,11 +243,28 @@ struct FeedView: View {
         }
         // Two buttons in one list row: without this a tap would press both.
         .buttonStyle(.plain)
-        .contextMenu {
-            Button(item.isRead ? "Mark Unread" : "Mark Read") {
-                item.isRead ? store.markUnread([item.id]) : store.markRead([item.id])
+        .storyMenu { menu(.story(item)) }
+    }
+
+    /// Held down: what a swipe does, and the wish to see less of it.
+    @ViewBuilder
+    private func menu(_ item: FeedItem) -> some View {
+        let read = item.stories.allSatisfy(\.isRead)
+        let links = item.stories.map(\.id)
+        Button(read ? "Mark Unread" : "Mark Read") {
+            read ? store.markUnread(links) : store.markRead(links)
+        }
+        if case .story(let story) = item, !story.story.isMail {
+            Button("Save to Read Later") { save(story) }
+        }
+        // A newsletter has its own way out: Unsubscribe.
+        if !item.stories.contains(where: \.story.isMail) {
+            Button("Show Less News Like This") {
+                Task {
+                    await store.showLess(item.stories.map(\.story))
+                    browser.showToast("Showing less like this")
+                }
             }
-            Button("Save to Read Later") { save(item) }
         }
     }
 
@@ -282,6 +300,7 @@ struct FeedView: View {
             .contentShape(.rect)
         }
         .buttonStyle(RowButtonStyle())
+        .storyMenu { menu(item) }
         .feedSwipes(item, store: store, browser: browser)
         .onAppear { store.wantCheck(item.stories) }
         .onDisappear { store.dropCheck(item.stories) }
@@ -340,6 +359,7 @@ struct FeedView: View {
             .contentShape(.rect)
         }
         .buttonStyle(RowButtonStyle())
+        .storyMenu { menu(.story(item)) }
         .feedSwipes(.story(item), store: store, browser: browser)
     }
 
@@ -375,7 +395,8 @@ struct FeedView: View {
     }
 
     private func ago(_ date: Date) -> String {
-        date.formatted(.relative(presentation: .numeric, unitsStyle: .abbreviated))
+        // A site's clock can run ahead: germanijak.hr dates in local time, marked as UTC.
+        date.timeIntervalSinceNow > -60 ? "now" : date.formatted(.relative(presentation: .numeric, unitsStyle: .abbreviated))
     }
 
     private func open(_ item: FeedItem) {
@@ -414,6 +435,17 @@ private struct FeedPile: View {
         // As wide as a single story's picture, so every headline starts on one line.
         .frame(width: 68, height: 76)
         .accessibilityHidden(true)
+    }
+}
+
+extension View {
+    /// A story's long-press menu. Held up, the story has room around it in its
+    /// rounded shape, its text clear of the edge; on the page it stays where it was.
+    func storyMenu(@ViewBuilder _ menu: () -> some View) -> some View {
+        padding(8)
+            .contentShape(.contextMenuPreview, .rect(cornerRadius: 16, style: .continuous))
+            .contextMenu { menu() }
+            .padding(-8)
     }
 }
 
