@@ -1557,6 +1557,7 @@ final class BrowserModel {
             }
         }
         try? context.save()
+        historyIndex.remove(Set(forgotten.map(\.url)))
         historyIndex.rebuild(from: context.container)
         return forgotten
     }
