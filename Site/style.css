@@ -152,18 +152,19 @@ div>.row:has(span){min-height:54px}
 .idle{position:relative;aspect-ratio:7/4}
 .idle svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .idle path{fill:none;stroke:var(--glow);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.scan{position:absolute;left:22%;right:0;top:92.5%}
+.scan{position:absolute;left:22%;right:0;top:92.5%;container-type:inline-size}
 .scan b{position:absolute;left:0;top:-4px;width:8px;height:8px;margin-left:-4px;background:var(--ink);border-radius:50%}
 @media (prefers-reduced-motion:no-preference){
   .sec.open i{animation:openRun 3.6s linear infinite}
   .sec.reach i{animation:goRun 3.6s linear infinite}
   .sec b{animation:restRun 3.6s linear infinite}
   .scan b{animation:scanRun 7s linear infinite}
+  .meter.parked :is(i,b){animation-play-state:paused}
 }
 @keyframes openRun{0%{clip-path:inset(0 100% 0 0 round 99px)}4.44%,100%{clip-path:inset(0 84% 0 0 round 99px)}}
 @keyframes goRun{0%{clip-path:inset(0 100% 0 0 round 99px)}2.78%,100%{clip-path:inset(0 90% 0 0 round 99px)}}
 @keyframes restRun{0%{transform:translateX(-100%)}27.78%{transform:translateX(0);opacity:1}27.79%,100%{transform:translateX(-100%);opacity:0}}
-@keyframes scanRun{from{left:0}to{left:100%}}
+@keyframes scanRun{to{transform:translateX(100cqw)}}
 @media (min-width:960px){
   .stats{grid-template-columns:2fr 1fr 1fr}
   .second{grid-column:auto;justify-content:space-between}
@@ -362,7 +363,7 @@ div>.row:has(span){min-height:54px}
 .tile.lead .talkpage{padding:12px 18px 22px 12px}
 .talk .band{height:70px;padding:0 6px 8px 14px;color:#e7e7e4}
 .fan{position:relative;flex:none;width:50px;height:34px}
-.fan i{position:absolute;left:3px;top:3px;width:21px;height:28px;border-radius:5px;background:#57534e url(/img/page.jpg) top/cover;box-shadow:inset 0 0 0 1px #ffffff1f;transform:rotate(-9deg) translateY(2px);filter:brightness(.62)}
+.fan i{position:absolute;left:3px;top:3px;width:21px;height:28px;border-radius:5px;background:#57534e url(/img/page-blur.webp) top/cover;box-shadow:inset 0 0 0 1px #ffffff1f;transform:rotate(-9deg) translateY(2px);filter:brightness(.62)}
 .fan i+i{left:12px;transform:rotate(7deg) translateY(-1px);filter:none}
 .talk .band .bk{width:50px;height:44px}
 .talk .band .bk .ic{width:19px;height:19px}
@@ -437,7 +438,7 @@ div>.row:has(span){min-height:54px}
 .feedui sup{margin-left:.900cqw;color:#e7e7e4;font-size:2.500cqw;font-weight:600;line-height:0;font-variant-numeric:tabular-nums}
 /* The launcher stands over the page you were on: dimmed and out of focus, as in the app. */
 .ui.launcher{position:relative;isolation:isolate;background:#343537}
-.ui.launcher::before{content:"";position:absolute;inset:-8%;z-index:-1;background:url(/img/page.jpg) top/cover;filter:blur(16px) brightness(.27) saturate(.75)}
+.ui.launcher::before{content:"";position:absolute;inset:-8%;z-index:-1;background:url(/img/page-blur.webp) top/cover;filter:blur(16px) brightness(.27) saturate(.75)}
 .ui.launcher .field{height:13.600cqw;margin:2.200cqw 2.200cqw 2cqw;padding:0 0 0 4cqw;background:#1b1b1c;border-radius:5.800cqw;box-shadow:inset 0 0 0 .250cqw #ffffff14}
 .ui.launcher .answer{min-height:13.400cqw;background:#ffffff17;border-radius:5.200cqw}
 .fend{position:relative;display:grid;place-items:center;flex:none;width:11cqw;height:100%;color:#c9c6bf}
