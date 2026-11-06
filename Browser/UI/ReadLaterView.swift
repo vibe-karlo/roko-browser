@@ -1,76 +1,120 @@
 import SwiftUI
 
-/// The pages put aside, newest first: what's still to read, with pages on one
-/// subject gathered under its name and a summary of just them a tap away, then
-/// what's been opened. Tap one to read it (it counts as read); swipe left to
-/// remove it, right to mark it read or not. The bar's middle writes one summary
-/// across everything unread. Pull down past the top to close.
+/// The pages put aside, gathered by why they were saved or by when, whichever
+/// was last chosen here. What's been opened stays in its group, after what hasn't
+/// and marked, so a page kept to come back to can still be found where it belongs.
+/// A summary of a group's unread pages is a tap away. More than a column's worth
+/// makes a shelf that swipes sideways, so one full group can't bury the others.
+/// Search looks through all of it. Tap a page to read it (it counts as read);
+/// touch and hold to remove it or mark it read or not, or outside a shelf, swipe.
+/// The bar's middle writes one summary across everything unread. Pull down past
+/// the top to close.
 struct ReadLaterView: View {
     @Environment(BrowserModel.self) private var browser
     private var store: ReadLater { .shared }
 
     private var unread: [ReadLaterPage] { store.unread }
-    private var read: [ReadLaterPage] { store.pages.filter(\.isRead) }
-    /// Groups of unread pages; a page read since leaves its group.
-    private var groups: [(ReadLaterGroup, [ReadLaterPage])] {
-        store.groups.compactMap { group in
-            let pages = store.pages(in: group).filter { !$0.isRead }
-            return pages.count >= 2 ? (group, pages) : nil
+    @AppStorage(SavedGrouping.key) private var grouping: SavedGrouping = .topic
+    @Namespace private var switchSpace
+    /// Left at the top by the reader, not by the list moving under them.
+    @State private var isAtTop = true
+    @State private var isSearching = false
+    @State private var query = ""
+    /// What the search found, and what for: nothing found isn't said until it has looked.
+    @State private var found: [UUID] = []
+    @State private var searchedFor = ""
+    @FocusState private var isTyping: Bool
+    /// A shelf's column, as many pages as fit a look.
+    private static let columnLength = 4
+
+    private var words: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    private var sections: [SavedSection] {
+        switch grouping {
+        case .topic: SavedSection.byTopic(store.pages, sorting: store.isSorting)
+        case .date: SavedSection.byDate(store.pages)
         }
-    }
-    /// Unread pages in no group.
-    private var alone: [ReadLaterPage] {
-        let grouped = Set(groups.flatMap { $0.1.map(\.id) })
-        return unread.filter { !grouped.contains($0.id) }
     }
 
     var body: some View {
+        ScrollViewReader { scroller in
+            list
+                // A list keeps the rows on screen in place as others move, so pages being
+                // sorted, or the other grouping, would carry someone at the top down the page.
+                .onChange(of: sections.map { "\($0.id) \($0.pages.count)" }) {
+                    if isAtTop { scroller.scrollTo("top", anchor: .top) }
+                }
+        }
+    }
+
+    private var list: some View {
         List {
             header
-                .plainRow(top: 26, bottom: unread.isEmpty ? 8 : 22)
+                .id("top")
+                .plainRow(top: 26, bottom: store.pages.isEmpty ? 8 : 22)
             if store.pages.isEmpty {
                 Text("Nothing saved yet. Save a page from its tools, or type \u{201C}read later\u{201D} on it.")
                     .font(.system(size: 17))
                     .foregroundStyle(Theme.secondaryInk)
                     .plainRow(top: 30, bottom: 0)
             }
-            ForEach(groups, id: \.0.id) { group, pages in
-                groupHeading(group, count: pages.count)
-                    .plainRow(top: 8, bottom: 12)
-                ForEach(pages) { page in row(page).plainRow(top: 0, bottom: 18) }
+            if store.pages.count >= 2 {
+                tools.plainRow(top: 0, bottom: 18)
             }
-            if !groups.isEmpty, !alone.isEmpty {
-                Text("On their own")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.secondaryInk)
-                    .plainRow(top: 20, bottom: 14)
-            }
-            ForEach(alone) { page in row(page).plainRow(top: 0, bottom: 18) }
-            if !read.isEmpty {
-                Text("Read")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.secondaryInk)
-                    .plainRow(top: unread.isEmpty ? 8 : 20, bottom: 14)
-                ForEach(read) { page in row(page).plainRow(top: 0, bottom: 18) }
+            if isSearching, !words.isEmpty {
+                results
+            } else {
+                // One page is nothing to gather.
+                if store.pages.count >= 2 {
+                    ForEach(sections) { section in
+                        heading(section).plainRow(top: 8, bottom: 12)
+                        rows(section.pages)
+                    }
+                } else {
+                    rows(store.pages)
+                }
             }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .scrollDismissesKeyboard(.immediately)
         .animation(.snappy(duration: 0.3), value: store.pages)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            ContextBar(leading: .init(glyph: .close, label: "Close", action: close),
-                       glyph: .summarize, title: "Summarize all",
-                       launch: summarize, morphs: false)
+            // Above the keyboard it would only sit on the results.
+            if !isTyping {
+                ContextBar(leading: .init(glyph: .close, label: "Close", action: close),
+                           glyph: .summarize, title: "Summarize all",
+                           launch: summarize, morphs: false)
+            }
         }
         .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas) }
         .background(Theme.canvas.ignoresSafeArea())
         .foregroundStyle(Theme.ink)
-        // Grouped afresh when the pages to read have changed since last time.
-        .task(id: unread.map(\.id)) { await store.regroup() }
+        // Topics for pages saved elsewhere, and for any it couldn't choose before.
+        .task(id: store.pages.map(\.id)) { store.sortNew() }
+        // A moment after the last letter: it reads every page's text.
+        .task(id: words) {
+            let words = words, pages = store.pages
+            guard !words.isEmpty else {
+                found = []
+                searchedFor = ""
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(120))
+            guard !Task.isCancelled else { return }
+            let matches = await Task.detached(priority: .userInitiated) { SavedSearch.pages(pages, matching: words) }.value
+            guard !Task.isCancelled else { return }
+            found = matches
+            searchedFor = words
+        }
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y < -geometry.contentInsets.top - 90
         } action: { _, pulled in
             if pulled { close() }
+        }
+        .onScrollPhaseChange { _, phase, context in
+            guard phase == .idle else { return }
+            isAtTop = context.geometry.contentOffset.y <= -context.geometry.contentInsets.top + 8
         }
     }
 
@@ -100,36 +144,164 @@ struct ReadLaterView: View {
         .accessibilityElement(children: .combine)
     }
 
-    // MARK: A group
+    // MARK: Gathering
 
-    /// Its subject, how many, and a summary of those pages alone.
-    private func groupHeading(_ group: ReadLaterGroup, count: Int) -> some View {
+    /// Topic or date and the way into search, or the search itself in their place.
+    private var tools: some View {
+        HStack(spacing: 8) {
+            if isSearching {
+                HStack(spacing: 8) {
+                    Glyph(.search, size: 16).foregroundStyle(Theme.secondaryInk)
+                    TextField("Search saved pages", text: $query)
+                        .font(.system(size: 15))
+                        .focused($isTyping)
+                        .submitLabel(.search)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .onAppear { isTyping = true }
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 38)
+                .background(Capsule().fill(Theme.raised))
+                Button {
+                    withAnimation(.snappy(duration: 0.28)) {
+                        isSearching = false
+                        query = ""
+                    }
+                } label: {
+                    Text("Cancel")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.secondaryInk)
+                        .frame(height: 44)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(RowButtonStyle())
+            } else {
+                groupingSwitch
+                Spacer(minLength: 0)
+                Button {
+                    withAnimation(.snappy(duration: 0.28)) { isSearching = true }
+                } label: {
+                    Glyph(.search, size: 18)
+                        .foregroundStyle(Theme.secondaryInk)
+                        // Its edge on the margin the headings' Summarize keeps to.
+                        .frame(width: 44, height: 44, alignment: .trailing)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(GlyphButtonStyle())
+                .accessibilityLabel("Search saved pages")
+            }
+        }
+    }
+
+    /// Everything that matched in one list: a search is read down, not across.
+    @ViewBuilder private var results: some View {
+        let pages = found.compactMap(store.page)
+        if searchedFor == words {
+            Text(pages.isEmpty ? "Nothing saved matches that." : pages.count == 1 ? "1 page" : "\(pages.count) pages")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.secondaryInk)
+                .monospacedDigit()
+                .plainRow(top: 8, bottom: 14)
+        }
+        ForEach(pages) { page in swipeableRow(page).plainRow(top: 0, bottom: 18) }
+    }
+
+    /// Topic or date, the one that's on on a raised capsule that slides across, as in Reader.
+    private var groupingSwitch: some View {
+        HStack(spacing: 0) {
+            ForEach(SavedGrouping.allCases, id: \.self) { choice in
+                Button {
+                    withAnimation(.snappy(duration: 0.28)) { grouping = choice }
+                } label: {
+                    Text(choice.title)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(grouping == choice ? Theme.ink : Theme.secondaryInk)
+                        .padding(.horizontal, 14)
+                        .frame(height: 34)
+                        .background {
+                            if grouping == choice { Capsule().fill(Theme.raised).matchedGeometryEffect(id: "grouping", in: switchSpace) }
+                        }
+                        .frame(height: 44)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Group by \(choice.title.lowercased())")
+                .accessibilityAddTraits(grouping == choice ? .isSelected : [])
+            }
+        }
+    }
+
+    /// Rows while they fit a column; past that, a shelf.
+    @ViewBuilder private func rows(_ pages: [ReadLaterPage]) -> some View {
+        if pages.count > Self.columnLength {
+            shelf(pages).plainRow(top: 0, bottom: 18, side: 0)
+        } else {
+            ForEach(pages) { page in swipeableRow(page).plainRow(top: 0, bottom: 18) }
+        }
+    }
+
+    /// Columns of four that swipe sideways and settle on a column, with the next
+    /// one showing at the edge to say there's more. Rows here can't also swipe.
+    private func shelf(_ pages: [ReadLaterPage]) -> some View {
+        let columns = stride(from: 0, to: pages.count, by: Self.columnLength).map {
+            Array(pages[$0..<min($0 + Self.columnLength, pages.count)])
+        }
+        return ScrollView(.horizontal) {
+            LazyHStack(alignment: .top, spacing: 18) {
+                ForEach(columns.indices, id: \.self) { index in
+                    VStack(alignment: .leading, spacing: 18) {
+                        ForEach(columns[index]) { page in row(page) }
+                    }
+                    .containerRelativeFrame(.horizontal) { width, _ in width - 62 }
+                }
+            }
+            .scrollTargetLayout()
+        }
+        .contentMargins(.horizontal, 22, for: .scrollContent)
+        .scrollTargetBehavior(.viewAligned)
+        .scrollIndicators(.hidden)
+        .scrollClipDisabled()
+    }
+
+    /// Its name, how many, and a summary of those pages alone.
+    private func heading(_ section: SavedSection) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(group.name)
+            Text(section.name)
                 .font(.system(size: 17, weight: .semibold))
                 .lineLimit(1)
-            Text("\(count)")
+                .foregroundStyle(section.isWaiting ? Theme.secondaryInk : Theme.ink)
+            Text("\(section.pages.count)")
                 .font(.system(size: 15).monospacedDigit())
                 .foregroundStyle(Theme.faintInk)
             Spacer(minLength: 12)
-            Button { browser.summarizeSaved(group) } label: {
-                HStack(spacing: 6) {
-                    Glyph(.summarize, size: 15, weight: 1.8)
-                    Text("Summarize").font(.system(size: 15, weight: .medium))
+            if let group = section.group {
+                Button { browser.summarizeSaved(group) } label: {
+                    HStack(spacing: 6) {
+                        Glyph(.summarize, size: 15, weight: 1.8)
+                        Text("Summarize").font(.system(size: 15, weight: .medium))
+                    }
+                    .foregroundStyle(Theme.secondaryInk)
+                    .frame(minHeight: 44)
+                    .contentShape(.rect)
                 }
-                .foregroundStyle(Theme.secondaryInk)
-                .frame(minHeight: 44)
-                .contentShape(.rect)
+                .buttonStyle(RowButtonStyle())
+                .accessibilityLabel("Summarize the \(group.pages.count) pages in \(group.name)")
             }
-            .buttonStyle(RowButtonStyle())
-            .accessibilityLabel("Summarize the \(count) pages on \(group.name)")
         }
+        .frame(minHeight: 44)
     }
 
     // MARK: A page
 
+    /// A tap opens it, touch and hold offers the rest. A menu of its own, not
+    /// `.contextMenu`: a list gives a row just one of those, so on a shelf, where
+    /// one row holds many pages, it acted on the column's first page whichever was held.
     private func row(_ page: ReadLaterPage) -> some View {
-        Button { withAnimation(.snappy(duration: 0.32)) { browser.openSaved(page) } } label: {
+        Menu {
+            Button(page.isRead ? "Mark as unread" : "Mark as read") { toggleRead(page) }
+            Button("Remove", role: .destructive) { ReadLater.shared.remove(page.id) }
+        } label: {
             HStack(alignment: .top, spacing: 14) {
                 SavedPicture(page: page)
                     .frame(width: 68, height: 68)
@@ -144,7 +316,7 @@ struct ReadLaterView: View {
                         .multilineTextAlignment(.leading)
                     HStack(spacing: 6) {
                         SiteIcon(host: page.site, size: 13, remote: true)
-                        Text(page.text.isEmpty ? page.site : "\(page.site) · \(page.minutes) min")
+                        Text(([page.site] + (page.text.isEmpty ? [] : ["\(page.minutes) min"]) + (page.isRead ? ["Read"] : [])).joined(separator: " · "))
                             .font(.system(size: 13))
                             .foregroundStyle(Theme.faintInk)
                             .lineLimit(1)
@@ -161,17 +333,28 @@ struct ReadLaterView: View {
                 }
             }
         }
+        primaryAction: {
+            withAnimation(.snappy(duration: 0.32)) { browser.openSaved(page) }
+        }
+        .menuOrder(.fixed)
         .buttonStyle(RowButtonStyle())
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(role: .destructive) { ReadLater.shared.remove(page.id) } label: { Text("Remove") }
-        }
-        .swipeActions(edge: .leading, allowsFullSwipe: true) {
-            Button {
-                page.isRead ? ReadLater.shared.markUnread(page.id) : ReadLater.shared.markRead(page.id)
-            } label: { Text(page.isRead ? "Unread" : "Read") }
-                .tint(Theme.secondaryInk)
-        }
-        .accessibilityHint("Swipe to remove it, or to mark it read")
+        .accessibilityHint("Touch and hold to remove it, or to mark it read")
+    }
+
+    /// A row outside a shelf, where swiping is free to mean something.
+    private func swipeableRow(_ page: ReadLaterPage) -> some View {
+        row(page)
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button(role: .destructive) { ReadLater.shared.remove(page.id) } label: { Text("Remove") }
+            }
+            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                Button { toggleRead(page) } label: { Text(page.isRead ? "Unread" : "Read") }
+                    .tint(Theme.secondaryInk)
+            }
+    }
+
+    private func toggleRead(_ page: ReadLaterPage) {
+        page.isRead ? ReadLater.shared.markUnread(page.id) : ReadLater.shared.markRead(page.id)
     }
 
     private func summarize() {
@@ -234,8 +417,8 @@ struct SavedPicture: View {
 
 extension View {
     /// A row with no list furniture: the canvas behind it, no separator, the page's own margins.
-    func plainRow(top: CGFloat, bottom: CGFloat) -> some View {
-        listRowInsets(EdgeInsets(top: top, leading: 22, bottom: bottom, trailing: 22))
+    func plainRow(top: CGFloat, bottom: CGFloat, side: CGFloat = 22) -> some View {
+        listRowInsets(EdgeInsets(top: top, leading: side, bottom: bottom, trailing: side))
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
     }
