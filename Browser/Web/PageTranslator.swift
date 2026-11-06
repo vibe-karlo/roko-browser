@@ -47,6 +47,9 @@ struct TranslationTarget: Hashable, Identifiable, Sendable {
     /// The page menu's: the last used first.
     static var allCases: [TranslationTarget] { chosen.map(TranslationTarget.init(rawValue:)) }
 
+    /// The language without its script or region: "zh" for "zh-Hans".
+    var language: String { Locale.Language(identifier: rawValue).languageCode?.identifier ?? rawValue }
+
     /// Used just now: first in line next time.
     static func used(_ target: TranslationTarget) {
         var codes = chosen
@@ -68,15 +71,37 @@ final class PageTranslator: NSObject, WKScriptMessageHandler {
     static let shared = PageTranslator()
     static let world = WKContentWorld.world(name: "translate")
 
+    enum Outcome {
+        case translated
+        /// Some of the text came back, not all of it.
+        case partly
+        /// No text on the page to translate.
+        case empty
+        case failed
+    }
+
     /// Tabs being translated, so new text on them is translated too.
     private var targets: [ObjectIdentifier: TranslationTarget] = [:]
 
-    func translate(_ webView: WKWebView, to target: TranslationTarget) async {
+    /// The language a page's words are in, read from the words: a page's declared
+    /// language is often a template's. Nil when they don't clearly say.
+    func language(of webView: WKWebView) async -> String? {
+        let text = try? await webView.callAsyncJavaScript("return (document.body && document.body.innerText || '').slice(0, 3000)",
+                                                          contentWorld: Self.world) as? String
+        guard let text else { return nil }
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(text)
+        guard let best = recognizer.languageHypotheses(withMaximum: 1).first, best.value > 0.8 else { return nil }
+        return Locale.Language(identifier: best.key.rawValue).languageCode?.identifier
+    }
+
+    @discardableResult
+    func translate(_ webView: WKWebView, to target: TranslationTarget) async -> Outcome {
         targets[ObjectIdentifier(webView)] = target
         let controller = webView.configuration.userContentController
         controller.removeScriptMessageHandler(forName: "translate", contentWorld: Self.world)
         controller.add(self, contentWorld: Self.world, name: "translate")
-        await translatePending(in: webView, to: target)
+        return await translatePending(in: webView, to: target)
     }
 
     func restore(_ webView: WKWebView) async {
@@ -92,10 +117,12 @@ final class PageTranslator: NSObject, WKScriptMessageHandler {
 
     // MARK: Collect, translate, apply
 
-    private func translatePending(in webView: WKWebView, to target: TranslationTarget) async {
+    @discardableResult
+    private func translatePending(in webView: WKWebView, to target: TranslationTarget) async -> Outcome {
         guard let result = try? await webView.callAsyncJavaScript(Self.collectScript, contentWorld: Self.world),
               let page = result as? [String: Any],
-              let start = page["start"] as? Int, let texts = page["texts"] as? [String], !texts.isEmpty else { return }
+              let start = page["start"] as? Int, let texts = page["texts"] as? [String] else { return .failed }
+        guard !texts.isEmpty else { return .empty }
         let declared = page["lang"] as? String ?? ""
 
         // Menus and buttons repeat; each distinct string is translated once.
@@ -111,6 +138,7 @@ final class PageTranslator: NSObject, WKScriptMessageHandler {
         let chunks = Self.chunks(of: unique)
         var translated = [String?](repeating: nil, count: unique.count)
         let source = Self.language(declared: declared, sample: unique)
+        var arrived = 0
         await withTaskGroup(of: (Int, [String]?).self) { group in
             var next = 0
             func addNext() {
@@ -124,6 +152,7 @@ final class PageTranslator: NSObject, WKScriptMessageHandler {
             for _ in 0..<min(4, chunks.count) { addNext() }
             for await (index, result) in group {
                 if let result {
+                    arrived += 1
                     let range = chunks[index]
                     for (offset, text) in result.enumerated() where range.lowerBound + offset < translated.count {
                         translated[range.lowerBound + offset] = text
@@ -137,6 +166,7 @@ final class PageTranslator: NSObject, WKScriptMessageHandler {
                 addNext()
             }
         }
+        return arrived == 0 ? .failed : arrived < chunks.count ? .partly : .translated
     }
 
     /// Up to 100 strings or about 4,000 characters each.

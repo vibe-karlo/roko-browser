@@ -4,6 +4,11 @@ import Foundation
 enum PageZoom {
     static let levels: [CGFloat] = [0.5, 0.75, 0.85, 1, 1.15, 1.25, 1.5, 1.75, 2, 2.5, 3]
 
+    /// Nowhere further to go that way.
+    static func isAtLimit(_ level: CGFloat, direction: Int) -> Bool {
+        step(from: level, direction: direction) == level
+    }
+
     static func level(for host: String?) -> CGFloat {
         guard let host else { return 1 }
         let stored = UserDefaults.standard.double(forKey: key(host))
