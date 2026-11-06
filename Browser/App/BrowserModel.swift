@@ -410,6 +410,7 @@ final class BrowserModel {
         BrowserTab.dropThumbnails(except: selectedID)
         WebViewFactory.dropPrewarmed()
         dropPreload()
+        FeedPictures.dropFromMemory()
         FaviconStore.shared.trimMemory()
     }
 

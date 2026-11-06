@@ -82,7 +82,7 @@ nonisolated enum WebResearcher {
 
     /// One page's share image, read from its head alone: for answers Claude
     /// wrote from pages it read on its own servers.
-    static func shareImage(of url: URL) async -> URL? {
+    @concurrent static func shareImage(of url: URL) async -> URL? {
         guard let (bytes, response) = try? await session.bytes(from: url),
               (response as? HTTPURLResponse)?.statusCode == 200,
               (response.mimeType ?? "").contains("html") else { return nil }
@@ -98,9 +98,12 @@ nonisolated enum WebResearcher {
     }
 
     /// A picture's width in pixels, from its first bytes: the rest stays unfetched.
-    static func pixelWidth(of url: URL) async -> Int? {
-        guard let (bytes, response) = try? await session.bytes(from: url),
-              (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+    @concurrent static func pixelWidth(of url: URL) async -> Int? {
+        // Only the start of the file is wanted, where a server will say so.
+        var request = URLRequest(url: url)
+        request.setValue("bytes=0-65535", forHTTPHeaderField: "Range")
+        guard let (bytes, response) = try? await session.bytes(for: request),
+              let status = (response as? HTTPURLResponse)?.statusCode, status == 200 || status == 206 else { return nil }
         var head = Data()
         do {
             for try await byte in bytes {

@@ -541,9 +541,7 @@ struct FeedPicture: View {
     private func picture(_ url: URL) -> some View {
         Color.clear
             .overlay {
-                AsyncImage(url: url) { phase in
-                    if let picture = phase.image { picture.resizable().scaledToFill() }
-                }
+                ShownPicture(url: url)
             }
             .clipped()
     }
