@@ -381,8 +381,12 @@ struct FeedView: View {
     }
 
     /// A story as a line of a list: no picture.
+    /// Held, a menu on the spot rather than a context menu: that lifts the row out of
+    /// its card, and takes the row's share of the card's background with it.
     private func line(_ item: FeedStory, showsSite: Bool) -> some View {
-        Button { browser.read(item.story) } label: {
+        Menu {
+            menu(.story(item))
+        } label: {
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.story.title)
                     .font(.scaled(15, weight: item.isRead ? .regular : .medium))
@@ -399,9 +403,10 @@ struct FeedView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(.rect)
+        } primaryAction: {
+            browser.read(item.story)
         }
         .buttonStyle(RowButtonStyle())
-        .storyMenu(inCard: true) { menu(.story(item)) }
         .feedSwipes(.story(item), store: store, browser: browser)
     }
 
@@ -483,11 +488,9 @@ private struct FeedPile: View {
 extension View {
     /// A story's long-press menu. Held up, the story has room around it in its
     /// rounded shape, its text clear of the edge; on the page it stays where it was.
-    /// A line of a card lifts square: the row's flat sides are part of the card, and
-    /// round corners showed the gap the row left behind.
-    func storyMenu(inCard: Bool = false, @ViewBuilder _ menu: () -> some View) -> some View {
+    func storyMenu(@ViewBuilder _ menu: () -> some View) -> some View {
         padding(8)
-            .contentShape(.contextMenuPreview, .rect(cornerRadius: inCard ? 0 : 16, style: .continuous))
+            .contentShape(.contextMenuPreview, .rect(cornerRadius: 16, style: .continuous))
             .contextMenu { menu() }
             .padding(-8)
     }
