@@ -9914,7 +9914,6 @@
 .cookieConsentWrapper	.cookieConsentWrapper
 .cookieConsentWrapperCon	.cookieConsentWrapperCon
 .cookieContainerV2	.cookieContainerV2
-.cookieControl	.cookieControl
 .cookieCorrector	.cookieCorrector
 .cookieCover	.cookieCover
 .cookieDetailsWrap	.cookieDetailsWrap
@@ -15419,6 +15418,9 @@ thecaterer.com	#aos-CookiePolicy
 thestage.co.uk	#aos-CookiePolicy
 travelweekly.co.uk	#aos-CookiePolicy
 mothersmarket.com	#aryosys-cookie-message
+animeschedule.net	#as-notice-layer
+animeschedule.net	#custom-consent-wrapper
+animeschedule.net	#site-preferences-layer
 virtualtrials.org	#askprivacy
 bing.com	#b_notificationContainer.bnp_ttc
 bing.com	#cookie-banner
@@ -15521,6 +15523,7 @@ skargards.com	#cc_dialog
 europa.eu	#cck_here
 europa.eu	#cookieConsentBanner
 europa.eu	#cookie-consent-banner
+dotesports.com	#ccm-banner
 jeffdaviesandson.com	#ccm-box
 hytale.game	#ccm-ui
 ammergauer-zeitgeist.de	#ccmodal-container
@@ -15670,6 +15673,7 @@ mathsisfun.com	#cookOK
 enermax.com	#cookice-text
 enermax.com	.privacyPreference-wrapper
 cookieshark.eu	#cookie--Modal
+mediafire.com	#cookie-accept-footer
 peterchristian.co.uk	#cookie-acceptancce
 peterchristianoutfitters.com	#cookie-acceptancce
 roguefitness.com	#cookie-agree
@@ -15782,6 +15786,7 @@ kiwi.com	#cookie_consent
 mkchulin.cz	#cookie_consent
 mzanzisolutions.co.za	#cookie_consent
 uscareerinstitute.edu	#cookie_consent
+think.ing.com	#cookie_consent_modal
 sendgb.com	#cookie_disabled
 sendgb.com	.bounceInLeft
 halcyon.net	#cookie_info
@@ -15848,7 +15853,6 @@ costco.ca	#onetrust-consent-sdk
 costco.ca	.onetrust-pc-dark-filter
 costcobusinesscentre.ca	#costco-consent-manager
 costcopharmacy.ca	#costco-consent-manager
-sameday.costco.ca	#costco-consent-manager
 atos.net	#cp
 tesco.ie	#cp
 tesco.ie	div[class*="CookieBanner"]
@@ -15865,8 +15869,6 @@ intone.com	#ct-ultimate-gdpr-cookie-modal
 thebagster.com	#ctl00_privacybanner_pnlPrivacyPolicy
 thebagster.com	.modalBackground
 thousandeyes.com	#custom-consent-sdk
-animeschedule.net	#custom-consent-wrapper
-animeschedule.net	#site-preferences-layer
 linknlink.com	#custom-cookie-consent
 nofluffjobs.com	#customized-consent-sdk
 dllsearch.net	#cw
@@ -16005,6 +16007,7 @@ careers.lilly.com	#gdpr-alert
 dell.com	#gdpr-alert
 itnews.com.au	#gdpr-alert
 jibtv.com	#gdpr-alert
+techpartner.news	#gdpr-alert
 vandyke.com	#gdpr-alert
 hotosm.org	#gdpr-banner-form
 aza.org	#gdpr-bar
@@ -16206,6 +16209,9 @@ life.wolt.com	#modal-root
 whenavailable.com	#modalConsent
 whenavailable.com	.modal-backdrop
 shellsmart.com	#modal_container
+genium360.ca	#modal_cookie_consent_manager
+genium360.ca	.agreement_message_block
+genium360.ca	.modal-backdrop
 eclipso.eu	#modalmsg
 momentumgroupltd.co.za	#motion-cookies-notice
 eurocirc.org	#msgBox_error
@@ -16545,6 +16551,7 @@ m.emsc.eu	.cookie_container
 thoughttechnology.com	#spopupCont
 superscout.ai	#ss-consent-banner
 killstar.com	#static-cookie-bar
+fanflix.co	#stcm-wrapper
 videocandy.com	#stcm-wrapper
 openweather.co.uk	#stick-footer-panel
 yow.ca	#sticky
@@ -16643,6 +16650,7 @@ dompe.com	#warning-popup
 rehva.eu	#wb-cookie-policy
 wealthfront.com	#wcm-container
 waterdropfilter.com	#wd-cookie-consent-popup
+aeropayouts.com	#website_cookies_bar
 artemes.org	#website_cookies_bar
 asviva.de	#website_cookies_bar
 datenpol.at	#website_cookies_bar
@@ -17071,8 +17079,10 @@ mynx.co	.amt_cookies_model
 sextpanther.com	.amt_cookies_model
 codesignal.com	.analytics-banner
 codesignal.com	.elementor-popup-modal
+videotextremover.net	.analytics-consent-banner
 ems.press	.analytics-consent-popup
 eggflow.com	.analytics-info
+malibujacksquadcities.com	.analytics-notice
 tipranks.com	.anchorbottomLeft
 headforpoints.com	.ancr-pos-bottom
 sudlisboa.com	.ancr-pos-bottom
@@ -17134,6 +17144,7 @@ landsend.com	.at-gdpr-msg
 atptour.com	.atp_cookie-message
 scandalbeauties.com	.attention-msg
 amplify.com	.augusta-campaign
+avioadsb.org	.avio-cc-box
 alivecolors.com	.awarning
 amundi.com	.awf-eu-cookie-compliance
 airwallex.com	.awx-privcbanner-root
@@ -17373,6 +17384,8 @@ kinesiotaping.com	.cachePopup
 recyclingproductnews.com	.card-cookie-notice
 claseazul.com	.cas-cookie
 enovap.com	.cb-container
+cookiebanner.co.uk	.cb-cookie-launch
+cookiebanner.co.uk	.cbcmp-root
 liveramp.com	.cb_modal
 pornone.com	.cbann
 jadlonomia.com	.cbar-container
@@ -17748,6 +17761,7 @@ fielmann.lt	.cookie-section
 finejas.lt	.cookie-section
 mymetpolicepension.equiniti.com	.cookie-section-fixed-top
 crossy-road.io	.cookie-setting
+hsparts.pl	.cookie-setting
 loods5.nl	.cookie-settings
 outfit7.com	.cookie-settings
 outfit7.com	.cookie-notice
@@ -17965,6 +17979,7 @@ unitedpets.com	.cupjma
 greats.com	.custom-onetrust-banner
 princetonreview.com	.customer-cookie-container
 tannoy.com	.cv2-wrapper
+freecords.com	.cw-cookies
 grassfeld.com	.cw-cookies
 hockeystack.com	.cw-cookies
 sogni.ai	.cw-cookies
@@ -18127,6 +18142,7 @@ skinmc.net	.eu-popup
 prospan.com.au	.eu-privacy
 worldcoinindex.com	.eupopup
 bahrain.bh	.eupopup-container
+chemistwarehouse.co.nz	.eupopup-container
 cognizantee.tekstac.com	.eupopup-container
 kromgaming.com	.eupouY
 investors.adtran.com	.evergreen-consent-banner
@@ -18606,6 +18622,7 @@ adbypass.org	.mantine-Dialog-root
 bypass.city	.mantine-Dialog-root
 f1store.formula1.com	.marketing-cookies-banner
 nbastore.eu	.marketing-cookies-banner
+nhlshop.ca	.marketing-cookies-banner
 irishstar.com	.marketing-opt-in-enabled
 realme.com	.mask
 hydra.bot	.max-w-screen-md.z-40
@@ -18993,6 +19010,7 @@ genesis.com	.privacy-dialog
 danawhitinglaw.com	.privacy-first-visit
 edmunds.com	.privacy-global-disclaimer
 araviscapital.com	.privacy-holder
+files-tech.com	.privacy-info-banner
 flysaa.com	.privacy-info-message
 businessinsider.com	.privacy-link
 petalmaps.com	.privacy-menu
@@ -19101,6 +19119,7 @@ southwestcoastpath.org.uk	.roar-body
 repovive.com	.rounded-lg.max-w-3xl
 totalserversolutions.com	.rplm-alert
 ramseysolutions.com	.rs-CookieBanner
+rudderstack.com	.rs-cookie
 seamless.ai	.rs-message-info
 rsc.org	.rsc-onetrust-cookie-footer
 limaeasy.com	.rstbox
@@ -19215,7 +19234,6 @@ haier.com	.swiper-slide-img-txt
 taschen.com	.switch-prompt
 bp.com	.syrenis-cookie-widget
 davines.com	.syrenis-cookie-widget
-us.davines.com	.syrenis-cookie-widget
 amplitude-studios.com	.system-notification-container
 games2gether.com	.system-notification-container
 termly.io	.t-consentPrompt
@@ -19598,7 +19616,7 @@ facebook.com	body:not([style^="margin-bottom"]) div[data-testid="cookie-policy-b
 community.nexthink.com	c-community-cookie-consent-banner
 success.trendmicro.com	c-dcx-cookie
 criticalsoftware.com	c15t-ui-bannerVisible-pYYY9
-order.maxburgers.com	consent-banner.ng-scope
+order.maxburgers.com	consent-banner
 qualified.io	consent-cookie-popup
 23degrees.io	consent-toast
 axis.com	cookie-consent
@@ -19806,8 +19824,6 @@ visitarizona.com	div[fs-consent-element]
 armbian.com	div[role="dialog"]
 companyweb.be	div[role="dialog"]
 fatalfans.com	div[role="dialog"]
-smythstoys.com	div[role="dialog"]
-zencreator.pro	div[role="dialog"]
 autodude.dk	div[style="background-color: rgb(240, 240, 240);"]
 autodude.fi	div[style="background-color: rgb(240, 240, 240);"]
 autodude.no	div[style="background-color: rgb(240, 240, 240);"]
@@ -19990,6 +20006,7 @@ nova.es	#cookieConsent
 psiphon.ca	#cookieConsent
 seguno.com	#cookieConsent
 supsystic.com	#cookieConsent
+tabortools.com	#cookieConsent
 tagesmutter-bz.it	#cookieConsent
 thebestporn.com	#cookieConsent
 timinis.com	#cookieConsent
@@ -20153,6 +20170,7 @@ ac-mejerimaskiner.dk	#cookieNotice
 amazingfoodmadeeasy.com	#cookieNotice
 bradyunited.org	#cookieNotice
 chetak.com	#cookieNotice
+defenderpolska.pl	#cookieNotice
 dks.at	#cookieNotice
 dochas.ie	#cookieNotice
 ecuavisa.com	#cookieNotice
@@ -20564,6 +20582,7 @@ plaidonline.com	.amgdprjs-bar-template
 scienceinsport.com	.amgdprjs-bar-template
 sparkfun.com	.amgdprjs-bar-template
 theraband.com	.amgdprjs-bar-template
+tomandco.com	.amgdprjs-bar-template
 vortexoptics.com	.amgdprjs-bar-template
 carletonvillemall.co.za	.cookie-notification
 ccdcoe.org	.cookie-notification
@@ -20667,6 +20686,7 @@ curvo.eu	.cookie-consent-banner
 delfortgroup.com	.cookie-consent-banner
 delfortgroup.com	.notification
 dtf.ru	.cookie-consent-banner
+fabletoapp.com	.cookie-consent-banner
 flying.co.il	.cookie-consent-banner
 githubstatus.com	.cookie-consent-banner
 goldaglida.co.il	.cookie-consent-banner
@@ -21247,6 +21267,7 @@ querstarter.de	.page-lock
 quesoslomogallego.com	#cookie-bar
 ryxy.online	#cookie-bar
 searchenginewatch.com	#cookie-bar
+sharkrobot.com	#cookie-bar
 shinden.pl	#cookie-bar
 sklep.stamarpoznan.pl	#cookie-bar
 svpressa.ru	#cookie-bar
@@ -21891,6 +21912,7 @@ techtest.org	#BorlabsCookieBox
 aem.hr	#cc-main
 aitum.tv	#cc-main
 aktivia.it	#cc-main
+allmylinks.com	#cc-main
 andromede-cms.com	#cc-main
 anker-in.com	#cc-main
 any.run	#cc-main
@@ -22112,6 +22134,7 @@ stocksy.com	#cc--main
 streetsblog.org	#cc--main
 suncalc.org	#cc--main
 superspeedyplugins.com	#cc--main
+switcher.co.il	#cc--main
 teksavvy.com	#cc--main
 theactive.thaipbs.or.th	#cc--main
 toscana-notizie.it	#cc--main
@@ -22240,6 +22263,7 @@ namal.co.il	.gdpr
 oplata.info	.gdpr
 partnerboost.com	.gdpr
 phonemore.com	.gdpr
+plati.market	.gdpr
 qbitsemi.com	.gdpr
 schmackarys.com	.gdpr
 srilankan.com	.gdpr
@@ -22263,11 +22287,13 @@ ennismore.com	.z-100
 gemini.pl	.z-100
 sallys-shop.de	.z-100
 1cbit.ru	.cookie-panel
+1pc.co.il	.cookie-panel
 schools.by	.cookie-panel
 talon.by	.cookie-panel
 timeweb.com	.cookie-panel
 amateurtvx.com	.cookie-bar
 ansell.com.cn	.cookie-bar
+appstorrent.ru	.cookie-bar
 bakkersonline.be	.cookie-bar
 bierlinie-shop.de	.cookie-bar
 bootstrapmade.com	.cookie-bar
@@ -22303,6 +22329,7 @@ shoplyfter.com	.cookie-bar
 siamsport.co.th	.cookie-bar
 siamsport.co.th	#popup-ss
 smartocto.com	.cookie-bar
+spiky.co.il	.cookie-bar
 swappz.com	.cookie-bar
 teamskeet.com	.cookie-bar
 teentvx.com	.cookie-bar
@@ -22350,6 +22377,7 @@ mimovrste.com	.legal-consent
 9minecraft.net	#cookie-consent
 altman.co.il	#cookie-consent
 anixe.pl	#cookie-consent
+anvelope.md	#cookie-consent
 avantlink.com	#cookie-consent
 avtovzglyad.ru	#cookie-consent
 b-kassa.ru	#cookie-consent
@@ -22365,6 +22393,7 @@ erau.edu	#cookie-consent
 fontawesome.com	#cookie-consent
 foodsdictionary.co.il	#cookie-consent
 garberhof.com	#cookie-consent
+gostynin24.pl	#cookie-consent
 guffi.is	#cookie-consent
 heictojpg.com	#cookie-consent
 hextom.com	#cookie-consent
@@ -22430,7 +22459,9 @@ perplexity.ai	#cookie-consent
 portalderwirtschaft.de	#cookie-consent
 rulate.ru	#cookie-consent
 seehotel.it	#cookie-consent
+sp-kapusta.ru	#cookie-consent
 stormware.cz	#cookie-consent
+swedbank.lv	#cookie-consent
 taseralm.com	#cookie-consent
 touring-artists.info	#cookie-consent
 toyotaselfossi.is	#cookie-consent
@@ -22578,7 +22609,6 @@ travelok.com	.cc-window
 tuxedocomputers.com	.cc-window
 tvheadend.org	.cc-window
 webit.org	.cc-window
-wham.physics.wisc.edu	.cc-window
 wisc.edu	.cc-window
 zinecultural.com	.cc-window
 advgazeta.ru	.popup
@@ -22863,6 +22893,7 @@ toolbox.googleapps.com	.cookie-notice
 topmarket.co.il	.cookie-notice
 trustsig.eu	.cookie-notice
 ucbi.com	.cookie-notice
+ucrazy.org	.cookie-notice
 underbelly.is	.cookie-notice
 viboom.com	.cookie-notice
 vidal.ru	.cookie-notice
@@ -23798,6 +23829,7 @@ dschool.ru	.cookie
 dubotechniek.nl	.cookie
 dw.com	.cookie
 dynamicasrl.com	.cookie
+dyson.co.il	.cookie
 eachother.org.uk	.cookie
 eastwoodfinancial.co.uk	.cookie
 eatstoats.com	.cookie
@@ -23959,6 +23991,7 @@ mazowieckie.com.pl	.cookie
 mci.gov.sg	.cookie
 mclaren.com	.cookie
 mcnallycontractors.com	.cookie
+mdregion.com	.cookie
 medianauka.pl	.cookie
 mediobancapremier.com	.cookie
 meetingselection.se	.cookie
@@ -24007,6 +24040,7 @@ novaindex.com	.cookie
 novyny.live	.cookie
 npl.co.uk	.cookie
 nudo.com.tr	.cookie
+objective-see.org	.cookie
 obligacjeskarbowe.pl	.cookie
 oceandegrace.com	.cookie
 octotree.io	.cookie
@@ -24073,6 +24107,7 @@ rutoken.ru	.cookie
 safaco.pl	.cookie
 safedns.com	.cookie
 samsunghealthcare.com	.cookie
+sber.ru	.cookie
 sbh-ausbau.de	.cookie
 schwarz-horn.de	.cookie
 scotchwhisky.com	.cookie
@@ -24114,6 +24149,7 @@ ssessments.com	.cookie
 stamendekoning.nl	.cookie
 stammzellen-verstehen.de	.cookie
 statusbrew.com	.cookie
+stbank.by	.cookie
 strive4.bg	.cookie
 student.is	.cookie
 suedtirol-tirol.com	.cookie
@@ -24210,6 +24246,7 @@ wykop.pl	.cookie
 x-lam.it	.cookie
 xn--80ahmohdapg.xn--80asehdb	.cookie
 xo-securite.com	.cookie
+xplode.ru	.cookie
 yachtclubgames.com	.cookie
 yalladisco.co.il	.cookie
 yavitrina.ru	.cookie
@@ -24277,7 +24314,6 @@ kooora.com	div[id^="sp_message_container_"]
 blickers.com	.tw-bottom-0
 blickers.com	.bottom-0.fixed
 blindewandplanken.nl	.tw-bottom-0
-cloud.ionos.com	.tw-bottom-0
 ionos.com	.tw-bottom-0
 naiin.com	.tw-bottom-0
 bestreisengroup.pl	.cookiesConsent
@@ -24472,6 +24508,7 @@ forcepoint.com	.cookie-consent
 freepdfconvert.com	.cookie-consent
 ftm.eu	.cookie-consent
 ftm.nl	.cookie-consent
+gamemag.ru	.cookie-consent
 gamewith.net	.cookie-consent
 gault-millau.nl	.cookie-consent
 gaultmillau.be	.cookie-consent
@@ -24656,6 +24693,7 @@ werkenbijversluis.nl	.cookie-consent
 whoacademy.org	.cookie-consent
 x5.ru	.cookie-consent
 xfolio.jp	.cookie-consent
+yodaat.org	.cookie-consent
 zhibo.fm	.cookie-consent
 latitudeandlongitude.net	#cookiesConsentModal
 fuelrewards.com	#spopupCont
@@ -24930,6 +24968,7 @@ ovomaltine.de	.sliding-popup-bottom
 paihdelinkki.fi	.sliding-popup-bottom
 piaggiogroup.com	.sliding-popup-bottom
 pioneer-car.eu	.sliding-popup-bottom
+ppp-certification.com	.sliding-popup-bottom
 prestashop.com	.sliding-popup-bottom
 prestashop.com	#cookie
 psau.edu.sa	.sliding-popup-bottom
@@ -24970,7 +25009,6 @@ waffengebraucht.at	.sliding-popup-bottom
 weightwatchers.com	.sliding-popup-bottom
 weizmann.ac.il	.sliding-popup-bottom
 wildlifetrusts.org	.sliding-popup-bottom
-wis-wander.weizmann.ac.il	.sliding-popup-bottom
 worldpressphoto.org	.sliding-popup-bottom
 zanzu.be	.sliding-popup-bottom
 ziraatkatilim.com.tr	.sliding-popup-bottom
@@ -25771,8 +25809,10 @@ adventuregamestudio.co.uk	.cookie-banner
 albertonrecord.co.za	.cookie-banner
 app.deriv.com	.cookie-banner
 aptekiplus.ru	.cookie-banner
+araba.nl	.cookie-banner
 artfund.org	.cookie-banner
 asia.nikkei.com	.cookie-banner
+astrum-entertainment.ru	.cookie-banner
 banco.bradesco	.cookie-banner
 banco.bradesco	#cookie-cta
 barkeepersfriend.com	.cookie-banner
@@ -26043,7 +26083,6 @@ tfgm.com	#cookie-consent-banner
 thecowboychannelcanada.ca	#cookie-consent-banner
 thetadata.net	#cookie-consent-banner
 thewaterchannel.ca	#cookie-consent-banner
-travel-europe.europa.eu	#cookie-consent-banner
 webdunia.com	#cookie-consent-banner
 wheretowatch.stream	#cookie-consent-banner
 wildtv.ca	#cookie-consent-banner
@@ -26207,6 +26246,7 @@ eqmac.app	.cdk-overlay-container
 flyingblue.us	.cdk-overlay-container
 fr.vanguard	.cdk-overlay-container
 fr.vanguard	.cdk-overlay-pane
+hiopos.com	.cdk-overlay-container
 iconnectfx.com	.cdk-overlay-container
 inforomawebtv.comune.roma.it	.cdk-overlay-container
 inshared.nl	.cdk-overlay-container
@@ -26640,6 +26680,7 @@ britishrenewables.com	.bottom-0.fixed
 bsbfashion.com	.bottom-0.fixed
 bulldogjob.com	.bottom-0.fixed
 bulldogjob.pl	.bottom-0.fixed
+business.x.com	.bottom-0.fixed
 canal1.com.co	.bottom-0.fixed
 canaries.co.uk	.bottom-0.fixed
 carzone.co.il	.bottom-0.fixed
@@ -26946,6 +26987,7 @@ zerofox.com	.bottom-4
 netnoticias.mx	.bottom-40
 accu-components.com	.bottom-3
 accu.co.uk	.bottom-3
+faivelo.com	.bottom-3
 knock.app	.bottom-3
 smartreplypro.ai	.bottom-3
 fotoregistro.com.br	.bottom-12
@@ -28136,11 +28178,13 @@ modivoplatform.com	.cm-overlay
 viennapte.pl	.cm-overlay
 bairesdev.com	.z-50
 bootstrap.academy	.z-50
+cfosilvia.com	.z-50
 doppelherz.com	.z-50
 energydashboard.co.uk	.z-50
 freelway.com	.z-50
 help.adjust.com	.z-50
 livecounts.io	.z-50
+maticrobots.com	.z-50
 natron.energy	.z-50
 new.adotat.com	.z-50
 perspectives.plus	.z-50
@@ -28491,7 +28535,6 @@ priorygroup.com	#cookie
 proglib.io	#cookie
 proklima-hannover.de	#cookie
 przegladarka-ekw.ms.gov.pl	#cookie
-przegladarka-ekw.ms.gov.pl	#cookies
 przyjaznarekrutacja.pl	#cookie
 pszs.eu	#cookie
 publishwhatyoufund.org	#cookie
@@ -29972,6 +30015,7 @@ sfr.fr	#CkC
 chaft.fr	#Cookieslaw
 domaine-du-montmarin.com	#\#cookie-banner
 kubii.com	#acb-banner
+lacompagniedublanc.com	#acb-banner
 decrypterlenergie.org	#alert-mention
 gatineau.ca	#arriere-plan-de-la-fenetre
 gatineau.ca	#fenetre
@@ -31005,9 +31049,15 @@ ortcolleges.org.il	#cookie-alert-dialog
 tambour.co.il	#cookie-consent-acf-backdrop
 tambour.co.il	#cookie-consent-acf-modal
 impress-stores.co.il	#cookie-consent-acf-modal
+azrad.co.il	#cookie-consent-popup
+cable.co.il	#cookie-consent-popup
+ertzcamping.co.il	#cookie-consent-popup
+graphor87.co.il	#cookie-consent-popup
 house-design.shop	#cookie-consent-popup
 kerenby.co.il	#cookie-consent-popup
 korenelectric.co.il	#cookie-consent-popup
+koretzki.co.il	#cookie-consent-popup
+leensknit.co.il	#cookie-consent-popup
 peerlocks.com	#cookie-consent-popup
 soragit.co.il	#cookie-consent-popup
 sporty.co.il	#cookie-consent-popup
@@ -31037,6 +31087,7 @@ mizraney-olympia.co.il	#flexiblecookies_container
 kleibait.com	#floating_privacy_notice
 jfc.org.il	#footer_cookies_message_wrap
 car-keys.co.il	#fzcn-banner
+hanson-israel.com	#gdpr-modal-overlay
 bigelectric.co.il	#gdprCookieBar
 andjoy.co.il	#hpPrivacyPopup
 idan88.co.il	#idan-cookie-banner
@@ -31048,10 +31099,14 @@ carmelph.co.il	#il-privacy-banner
 equipit.co.il	#il-privacy-banner
 h1944.co.il	#il-privacy-banner
 iccjer.co.il	#il-privacy-banner
+mekimi.co.il	#il-privacy-banner
+mnews.co.il	#il-privacy-banner
 ptora.co.il	#ilp-consent-banner
 zmaneshkol.co.il	#ilp-consent-banner
 jppi.org.il	#jppi-cc-banner
 lizlol.co.il	#lz-consent
+maven-group.co.il	#maven-cookie
+maven-group.co.il	#maven-cookie-overlay
 wine-eilat.com	#mcc-cookie-bar
 smnh.tau.ac.il	#nmoCookieBanner
 tekoafarms.co.il	#pcm-consent-popup
@@ -31062,6 +31117,7 @@ coi.co.il	#privacyPop
 storemobile.co.il	#privacyPop
 inz.org.il	#privacyPrompt
 nabob-lock.co.il	#privacy_alert
+ronitek.co.il	#privacy_alert
 shukhashmal.co.il	#privacy_alert
 dunietz-elad.co.il	#privacy_policy_popup
 invoice4u.co.il	#privacy_policy_popup
@@ -31085,6 +31141,7 @@ matrefa.com	#sb_privacy_policy_notice
 matzberim.co.il	#sb_privacy_policy_notice
 medi-pharm.co.il	#sb_privacy_policy_notice
 mersa.co.il	#sb_privacy_policy_notice
+meyuly.co.il	#sb_privacy_policy_notice
 mishely-art.com	#sb_privacy_policy_notice
 peimot.com	#sb_privacy_policy_notice
 sjlightcompany.com	#sb_privacy_policy_notice
@@ -31104,15 +31161,18 @@ lasport.co.il	#scb-banner
 maakav.org.il	#scb-banner
 marble-elchai.co.il	#scb-banner
 mrs-clean.co.il	#scb-banner
+mylist.co.il	#scb-banner
 nyga.co.il	#scb-banner
 peledlocks.co.il	#scb-banner
 trucksmuseum.org.il	#scb-banner
+wlight.co.il	#scb-banner
 yad-sarah.net	#scb-banner
 rozi-arizot.co.il	#scm-banner
 rozi-arizot.co.il	#scm-custom
 willi-food.co.il	#scm-banner
 willi-food.co.il	#scm-custom
 bike.co.il	#scn-banner-root
+bniyah.co.il	#scn-banner-root
 climma.co.il	#sp-consent
 derech-eretz.co.il	#sp-consent
 health-comfort.co.il	#sp-consent
@@ -31155,10 +31215,12 @@ solar-click.co.il	.cbox-wrap
 sorag.co.il	.cbox-wrap
 nooa.co.il	.cmplz-cookiebanner
 israelpost.co.il	.cookie-agreement
+moadonsport.com	.cookie-agreement-container
 yad2.co.il	.cookie-implementation-disclaimer_popupRoot__CLI1m
 yad2.co.il	div[data-nagish="cookie-implementation-disclaimer"]
 deasy.co.il	.cookieMessage
 easygo.co.il	.cookieMessage
+icomp.co.il	.cookieagry
 novelsat.com	.cookiepopup
 gesher-theatre.co.il	.cookies-approval-strip-wrapper
 bug.co.il	.cookies-policy-modal-container
@@ -31186,6 +31248,7 @@ tel-aviv.gov.il	.customerAgreement
 medic-center-sport.co.il	.digita-privacy-popup
 winehouse.co.il	.digita-privacy-popup
 drushim.co.il	.dr-cookie-banner
+digitall.co.il	.dt-cookie
 mtoys.co.il	.e2w-cookie-popup
 booknet.co.il	.ec_modal-cover
 bcommunications.co.il	.ecl-banner
@@ -31222,6 +31285,7 @@ lilit.co.il	.idus_popup_widget_cookie_popup
 panta-rei.com	.idus_popup_widget_cookie_popup
 urbanica-wh.com	.idus_popup_widget_cookie_popup
 aklimapro.co.il	.ilpc-banner
+hameigaash.co.il	.ilpc-banner
 sleepspa.co.il	.ilpc-banner
 sleepspa.co.il	.info_popup
 taamal.co.il	.ilpc-banner
@@ -31265,11 +31329,14 @@ tlvmall.com	.sbb-sticky-bar
 mazda.co.il	.sc-26e57d0b-0.hsLpSr
 bleeckerbakery.co.il	.sgcc-main-wrapper
 million-kisot.co.il	.sgcc-main-wrapper
+podiumil.co.il	.sgcc-main-wrapper
 my.mor.org.il	.shadow-consent-banner
 jspca.org.il	.site-consent-banner
 letlive.org.il	.site-consent-banner
 l-s.co.il	.sogo-pc-banner
+israelprintcenter.co.il	.sux-cb-backdrop
 htrl.co.il	.w3d-cb-banner
+mgweb.co.il	.widget_privacy_alert
 sancar.co.il	.xtra-cookie
 dominos.co.il	[class^="CloseableDisclaimer_"]
 hillula.co.il	[class^="ai-cookie-popup-"]
@@ -31321,6 +31388,7 @@ musicol-shop.co.il	div[class^="cookiesPopup"]
 musicworld.co.il	div[class^="cookiesPopup"]
 orpc.co.il	div[class^="cookiesPopup"]
 out-of-the-box.co.il	div[class^="cookiesPopup"]
+owlmarket.co.il	div[class^="cookiesPopup"]
 pascale.co.il	div[class^="cookiesPopup"]
 pokito.co.il	div[class^="cookiesPopup"]
 pro-safety.co.il	div[class^="cookiesPopup"]
@@ -31348,6 +31416,8 @@ milega.co.il	flashy-popup
 shkedya.co.il	flashy-popup
 tooleden.com	flashy-popup
 postalfinance.co.il	float-window-alert
+shilav.co.il	popup-message[data-cookie-duration]
+zurmarket.co.il	popup-message[data-cookie-duration]
 tase.co.il	tase-cookies-policy
 alpinbike.hu	#CLayer
 belteriajtok.hu	#CLayer
@@ -31966,6 +32036,7 @@ portfeo.pl	#data-processing-popup
 redbullmobile.pl	#didomiBlockNavigation
 redbullmobile.pl	#more1
 kinonh.pl	#div_ac
+acana.com.pl	#ext_advancedcookie_overlay
 asc-pro.pl	#flexiblecookies_container
 maciej.je	#flexiblecookies_container
 ria.com.pl	#flexiblecookies_container
@@ -32027,6 +32098,7 @@ archiwumalle.pl	#polityka
 basketzone.pl	#polityka
 getem.pl	#polityka
 kosmetykizameryki.pl	#polityka
+polon.nauka.gov.pl	#polon-system-cookie-notice
 pkspolonus.pl	#popek
 poznan.pl	#popup-peka
 erhem.pl	#popupContact
@@ -32127,6 +32199,7 @@ forumrowerowe.org	.ckg
 itaka.pl	.cky-modal
 itaka.pl	.cky-overlay
 aterima-work.pl	.cm-popup-wrapper
+mezczyzni.mistrzostwapolskimasters.pl	.cokie-manager-dialog
 pls.pl	.cokie-manager-dialog
 tauronliga.pl	.cokie-manager-dialog
 sklep.szprychy.com	.config-messages
@@ -32227,6 +32300,7 @@ mein-schauinsland.de	.popup-top-header
 masz.eu	.popupContent
 toczeniewdrewnie.pl	.position-bottom
 webprojekt.biz	.ppc
+insert.com.pl	.privacyAndCookiePolicy_wrapper
 kp.pl	.privacyModal
 hejto.pl	.py-4.px-6.items-center
 hejto.pl	.z-1200.border-primary-main
@@ -32240,7 +32314,6 @@ mlekovita.com.pl	.realCookies
 mlekovitka.pl	.realCookies
 sklep.plast-pol.com	.realCookies
 stonefeather.pl	.realCookies
-super.buycom.pl	.realCookies
 prk24.pl	.rk-cookie-overlay
 alloc.pl	.rodopolicy
 bagpolska.pl	.rodopolicy
@@ -32646,6 +32719,7 @@ actualitati-arad.ro	.viral-pro-privacy-policy
 altex.ro	.z-1050
 pressone.ro	[style="position: fixed; top: 0px; left: 0px; width: 100%; height: 100%; z-index: 1040;"]
 abekker.ru	#GDPR-container
+developers.sber.ru	#GDPRBanner
 videosmile.ru	#accept_q
 startsmile.ru	#access_cookie
 spbtvonline.ru	#agreeC
@@ -32672,6 +32746,7 @@ ria-m.tv	#cookie-msg
 openspeedtest.ru	#cookieConsentParams
 violity.com	#cookieConsentPopup
 violity.com	#floating_agreement
+nsis.ru	#cookieDisclaimer
 zia.aero	#cookieDisclaimer
 aeroflot.ru	#cookieInfo
 abok.ru	#cookieNotice
@@ -32710,6 +32785,7 @@ dzen.ru	#recommend-tech-snackbar
 blsspainrussia.ru	#removeCookie
 rutgames.net	#rg-cookie-bar
 rgs.ru	#rgs-main-context-bar
+rmansys.ru	#rmsCookieNotice
 sport-express.net	#se-cookie-popup
 calend.ru	#thecookies_note
 shkolazhizni.ru	#thecookies_note
@@ -32769,6 +32845,7 @@ vsemayki.ru	._gTi8L8k
 2gis.ru	._n1367pl
 2gis.ru	._nlniiu
 2gis.uz	._nlniiu
+astrum-play.ru	._root_1fhto_1
 gastronom.ru	._root_24byp_2
 gastronom.ru	.accept-cookies-popup
 bankprav.ru	.a-warning
@@ -32821,15 +32898,18 @@ atlant-minsk.ru	.confirm-panel
 darina.su	.container-coocke
 tastycoffee.ru	.container__content
 esplus.ru	.coo-poly
+eridon.ua	.cook
 2x2tv.ru	.cook-web
 mnogo.ru	.cook_LFPnK
 propb.ru	.cooke
 invitro.ru	.cookie--popup
 voka.tv	.cookie-alertcomponent__BlurContainer-sc-b564p5-0
+technopark.ru	.cookie-allow
 spbu.ru	.cookie-block
 akit.ru	.cookie-consent-banner
 supersamsev.ru	.cookie-consent-container-wrap
 4ege.ru	.cookie-consent-mini
+bsb.by	.cookie-fix-wrapper
 lk-new.vtbnpf.ru	.cookie-layout
 theblueprint.ru	.cookie-line
 rutube.ru	.cookie-message-module__cookie-consent
@@ -32854,6 +32934,7 @@ job.mts.ru	.cookies-agreement-alert
 ok.ru	.cookies-agreement-notification
 1c-victory.ru	.cookies-block
 is1c.ru	.cookies-block-wrap
+fissman.ru	.cookies-custom-popup
 gosapteka-mo.ru	.cookies-info__box
 regnum.ru	.cookies-notice-container
 getcourse.ru	.cookies-notification
@@ -32931,6 +33012,7 @@ vitaexpress.ru	.info-processing-personal-data-container
 stgau.ru	.inform
 friday.ru	.information
 bbr.ru	.is-message-ppd
+aeza.ru	.jUoafE
 life.ru	.jnpUBg
 icenter-store.ru	.jqmWindow
 incanto.eu	.js-footer
@@ -33130,6 +33212,8 @@ sravni.ru	[sr-portal-container]
 sportmk.ru	[style^="position: fixed; left: 50%; bottom:"]
 reshuent.ru	[style^="text-align: left; position: fixed;"]
 sdamgia.ru	[style^="text-align: left; position: fixed;"]
+gkbyudina.ru	[x-data="BannerCookies"]
+helix.ru	app-cookie-consent
 fastvps.ru	app-cookies-accept
 authedu.mosreg.ru	body > div[style^="position: fixed; overflow: visible; top: 0px; left: 0px; transform: translate("]
 myschool.mos.ru	body > div[style^="position: fixed; overflow: visible; top: 0px; left: 0px; transform: translate("]
@@ -33163,6 +33247,34 @@ id.sber.ru	div[data-testid="cookie_banner"]
 litres.ru	div[data-testid="cookieAcceptPopup"]
 7dach.ru	div[style^="background-color:#fff3cd; color: #856404;"]
 chaynikam.info	div[style^="position: fixed; bottom: 0px;"]
+bloknot-astrakhan.ru	div[style^="position: fixed; bottom:"]
+bloknot-donetsk.ru	div[style^="position: fixed; bottom:"]
+bloknot-gelendzhik.ru	div[style^="position: fixed; bottom:"]
+bloknot-herson.ru	div[style^="position: fixed; bottom:"]
+bloknot-kamyshin.ru	div[style^="position: fixed; bottom:"]
+bloknot-krasnodar.ru	div[style^="position: fixed; bottom:"]
+bloknot-krymska.ru	div[style^="position: fixed; bottom:"]
+bloknot-lugansk.ru	div[style^="position: fixed; bottom:"]
+bloknot-moldova.ru	div[style^="position: fixed; bottom:"]
+bloknot-morozovsk.ru	div[style^="position: fixed; bottom:"]
+bloknot-novorossiysk.ru	div[style^="position: fixed; bottom:"]
+bloknot-odessa.ru	div[style^="position: fixed; bottom:"]
+bloknot-rostov.ru	div[style^="position: fixed; bottom:"]
+bloknot-shakhty.ru	div[style^="position: fixed; bottom:"]
+bloknot-stavropol.ru	div[style^="position: fixed; bottom:"]
+bloknot-taganrog.ru	div[style^="position: fixed; bottom:"]
+bloknot-volgodonsk.ru	div[style^="position: fixed; bottom:"]
+bloknot-volgograd.ru	div[style^="position: fixed; bottom:"]
+bloknot-volzhsky.ru	div[style^="position: fixed; bottom:"]
+bloknot-voronezh.ru	div[style^="position: fixed; bottom:"]
+bloknot-zaporozhie.ru	div[style^="position: fixed; bottom:"]
+bloknot.ru	div[style^="position: fixed; bottom:"]
+bloknotanapa.ru	div[style^="position: fixed; bottom:"]
+bloknotanna.ru	div[style^="position: fixed; bottom:"]
+bloknotborisoglebsk.ru	div[style^="position: fixed; bottom:"]
+bloknotsaratov.ru	div[style^="position: fixed; bottom:"]
+bloknottambov.ru	div[style^="position: fixed; bottom:"]
+sochi-bloknot.ru	div[style^="position: fixed; bottom:"]
 pikabu.ru	div[style^="position: fixed; left: 0px;"]
 znayka.cc	div[style^="position:fixed;z-index:9999;left:18px;bottom:18px;"]
 delimobil.ru	footer

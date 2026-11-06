@@ -241,7 +241,6 @@
 #gkBackToTop	#gkBackToTop
 #gkTopLink	#gkTopLink
 #go-to-bottom	#go-to-bottom
-#go-to-top	#go-to-top
 #goDownFooter	#goDownFooter
 #goToTop	#goToTop
 #goToTopButton	#goToTopButton
@@ -622,6 +621,7 @@
 .oui-back-to-top	.oui-back-to-top
 .p-pagetop-btn	.p-pagetop-btn
 .page-to-top-visible	.page-to-top-visible
+.pageActionButtonToTop	.pageActionButtonToTop
 .pagetop-btn	.pagetop-btn
 .pb-back-to-top	.pb-back-to-top
 .penci-go-to-top-floating	.penci-go-to-top-floating
@@ -12292,6 +12292,7 @@ seroundtable.com	#share
 pagesix.com	#pagesix-app-flyout__wrapper
 pagesix.com	.comments-inline-cta
 pagesix.com	.inline-module--newsletter
+pagesix.com	.google-preferred-sources
 dmv-practice-test.com	#pop-up-show
 hentairead.com	#popupBannerModal
 imagenimage.com	#popupOverlay
@@ -13646,6 +13647,7 @@ thejakartapost.com	.suscribe
 carnewschina.com	.ad__custom_html_datatracker_article_top
 carnewschina.com	.block__newsletter
 carnewschina.com	.newsletter-for-scroll
+carnewschina.com	.nwsl-adv
 carnewschina.com	.td-pb-span4.tdi_127
 carnewschina.com	.tdi_117
 carnewschina.com	.tdi_134.vc_column
@@ -13997,6 +13999,8 @@ bizpacreview.com	.membership-appeal-top
 bizpacreview.com	#enhancedtextwidget-2
 alistapart.com	.coil-banner-message-container
 foxbusiness.com	.commenting-nation-promo
+foxbusiness.com	.amp-share
+foxbusiness.com	.social-sharing
 foxnews.com	.commenting-nation-promo
 foxnews.com	.item-nation-trial-mod
 foxnews.com	.promo
@@ -14005,7 +14009,9 @@ foxnews.com	.item-newsletter
 foxnews.com	.item-subscribe
 foxnews.com	.newsletter-form
 foxnews.com	.subscribe
+foxnews.com	.amp-share
 foxnews.com	.article-meta-lower:has(.article-social)
+foxnews.com	.social-sharing
 foxnews.com	.social-icons
 browardpalmbeach.com	.comp-content-keepfreebannercontent
 browardpalmbeach.com	.fdn-support-us-block
@@ -14399,6 +14405,7 @@ patriotfetch.com	.gpoll_enabled_wrapper
 united24media.com	.gtm-article-small
 united24media.com	.gtm-bottom-popup-article
 united24media.com	.c-post__props
+united24media.com	.gtm-bottom-popup-article
 consumerreports.org	.guardian-cta
 consumerreports.org	#mtRoundupPaywallPopup
 consumerreports.org	#mtExitModalPopup
@@ -14742,8 +14749,11 @@ outlookindia.com	.social-media-icons
 outlookindia.com	.social_sharing_article
 pressreader.com	.prpromo
 designboom.com	.publish-your-work
+designboom.com	.rail--sticky
 designboom.com	.nlbox-form-box
+designboom.com	.rail--nlsticky
 designboom.com	.subscribe-box
+designboom.com	.page--byline--icons
 designboom.com	.share-bar
 ess-news.com	.pvmagazine-announcement-block
 ess-news.com	.pvmagazine-newsletter-block
@@ -14769,6 +14779,7 @@ reuters.com	.article-prompt__container__3uXJV
 reuters.com	.regular-article-layout__newsletter__3wzPk
 reuters.com	[data-testid="NewsletterSignupCard"]
 reuters.com	#toolbar-item-parent-share-12
+reuters.com	.social-links-module__wrap-links__Zxr2b
 reuters.com	[data-testid="SharingSymbols"]
 reuters.com	div[class^="image-caption__social__"]
 reuters.com	div[class^="social__container_"]
@@ -15065,6 +15076,8 @@ themarshallproject.org	.email-signup-v2-js
 themarshallproject.org	.inline-signup
 themarshallproject.org	.post-footer-subscribe-promo
 themarshallproject.org	.toast-notifications-container
+washingtonexaminer.com	.wex-ad-wrap
+washingtonexaminer.com	.ActionBar
 cpuid.com	.widget-advert-300-sticky
 cpuid.com	.widget-advert-336
 gulftoday.ae	.widget-advertisement-card
@@ -15072,8 +15085,12 @@ gulftoday.ae	.scroll-to-top
 chicagoreporter.com	.widget-support-tcr
 religionnews.com	.widget.post-donation-callout-container
 religionnews.com	#newsletter_sidebar_widget-3
+religionnews.com	.rns-article-signup-blurb-wrap
+religionnews.com	.rns-immigration-popup-overlay
 religionnews.com	.rns-newsletter-embed-content
 religionnews.com	.rns-pop-up-wrapper
+religionnews.com	.rns-promo-banner
+religionnews.com	.widget_newsletter_sidebar_widget
 religionnews.com	.social-buttons
 factcheck.org	.widget_factcheck_donate_widget
 factcheck.org	a[href*="/subscribe/"]
@@ -15236,18 +15253,21 @@ news18.com	.phtshare
 news18.com	.social-icon
 news18.com	.social_share
 99percentinvisible.org	#post-navigation
+99percentinvisible.org	.social-nav
 inquirer.net	#read-next-2018
 inquirer.net	.sib-form
 crossroadstoday.com	#slidepanel
 crossroadstoday.com	.asset-paging-container
 gamesradar.com	#sticky-nav--floating
 gamesradar.com	#signupForm
+gamesradar.com	#skinnyBanner
 gamesradar.com	.slice-container-newsletterForm
 gamesradar.com	#utilitybar__button--share
 gamesradar.com	[data-testid="buttons-social"]
 gamesradar.com	p:has(> a[href^="https://news.google.com/publications/"])
 tomsguide.com	#sticky-nav--floating
 tomsguide.com	.scrollUp__button
+tomsguide.com	#skinnyBanner
 tomsguide.com	#utilitybar__button--newsletter
 tomsguide.com	.slice-container-newsletterForm
 tomsguide.com	.widget-membership-signup-popup-2
@@ -15524,6 +15544,7 @@ bucketlistseekers.com	.pagination
 deadline.com	.pmc-u-background-white.pmc-u-margin-b-0
 deadline.com	.newsletter-cta
 deadline.com	.widget-newsletter
+deadline.com	.o-google-preferred-button
 theprp.com	.post-preview-next
 theprp.com	.post-preview-prev
 ew-nutrition.com	.post_navigation
@@ -15566,9 +15587,12 @@ phonearena.com	.google-news-follow
 phonearena.com	.social
 indiatoday.in	.recommended__widget
 indiatoday.in	.tapBoxCls
+indiatoday.in	.rhs_banner_widget
+indiatoday.in	.Story_prefergogl__Nw2MQ
 indiatoday.in	.Story_whatsapp_channel__6xdtB
 indiatoday.in	.fixedshared
 indiatoday.in	.footer__socialshare
+indiatoday.in	.googprefer
 indiatoday.in	.share-social-icons
 indiatoday.in	.whtspp_share
 indiatoday.in	.sharing
@@ -15778,6 +15802,7 @@ nationaltoday.com	.nt-share
 decider.com	.comments-inline-cta
 decider.com	.widget__newsletter
 decider.com	.widget_nypost_decider_social_connect_widget
+decider.com	.google-preferred-sources
 nypost.com	.comments-inline-cta
 nypost.com	.inline-module--newsletter
 nypost.com	.floating-share
@@ -16318,6 +16343,7 @@ rstore.it	#totop
 scarpescarpestore.com	#totop
 scarpescarpestore.com	.footer-social-icons
 sexcash.com	#totop
+sharkrobot.com	#totop
 teenxy.com	#totop
 u-news.com.ua	#totop
 altoadigelatte.com	#up
@@ -16892,6 +16918,7 @@ bergsysteemafbouw.nl	.totoplink
 nftplazas.com	.trx_addons_scroll_to_top
 repuestosportatiles.es	.tvbottom-to-top
 nippon.com	.u-pagetop
+avforums.com	.u-scrollButtons
 news.arizona.edu	.ua-zen-back-to-top
 unige.ch	.unige-topnav
 atramentowka.com	.up
@@ -16990,6 +17017,7 @@ thehill.com	.desktop-floating-player
 thehill.com	.hardwall
 thehill.com	.network-footer__ca-newsletter
 thehill.com	.network-footer__newsletter
+thehill.com	.menu-item:has(> [data-link-label="Newsletters"])
 thehill.com	.social
 thehill.com	.social-share
 cwtv.com	#user_optin_banner
@@ -17527,6 +17555,7 @@ map.baidu.com	#message-panel
 economictimes.indiatimes.com	#float_app_ET
 economictimes.indiatimes.com	.styles_homeLeftSectionBanner__8_ohA
 economictimes.indiatimes.com	.sharePbanner
+tokubai.co.jp	#float_web2app_smart_phone_wrapper
 kogan.com	#footer-native-banner
 bmwc.marv.jp	#footer_badge-fixed
 mercari.com	#getTheAppFooter
@@ -17955,6 +17984,9 @@ my.mintmobile.com	.justify-content-end.rounded-1.g-0.p-3
 news.bitcoin.com	.kBQmzn.sc-gMKojc
 news.bitcoin.com	.dXWTEu
 news.bitcoin.com	.gyHIup
+leicester.news	.kg-cta-content-app
+leicester.news	.kg-signup-card
+leicester.news	.subscribe-cta
 baby-calendar.jp	.l-anime-bana.js-bcweb-only
 sauna-ikitai.com	.l-headerApp
 raileurope.com	.l2-8javB
@@ -18055,6 +18087,11 @@ chess.com	.ready-to-play-banner-component
 chess.com	.navigation-footer-platforms-component
 agoda.com	.redirectToAppBar
 medscape.com	.rel-links-media
+sfgate.com	.row1:has([aria-label="Get our ad-free app"])
+sfgate.com	[href="https://link.sfgate.com/join/signup-sfgate"]
+sfgate.com	#HP-Sig-ChronFunds
+sfgate.com	[aria-label="Share from Email"]
+sfgate.com	[aria-label="Share to Twitter"]
 rekhta.org	.rt_AppBtn
 fdownload.app	.section-app-fb
 comicsvalley.com	.sgpb-popup-dialog-main-div-wrapper
@@ -19374,6 +19411,7 @@ holdthecarbs.ca	#chated-overlay
 tomshardware.com	#clubPopup
 tomshardware.com	#newsletter-slice
 tomshardware.com	#signupForm
+tomshardware.com	#skinnyBannerT2
 tomshardware.com	#utility-bar
 tomshardware.com	.flexisites-social
 tomshardware.com	.image-widthsetter[style="max-width:676px;"]
@@ -19490,6 +19528,8 @@ courthousenews.com	#email-subscribers
 courthousenews.com	.apps-links
 courthousenews.com	.x-follow-button
 courthousenews.com	.share
+ballotpedia.org	#email-update-small
+ballotpedia.org	.drift-widget-email-capture
 sheets.works	#emailFloat
 sheets.works	#stickyEmailBar
 sheets.works	.cta
@@ -19631,8 +19671,11 @@ dot.la	.pop-up-content
 dot.la	.foot_bar
 dot.la	.foot_social
 mobilesyrup.com	#mc_newsletter_signup_article
+mobilesyrup.com	.max-\[901px\]\:pt-10
 mobilesyrup.com	.newsletter-article-container
 mobilesyrup.com	.newsletter-form-container
+mobilesyrup.com	.pb-\[22px\]
+mobilesyrup.com	.article-share-row
 mobilesyrup.com	.share-links
 mobilesyrup.com	.social-links
 lawyerscommittee.org	#media_image-7
@@ -19735,6 +19778,9 @@ cryptonews.com	#newsletter-modal
 cryptonews.com	.ssk
 perizona.it	#newsletter-modal
 perizona.it	.google_news
+tarnkappe.info	#newsletter-modal
+tarnkappe.info	#newsletter-modal-overlay
+tarnkappe.info	#custom_html-1203
 thejc.com	#newsletter-modal
 thejc.com	#newsletter-reminder
 thejc.com	.flex.self-start.flex-col.gap-24.p-24.bg-black.text-white.rounded-md.\[\&_\.account-exists-message\]\:text-white
@@ -19840,6 +19886,8 @@ soleyama.com	#overlay
 irishpost.com	#overlay-form-container
 irishpost.com	.subscribe
 mrctv.org	#pardotForm
+newsweek.com	#piano-inline-engagement
+newsweek.com	.GooglePreferredSourceBanner_container__4kWoo
 brusselstimes.com	#piano-single-before-ads-jobs
 hyperallergic.com	#pico_prompt
 hyperallergic.com	.wp-block-jetpack-sharing-buttons
@@ -19947,22 +19995,28 @@ amazingfoodmadeeasy.com	#signup-wrapper
 businesstimes.com.sg	#signup-wrapper
 businesstimes.com.sg	[data-testid="article-inside-btg-newsletter-component"]
 guitarworld.com	#signupForm
+guitarworld.com	#skinnyBanner
 guitarworld.com	p:has(> a[href^="https://news.google.com/publications/"])
 pcgamer.com	#signupForm
+pcgamer.com	#skinnyBanner
 pcgamer.com	#utility-bar
 pcgamer.com	[data-testid="buttons-social"]
 pcgamer.com	p:has(> a[href^="https://news.google.com/publications/"])
 techradar.com	#signupForm
+techradar.com	#utilitybar__button--share
 techradar.com	.facebook-icon
 techradar.com	.flexisites-social
 techradar.com	.flipboard-icon
 techradar.com	p:has(> a[href^="https://news.google.com/publications/"])
 windowscentral.com	#signupForm
+windowscentral.com	#skinnyBanner
 windowscentral.com	#utilitybar__button--share
 windowscentral.com	.flexisites-social
 windowscentral.com	p:has(> a[href^="https://news.google.com/publications/"])
 domainnamewire.com	#simple-banner
 domainnamewire.com	.widget-wrap.widget_text
+space.com	#skinnyBanner
+space.com	.newsletter-branded-widget
 amd.com	#slidebox
 logisticsit.com	#slidingbar
 infodocket.com	#smallmeternote
@@ -20184,6 +20238,7 @@ axial.acs.org	.Button_button__dSklw
 axial.acs.org	.NewsletterCTA_inner__8UZPJ
 cnbc.com	.CNBCFooter-info
 cnbc.com	.WildcardEmbed-wrapper
+cnbc.com	.CNBCFooter-sectionItem:has(> [href="/sign-up-for-cnbc-newsletters/"])
 cnbc.com	.ArticleBody-googlePreferredSourceContainer
 cnbc.com	.CNBCFooter-social
 cnbc.com	.HighlightShare-container
@@ -20308,6 +20363,7 @@ publicradiotulsa.org	.gtm_share
 abc7.com	.Shfq
 abc7.com	.social
 abc7ny.com	.Shfq
+abc7ny.com	.footer-icons
 abc7ny.com	.social
 audioxpress.com	.SignUp
 futurework.org.au	.SiteFooter_signup
@@ -20367,6 +20423,7 @@ tvline.com	.add-on-google-widget
 goldderby.com	._newsletter_ixyx8_1
 goldderby.com	.expert-newslater
 goldderby.com	._socialMedia_hgv74_1
+goldderby.com	.o-google-preferred-button
 goldderby.com	.share-group
 blog.logto.io	._subscribe_pm84d_312
 blog.logto.io	._share_pm84d_360
@@ -20377,6 +20434,8 @@ nytimes.com	.a8f50c72
 nytimes.com	[data-gtm-element="newsletter_loaf_form"]
 nytimes.com	[data-scp="newsletter"]
 nytimes.com	[data-testid="social-group"]
+nytimes.com	[data-testid="floating-button"]:has([aria-label="More sharing options ..."])
+nytimes.com	[data-testid="share-tools-list"] > li:has([aria-label="More sharing options ..."])
 the18.com	.above-email
 atlanticcouncil.org	.ac-mkto-form
 atlanticcouncil.org	.gform_wrapper
@@ -20980,7 +21039,6 @@ sundaysuppermovement.com	.pin-recipe-container
 thecountrycook.net	.cls-inserted
 wideopencountry.com	.cls-inserted
 wideopencountry.com	.entry-social
-www.thecountrycook.net	.cls-inserted
 wyseguide.com	.cls-inserted
 wyseguide.com	.seva-form
 wyseguide.com	.share-your-results
@@ -21434,6 +21492,7 @@ androidpolice.com	.btn-whatsapp
 androidpolice.com	.btn-x
 androidpolice.com	.copy-link-button
 androidpolice.com	.google-addus
+androidpolice.com	.w-google-addus-btn--article-header-variants
 androidpolice.com	.w-social-follow-button
 androidpolice.com	.social-media
 backyardboss.net	.footer-newsletter
@@ -21441,39 +21500,47 @@ backyardboss.net	.w-newsletter-in_article
 backyardboss.net	.w-promotion-offer:has(.newsletter-promotion-large)
 backyardboss.net	.btn-mail
 backyardboss.net	.google-addus
+backyardboss.net	.w-google-addus-btn--article-header-variants
 carbuzz.com	.footer-newsletter
 carbuzz.com	.w-promotion-offer:has(.newsletter-promotion-large)
 carbuzz.com	.article-add-google
 carbuzz.com	.google-addus
+carbuzz.com	.w-google-addus-btn--article-header-variants
 cbr.com	.footer-newsletter
 cbr.com	.w-promotion-offer:has(.newsletter-promotion-large)
 cbr.com	.article-add-google
 cbr.com	.btn-mail
 cbr.com	.copy-link-button
 cbr.com	.google-addus
+cbr.com	.w-google-addus-btn--article-header-variants
 collider.com	.footer-newsletter
 collider.com	.w-promotion-offer:has(.newsletter-promotion-large)
 collider.com	.article-add-google
 collider.com	.btn-mail
 collider.com	.google-addus
+collider.com	.w-google-addus-btn--article-header-variants
 dualshockers.com	.footer-newsletter
 dualshockers.com	.w-promotion-offer:has(.newsletter-promotion-large)
 dualshockers.com	.btn-mail
 dualshockers.com	.copy-link-button
 dualshockers.com	.google-addus
+dualshockers.com	.w-google-addus-btn--article-header-variants
 footballfancast.com	.footer-newsletter
 footballfancast.com	.w-promotion-offer:has(.newsletter-promotion-large)
 footballfancast.com	.article-add-google
 footballfancast.com	.google-addus
+footballfancast.com	.w-google-addus-btn--article-header-variants
 footballleagueworld.co.uk	.footer-newsletter
 footballleagueworld.co.uk	.w-promotion-offer:has(.newsletter-promotion-large)
 footballleagueworld.co.uk	.google-addus
+footballleagueworld.co.uk	.w-google-addus-btn--article-header-variants
 gamerant.com	.footer-newsletter
 gamerant.com	.w-promotion-offer:has(.newsletter-promotion-large)
 gamerant.com	.article-add-google
 gamerant.com	.btn-mail
 gamerant.com	.copy-link-button
 gamerant.com	.google-addus
+gamerant.com	.w-google-addus-btn--article-header-variants
 givemesport.com	.footer-newsletter
 givemesport.com	.newsletter-section
 givemesport.com	.w-newsletter-in_article
@@ -21483,17 +21550,21 @@ givemesport.com	.btn-flipboard
 givemesport.com	.btn-mail
 givemesport.com	.btn-whatsapp
 givemesport.com	.google-addus
+givemesport.com	.w-google-addus-btn--article-header-variants
 hardcoregamer.com	.footer-newsletter
 hardcoregamer.com	.article-add-google
 hardcoregamer.com	.google-addus
+hardcoregamer.com	.w-google-addus-btn--article-header-variants
 hotcars.com	.footer-newsletter
 hotcars.com	.w-promotion-offer:has(.newsletter-promotion-large)
 hotcars.com	.article-add-google
 hotcars.com	.google-addus
+hotcars.com	.w-google-addus-btn--article-header-variants
 howtogeek.com	.footer-newsletter
 howtogeek.com	.article-add-google
 howtogeek.com	.btn-mail
 howtogeek.com	.google-addus
+howtogeek.com	.w-google-addus-btn--article-header-variants
 kunstenfestivalwatou.be	.footer-newsletter
 makeuseof.com	.footer-newsletter
 makeuseof.com	.w-promotion-offer:has(.newsletter-promotion-large)
@@ -21501,60 +21572,72 @@ makeuseof.com	.article-add-google
 makeuseof.com	.btn-mail
 makeuseof.com	.copy-link-button
 makeuseof.com	.google-addus
+makeuseof.com	.w-google-addus-btn--article-header-variants
 movieweb.com	.footer-newsletter
 movieweb.com	.w-promotion-offer:has(.newsletter-promotion-large)
 movieweb.com	.article-add-google
 movieweb.com	.btn-mail
 movieweb.com	.copy-link-button
 movieweb.com	.google-addus
+movieweb.com	.w-google-addus-btn--article-header-variants
 pocket-lint.com	.footer-newsletter
 pocket-lint.com	.w-newsletter-in_article
 pocket-lint.com	.w-promotion-offer:has(.newsletter-promotion-large)
 pocket-lint.com	.article-add-google
 pocket-lint.com	.copy-link-button
 pocket-lint.com	.google-addus
+pocket-lint.com	.w-google-addus-btn--article-header-variants
 screenrant.com	.footer-newsletter
 screenrant.com	.w-promotion-offer:has(.newsletter-promotion-large)
 screenrant.com	.article-add-google
 screenrant.com	.google-addus
+screenrant.com	.w-google-addus-btn--article-header-variants
 screenrant.com	.sharing
 simpleflying.com	.footer-newsletter
 simpleflying.com	.w-promotion-offer:has(.newsletter-promotion-large)
 simpleflying.com	.article-add-google
 simpleflying.com	.google-addus
+simpleflying.com	.w-google-addus-btn--article-header-variants
 thegamer.com	.footer-newsletter
 thegamer.com	.w-promotion-offer:has(.newsletter-promotion-large)
 thegamer.com	.article-add-google
 thegamer.com	.btn-mail
 thegamer.com	.copy-link-button
 thegamer.com	.google-addus
+thegamer.com	.w-google-addus-btn--article-header-variants
 thegamer.com	.social-media
 therichest.com	.footer-newsletter
 therichest.com	.w-promotion-offer:has(.newsletter-promotion-large)
 therichest.com	.google-addus
+therichest.com	.w-google-addus-btn--article-header-variants
 thesportster.com	.footer-newsletter
 thesportster.com	.w-promotion-offer:has(.newsletter-promotion-large)
 thesportster.com	.google-addus
+thesportster.com	.w-google-addus-btn--article-header-variants
 thethings.com	.footer-newsletter
 thethings.com	.w-newsletter-in_article
 thethings.com	.w-promotion-offer:has(.newsletter-promotion-large)
 thethings.com	.btn-mail
 thethings.com	.google-addus
+thethings.com	.w-google-addus-btn--article-header-variants
 thetravel.com	.footer-newsletter
 thetravel.com	.w-promotion-offer:has(.newsletter-promotion-large)
 thetravel.com	.article-add-google
 thetravel.com	.btn-mail
 thetravel.com	.copy-link-button
 thetravel.com	.google-addus
+thetravel.com	.w-google-addus-btn--article-header-variants
 topspeed.com	.footer-newsletter
 topspeed.com	.w-promotion-offer:has(.newsletter-promotion-large)
 topspeed.com	.google-addus
+topspeed.com	.w-google-addus-btn--article-header-variants
 xda-developers.com	.footer-newsletter
 xda-developers.com	.w-promotion-offer:has(.newsletter-promotion-large)
 xda-developers.com	.article-add-google
 xda-developers.com	.btn-mail
 xda-developers.com	.copy-link-button
 xda-developers.com	.google-addus
+xda-developers.com	.w-google-addus-btn--article-header-variants
 letsencrypt.org	.footer-newsletter-col
 moonpalacecancun.com	.footer-newsletter__form
 stereogum.com	.footer-right__box
@@ -22120,6 +22203,7 @@ findingtheuniverse.com	.ml-form-embedContainer
 levittownnow.com	.ml-form-embedContainer
 serenabakessimplyfromscratch.com	.ml-form-embedContainer
 techpolicy.press	.ml-form-embedContainer
+techpolicy.press	.ml-subscribe-form
 pymnts.com	.ml-subscribe-form-5774674
 pymnts.com	.mt-3.sticky-top
 pymnts.com	.sailthru-nl-signup
@@ -22260,7 +22344,6 @@ thartribune.com	.e-shared-sec
 thartribune.com	.highlight-shares
 thartribune.com	.t-shared-sec
 thartribune.com	.l-shared-sec
-space.com	.newsletter-branded-widget
 slashfilm.com	.newsletter-btn
 slashfilm.com	.newsletter
 slashfilm.com	.add-on-google-widget
@@ -22620,6 +22703,7 @@ longevity.technology	.popup_bg
 styletread.co.nz	.popup_overlay
 lemonstripes.com	.popupally-overlay-gfcr-1
 rairfoundation.com	.popupally-overlay-gfcr-1
+influxdata.com	.pos-signup-bg
 bicycleretailer.com	.post-article-signup
 tasteofhome.com	.post-nl-promo
 tasteofhome.com	.newsletter
@@ -22663,6 +22747,8 @@ planetrugby.com	.ps-email-subscription
 planetrugby.com	.share
 teamtalk.com	.ps-email-subscription
 tennis365.com	.ps-email-subscription
+pridesource.com	.psnl
+pridesource.com	.sub:has(> .psnl)
 techrepublic.com	.pt-\[20px\]
 techrepublic.com	.ta-campaign-widget
 techrepublic.com	.ta-campaign-widget__popup-wrapper
@@ -23208,6 +23294,8 @@ craftybaking.com	.upper
 usa.gov	.usa-sign-up
 nscale.com	.uui-blogpost05_newsletter
 nscale.com	.uui-blogpost05_share-wrapper
+cybersecuritynews.com	.vc_raw_html
+cybersecuritynews.com	.tdm-ii-wrap
 minimalistbaker.com	.vertical-subscribe
 theshoecompany.ca	.vip-enrollment-banner
 wateronline.com	.vm-hello-bar
@@ -23283,6 +23371,7 @@ whats-on-netflix.com	.won-rec-tags-strip--social
 worth.com	.worth-newsletter-section
 plantpowercouple.com	.wp-block-aweber-signupform-block-aweber-shortcode
 creepycatalog.com	.wp-block-cata-newsletter
+news.ballotpedia.org	.wp-block-cover
 eugeneweekly.com	.wp-block-eugene-weekly-newsletter-signup
 destructoid.com	.wp-block-gamurs-newsletter
 destructoid.com	#newsletter-form
@@ -23418,10 +23507,6 @@ torontosun.com	[data-widget="newsletter"]
 oann.com	[href="/alerts"]
 oann.com	.social-links
 jewishworldreview.com	[href="/subs.php"]
-sfgate.com	[href="https://link.sfgate.com/join/signup-sfgate"]
-sfgate.com	#HP-Sig-ChronFunds
-sfgate.com	[aria-label="Share from Email"]
-sfgate.com	[aria-label="Share to Twitter"]
 techcabal.com	[href="https://techcabal.com/newsletter"]
 cbtnews.com	[href="https://www.cbtnews.com/newsletter-signup/"]
 cbtnews.com	.share-buttons
@@ -23629,6 +23714,9 @@ bitnewsbot.com	.ml-subscribe-form
 designersbrasileiros.com.br	.ml-subscribe-form
 fosspost.org	.ml-subscribe-form
 justrunlah.com	.ml-subscribe-form
+lrt.lt	.ml-subscribe-form
+lrt.lt	.js-modal-share
+lrt.lt	.social-list
 nanowerk.com	.ml-subscribe-form
 osxdaily.com	.ml-subscribe-form
 osxdaily.com	#subscribe_box
@@ -24275,7 +24363,6 @@ metro-magazine.com	.newsletter
 michiganchronicle.com	.newsletter
 micura.it	.newsletter
 mlb.com	.newsletter
-mmajunkie.usatoday.com	.newsletter
 mondoudinese.it	.newsletter
 mondoudinese.it	.social
 mondoudinese.it	.share
@@ -24337,6 +24424,7 @@ redsharknews.com	.newsletter
 revealnews.org	.newsletter
 rivistacontrasti.it	.newsletter
 rollingstone.com	.newsletter
+rollingstone.com	.o-google-preferred-button
 sabado.pt	.newsletter
 sangbadpratidin.in	.newsletter
 sapo.pt	.newsletter
@@ -24905,7 +24993,6 @@ refractor.io	.ActionBar
 afar.com	.ArticlePage-actions-wrapper
 embed.listcorp.com	.CompanyPage2CompanyPageAbout__share
 nutraingredients.com	.Detail-share
-newsweek.com	.GooglePreferredSourceBanner_container__4kWoo
 irishstar.com	.GooglePreferredSource_wrapper__lSRA6
 irishstar.com	.ShareBar_sharebar-inner-wrapper__D0YTf
 irishstar.com	.SocialFollowBar_wrapper__h4k_D
@@ -25058,6 +25145,7 @@ automart.co.za	.btn-whatsapp
 equinix.com	.btn-group
 pocketnow.com	.btn-mail
 pocketnow.com	.copy-link-button
+pocketnow.com	.w-google-addus-btn--article-header-variants
 f1-news.eu	.btn-share
 mainichi.jp	.btn-share
 mainichi.jp	.inline-list
@@ -25232,6 +25320,8 @@ windowsreport.com	.follow-more-news
 windowsreport.com	.reader-action-panel
 windowsreport.com	.shareMobile
 windowsreport.com	.share
+techpartner.news	.follow-on-whatsapp__container
+techpartner.news	.gps-block
 amoledo.com	.follow-please
 amoledo.com	.sharing
 ausgamers.com	.follow-us
@@ -25349,7 +25439,9 @@ glassalmanac.com	.shhr-btn
 sammobile.com	.google-news-cta
 sammobile.com	.google-preferred-news-source-cta
 ringsidenews.com	.google-preferred-btn
+ringsidenews.com	.rsn-bluesky-bar
 ringsidenews.com	.rsn-follow-box
+ringsidenews.com	.rsn-single-actions
 ringsidenews.com	.social_holder
 ringsidenews.com	.social_label
 ringsidenews.com	.google-news
@@ -25542,7 +25634,6 @@ coursera.org	.share-button
 dermatologytimes.com	.react-share__ShareButton
 newsukraine.rbc.ua	.read-in-google
 newsukraine.rbc.ua	.read-in-socials
-newsukraine.rbc.ua	.share
 fleischmannsyeast.com	.recipe__social
 teamcoco.com	.reddit
 the-gadgeteer.com	.review-price
@@ -25834,7 +25925,6 @@ areavip.com.br	.followit--follow-form-container
 heritagedaily.com	.td-post-sharing
 heritagedaily.com	.tdm_block_socials
 victoriabuzz.com	.tdi_141
-cybersecuritynews.com	.tdm-ii-wrap
 eandt.theiet.org	.teaser-utility-links
 eandt.theiet.org	.social-buttons
 techgaged.com	.techg-after-content-2
@@ -25860,6 +25950,8 @@ jonathanball.co.za	.ube-social-icons
 aa.com.tr	.ustBar-sosyal
 healthday.com	.video-story-m_share__d27z7
 motorsport.tv	.vjs-icons-bar
+babygaga.com	.w-google-addus-btn--article-header-variants
+moms.com	.w-google-addus-btn--article-header-variants
 thesfnews.com	.wa__btn_popup
 newsroom.paypal-corp.com	.wd_tools
 thepridela.com	.weart-share
@@ -26224,7 +26316,6 @@ turnto23.com	.ActionBar
 tv20detroit.com	.ActionBar
 tvazteca.com	.ActionBar
 vanidades.com	.ActionBar
-washingtonexaminer.com	.ActionBar
 wcpo.com	.ActionBar
 wkbw.com	.ActionBar
 wptv.com	.ActionBar
@@ -27294,6 +27385,7 @@ docker.com	.social-icons
 esquerdaonline.com.br	.social-icons
 esquerdaonline.com.br	.social-icons-colunist
 esquerdaonline.com.br	.social-icons-post
+foxweather.com	.social-icons
 frankenpost.de	.social-icons
 ijr.com	.social-icons
 insuedthueringen.de	.social-icons
@@ -27587,6 +27679,8 @@ nationalactionnetwork.net	.social-links
 nau.ch	.social-links
 passioneturchia.it	.social-links
 rocketbeans.tv	.social-links
+salzburg24.at	.social-links
+salzburg24.at	.social-details
 searchnowweb.com	.social-links
 serieturche.eu	.social-links
 theeagleonline.com	.social-links
@@ -27975,6 +28069,7 @@ sp.netkeiba.com	#colorbox:has(#ModalLink > img[src^="https://cdn.netkeiba.com/im
 autoway.jp	#cm_attend_popup
 oh-my-teeth.com	#cta-sticky-banner
 news.denfaminicogamer.jp	#dfng-popup
+gigazine.net	#donate_footer
 dandy-house.co.jp	#entryprompt_area
 dandy-house.co.jp	.post_content > a[href*="?utm_source"] > img
 service.ocn.ne.jp	#floatingBanner
@@ -28258,6 +28353,8 @@ urlaubsguru.de	.smeShare
 goldinvest.de	.social-block
 goldinvest.de	.uael-marketing-button
 goldinvest.de	.post_newsletter
+sn.at	.social-detail
+sn.at	.box-emarsys
 deutsche-wirtschafts-nachrichten.de	.social-line
 autohaus.de	.social-list
 lt1.at	.social-listing
@@ -29371,7 +29468,6 @@ cumhuriyet.com.tr	.sosyal-medya
 onlinehaendler-news.de	#article-subscribe
 50plus.de	#c5531
 50plus.de	#nlNag
-tarnkappe.info	#custom_html-1203
 digitalfernsehen.de	#custom_html-3
 allround-pc.com	#global-newsletter
 clever-tanken.de	#newsletter-container
@@ -29390,7 +29486,6 @@ ecomento.de	.after-post-sharing
 gesundheit.de	.areas-newsletter
 freitag.de	.bc-newsletter--container
 finom.co	.blog-subscribe-banner
-sn.at	.box-emarsys
 gewinnspiele-markt.de	.box-nl
 bluray-disc.de	.daily-newsletter-anmeldung_r
 elektroauto-news.net	.elementor-element-b0ed665
@@ -29450,6 +29545,8 @@ lokan.fr	.exit-intent-popup
 lokan.fr	.newsletter-shortcode-wrapper
 monaco-tribune.com	.follow-us
 vinyculture.dz	.g1-newsletter
+magicmaman.com	.js-newsletterPopupModal
+magicmaman.com	overlay
 toulouscope.fr	.newsletter-popin-overlay
 closermag.fr	.newsletter_widget
 repasdelice.com	.newslettreastuce

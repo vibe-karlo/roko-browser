@@ -12549,6 +12549,7 @@
 .vf-conversation-starter__ad	.vf-conversation-starter__ad
 .vf-promo-gtag	.vf-promo-gtag
 .vf-promo-wrapper	.vf-promo-wrapper
+.vf-trending-articles__flex-wrapper	.vf-trending-articles__flex-wrapper
 .vf3-conversations-list__promo	.vf3-conversations-list__promo
 .vi-sticky-ad	.vi-sticky-ad
 .video-ad-bottom	.video-ad-bottom
@@ -13690,6 +13691,7 @@ tweaktown.com	#DesktopTop
 tweaktown.com	#toppbnf
 tweaktown.com	.DesktopRightBA
 tweaktown.com	.ad
+tweaktown.com	.tt-price-board
 tweaktown.com	.fusevidad
 tweaktown.com	.tldrad
 tweaktown.com	.adcon
@@ -13817,9 +13819,11 @@ fortune.com	.min-h-\[404px\]
 fortune.com	.nativo-wrapper
 fortune.com	[data-cy="hp-in-stream-0"]
 fortune.com	#related-video
+usps.com	#Mailpieces.item:has(.rideAlongLinkImage)
 mainichi.jp	#PC-english-rec1
 kohls.com	#PDP_monetization_HL
 kohls.com	#PMP_monetization_HL
+kohls.com	#kmn-brand-spotlight
 kohls.com	#kmn-featured-carousel
 kohls.com	#kmn-more-to-consider
 kohls.com	#kmnbanner-pencil_bottom-anchor
@@ -15281,6 +15285,8 @@ wsj.com	#other-buckets > div > div:has(> .uds-ad-container)
 wsj.com	.e1ewmsuz20:has(> .uds-ad-container)
 wsj.com	.e1vnmyci0:has(> .adWrapper)
 pcgamer.com	#coupons
+pcgamer.com	.bordeaux-anchored-container
+pcgamer.com	.bordeaux-filled-slot
 pcgamer.com	.sponsored-card
 pcgamer.com	[data-bordeaux-hook-loaded]
 pcgamer.com	div[class*="ad-unit"]
@@ -16254,6 +16260,7 @@ forward.com	.ad
 forward.com	div.sticky-container:first-child
 cyberdaily.au	#mm-azk560023-zone
 cyberdaily.au	.b-topLeaderboard
+moviesmod.meme	#mm-sticky-ad
 mmorpg.com	#mmorpg_desktop_list_1
 mmorpg.com	#mmorpg_desktop_list_3
 mmorpg.com	.banner
@@ -16278,6 +16285,9 @@ pocketgamer.com	#mobile-background
 pocketgamer.com	#site-background
 pocketgamer.com	.abs
 pocketgamer.com	.item-unit
+gridinsoft.com	#modal-leave
+gridinsoft.com	.banner
+gridinsoft.com	[data-report-ad]
 mytuner-radio.com	#move-ad
 moviemistakes.com	#moviemistakes_300x600_300x250_160x600_sidebar_2
 moviemistakes.com	.freestarad
@@ -16331,6 +16341,7 @@ footballleagueworld.co.uk	.ad-zone-container-sidebar-default
 footballleagueworld.co.uk	.ad-zone-sidebar-default
 footballleagueworld.co.uk	.ad-zone-sidebar-first
 footballleagueworld.co.uk	.ad-zone-size-container-content-above-latest
+footballleagueworld.co.uk	.no-badge.video.display-card
 footballleagueworld.co.uk	[class*="ad-zone-container-content-character-count-repeatable"]
 footballleagueworld.co.uk	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 ioncinema.com	#mvp-leader-wrap
@@ -16440,6 +16451,7 @@ gamertweak.com	.widget_srlzycxh
 steamidfinder.com	#nn_mpu1
 steamidfinder.com	#nn_player_wrapper
 tftactics.gg	#nn_player
+tftactics.gg	#pwParentContainer
 tftactics.gg	.wrapper-lb1
 forums.somethingawful.com	#notregistered
 forums.somethingawful.com	.oma_pal
@@ -16514,6 +16526,9 @@ tokyvideo.com	#overlay-video
 tokyvideo.com	.fan--related-videos.fan
 mp4upload.com	#overlayads
 explainxkcd.com	#p-Ads
+animeschedule.net	#page-partner
+animeschedule.net	#site-theme
+animeschedule.net	#site-theme-foot
 accuradio.com	#pageSidebarWrapper
 accuradio.com	#pl_leaderboard
 accuradio.com	#slot2Wrapper
@@ -16597,6 +16612,7 @@ daijiworld.com	[href="https://sjec.ac.in/"]
 politico.com	#pol-01-wrap
 politico.com	.ad
 politico.com	.adlib-sticky-footer
+politico.com	.pt-\[1\.25rem\]
 politico.com	.styles_container__zuzL0
 politico.com	div[class][rowindex]:has(> .ad)
 politico.com	.border-gray-vulcan-92:has(> #banner-wrap)
@@ -16644,6 +16660,7 @@ forums.redflagdeals.com	.topiclist > .topic:has(span.sponsored)
 walgreens.com	#prod-sponsored
 walgreens.com	#searchSponsoredProductContainer
 walgreens.com	li.owned-brands:has(figure.sponsored)
+walgreens.com	li.product-grid-item:has(.sponsored-badge)
 programmerhumor.io	#product-widget
 programmerhumor.io	.programmer-essentials-widget
 programmerhumor.io	.spotlight-widget
@@ -16714,6 +16731,8 @@ sporcle.com	#top-unit
 sporcle.com	.IMGgi
 sporcle.com	.main-content-unit-wrapper
 sporcle.com	.temp-unit
+sweepstakesfanatics.com	#railad1
+sweepstakesfanatics.com	.top-ad-container-parent
 coincarp.com	#random_sponsored
 coincarp.com	.StickyBottom
 coincarp.com	.customspon
@@ -16804,6 +16823,7 @@ anisearch.com	a[href^="https://www.amazon."][href*="tag="]
 ringsidenews.com	#rsn-ap-sticky-bar
 ringsidenews.com	.ad-container
 ringsidenews.com	.elementor-shortcode
+ringsidenews.com	.ringside-ad-wrapper
 ringsidenews.com	.rsn-laai-ad
 glennbeck.com	#sPost_0_0_5_0_15_5_0_1_2_0
 glennbeck.com	#sPost_Default_Layout_0_0_6_0_0_9_0_1_2_0
@@ -17001,8 +17021,8 @@ guessthephrase.xyz	.fallback-footer-ad-shell
 guessthephrase.xyz	.fallback-side-ad
 webkinznewz.ganzworld.com	#site-description
 webkinznewz.ganzworld.com	.widget_text
-animeschedule.net	#site-theme
-animeschedule.net	#site-theme-foot
+gg.deals	#site-page-feature
+gg.deals	#site-top-feature
 dead-frog.com	#site_top
 2oceansvibe.com	#skin
 2oceansvibe.com	.partners
@@ -17675,7 +17695,6 @@ jagranjosh.com	.homeSlider
 jagranjosh.com	[class*="_AdColl_"]
 jagranjosh.com	[class*="_BodyAd_"]
 jagranjosh.com	[class^="Ad_"]
-thingiverse.com	.AdBanner__adBanner--gSsno
 laist.com	.AdModule-container
 laist.com	.Page-above
 ratemyprofessors.com	.AdNoBid__AdContainer-sc-7ofdbw-0
@@ -18166,6 +18185,7 @@ tampafp.com	.sticky-inside-pad
 tampafp.com	.tampa-widget
 filerox.com	._ozxowqadvert
 filerox.com	.ad
+instructables.com	._promoStickyContainer_19m79_13
 startpage.com	.a-bg-result
 startpage.com	.css-1j5r2ie
 startpage.com	.pa-amp
@@ -18576,6 +18596,7 @@ segmentnext.com	.ad
 simpledesktops.com	.ad
 slippedisc.com	.ad
 sltrib.com	.ad
+sltrib.com	.grid-ad-container-1
 sltrib.com	.grid-ad-container-2
 sltrib.com	.sltrib_medrec_sidebar_atf
 sltrib.com	.sponsored-card
@@ -18902,6 +18923,9 @@ miningweekly.com	.ad-container
 mixed-news.com	.ad-container
 mobilesyrup.com	.ad-container
 mobilesyrup.com	.ad-goes-here
+mobilesyrup.com	.engagement-starter-inline
+mobilesyrup.com	.publift-ad-slot
+mobilesyrup.com	.publift-ad-zone
 mobilesyrup.com	.sidebarSponsoredAd
 modernhealthcare.com	.ad-container
 nbcnews.com	.ad-container
@@ -19214,6 +19238,8 @@ companiesmarketcap.com	.ad-tr
 sdxcentral.com	.ad-unit
 sdxcentral.com	.header-lemur
 windowscentral.com	.ad-unit
+windowscentral.com	.bordeaux-anchored-container
+windowscentral.com	.bordeaux-filled-slot
 windowscentral.com	.brdx-unit
 windowscentral.com	.hawk-deal-widget-hero
 windowscentral.com	.hawk-master-widget-hawk-wrapper
@@ -19420,9 +19446,6 @@ urldecoder.org	.ad_right_top_box
 urlencoder.org	.ad_header_box
 urlencoder.org	.ad_left_box
 urlencoder.org	.ad_right_box
-urlencoder.org.prettifycss.com	.ad_header_box
-urlencoder.org.prettifycss.com	.ad_left_box
-urlencoder.org.prettifycss.com	.ad_right_box
 webdunia.com	.ad_in_between_art
 webdunia.com	.full_ads_block
 auto-data.net	.ad_incar
@@ -19505,6 +19528,7 @@ queerty.com	.adb-box-large
 queerty.com	.adb-qt-box
 queerty.com	.adb-top-lb
 lgbtqnation.com	.adb-ln-inarticle
+lgbtqnation.com	.adb-ln-lb-incontent
 lgbtqnation.com	.bg-gray-100
 lgbtqnation.com	.index-bottom-ad
 lgbtqnation.com	.single-bottom-ad
@@ -19779,6 +19803,7 @@ medicalxpress.com	.news-related
 mehrnews.com	.ads
 meta-calculator.com	.ads
 mini-ielts.com	.ads
+motionbgs.com	.ads
 motogp.com	.ads
 mugshots.com	.ads
 nbc.na	.ads
@@ -19939,6 +19964,9 @@ search.b1.org	.adslabel
 healthing.ca	.adslot
 healthing.ca	.desktop-sticky-ad
 healthing.ca	.sticky-ad-spacer-desktop
+designboom.com	.adslot--box
+designboom.com	.adslot--upper
+designboom.com	.aside-adv-box
 ev-database.org	.adslot_detail1
 ev-database.org	.adslot_detail2
 cdrab.com	.adslr
@@ -19948,6 +19976,7 @@ downzen.com	.advertisement
 makemytrip.com	.adtech-desktop
 makemytrip.com	.hotDeals
 makemytrip.com	.hotelTileDt:has(.icSponsored)
+makemytrip.com	li:has(> [class="cardInteractive"] img[src*="sponsoredtag"])
 indiatodayne.in	.adtext
 miamitodaynews.com	.adtext
 wdwmagic.com	.adthrive-homepage-header
@@ -20475,6 +20504,7 @@ androidpolice.com	.ad-zone-container-sidebar-default
 androidpolice.com	.ad-zone-sidebar-default
 androidpolice.com	.ad-zone-sidebar-first
 androidpolice.com	.ad-zone-size-container-content-above-latest
+androidpolice.com	.no-badge.video.display-card
 androidpolice.com	[class*="ad-zone-container-content-character-count-repeatable"]
 androidpolice.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 constructionreviewonline.com	.ai-track
@@ -20575,6 +20605,7 @@ simpleflying.com	.ad-zone-container-sidebar-default
 simpleflying.com	.ad-zone-sidebar-default
 simpleflying.com	.ad-zone-sidebar-first
 simpleflying.com	.ad-zone-size-container-content-above-latest
+simpleflying.com	.no-badge.video.display-card
 simpleflying.com	[class*="ad-zone-container-content-character-count-repeatable"]
 simpleflying.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 letras.com	.an-pub
@@ -20786,6 +20817,7 @@ bleepingcomputer.com	[href^="https://www.wiz.io/"]
 bleepingcomputer.com	[href^="https://www.ztw.com/"]
 bleepingcomputer.com	[href^="https://ztw.com/"]
 bleepingcomputer.com	[src*="https://www.bleepstatic.com/c/t/threatlocker/"]
+bleepingcomputer.com	a[href^="https://www.kaseya.com/lp/"]
 bleepingcomputer.com	div[style="width:98%; margin:0 auto; padding:5px; text-align:center; background:#f0f0f0; border:1px solid #ccc; border-radius:6px;"]
 bleepingcomputer.com	div[style="width:98%; margin:0 auto; text-align:center; padding:4px; background:#f0f0f0; border:1px solid #ccc; border-radius:6px;"]
 bleepingcomputer.com	div[style="width:98%; margin:0 auto; text-align:center; padding:5px; background:#f0f0f0; border:1px solid #ccc; border-radius:6px;"]
@@ -20842,7 +20874,6 @@ theinertia.com	.inertia-ad-label
 theinertia.com	.inertia-ad-top
 theinertia.com	[data-spotim-module="tag-tester"]
 rentry.co	.asd_1
-designboom.com	.aside-adv-box
 healthday.com	.aside-collection-ad-slot
 pickmypostcode.com	.aside-right.aside
 decrypt.co	.aspect-video
@@ -21205,6 +21236,7 @@ kotaku.com	.lg\:min-h-\[300px\]
 kotaku.com	.min-h-\[250px\]
 kotaku.com	.od-wrapper
 kotaku.com	.widget_keleops-ad
+kotaku.com	.aspect-video:has(#cnx-player-main)
 lancasterguardian.co.uk	.banner
 lancasterguardian.co.uk	[data-type="AdRowBillboard"]
 lancasterguardian.co.uk	div[class^="AdLoadingText"]
@@ -21770,6 +21802,8 @@ newzit.com	.big_WcxYT
 gamemodding.com	.big_banner
 gamemodding.com	.right_banner
 hellenicshippingnews.com	.bigbanner
+smartshanghai.com	.bigboxes:has(> a[href^="https://www.smartshanghai.com/ads/"])
+smartshanghai.com	.wallpaper-ad-link
 snokido.com	.bigsquare
 snokido.com	.square
 dev.to	.billboard
@@ -21886,7 +21920,35 @@ boingboing.net	.boing-primis-video-in-article-content
 myanimelist.net	.bookstores-recommend-plugin
 myanimelist.net	.border_top
 myanimelist.net	[src*="/c/img/images/event/"]
+androidcentral.com	.bordeaux-anchored-container
+androidcentral.com	.bordeaux-filled-slot
+androidcentral.com	.hawk-multi-model-review-container
+androidcentral.com	.sponsored-card
+androidcentral.com	[data-bordeaux-hook-loaded]
+androidcentral.com	.vid-present
+androidcentral.com	[data-component-name="JwPlayer:Carousel"]
+guitarworld.com	.bordeaux-anchored-container
+guitarworld.com	.bordeaux-filled-slot
+guitarworld.com	.sponsored-card
+guitarworld.com	.vid-present
+guitarworld.com	[data-component-name="JwPlayer:Carousel"]
+space.com	.bordeaux-anchored-container
+space.com	.bordeaux-filled-slot
+space.com	.skyscraper-container
+space.com	.sponsored-card
+space.com	.aspect-video
+space.com	.jwplayer__wrapper
+space.com	[data-component-name="JwPlayer:Carousel"]
+techradar.com	.bordeaux-anchored-container
+techradar.com	.bordeaux-filled-slot
+techradar.com	.hawk-main-editorialized
+techradar.com	.hawk-merchant-link-widget-container
+techradar.com	.hawk-nest
+techradar.com	.sponsored-card
+techradar.com	.vid-present
+techradar.com	[data-component-name="JwPlayer:Carousel"]
 tomsguide.com	.bordeaux-anchored-container
+tomsguide.com	.bordeaux-filled-slot
 tomsguide.com	.bordeaux-slot
 tomsguide.com	.hawk-base
 tomsguide.com	.hawk-main-editorialised
@@ -21897,6 +21959,14 @@ tomsguide.com	[data-bordeaux-hook-loaded]
 tomsguide.com	div[class*="ad-unit"]
 tomsguide.com	.vid-present
 tomsguide.com	[data-component-name="JwPlayer:Carousel"]
+tomshardware.com	.bordeaux-anchored-container
+tomshardware.com	.bordeaux-filled-slot
+tomshardware.com	.sponsored-card
+tomshardware.com	[data-bordeaux-hook-loaded]
+tomshardware.com	div[class*="ad-unit"]
+tomshardware.com	.jwplayer__widthsetter
+tomshardware.com	.vid-present
+tomshardware.com	[data-component-name="JwPlayer:Carousel"]
 everydayrussianlanguage.com	.border
 everydayrussianlanguage.com	aside img[src^="/wp-content/themes/edr/img/"]
 bluelockread.com	.border-b-0.border-border-primary.overflow-hidden
@@ -22061,14 +22131,6 @@ business2community.com	.busin-coinzilla-after-content
 business2community.com	.busin-news-placement-2nd-paragraph
 business2community.com	.sticky-header
 business2community.com	div[id^="busin-"]
-filecrypt.cc	.butt1ns button[onclick*="loc.href='/Link/"]
-filecrypt.cc	.fiIItheadblockqueue4
-filecrypt.cc	.filItheadbIockgueue3
-filecrypt.cc	.filItheadbIockqueue3
-filecrypt.cc	.hghspd
-filecrypt.cc	.hghspd + *
-filecrypt.cc	[onclick*="/linkonclick.com/"]
-filecrypt.cc	[onclick^="var lj"]
 w3docs.com	.buttom-ads
 w3docs.com	.cta-bookduck
 w3docs.com	.min-h-\[90px\]
@@ -22233,6 +22295,7 @@ carbuzz.com	.ad-zone-container-sidebar-default
 carbuzz.com	.ad-zone-sidebar-default
 carbuzz.com	.ad-zone-sidebar-first
 carbuzz.com	.ad-zone-size-container-content-above-latest
+carbuzz.com	.no-badge.video.display-card
 carbuzz.com	[class*="ad-zone-container-content-character-count-repeatable"]
 carbuzz.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 supercheats.com	.cboth_sm
@@ -22427,6 +22490,7 @@ noahreport.com	.code-block
 nokiapoweruser.com	.code-block
 notalwaysright.com	.code-block
 nxbrew.com	.code-block
+nxbrew.net	.code-block
 organicfacts.net	.code-block
 organicfacts.net	.header-ad
 orlandoweekly.com	.code-block
@@ -22445,9 +22509,14 @@ protrumpnews.com	[href^="https://www.twc.health/"]
 protrumpnews.com	.enhanced-text-widget:has(span.pre-announcement)
 psu.com	.code-block
 pureinfotech.com	.code-block
+pwmania.com	.code-block
 redrightvideos.com	.code-block
+religionnews.com	.code-block
+religionnews.com	.sticky-ad-white-space
 reneweconomy.com.au	.code-block
 reptilesmagazine.com	.code-block
+retrohandhelds.gg	.code-block
+retrohandhelds.gg	.rh-supabase-deals
 rightwingnews.com	.code-block
 rightwingnews.com	.z-ad
 romsworlds.com	.code-block
@@ -22541,9 +22610,6 @@ holyrood.com	.col--ad
 roseindia.net	.col-md-4
 roseindia.net	.tutorialsstaticdata
 lapa.ninja	.col-sm-1
-turtlecute.org	.collab_wrap
-turtlecute.org	.sponsor_banner_wrap
-turtlecute.org	a[href^="https://shockvpn.com/?"]
 atalayar.com	.column-content > .megabanner
 atalayar.com	.rotulo-publi
 atalayar.com	.superbanner
@@ -22702,8 +22768,6 @@ cruisecritic.com	.css-1xzyepp
 cruisecritic.com	.min-h-\[250px\]
 cruisecritic.com	.min-h-\[80px\].md\:min-h-\[90px\]
 gamingbible.com	.css-1z9hhh
-gamingbible.com	div[class*="margin-Advert"]
-gamingbible.com	div[class^="advert-placeholder_"]
 gamingbible.com	div[data-cypress^="sticky-header"]
 gamingbible.com	.floating-video-player_container__u4D9_
 gamingbible.com	div[class^="floating-video-player_container"]:has(> #primisPlayer)
@@ -23126,10 +23190,6 @@ forum.lowyat.net	[style="height:250px;padding:5px 0 5px 0;"]
 gq.com.au	.ffNDsR
 thefilmhq.com	.fhq-home-ad
 thefilmhq.com	.fhq-news-sidebar-ad
-filecrypt.co	.filItheadbIockqueue3
-filecrypt.co	.hghspd
-filecrypt.co	.hghspd + *
-filecrypt.co	[onclick^="var lj"]
 telugupeople.com	.fineprint
 bestlifeonline.com	.first-ad
 bestlifeonline.com	.inline
@@ -23455,9 +23515,6 @@ flickr.com	.photo-list-revenue-item-view
 flickr.com	div[class^="main view"]:has(a[href$="&ref=sponsored"])
 marketsfarm.com	.gfm-ad-network-ad
 law.cornell.edu	.gfs
-gg.deals	.gg-banner-full-link
-gg.deals	.gg-full-content-widget
-gg.deals	.site-banner-top-widget
 ganjingworld.com	.ggAdZone_gg-banner-ad_zone__wK3kF
 ganjingworld.com	.topAdsSection_wrapper__cgH4h
 cometbird.com	.gg_250x250
@@ -23492,6 +23549,12 @@ dicoall.com	.googleAdMain
 dicoall.com	[href^="/ads/"]
 dicoall.com	.sidebarListMenu > button:has([class^="item_adsMark"])
 css3generator.com	.gotta-pay-the-bills
+gamepadla.com	.gpPartnerCard
+gamepadla.com	a[href^="https://www.amazon.com/"] + div + picture
+gamepadla.com	.pMain:has(a[href^="/go/"])
+gamepadla.com	.pMain:has(div[class^="asd_"])
+gamepadla.com	.pMain:has(div[title="Partner placement"])
+gamepadla.com	.panel-container:has(.media-header-row-item)
 truckinginfo.com	.gpt-ad-slot-wrapper
 truckinginfo.com	.lazy-ad-slot-wrapper
 di.fm	.gpt-slot
@@ -23548,6 +23611,10 @@ emojipedia.org	.h-\[282px\]
 emojipedia.org	.h-\[312px\]
 emojipedia.org	div[class="flex flex-col items-center md:order-1"]
 emojipedia.org	div[class^="AdContainer"]
+u.gg	.h-\[48px\]
+dpm.lol	.h-\[634px\]
+dpm.lol	.h-\[640px\]
+dpm.lol	.min-h-\[88px\]
 supercarblondie.com	.h-\[660px\]
 xe.com	.h-\[90px\]
 mvnrepository.com	.h-ad
@@ -23594,17 +23661,6 @@ apps.npr.org	.has-sponsorship
 maxroll.gg	.hasAdhesion
 itpro.com	.hawk-base
 cinemablend.com	.hawk-deal-widget-container
-techradar.com	.hawk-main-editorialized
-techradar.com	.hawk-merchant-link-widget-container
-techradar.com	.hawk-nest
-techradar.com	.sponsored-card
-techradar.com	.vid-present
-techradar.com	[data-component-name="JwPlayer:Carousel"]
-androidcentral.com	.hawk-multi-model-review-container
-androidcentral.com	.sponsored-card
-androidcentral.com	[data-bordeaux-hook-loaded]
-androidcentral.com	.vid-present
-androidcentral.com	[data-component-name="JwPlayer:Carousel"]
 girlswithmuscle.com	.hb-static-banner-div
 girlswithmuscle.com	.hb-video-ad
 trendhunter.com	.hcamp
@@ -24080,6 +24136,7 @@ stopdroplol.com	.leaderboard
 supersport.com	.leaderboard
 tattoofailure.com	.leaderboard
 tattoofailure.com	a[href^="http://goo.gl/"]
+techpartner.news	.leaderboard
 thefashionspot.com	.leaderboard
 thefashionspot.com	.pb-in-article-content
 tutorialrepublic.com	.leaderboard
@@ -24207,6 +24264,7 @@ fashionista.com	.m-fixedbottom-ad--container
 aol.co.uk	.m-gam__container
 bitcoinmagazine.com	.m-in-content-ad-row
 avforums.com	.m2n-ads-slot
+avforums.com	.m2n-unit
 morningagclips.com	.mac-ad-group
 morningagclips.com	ul.logo-nav
 macdailynews.com	.macdailynews-after-article-ad-holder
@@ -24494,11 +24552,16 @@ cookingforengineers.com	.nothing
 moodiedavittreport.com	.notice
 cityam.com	.notice-header
 torrends.to	.notice-top
+turtlecute.org	.notice_stack > button[role="link"][aria-label]
 dirproxy.com	.nrd-general-d-box
 mgeko.cc	.nsad
 nowtoronto.com	.nt-ad-wrapper
 english.nv.ua	.nts-ad
 english.nv.ua	.nts-video-wrapper
+adfoc.us	.nv-foot-ref
+adfoc.us	.nv-phdr-mark
+adfoc.us	.nv-root
+adfoc.us	a[href^="https://www.survivalservers.com/"]
 marineelectronics.com	.nwm-banner
 kueez.com	.nya-slot
 trendexposed.com	.nya-slot
@@ -25106,6 +25169,9 @@ hope1032.com.au	.s-supported-by
 japantoday.com	.s10r
 japantoday.com	.widget--animated
 japantoday.com	.widget--jobs
+videocardz.com	.s7k2m9qx
+videocardz.com	.s7k2m9qx-adhesive
+videocardz.com	div[aria-label="Shop"]
 nodejs.libhunt.com	.saashub-ad
 takeuforward.org	.sales-timer-banner
 takeuforward.org	[alt="Ad Panel"]
@@ -25237,6 +25303,7 @@ makeuseof.com	.ad-zone-container-sidebar-default
 makeuseof.com	.ad-zone-sidebar-default
 makeuseof.com	.ad-zone-sidebar-first
 makeuseof.com	.ad-zone-size-container-content-above-latest
+makeuseof.com	.no-badge.video.display-card
 makeuseof.com	[class*="ad-zone-container-content-character-count-repeatable"]
 makeuseof.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 gameflare.com	.sidebar-game
@@ -25355,19 +25422,6 @@ reviewjournal.com	.sponsored
 saashub.com	.sponsored
 samedicalspecialists.co.za	.sponsored
 sportsbusinessjournal.com	.sponsored
-guitarworld.com	.sponsored-card
-guitarworld.com	.vid-present
-guitarworld.com	[data-component-name="JwPlayer:Carousel"]
-space.com	.sponsored-card
-space.com	.aspect-video
-space.com	.jwplayer__wrapper
-space.com	[data-component-name="JwPlayer:Carousel"]
-tomshardware.com	.sponsored-card
-tomshardware.com	[data-bordeaux-hook-loaded]
-tomshardware.com	div[class*="ad-unit"]
-tomshardware.com	.jwplayer__widthsetter
-tomshardware.com	.vid-present
-tomshardware.com	[data-component-name="JwPlayer:Carousel"]
 listdle.com	.sponsored-card-bg
 livingetc.com	.sponsored-card-centred
 womanandhome.com	.sponsored-card-centred
@@ -25424,7 +25478,6 @@ aupetitparieur.com	.st85ip42z1v3x
 aupetitparieur.com	.x7zry3pb
 cvs.com	.stencil-criteo-shelf
 cvs.com	cvs-shop-product-shelf-container[shelf-type*="criteoType"]
-religionnews.com	.sticky-ad-white-space
 rugbyonslaught.com	.sticky-add
 psycatgames.com	.sticky-banner
 note.nkmk.me	.sticky-block
@@ -25792,12 +25845,14 @@ valueresearchonline.com	.vr-adv-container
 upload-apk.com	.vr-adv-unit
 vsbattles.com	.vsb_ad
 vsbattles.com	.vsb_sticky
+vaultwarden.com	.vw-inline-ad
 horoscopes.astro-seek.com	.vyska-sense
 givemesport.com	.w-promotion-offer
 givemesport.com	.ad-zone-container-sidebar-default
 givemesport.com	.ad-zone-sidebar-default
 givemesport.com	.ad-zone-sidebar-first
 givemesport.com	.ad-zone-size-container-content-above-latest
+givemesport.com	.no-badge.video.display-card
 givemesport.com	[class*="ad-zone-container-content-character-count-repeatable"]
 givemesport.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 cricket.com.au	.w-sponsors
@@ -25807,6 +25862,8 @@ wetransfer.com	.wallpaper
 goodfon.com	.wallpapers__banner240
 watson.ch	.watson-ad
 technclub.com	.wbyqkx-container
+warez-db.org	.wd-promo
+warez-db.org	.wd-vpn
 northernvirginiamag.com	.website-header__ad--leaderboard
 probuilds.net	.welcome-bnr
 probuilds.net	a[class^="dl-blitz-"]
@@ -25960,6 +26017,7 @@ reuters.com	.workspace-article-banner-module__image__F14iP
 reuters.com	[data-testid="CnxPlayer"]
 reuters.com	[data-testid="Leaderboard"]
 reuters.com	[data-testid="ResponsiveAdSlot"]
+reuters.com	.leaderboard-space-module__leaderboard-space__VFflk
 warontherocks.com	.wotr_top_lbjspot
 gameskinny.com	.wp-block-gamurs-ad
 primagames.com	.wp-block-gamurs-ad
@@ -26330,6 +26388,7 @@ manomano.it	div[data-testid="boosted-product-recommendations"]
 manomano.it	.Ssfiu-:has([data-testid="popoverTriggersponsoredLabel"])
 manomano.it	.hrHZYT:has([data-testid="popoverTriggersponsoredLabel"])
 manomano.it	div > div:has([data-testid="banner-spr-label"])
+vanityfair.com	[data-testid="sticky-hero-ad"]
 irishmirror.ie	[data-tmdatatrack-id]
 thesportsrush.com	[data-type="ad"]
 theautopian.com	[data-widget_type="html.default"]
@@ -26536,11 +26595,16 @@ topcpu.net	[id^="topcpu_net_in_page_repeat_responsive"][style="min-height: 300px
 usdoku.com	[id^="usdoku-com_"]
 samfw.com	[name="chimera_b"]
 grabcad.com	[ng-if="model.asense"]
+filecrypt.cc	[onclick*="/linkonclick.com/"]
+filecrypt.co	[onclick*="/linkonclick.com/"]
+filecrypt.to	[onclick*="/linkonclick.com/"]
 haxnode.net	[onclick^="window.open"]
 haxnode.net	a[href*="javascript:"]
 twitch-tools.rootonline.de	[rel*="sponsored"]
 warecracks.com	[rel="nofollow"]
 websiteoutlook.com	[rel="nofollow"]
+adblock.turtlecute.org	[role="link"]
+adblock.turtlecute.org	[src*="blob:"]
 wallpaperaccess.com	[src="/continue.png"]
 webcamtests.com	[src^="/MyShowroom/view.php?medium="]
 nesmaps.com	[src^="images/ads/"]
@@ -26776,10 +26840,6 @@ piratebay.live	a[href^="https://thesurferprotector.com/"]
 battlemetrics.com	a[href^="https://us.ovhcloud.com"]
 vnkb.com	a[href^="https://vnkb.com/e/"]
 catholicculture.org	a[href^="https://www.amazon."][href*="tag="]
-gamepadla.com	a[href^="https://www.amazon.com/"] + div + picture
-gamepadla.com	.pMain:has(a[href^="/go/"])
-gamepadla.com	.pMain:has(div[class^="asd_"])
-gamepadla.com	.pMain:has(div[title="Partner placement"])
 magic1069.com	a[href^="https://www.fetchahouse.com/"]
 coachhuey.com	a[href^="https://www.hudl.com"]
 elamigos-games.net	a[href^="https://www.instant-gaming.com/"][href*="?igr="]
@@ -26789,7 +26849,6 @@ wgrr.com	a[href^="https://www.mccabelumber.com/"]
 joxfm.com	a[href^="https://www.milb.com/"]
 minecraft-schematics.com	a[href^="https://www.pingperfect.com/aff.php?"]
 foxcincinnati.com	a[href^="https://www.safeauto.com"]
-adfoc.us	a[href^="https://www.survivalservers.com/"]
 home-barista.com	a[onclick]
 dailytruthreport.com	a[onclick^="javascript:window.open('https://bit.ly/"]
 amishamerica.com	a[rel="nofollow"] > img
@@ -26842,26 +26901,14 @@ abcnews4.com	div[class*="MidArticleAdUnit_"]
 wach.com	div[class*="MidArticleAdUnit_"]
 techcrunch.com	div[class*="ad-unit"]
 aajtakcampus.in	div[class*="ads_ads_container__"]
-foodbible.com	div[class*="margin-Advert"]
-foodbible.com	div[class^="advert-placeholder_"]
-foodbible.com	.floating-video-player_container__u4D9_
-ladbible.com	div[class*="margin-Advert"]
-ladbible.com	div[class^="advert-placeholder_"]
-ladbible.com	.floating-video-player_container__u4D9_
-sportbible.com	div[class*="margin-Advert"]
-sportbible.com	div[class^="advert-placeholder_"]
-sportbible.com	.floating-video-player_container__u4D9_
-unilad.com	div[class*="margin-Advert"]
-unilad.com	div[class^="advert-placeholder_"]
-unilad.com	div[data-cypress^="sticky-header"]
-unilad.com	.floating-video-player_container__u4D9_
-unilad.com	.jw-player_container__wuaGn
 thefiscaltimes.com	div[class*="pane-dfp-"]
 arkadium.com	div[class^="Ad-adContainer"]
 dailymotion.com	div[class^="AdBanner"]
 dailymotion.com	div[class^="DisplayAd"]
 dailymotion.com	div[class^="NewWatchingDiscovery__adSection"]
 dailymotion.com	div[class^="VideoInfo__videoInfoAdContainer"]
+thingiverse.com	div[class^="AdBanner"]
+thingiverse.com	div[class^="AdCard_"]
 breastcancer.org	div[class^="AdContainer"]
 lataco.com	div[class^="AdUnit_"]
 lataco.com	div[class^="Sponsorship_"]
@@ -26881,6 +26928,10 @@ appsample.com	div[class^="MapLayout_Bottom"]
 dsearch.com	div[class^="PreAd_"]
 chloeting.com	div[class^="StickyFooterAds__Wrapper"]
 newyorker.com	div[class^="StickyHeroAdWrapper-"]
+fox11online.com	div[class^="StoryPage_taboolaDeeperDive"]
+fox11online.com	div[class^="UserCommenting_commentingAd"]
+weartv.com	div[class^="StoryPage_taboolaDeeperDive"]
+weartv.com	div[class^="UserCommenting_commentingAd"]
 makeitmeme.com	div[class^="_adContainer_"]
 cyprus-mail.com	div[class^="_amHorizontal_"]
 cyprus-mail.com	div[class^="_stickyCnt_"]
@@ -26899,8 +26950,6 @@ constative.com	div[style]:not([class])
 ntdeals.net	div[class^="ads-"]
 psdeals.net	div[class^="ads-"]
 xbdeals.net	div[class^="ads-"]
-tyla.com	div[class^="advert-placeholder_"]
-tyla.com	.floating-video-player_container__u4D9_
 woolworths.com.au	div[class^="aem-video-ad-unit_component_video-container_"]
 woolworths.com.au	shared-header-adaptive-menu-panel.category-list .featured
 woolworths.com.au	.product-grid-v2--tile:has(.sponsored-text)
@@ -26930,6 +26979,9 @@ spiegel.de	.ob-dynamic-rec-container.ob-p
 back2gaming.com	div[data-ai]
 999thehawk.com	div[data-alias="Sweetjack"]
 artforum.com	div[data-component="ad-unit-gallery"]
+unilad.com	div[data-cypress^="sticky-header"]
+unilad.com	.floating-video-player_container__u4D9_
+unilad.com	.jw-player_container__wuaGn
 esmmagazine.com	div[data-dfp]
 feedzop.com	div[data-gzp-display-ad-status]
 my.clevelandclinic.org	div[data-identity*="board-ad"]
@@ -26994,6 +27046,7 @@ howtogeek.com	.ad-zone-container-sidebar-default
 howtogeek.com	.ad-zone-sidebar-default
 howtogeek.com	.ad-zone-sidebar-first
 howtogeek.com	.ad-zone-size-container-content-above-latest
+howtogeek.com	.no-badge.video.display-card
 howtogeek.com	[class*="ad-zone-container-content-character-count-repeatable"]
 howtogeek.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 radioinsight.com	div[id^="radio-"]
@@ -27380,10 +27433,6 @@ maisonsdumonde.com	[data-el="product-card-grid"] article:has([data-el="product-c
 avxhm.se	[data-localize]:has(a[href^="https://canv.ai/"])
 outlook.live.com	[data-message-ad-id="MessageAdKeyOutlookUpSell0"]
 outlook.live.com	div[role="complementary"][data-skip-link-name][id] div[id*="-"]:has(> div:not([class]) > div[class] img[src$="/images/ads-olk-icon.png"])
-wolt.com	[data-test-id="MainDiscoveryContent"] li[draggable]:has(a[aria-label*="Sponsored"])
-wolt.com	div[data-test-id="MainDiscoveryContent"] li:has(> div.cb-elevated:has(button[data-test-id="AdvertisingLabel"]))
-wolt.com	div[data-test-id="SearchResultVenueSection"] li:has(> div.cb-elevated button[data-test-id="AdvertisingLabel"])
-wolt.com	ul[data-test-id="VenueVerticalListGrid"] > li:has( > div.cb-elevated button[data-test-id="AdvertisingLabel"])
 farfetch.com	[data-testid="featured"]:has([data-ffref*="sponsoredBy"])
 mail.aol.com	[role="presentation"]:has(> div[data-ad-row-id])
 mail.aol.com	div[data-test-id="virtual-list"] > ul[role="list"][aria-label] > li[style]:has(a[href^="https://api.taboola.com/"][href*="/yahoo-aol-mail/"])
@@ -27409,6 +27458,9 @@ wish.com	div[class^="ProductTray__ProductStripItem-"]:has(div[class^="DesignSpec
 virginradio.co.uk	div[class^="css-"]:has(> .ad-outline)
 flipkart.com	div[data-id]:has(a > [data-tkid^="ADVIEW"])
 flipkart.com	div[style="max-width:1200px;width:100%"]:has(source[srcset^="https://rukminim1.flixcart.com/fk-p-flap/1570/520/image/eb2033142a4a8eab.png"])
+wolt.com	div[data-test-id="MainDiscoveryContent"] li:has(> div.cb-elevated:has(button[data-test-id="AdvertisingLabel"]))
+wolt.com	div[data-test-id="SearchResultVenueSection"] li:has(> div.cb-elevated button[data-test-id="AdvertisingLabel"])
+wolt.com	ul[data-test-id="VenueVerticalListGrid"] > li:has( > div.cb-elevated button[data-test-id="AdvertisingLabel"])
 booking.com	div[data-testid="property-card"]:has(a[href*="nad_id="])
 booking.com	div[data-testid="property-card"]:has(div[data-testid="new-ad-design-badge"])
 booking.com	.js_sr_persuation_msg
@@ -27590,126 +27642,147 @@ babygaga.com	.ad-zone-container-sidebar-default
 babygaga.com	.ad-zone-sidebar-default
 babygaga.com	.ad-zone-sidebar-first
 babygaga.com	.ad-zone-size-container-content-above-latest
+babygaga.com	.no-badge.video.display-card
 babygaga.com	[class*="ad-zone-container-content-character-count-repeatable"]
 babygaga.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 backyardboss.net	.ad-zone-container-sidebar-default
 backyardboss.net	.ad-zone-sidebar-default
 backyardboss.net	.ad-zone-sidebar-first
 backyardboss.net	.ad-zone-size-container-content-above-latest
+backyardboss.net	.no-badge.video.display-card
 backyardboss.net	[class*="ad-zone-container-content-character-count-repeatable"]
 backyardboss.net	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 cbr.com	.ad-zone-container-sidebar-default
 cbr.com	.ad-zone-sidebar-default
 cbr.com	.ad-zone-sidebar-first
 cbr.com	.ad-zone-size-container-content-above-latest
+cbr.com	.no-badge.video.display-card
 cbr.com	[class*="ad-zone-container-content-character-count-repeatable"]
 cbr.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 collider.com	.ad-zone-container-sidebar-default
 collider.com	.ad-zone-sidebar-default
 collider.com	.ad-zone-sidebar-first
 collider.com	.ad-zone-size-container-content-above-latest
+collider.com	.no-badge.video.display-card
 collider.com	[class*="ad-zone-container-content-character-count-repeatable"]
 collider.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 dualshockers.com	.ad-zone-container-sidebar-default
 dualshockers.com	.ad-zone-sidebar-default
 dualshockers.com	.ad-zone-sidebar-first
 dualshockers.com	.ad-zone-size-container-content-above-latest
+dualshockers.com	.no-badge.video.display-card
 dualshockers.com	[class*="ad-zone-container-content-character-count-repeatable"]
 dualshockers.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 footballfancast.com	.ad-zone-container-sidebar-default
 footballfancast.com	.ad-zone-sidebar-default
 footballfancast.com	.ad-zone-sidebar-first
 footballfancast.com	.ad-zone-size-container-content-above-latest
+footballfancast.com	.no-badge.video.display-card
 footballfancast.com	[class*="ad-zone-container-content-character-count-repeatable"]
 footballfancast.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 gamerant.com	.ad-zone-container-sidebar-default
 gamerant.com	.ad-zone-sidebar-default
 gamerant.com	.ad-zone-sidebar-first
 gamerant.com	.ad-zone-size-container-content-above-latest
+gamerant.com	.no-badge.video.display-card
 gamerant.com	[class*="ad-zone-container-content-character-count-repeatable"]
 gamerant.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 hardcoregamer.com	.ad-zone-container-sidebar-default
 hardcoregamer.com	.ad-zone-sidebar-default
 hardcoregamer.com	.ad-zone-sidebar-first
 hardcoregamer.com	.ad-zone-size-container-content-above-latest
+hardcoregamer.com	.no-badge.video.display-card
 hardcoregamer.com	[class*="ad-zone-container-content-character-count-repeatable"]
 hardcoregamer.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 hotcars.com	.ad-zone-container-sidebar-default
 hotcars.com	.ad-zone-sidebar-default
 hotcars.com	.ad-zone-sidebar-first
 hotcars.com	.ad-zone-size-container-content-above-latest
+hotcars.com	.no-badge.video.display-card
 hotcars.com	[class*="ad-zone-container-content-character-count-repeatable"]
 hotcars.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 moms.com	.ad-zone-container-sidebar-default
 moms.com	.ad-zone-sidebar-default
 moms.com	.ad-zone-sidebar-first
 moms.com	.ad-zone-size-container-content-above-latest
+moms.com	.no-badge.video.display-card
 moms.com	[class*="ad-zone-container-content-character-count-repeatable"]
 moms.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 movieweb.com	.ad-zone-container-sidebar-default
 movieweb.com	.ad-zone-sidebar-default
 movieweb.com	.ad-zone-sidebar-first
 movieweb.com	.ad-zone-size-container-content-above-latest
+movieweb.com	.no-badge.video.display-card
 movieweb.com	[class*="ad-zone-container-content-character-count-repeatable"]
 movieweb.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 pocket-lint.com	.ad-zone-container-sidebar-default
 pocket-lint.com	.ad-zone-sidebar-default
 pocket-lint.com	.ad-zone-sidebar-first
 pocket-lint.com	.ad-zone-size-container-content-above-latest
+pocket-lint.com	.no-badge.video.display-card
 pocket-lint.com	[class*="ad-zone-container-content-character-count-repeatable"]
 pocket-lint.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 pocketnow.com	.ad-zone-container-sidebar-default
 pocketnow.com	.ad-zone-sidebar-default
 pocketnow.com	.ad-zone-sidebar-first
 pocketnow.com	.ad-zone-size-container-content-above-latest
+pocketnow.com	.no-badge.video.display-card
 pocketnow.com	[class*="ad-zone-container-content-character-count-repeatable"]
 pocketnow.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 screenrant.com	.ad-zone-container-sidebar-default
 screenrant.com	.ad-zone-sidebar-default
 screenrant.com	.ad-zone-sidebar-first
 screenrant.com	.ad-zone-size-container-content-above-latest
+screenrant.com	.no-badge.video.display-card
 screenrant.com	[class*="ad-zone-container-content-character-count-repeatable"]
 screenrant.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 thegamer.com	.ad-zone-container-sidebar-default
 thegamer.com	.ad-zone-sidebar-default
 thegamer.com	.ad-zone-sidebar-first
 thegamer.com	.ad-zone-size-container-content-above-latest
+thegamer.com	.no-badge.video.display-card
 thegamer.com	[class*="ad-zone-container-content-character-count-repeatable"]
 thegamer.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 therichest.com	.ad-zone-container-sidebar-default
 therichest.com	.ad-zone-sidebar-default
 therichest.com	.ad-zone-sidebar-first
 therichest.com	.ad-zone-size-container-content-above-latest
+therichest.com	.no-badge.video.display-card
 therichest.com	[class*="ad-zone-container-content-character-count-repeatable"]
 therichest.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 thesportster.com	.ad-zone-container-sidebar-default
 thesportster.com	.ad-zone-sidebar-default
 thesportster.com	.ad-zone-sidebar-first
 thesportster.com	.ad-zone-size-container-content-above-latest
+thesportster.com	.no-badge.video.display-card
 thesportster.com	[class*="ad-zone-container-content-character-count-repeatable"]
 thesportster.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 thethings.com	.ad-zone-container-sidebar-default
 thethings.com	.ad-zone-sidebar-default
 thethings.com	.ad-zone-sidebar-first
 thethings.com	.ad-zone-size-container-content-above-latest
+thethings.com	.no-badge.video.display-card
 thethings.com	[class*="ad-zone-container-content-character-count-repeatable"]
 thethings.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 thetravel.com	.ad-zone-container-sidebar-default
 thetravel.com	.ad-zone-sidebar-default
 thetravel.com	.ad-zone-sidebar-first
 thetravel.com	.ad-zone-size-container-content-above-latest
+thetravel.com	.no-badge.video.display-card
 thetravel.com	[class*="ad-zone-container-content-character-count-repeatable"]
 thetravel.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 topspeed.com	.ad-zone-container-sidebar-default
 topspeed.com	.ad-zone-sidebar-default
 topspeed.com	.ad-zone-sidebar-first
 topspeed.com	.ad-zone-size-container-content-above-latest
+topspeed.com	.no-badge.video.display-card
 topspeed.com	[class*="ad-zone-container-content-character-count-repeatable"]
 topspeed.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 xda-developers.com	.ad-zone-container-sidebar-default
 xda-developers.com	.ad-zone-sidebar-default
 xda-developers.com	.ad-zone-sidebar-first
 xda-developers.com	.ad-zone-size-container-content-above-latest
+xda-developers.com	.no-badge.video.display-card
 xda-developers.com	[class*="ad-zone-container-content-character-count-repeatable"]
 xda-developers.com	[id^="adsninja-ad-zone-adsninja-ad-unit-footer"]
 tianxun.com	[class^="FlightsResults"] > div:has([class^="Sponsored"])
@@ -27754,6 +27827,7 @@ wideopencountry.com	#sv-video-container
 wideopencountry.com	#video-header
 newseveryday.com	#vplayer_large
 nautil.us	.PrimisVideoAdBlock_wrapper__vYQNI
+metatft.com	.VideoAdContainer
 tvline.com	._video_ti56x_1
 musictimes.com	.ad_wrapper_video
 musictimes.com	.page-top-mobile-video
@@ -27771,6 +27845,10 @@ pep.ph	.c-ad__item
 cartoonbrew.com	.cb-ad
 iphoneincanada.ca	.cls-video-container-9GFn3u0f
 familystylefood.com	.email-highlight
+foodbible.com	.floating-video-player_container__u4D9_
+ladbible.com	.floating-video-player_container__u4D9_
+sportbible.com	.floating-video-player_container__u4D9_
+tyla.com	.floating-video-player_container__u4D9_
 redboing.com	.fw-ad
 foxsports.com	.fwAdContainer
 electricianforum.co.uk	.gb-sponsored
@@ -28699,12 +28777,15 @@ boyfriend.tv	a[href*="//bit.ly/"]
 boyfriend.tv	li[class="media-item no-popup"]
 boyfriendtv.com	.adblock
 boyfriendtv.com	.fh-line
+boyfriendtv.com	.grid:has(a[href*="faphouse.com"])
 boyfriendtv.com	.info-block-wrapper
 boyfriendtv.com	.live-cam-popunder
+boyfriendtv.com	.right-rail-block
 boyfriendtv.com	.side-content-block
 boyfriendtv.com	.video-extra-wrapper
 boyfriendtv.com	a[href*="&creativeId="]
 boyfriendtv.com	a[href*="//bit.ly/"]
+boyfriendtv.com	a[href*="faphouse.com"]
 boyfriendtv.com	li[class="media-item no-popup"]
 boyfriendtv.com	#b-page-frame > * {pointer-events:auto;}
 boyfriendtv.com	#b-page-frame {padding-top:0;}
@@ -29319,6 +29400,7 @@ teenanal.co	.clickable-overlay
 fap-nation.com	.code-block
 fyptt.to	.code-block
 gamegill.com	.code-block
+instavipclub.com	.code-block
 isekaitube.com	.code-block
 japaneseasmr.com	.code-block
 taxidrivermovie.com	.col-pfootban
@@ -29408,6 +29490,7 @@ upornia.tube	.voiscscttnn
 upornia.tube	.wcccswvsyvk
 upornia.tube	.wrapper > section
 upornia.tube	.wssvkvkyyee
+8boobs.com	.exc-pp
 fapachi.com	.exc-pp
 eromanga-show.com	.external
 eromanga-show.com	div[id^="ts_ad_"]
@@ -29539,6 +29622,7 @@ jizzbunker2.com	.zx1p
 teenpornvideo.fun	.full-ave
 teenpornvideo.fun	.sponsor-link-desk
 teenpornvideo.fun	.sponsor-link-mob
+nightdreambabe.com	.g-owner-banner
 xxxonxxx.com	.gallery-thumbs
 xxxonxxx.com	.player-bn
 xxxonxxx.com	a[href*=".com/track/"]
