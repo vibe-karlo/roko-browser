@@ -98,11 +98,14 @@ const pinnedBoxes = (el) => {
 
 // The yes button of such a wall, or null.
 // Some sites take a no to a page of its own: accept, or pay (Corriere dello Sport's /preview).
-// A whole page like that has no pinned box, so it's known by being short and saying so.
-const CONSENT_WORDS = /consen|einwillig|zustimm|cookie/i;
+// A whole page like that has no pinned box, so it's known by being short, by asking for
+// consent in so many words, not a footer's "cookies", and by being no form: a sign-up page
+// with an "I agree" isn't this.
+const CONSENT_WORDS = /consen|einwillig|zustimm/i;
 const wholePageWall = () => {
     const text = document.body ? document.body.innerText || '' : '';
-    return text.length < 4000 && CONSENT_WORDS.test(text);
+    if (text.length >= 4000 || !CONSENT_WORDS.test(text)) return false;
+    return ![...document.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, select')].some(shown);
 };
 
 const paidWall = (mainFrame) => {

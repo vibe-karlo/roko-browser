@@ -22,6 +22,7 @@ did worse than another browser is here, with its cause and what became of it. Re
 | 16 | Visible ad | Focus | An "Anzeige" strip at the bottom and a sponsored box in the page, once its wall is answered | The strip is a picture from Burda's own server, under a made-up id. That server also has Focus's photos, so blocking it blanks them (tried and undone) | Strip fixed in general, confirmed on the phone. The sponsored boxes in the page are open |
 | 17 | Cookie wall | Corriere dello Sport, L'Express | roko pressed the no, landing on a subscription offer and an account form | Didomi's no gave no price ("Continue without agreeing", "Disagree and create account") | Fixed in general, confirmed on the phone on repeat visits |
 | 18 | Cookie wall | AS, Repubblica, Il Messaggero | Wall stayed up or the no was pressed | "Deny & surf ad-free" and "Rifiuta e abbonati" weren't read as a price on no, a linked word was pressed as yes, and a wall asking twice got one press | Fixed in general, confirmed on the phone on repeat visits |
+| 19 | Link covered | Any | A question from another app stayed hidden behind an open reader | Only panels were closed for one, not sheets | Fixed in general, tested in the simulator |
 | 14 | Slow | Daily Mail | 3.2 to 3.9 s in some rounds, 1.2 s in others | In a slow run the page commits, paints nothing, and navigates again with 1 s to its first byte; a quick run commits once. It looks like the site's own bounce (Quiche had 3.21 s once too), not proven | Not roko's as far as known |
 
 Checked and not roko's:
