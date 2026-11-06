@@ -17,8 +17,10 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Reader no longer starts with a byline, a picture credit or "44 minutes ago".
 
 ### Website
+- One gradient now runs the whole page, near-black at the top and ember at the footer, in place of a gradient per section, so no section can seam against the next. Content has a maximum width on big screens. The clean-page comparison uses a new pair of real captures: Allrecipes' pancake recipe with roko's blocking off and on.
+- "Nothing in your way" is now a scene: the cookie wall wipes away to the pancakes as you scroll, and the light comes up with it. "Two pages at once" turns the phone sideways as you scroll, with each page staying upright, and the divider can still be dragged either way.
 - The page is recomposed around one light: it rises as you scroll, peaks behind "Nothing in your way" and ends in the footer, and the headline passes behind the phone. The bar's jobs are a grid of different tiles, and the scoreboard sits beside its claim.
-- On a phone, tapping the bar brings its keys into view, without zooming. On a computer, a QR code carries the beta link to your iPhone.
+- On a phone, tapping the bar brings its keys into view, without zooming. On a computer, the beta buttons open a QR code that carries the link to your iPhone.
 - The keyboard reaches every demo and nothing hidden, whole FAQ rows open, and the demo's bar answers Enter and replaces a suggestion when you type. There's a 404 page, and the contact address is karlo@rokobrowser.com.
 - The scoreboard now shows the real-site test: speed, ads and trackers reached and pages without ads, pop-ups or walls, across ten browsers, with the method under each.
 - A scoreboard beside the speed section: nine browsers on one iPhone, re-sorting themselves for data used, trackers blocked and time to page, with the method, date and versions under it and a link to the test in `Scripts/compare`.
