@@ -392,10 +392,21 @@ cookies or data and holds both a yes button and a subscribe or pay button. Sourc
 alone on purpose, and its top-level rule only hides them, which is why BILD showed an empty page. A frame on
 any address is sent the rules when it's big enough to cover the page and has a button saying yes.
 
-**A page that refuses to show.** A page still nearly empty three seconds after its wall was answered reloads
-(BILD's fills in with consent). If `cosmetic-filter.js` later finds a page about a screen tall with next to no
+**Anti-adblock walls.** `site-scripts.js` changes a page before it runs so its wall never comes up, with
+uBlock Origin's `##+js` rules (GPL-3.0), about 8,200 sites. BILD's page reads `"adBlockWallEnabled":true`;
+turned false, there's no wall, with its ads still blocked. `Scripts/build_scriptlets.py` keeps the scripts
+`site-scripts.js` implements, for named sites only, in `site-scripts.txt`, sorted so `SiteScripts` can search
+it mapped without parsing it. A site with no rule costs a few comparisons per navigation. Run it with the list
+refresh before each release.
+
+**A page that refuses to show.** A page still nearly empty three seconds after its wall was answered reloads. If `cosmetic-filter.js` later finds a page about a screen tall with next to no
 words and an anti-adblock wall in it, `ContentBlocker.pageRefusedToShow` takes two steps, each with a reload:
 the ads list compiled with scripts and their requests let through, kept for that site, then that site's ads.
+A page with no rule is the case for this: the check also runs 1.5 seconds after a wall is hidden.
+
+**A page that keeps crashing.** Twice in a row within a minute, and `BrowserTab` loads it once more without
+the hiding script or site scripts (`ContentBlocker.loadGently`, until roko is next opened), its requests
+still blocked, before showing "This page keeps stopping".
 
 ## To-do and Today
 

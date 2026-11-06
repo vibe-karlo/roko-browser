@@ -1023,6 +1023,7 @@ private struct AboutSettings: View {
 
     private let credits: [(String, String, String)] = [
         ("Filter lists", "The EasyList authors: EasyList, EasyPrivacy and Fanboy's lists, converted and trimmed (CC BY-SA 3.0)", "https://easylist.to"),
+        ("Anti-adblock walls", "uBlock Origin's site rules, by Raymond Hill and contributors (GPL-3.0)", "https://github.com/uBlockOrigin/uAssets"),
         ("Cookie pop-ups", "DuckDuckGo Autoconsent, with Consent-O-Matic's rules (MPL 2.0)", "https://github.com/duckduckgo/autoconsent"),
         ("Article extraction", "Mozilla Readability, © 2010 Arc90 Inc (Apache 2.0)", "https://github.com/mozilla/readability"),
         ("Icons", "Phosphor Icons, © 2023 Phosphor Icons (MIT)", "https://phosphoricons.com"),

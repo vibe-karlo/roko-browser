@@ -740,6 +740,12 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
         // minute at most: a page that brings WebKit down every time would
         // otherwise reload forever and drain the battery.
         if let last = lastCrashReload, Date.now.timeIntervalSince(last) < 60 {
+            // Twice in a row: one more try without what roko changes on the page.
+            if let host = webView.url?.host(), ContentBlocker.shared.loadGently(host: host) {
+                ContentBlocker.shared.configure(webView.configuration.userContentController, for: host)
+                webView.reload()
+                return
+            }
             loadError = LoadError(kind: .crashed, host: webView.url?.host())
             return
         }

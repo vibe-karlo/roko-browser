@@ -85,6 +85,12 @@ final class ContentBlocker {
         webView.reload()
     }
 
+    /// A page that keeps crashing may be crashing over what roko changes on it. Until roko is
+    /// next opened it's loaded without those changes, its requests still blocked. True the
+    /// first time a site asks: after that there's nothing left to try.
+    func loadGently(host: String) -> Bool { gentleHosts.insert(Self.normalize(host)).inserted }
+    private var gentleHosts = Set<String>()
+
     private var softHosts: Set<String> { Set(defaults.stringArray(forKey: Self.softKey) ?? []) }
     private static let softKey = "block.ads.softHosts"
 
@@ -296,7 +302,10 @@ final class ContentBlocker {
         let acceptsCookies = host.map { ConsentHandler.shared.acceptance(for: $0) != nil } ?? false
         let dark = ForceDark.applies(to: host)
         let softAdsHere = softAds != nil && host.map { softHosts.contains(Self.normalize($0)) } == true
-        let signature = "\(allowed)|\(exempt.map(\.rawValue).joined(separator: ","))|\(acceptsCookies)|\(compiled.count)|\(dark)|\(softAdsHere)"
+        // Only where its ads are blocked: it's what those ads' absence brought on.
+        let gentle = host.map { gentleHosts.contains(Self.normalize($0)) } == true
+        let siteCalls = allowed || gentle || exempt.contains(.ads) ? nil : SiteScripts.calls(for: host)
+        let signature = "\(allowed)|\(exempt.map(\.rawValue).joined(separator: ","))|\(acceptsCookies)|\(compiled.count)|\(dark)|\(softAdsHere)|\(siteCalls ?? "")|\(gentle)"
         if applied.object(forKey: controller) as String? == signature { return }
         applied.setObject(signature as NSString, forKey: controller)
 
@@ -311,6 +320,7 @@ final class ContentBlocker {
         if dark, let script = ForceDark.script { controller.addUserScript(script) }
         guard !allowed else { return }
 
+        if let siteCalls, let script = SiteScripts.script(calls: siteCalls) { controller.addUserScript(script) }
         for category in Category.allCases where isEnabled(category) {
             if let host, isAllowed(host: host, category: category) { continue }
             if category == .cookies, acceptsCookies { continue }
@@ -325,7 +335,7 @@ final class ContentBlocker {
                                                name: ConsentHandler.handlerName)
         }
         // Element hiding is served per page rather than through the rule lists.
-        if isEnabled(.ads) || isEnabled(.cookies) || isEnabled(.popups), let script = CosmeticFilter.shared.script {
+        if !gentle, isEnabled(.ads) || isEnabled(.cookies) || isEnabled(.popups), let script = CosmeticFilter.shared.script {
             controller.addUserScript(script)
             controller.addScriptMessageHandler(CosmeticFilter.shared, contentWorld: CosmeticFilter.world,
                                                name: CosmeticFilter.handlerName)

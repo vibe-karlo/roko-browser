@@ -62,16 +62,18 @@ const WALL_PAY = /subscri|suscri|abonn|abbon|\babo\b|\bpay\b|\bpaga|\bpago\b|bez
 const WALL_WORDS = /cookie|kolačić|kolacic|consent|tracking|privacy|partner|personal|datos|daten|données|donnees|dati\b|podat|werbung|publicidad|pubblicit|publicité|adverts/i;
 const WALL_BUTTONS = 'button, a, [role="button"], input[type="button"], input[type="submit"]';
 
-// The big pinned box around a button: a wall's buttons often sit in a small
-// pinned footer of their own (Corriere's), inside the box that covers the page.
-const pinnedBox = (el) => {
+// The big pinned boxes around a button, innermost first: a wall's buttons often sit in a
+// small pinned footer of their own (Corriere's), inside the box that covers the page. On a
+// small screen that footer counts as big too, so the size alone can't say which is the wall.
+const pinnedBoxes = (el) => {
+    const boxes = [];
     for (let node = el, depth = 0; node && node !== document.body && depth < 20; node = node.parentElement, depth++) {
         const position = getComputedStyle(node).position;
         if (position !== 'fixed' && position !== 'sticky') continue;
         const rect = node.getBoundingClientRect();
-        if (rect.width >= window.innerWidth * 0.6 && rect.height >= window.innerHeight * 0.25) return node;
+        if (rect.width >= window.innerWidth * 0.6 && rect.height >= window.innerHeight * 0.25) boxes.push(node);
     }
-    return null;
+    return boxes;
 };
 
 // The yes button of such a wall, or null.
@@ -85,9 +87,9 @@ const paidWall = (mainFrame) => {
     for (const yes of buttons) {
         const words = label(yes);
         if (!WALL_YES.test(words) || WALL_NOT_YES.test(words) || WALL_PAY.test(words)) continue;
-        const box = mainFrame ? pinnedBox(yes) : document.body;
-        if (!box || !pay.some((b) => box.contains(b))) continue;
-        if (WALL_WORDS.test((box.innerText || '').slice(0, 3000))) return yes;
+        for (const box of mainFrame ? pinnedBoxes(yes) : [document.body]) {
+            if (pay.some((b) => box.contains(b)) && WALL_WORDS.test((box.innerText || '').slice(0, 3000))) return yes;
+        }
     }
     return null;
 };

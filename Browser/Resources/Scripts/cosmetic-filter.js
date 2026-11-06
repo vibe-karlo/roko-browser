@@ -94,12 +94,30 @@
       if (getComputedStyle(el).position === "fixed") el.style.setProperty("position", "static", "important");
     }
   };
+  const coveredByWhatsLeft = () => {
+    let el = document.elementFromPoint(innerWidth / 2, innerHeight / 2);
+    for (; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
+      if (el.offsetHeight >= innerHeight * 0.5 && pinned(el)) return true;
+    }
+    return false;
+  };
   const unlockIfNeeded = () => {
     const root = document.documentElement, body = document.body;
     if (!isLocked(root) && !isLocked(body)) return;
+    // Lists hide plain page parts too (.social), and matching one of those proves nothing:
+    // it must be the kind of thing that sits over a page. And a page locked behind something
+    // still standing (a wall waiting for its answer) stays locked: Corriere, let go that
+    // early, ran out of memory in a second.
     const hidOne = overlays.some((selector) => {
-      try { return document.querySelector(selector) !== null; } catch (_) { return false; }
+      try {
+        for (const el of document.querySelectorAll(selector)) {
+          const position = getComputedStyle(el).position;
+          if (position === "fixed" || position === "sticky" || position === "absolute") return true;
+        }
+      } catch (_) {}
+      return false;
     });
+    if (hidOne && coveredByWhatsLeft()) return;
     if (hidOne) unlock();
   };
   // Sites often lock scrolling a moment after the pop-up would have appeared.
@@ -137,7 +155,14 @@
   const MARK = "data-roko-empty-ad";
   let collapsing = false, collapseTimer = 0, lastPass = 0;
 
-  const isLabelOnly = (text) => !text || (text.length <= 24 && AD_LABEL.test(text.replace(/\s+/g, " ")));
+  // A sticky slot's close button says what it closes ("Cerrar Publicidad"): still only a label.
+  const CLOSE_AD = /(?:close|cerrar|schlie(?:ß|ss)en|fermer|chiudi|zatvori|sluiten)\s+(?:oglas|reklam\w*|advert\w*|ad|ads|anzeige|werbung|publicit[ée]|publicidad|pubblicit[àa]|annonce|reclame)\b/gi;
+  const isLabelOnly = (text) => {
+    if (!text) return true;
+    if (text.length > 48) return false;
+    const rest = text.replace(/\s+/g, " ").replace(CLOSE_AD, "").trim();
+    return !rest || AD_LABEL.test(rest);
+  };
   const pseudoLabel = (el) => {
     for (const which of ["::after", "::before"]) {
       const content = getComputedStyle(el, which).content;
@@ -155,7 +180,20 @@
     }
     return false;
   };
-  const isEmptyBox = (el) => isLabelOnly(el.textContent.trim()) && !hasRealMedia(el);
+  // What a reader could read. A slot often holds its own script or style, and those aren't
+  // content: counting them kept Marca's and Welt's empty slots on the page. Past what a
+  // label could be, the rest doesn't matter.
+  const readable = (el) => {
+    if (!el.querySelector("script,style,noscript")) return el.textContent.trim();
+    let text = "";
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let node; (node = walker.nextNode()) && text.length <= 48;) {
+      const parent = node.parentNode.nodeName;
+      if (parent !== "SCRIPT" && parent !== "STYLE" && parent !== "NOSCRIPT") text += node.nodeValue;
+    }
+    return text.trim();
+  };
+  const isEmptyBox = (el) => isLabelOnly(readable(el)) && !hasRealMedia(el);
   // Boxes holding real text: they never turn into empty ad slots, so later
   // passes skip them and stay cheap however long the page grows.
   const settled = new WeakSet();
@@ -174,8 +212,9 @@
       const name = el.id + " " + (typeof el.className === "string" ? el.className : "");
       const named = name.length > 1 && AD_NAME.test(name);
       if (!named && el.childElementCount > 4) continue;
-      const text = el.textContent.trim();
-      if (!isLabelOnly(text)) { settled.add(el); continue; }
+      const text = readable(el);
+      // A named slot may carry a site's lone mark (Welt's "-W-").
+      if (!isLabelOnly(text) && !(named && /^\W*\w?\W*$/.test(text))) { settled.add(el); continue; }
       if (hasRealMedia(el)) continue;
       // An ad-like name, or (unnamed) an ad label shown as text or drawn by CSS.
       const isSlot = named || (height >= 50 && (text ? true : pseudoLabel(el)));
@@ -268,6 +307,8 @@
       (document.head || document.documentElement).appendChild(wallStyle);
     }
     box.setAttribute(WALL, "");
+    // Its page may have gone with it: don't leave that blank a moment longer than needed.
+    setTimeout(checkRefusal, 1500);
     // A backdrop drawn as a box of its own beside it: full-screen, pinned, wordless.
     for (const sibling of box.parentElement ? box.parentElement.children : []) {
       if (sibling === box || sibling.hasAttribute(WALL) || (sibling.innerText || "").trim()) continue;

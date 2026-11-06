@@ -171,6 +171,12 @@ final class TodayModel {
         UserDefaults.standard.set(Date.now, forKey: shownKey)
     }
 
+    /// Up for a moment and covered by a link at once: it wasn't seen.
+    static func forgetIfJustShown() {
+        guard let shown = UserDefaults.standard.object(forKey: shownKey) as? Date, Date.now.timeIntervalSince(shown) < 5 else { return }
+        UserDefaults.standard.removeObject(forKey: shownKey)
+    }
+
     // MARK: Prepared in the background
 
     static let taskID = "com.growthstudio.roko.today"

@@ -1016,15 +1016,27 @@ final class BrowserModel {
         case _ where url.scheme == "roko" && (url.host() == "open" || url.host() == "ask"):
             let value = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first?.value
             if url.host() == "open", let page = value.flatMap(URL.init(string:)), page.scheme?.hasPrefix("http") == true {
-                open(page, inNewTab: true)
+                openFromOutside(page)
             } else if url.host() == "ask", let question = value, !question.isEmpty {
                 browse(for: question)
             }
         default:
             guard url.scheme?.hasPrefix("http") == true else { return }
-            open(url, inNewTab: true)
+            openFromOutside(url)
         }
     }
+
+    /// A link from another app is what you came for, so it goes over whatever panel is up.
+    /// That includes the day's first Today, which then waits for your next return.
+    private func openFromOutside(_ page: URL) {
+        lastOutsideLink = .now
+        if panel == .today { TodayModel.forgetIfJustShown() }
+        panel = .none
+        open(page, inNewTab: true)
+    }
+
+    private var lastOutsideLink: Date?
+    var linkJustArrived: Bool { lastOutsideLink.map { Date.now.timeIntervalSince($0) < 2 } ?? false }
 
     func showToast(_ text: String) {
         toast = text

@@ -456,7 +456,7 @@ struct BrowserView: View {
             }
             if browser.isBarCollapsed { browser.isBarCollapsed = false }
             // The first time on a new day: Today first.
-            if !browser.showsOnboarding, TodayModel.shouldOpenNow(), browser.panel == .none, browser.summary == nil, browser.browseForMe == nil {
+            if !browser.showsOnboarding, TodayModel.shouldOpenNow(), browser.panel == .none, browser.summary == nil, browser.browseForMe == nil, !browser.linkJustArrived {
                 browser.panel = .today
                 return
             }
