@@ -680,7 +680,7 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
         }
         // A link with download, or a blob a page saves: a file, not a page.
         if navigationAction.shouldPerformDownload {
-            return (.download, preferences)
+            return (webView.isPreloading ? .cancel : .download, preferences)
         }
         if navigationAction.targetFrame?.isMainFrame == true, navigationAction.navigationType == .reload {
             noteReload(of: url)
