@@ -86,6 +86,19 @@ enum Watcher {
                         lines = await RenderedPage.lines(of: url)
                     }
                 }
+                // A page that reads plainly until it won't, with bot protection in front of
+                // it, would never be checked again. Once a whole check has been missed it's
+                // read rendered from now on, its reading taken afresh as above.
+                if lines == nil, !watch.needsRendering, !inBackground, let url = URL(string: watch.url),
+                   force || watch.nextCheck.addingTimeInterval(Double(watch.everyHours) * 3600) <= .now,
+                   let rendered = await RenderedPage.lines(of: url), !PageLines.isThin(rendered) {
+                    watch.needsRendering = true
+                    watch.snapshot = rendered.joined(separator: "\n")
+                    watch.readingVersion = PageLines.version
+                    watch.lastChecked = .now
+                    try? context.save()
+                    continue
+                }
                 // Offline, or the page didn't load: it's still due, so next time.
                 guard let lines else { continue }
                 await compare(watch, with: lines)
@@ -120,8 +133,8 @@ enum Watcher {
         let verdict: (happened: Bool, notification: String)
         if watch.lookFor.isEmpty {
             // Anything new: new lines of real text, not a time or a counter ticking on.
-            let ticked = Set(removed.map(withoutDigits))
-            let news = added.filter { $0.count >= 30 && !ticked.contains(withoutDigits($0)) }
+            let ticked = Set(removed.map(withoutTime))
+            let news = added.filter { $0.count >= 30 && !ticked.contains(withoutTime($0)) }
             guard !news.isEmpty else { return }
             verdict = await WatchJudge.news(in: news) ?? WatchJudge.guess(lookFor: "", added: news)
         } else {
@@ -137,8 +150,19 @@ enum Watcher {
                                 url: watch.url, thread: watch.host)
     }
 
-    private static func withoutDigits(_ line: String) -> String {
-        String(line.unicodeScalars.filter { !CharacterSet.decimalDigits.contains($0) })
+    /// A label saying how long ago, in English or Croatian: "Just now", "1m ago", "2 hr. ago",
+    /// "prije 5 minuta", "upravo". Whole words like "3 hours" need their "ago".
+    private static let timeLabel = #"(just now|moments? ago|an? (minute|hour|day) ago|\d*\s*(s|secs?|seconds?|m|mins?|minutes?|h|hrs?|hours?|d|days?)\.?\s*ago|\d+\s*(s|m|h|d|mins?|hrs?)\.?|upravo|maloprije|prije\s+(\d+\s*|nekoliko\s+)?(sek|min|sat|dan)\p{L}*\.?)"#
+
+    /// A line without what ticks on: its digits, and a time label at its start, at its end
+    /// or set apart by separators, since "Just now" becoming "1m ago" has no digit to take
+    /// away. Only there: "Three hours of talks end" is news, not a label.
+    private static func withoutTime(_ line: String) -> String {
+        var plain = line.lowercased()
+        for pattern in [timeLabel + #"\s*$"#, "^\\s*" + timeLabel + #"\s*[:·|•,–-]"#, #"[·|•]\s*"# + timeLabel + #"\s*(?=[·|•])"#] {
+            plain = plain.replacingOccurrences(of: pattern, with: "", options: .regularExpression)
+        }
+        return String(plain.unicodeScalars.filter { !CharacterSet.decimalDigits.contains($0) })
     }
 }
 
@@ -163,8 +187,8 @@ nonisolated enum PageLines {
     }()
 
     /// Bumped when the way pages are read changes (2: link text on pages of
-    /// boxes; 3: no dialogs), so a watch re-reads instead of announcing the change as news.
-    static let version = 3
+    /// boxes; 3: no dialogs; 4: at a phone's width), so a watch re-reads instead of announcing the change as news.
+    static let version = 4
 
     @concurrent static func fetch(_ url: URL) async -> [String]? {
         guard let (data, response) = try? await session.data(from: url),
@@ -267,8 +291,16 @@ nonisolated enum PageLines {
 /// Reads a page whose text its scripts write, in a web view nobody sees. Only
 /// while roko is open: iOS doesn't run web views for an app in the background.
 enum RenderedPage {
-    static func lines(of url: URL) async -> [String]? {
+    /// A web view out of any window, at a phone's size: at no width at all, a page that
+    /// lays itself out by width writes less (Reuters: 117 lines of 141).
+    private static func makeView() -> WKWebView {
         let webView = WebViewFactory.makeOffscreen()
+        webView.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        return webView
+    }
+
+    static func lines(of url: URL) async -> [String]? {
+        let webView = makeView()
         let loader = Loader()
         webView.navigationDelegate = loader
         webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData))
@@ -321,7 +353,7 @@ enum RenderedPage {
     /// The article on a page, by Readability, off screen: its scripts run, and
     /// the app's blocking applies. Still read if the page never quite finishes.
     static func readable(of url: URL) async -> ReadablePage? {
-        let webView = WebViewFactory.makeOffscreen()
+        let webView = makeView()
         let loader = Loader()
         webView.navigationDelegate = loader
         webView.load(URLRequest(url: url))
