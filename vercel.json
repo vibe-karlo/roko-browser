@@ -3,7 +3,7 @@
   "buildCommand": "",
   "installCommand": "",
   "outputDirectory": "Site",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- Site vercel.json",
+  "ignoreCommand": "for p in $(git rev-parse HEAD^@); do git diff --quiet $p HEAD -- Site vercel.json || exit 1; done",
   "cleanUrls": true,
   "trailingSlash": false
 }
