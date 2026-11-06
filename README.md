@@ -603,7 +603,7 @@ roko's own code is free software under the [GNU General Public License, version 
 | Most visited sites per country, filtered and reordered | `Browser/Resources/TopSites` | From the Chrome UX Report by Google, CC BY 4.0 |
 | Product names | `Browser/Resources/Shopping/products.txt` | From one shop's published price list, not ours to license |
 | Screenshots | `Site/img`, `docs/screens` | They show other people's pages, such as Wikipedia (CC BY-SA), which stay theirs |
-| Cabinet Grotesk | Not in this repository | Closed-source font: the site loads it from [Fontshare](https://www.fontshare.com), and its licence forbids copies here |
+| Funnel Display | `Site/fonts/funnel-display.woff2` | [SIL Open Font License 1.1](Site/fonts/OFL.txt), from [The Funnel Project Authors](https://github.com/Dicotype/Funnel) |
 
 The Raycast extension in `Raycast/` is MIT, as its `package.json` says.
 

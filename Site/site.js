@@ -83,6 +83,13 @@ async function weather(place, stamp) {
   } catch { if (stamp === asked) show("Weather needs a connection", "Check yours and try again", "Weather", true); }
 }
 
+function toDo(text) {
+  const low = text.toLowerCase(), when = low.match(/\b(today|tonight|tomorrow)\b/), at = low.match(/\bat (\d{1,2})(?::(\d{2}))?\b/);
+  const name = text.replace(/\s+(today|tonight|tomorrow)\b/i, "").replace(/\s+at \d{1,2}(:\d{2})?\b/i, "").replace(/\bpetra\b/i, "Petra");
+  const hour = at ? +at[1] : 0, time = at ? `${hour % 12 || 12}:${at[2] || "00"} ${hour < 12 ? "AM" : "PM"}` : "";
+  return { name: name[0].toUpperCase() + name.slice(1), when: [when ? when[1][0].toUpperCase() + when[1].slice(1) : "New to-do", time && `at ${time}`].filter(Boolean).join(" ") };
+}
+
 function answer(raw) {
   const text = raw.trim(), low = text.toLowerCase(), stamp = ++asked;
   out.classList.remove("typing");
@@ -98,10 +105,8 @@ function answer(raw) {
   if (/^(https?:\/\/)?[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(\/\S*)?$/.test(low)) return show(low.replace(/^https?:\/\//, ""), "Opens the site, already loading", "Open", true);
   if (/\?$/.test(text) || /^(how|what|why|when|where|who|which|is|are|can|should|best)\b/.test(low)) return show(text, "Browse for Me: reads the web and answers", "Ask", true);
   if (/^(call|buy|email|text|pay|book|remember|pick up|send)\b/.test(low) || /\b(tomorrow|tonight)\b/.test(low)) {
-    const when = low.match(/\b(today|tonight|tomorrow)\b/), at = low.match(/\bat (\d{1,2})(?::(\d{2}))?\b/);
-    const name = text.replace(/\s+(today|tonight|tomorrow)\b/i, "").replace(/\s+at \d{1,2}(:\d{2})?\b/i, "").replace(/\bpetra\b/i, "Petra");
-    const hour = at ? +at[1] : 0, time = at ? `${hour % 12 || 12}:${at[2] || "00"} ${hour < 12 ? "AM" : "PM"}` : "";
-    return show(name[0].toUpperCase() + name.slice(1), [when ? when[1][0].toUpperCase() + when[1].slice(1) : "New to-do", time && `at ${time}`].filter(Boolean).join(" "), "To-do", true);
+    const { name, when } = toDo(text);
+    return show(name, when, "To-do", true);
   }
   show(text, "Search Google", "Search", true);
 }
@@ -193,7 +198,7 @@ function drag(box, name, axis, min, max, area, onUse, onSet) {
   return set;
 }
 drag(puller, "--p", "y", 6, 100, puller.querySelector(".grip"), () => { pulled = true; });
-const shade = v => { labA.style.opacity = .5 + .5 * Math.min(1, v / 50); labB.style.opacity = .5 + .5 * Math.min(1, (100 - v) / 50); compare.classList.toggle("end", v < .5 || v > 99.5); };
+const shade = v => { labA.style.setProperty("--shade", .5 + .5 * Math.min(1, v / 50)); labB.style.setProperty("--shade", .5 + .5 * Math.min(1, (100 - v) / 50)); compare.classList.toggle("end", v < .5 || v > 99.5); };
 const setCompare = drag(compare, "--p", "x", 0, 100, compare, () => { compared = true; }, shade);
 const splitter = document.getElementById("splitter"), splitSection = document.getElementById("split");
 const splitShots = [[splitter.querySelector(".one img"), 0], [splitter.querySelector(".two img"), -.136]];
@@ -285,6 +290,35 @@ const tdSay = () => {
 };
 for (const r of tdRows) r.addEventListener("click", () => { r.classList.add("off"); r.disabled = true; setTimeout(tdSay, 200); });
 
+// The to-do bar really works: type a line, tap the answer, and it lands on the list.
+const todoIn = document.getElementById("todoIn"), todoAdd = document.getElementById("todoAdd"), todoSearch = document.getElementById("todoSearch"), todoList = document.getElementById("todoList");
+const todoSay = () => {
+  const text = todoIn.value.trim();
+  todoAdd.hidden = !text; todoSearch.hidden = !text; todoList.hidden = !!text;
+  if (!text) return;
+  const { name, when } = toDo(text);
+  document.getElementById("todoName").textContent = name;
+  document.getElementById("todoWhen").textContent = when;
+  document.getElementById("todoText").textContent = text;
+};
+const todoLand = () => {
+  const text = todoIn.value.trim();
+  if (!text) return;
+  const { name, when } = toDo(text), row = document.createElement("div");
+  row.className = "row added";
+  row.innerHTML = '<i class="tick"></i><div><b></b><span></span></div>';
+  row.querySelector("b").textContent = name;
+  row.querySelector("span").textContent = when;
+  todoList.prepend(row);
+  while (todoList.children.length > 3) todoList.lastChild.remove();
+  todoIn.value = "";
+  todoSay();
+};
+todoIn.addEventListener("input", todoSay);
+todoIn.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); todoLand(); } });
+todoAdd.addEventListener("click", todoLand);
+todoSay();
+
 // The list really works: three shops, and things ticked off in each.
 const shop = document.getElementById("shop"), shopTabs = [...shop.querySelectorAll(".shops button")], shopLists = [...shop.querySelectorAll(".aisles")];
 const shopCount = () => {
@@ -344,8 +378,8 @@ hold.addEventListener("keyup", spEnd);
 hold.addEventListener("blur", spEnd);
 
 if (!still) {
-  const cleanPin = document.getElementById("cleanPin"), hidePin = document.getElementById("hidePin"), splitPin = document.getElementById("splitPin"), splitDevice = splitter.closest(".device");
-  let splitFit = 1, splitUp = 0, pinned = false;
+  const trio = document.getElementById("trio"), stage = trio.querySelector(".held"), chaps = [...stage.querySelectorAll(".chap")], seam = Object.assign(document.createElement("i"), { className: "seam" }), duoRun = document.getElementById("duoRun"), duoHeld = duoRun.querySelector(".held"), duoChaps = [...duoHeld.querySelectorAll(".chap")], duoSeam = Object.assign(document.createElement("i"), { className: "seam" }), newsRun = document.getElementById("newsRun"), newsHeld = newsRun.querySelector(".held"), newsChaps = [...newsHeld.querySelectorAll(".chap")], newsSeam = Object.assign(document.createElement("i"), { className: "seam" }), feedUI = document.getElementById("feedUI"), splitDevice = splitter.closest(".device");
+  let splitFit = 1, splitUp = 0, pinned = false, stageTop = 0, phoneTall = 0, phoneMid = 0, duoTop = 0, duoTall = 0, duoMid = 0, newsTop = 0, newsTall = 0, newsMid = 0;
   // The tall height, which Safari's toolbar coming and going doesn't change: scenes measure from this alone.
   const stable = Object.assign(document.createElement("div"), { style: "position:fixed;top:0;width:0;height:100vh;visibility:hidden;pointer-events:none" });
   stable.setAttribute("aria-hidden", "true");
@@ -355,39 +389,47 @@ if (!still) {
   const pinTo = on => {
     if (on === pinned) return;
     pinned = turning = on;
-    for (const pin of [cleanPin, hidePin, splitPin]) pin.classList.toggle("on", on); splitSection.classList.toggle("scrub", on);
+    trio.classList.toggle("on", on); duoRun.classList.toggle("on", on); newsRun.classList.toggle("on", on); splitSection.classList.toggle("scrub", on);
+    if (on) { stage.append(seam); duoHeld.append(duoSeam); newsHeld.append(newsSeam); } else { seam.remove(); duoSeam.remove(); newsSeam.remove(); feedUI.style.removeProperty("--m"); }
     splitter.querySelector(".two img").style.top = on ? "0" : "";
     if (on) return;
     turned = 0;
     splitDevice.style.transform = "";
     for (const [img] of splitShots) img.style.transform = "";
+    trio.style.marginBottom = "";
     if (!compared) setCompare(50);
     if (!splitTaken) setSplit(50);
     playHide(0);
-    for (const held of [cleanPin, hidePin]) held.firstElementChild.style.top = "";
+    if (!pulled) puller.style.setProperty("--p", "62%");
+    for (const chap of [...chaps, ...duoChaps, ...newsChaps]) { chap.classList.remove("now", "under"); for (const name of ["--o", "--ty", "--clip"]) chap.style.removeProperty(name); }
   };
   // Measured once and on resize, never while scrolling.
   const measure = () => {
     vh0 = stable.offsetHeight;
     pinTo(vh0 >= 620);
     if (!pinned) return;
-    // Each held scene stops in the middle of the screen, clear of the nav.
-    for (const held of [cleanPin, hidePin]) {
-      const scene = held.firstElementChild;
-      const stop = Math.max(72, (innerHeight - scene.offsetHeight) / 2);
-      scene.style.top = stop + "px";
-      held.stop = stop - parseFloat(getComputedStyle(scene).marginTop);
-    }
+    stageTop = parseFloat(getComputedStyle(stage).top) || 0;
+    phoneTall = chaps[0].querySelector(".device").offsetHeight;
+    phoneMid = stage.offsetHeight / 2 + (innerWidth >= 1100 ? 26 : 97);
+    duoTop = parseFloat(getComputedStyle(duoHeld).top) || 0;
+    duoTall = duoChaps[0].querySelector(".device").offsetHeight;
+    duoMid = duoHeld.offsetHeight / 2 + (innerWidth >= 1100 ? 26 : 116);
+    newsTop = parseFloat(getComputedStyle(newsHeld).top) || 0;
+    newsTall = newsChaps[0].querySelector(".device").offsetHeight;
+    newsMid = newsHeld.offsetHeight / 2 + (innerWidth >= 1100 ? 26 : 116);
     splitW = splitter.offsetWidth; splitH = splitter.offsetHeight;
     const tall = splitDevice.offsetHeight;
     splitFit = Math.min(1, (innerWidth - 32) / tall);
     splitUp = innerWidth >= 1100 ? 0 : Math.max(0, (tall - splitDevice.offsetWidth * splitFit) / 2 * .7);
+    // Turned sideways on a narrow screen, the phone leaves the stage's foot empty: the next section comes up into it.
+    const turnedFoot = phoneMid - splitUp + splitDevice.offsetWidth * splitFit / 2;
+    trio.style.marginBottom = innerWidth >= 1100 ? "" : -Math.max(0, stage.offsetHeight - turnedFoot) + "px";
     const line = splitSection.querySelector("h2"), [a, b] = line.querySelectorAll("span"), wide = innerWidth >= 1100;
     const air = b.offsetLeft - a.offsetLeft - a.offsetWidth, half = splitDevice.offsetWidth / 2 + 44;
     splitSection.style.setProperty("--lx", wide ? (air + b.offsetWidth - a.offsetWidth) / 2 - half + "px" : "0px");
     splitSection.style.setProperty("--rx", wide ? half + (b.offsetWidth - a.offsetWidth - air) / 2 + "px" : "0px");
     splitSection.style.setProperty("--lc", wide ? half + b.offsetWidth / 2 + "px" : "0px");
-    splitSection.style.setProperty("--dy", wide ? vh0 / 2 - line.offsetTop - line.offsetHeight / 2 + "px" : "0px");
+    splitSection.style.setProperty("--dy", wide ? phoneMid - line.offsetTop - line.offsetHeight / 2 + "px" : "0px");
     layPages();
   };
   measure();
@@ -405,90 +447,117 @@ if (!still) {
       io.unobserve(target);
       for (const img of target.querySelectorAll("img")) { img.loading = "eager"; img.decode?.().catch(() => {}); }
     }
-  }, { rootMargin: "200% 0px" }).observe(cleanPin);
+  }, { rootMargin: "400% 0px" }).observe(duoRun);
+  // A keyboard reaching a demo that isn't showing brings it into view.
+  stage.addEventListener("focusin", e => {
+    if (!pinned) return;
+    const at = chaps.indexOf(e.target.closest(".chap"));
+    if (at < 0 || chaps[at].classList.contains("now")) return;
+    scrollTo(0, trio.getBoundingClientRect().top + scrollY - stageTop + [.5, 1.6, 3.1][at] * vh0);
+  });
+  duoHeld.addEventListener("focusin", e => {
+    if (!pinned) return;
+    const at = duoChaps.indexOf(e.target.closest(".chap"));
+    if (at < 0 || duoChaps[at].classList.contains("now")) return;
+    scrollTo(0, duoRun.getBoundingClientRect().top + scrollY - duoTop + [.5, 1.7][at] * vh0);
+  });
   // The summary comes down over the page as it scrolls in, until someone takes it.
   let queued = false;
-  // The light, as the app has it: two pictures drawn once and only moved, so a still page does no work.
-  // It sits low, comes up with the pop-up going, and at the foot its crest catches and it carries the page off.
-  const rise = document.createElement("div"), dome = document.createElement("canvas"), crest = document.createElement("i");
-  const lightBox = document.createElement("div");
+  // The light: one soft radial glow, drawn once and only moved, so a still page does no work.
+  // Black at its rim, a little plum, then deepening to the brand's red-orange at its heart.
+  const rise = document.createElement("canvas"), lightBox = document.createElement("div");
   lightBox.className = "sky"; lightBox.setAttribute("aria-hidden", "true"); rise.className = "rise";
-  rise.append(dome, crest); lightBox.append(rise); document.body.append(lightBox);
+  lightBox.append(rise); document.body.append(lightBox);
   document.documentElement.classList.add("lit");
-  let drawn = null, riseOffset = 0;
-  const drawDome = round => {
-    if (drawn === round) return;
-    drawn = round;
-    const w = round ? 512 : 640, h = round ? 512 : 400, edge = .62, soft = round ? 1.6 : 1;
-    dome.width = w; dome.height = h;
-    const body = new ImageData(w, h);
+  {
+    const w = 480, h = 960, wash = new ImageData(w, h);
+    const stops = [[0, 15, 15, 14], [.14, 30, 15, 20], [.34, 62, 20, 25], [.58, 108, 30, 26], [.8, 146, 44, 30], [1, 172, 54, 32]];
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const u = x / w * 2 - 1, v = round ? 1 - y / h * 2 : 1 - y / h, d = Math.hypot(u, v) - edge, at = (x + y * w) * 4, n = Math.random() * 2 - 1;
-      const inside = Math.min(1, Math.max(0, -d / .5));
-      const alpha = d > 0 ? .5 * Math.exp(-d / (.09 * soft)) : .5 + .5 * (1 - Math.exp(d / (.07 * soft)));
-      // Opaque over the page's own black: a see-through picture rounds its dim colours into visible rings.
-      const n2 = Math.random() * 2 - 1, n3 = Math.random() * 2 - 1;
-      body.data[at] = 15 + (124 + 57 * inside - 15) * alpha + n;
-      body.data[at + 1] = 15 + (47 + 25 * inside - 15) * alpha + n2;
-      body.data[at + 2] = 14 + (20 + 8 * inside - 14) * alpha + n3;
-      body.data[at + 3] = 255;
+      const off = Math.hypot((x / w - .44) * .95, y / h * 2 - 1.62), t = Math.exp(-((off / .8) ** 2.3));
+      let i = 0;
+      while (i < stops.length - 2 && t > stops[i + 1][0]) i++;
+      const [from, to] = [stops[i], stops[i + 1]], k = (t - from[0]) / (to[0] - from[0]), at = (x + y * w) * 4, n = (Math.random() - .5) * 2.4;
+      for (let c = 0; c < 3; c++) wash.data[at + c] = from[c + 1] + (to[c + 1] - from[c + 1]) * k + n;
+      wash.data[at + 3] = 255;
     }
-    dome.getContext("2d").putImageData(body, 0, 0);
-  };
-  let levels = [], footTop = 0, lightDirty = true, lastY = scrollY, lift = 0, navY = scrollY;
+    rise.width = w; rise.height = h;
+    rise.getContext("2d").putImageData(wash, 0, 0);
+  }
+  let levels = [], footTop = 0, lightDirty = true, navY = scrollY;
   const navBar = document.querySelector(".nav");
   const foot = document.querySelector("footer");
   const mapLight = () => {
     lightDirty = false;
-    drawDome(vw0 <= 600);
-    riseOffset = vw0 <= 600 ? rise.offsetHeight * .19 : vh0 * .008;
     const top = el => el.getBoundingClientRect().top + scrollY, vh = vh0;
-    const clean = document.getElementById("cleanPin"), held = document.getElementById("hidePin"), turn = document.getElementById("splitPin");
+    const run = top(document.getElementById("trio")), ask = top(document.getElementById("duoRun")), reading = top(document.getElementById("newsRun"));
+    // The light only ever rises down the page, slowly, and never answers to how fast you scroll.
     levels = [
-      [0, .2, .9], [top(document.getElementById("fast")), .26, .8], [top(document.getElementById("smart")), .3, .75],
-      [top(clean), .34, .75], [top(clean) + vh * 1.3, .6, 1], [top(held) - vh * .2, .36, .75], [top(held) + vh * 1.1, .46, .85],
-      [top(turn), .36, .75], [top(turn) + turn.offsetHeight - vh, .54, .95], [top(document.getElementById("rest")), .34, .75],
-      [top(foot) - vh, .4, .85],
+      [0, .2, .85], [top(document.getElementById("fast")), .23, .85], [top(document.getElementById("smart")), .26, .85],
+      [ask + vh * 2.2, .3, .85], [reading, .31, .85], [reading + vh * 2.2, .35, .85],
+      [run, .36, .85], [run + vh * 4, .5, .85], [top(document.getElementById("rest")), .51, .85],
+      [top(foot) - vh, .54, .85],
     ].sort((a, b) => a[0] - b[0]);
     footTop = top(foot);
   };
   const moveLight = vh => {
     if (lightDirty) mapLight();
     const y = scrollY;
-    lift = Math.max(lift * .9, Math.min(1, Math.abs(y - lastY) / 160));
     if (vw0 <= 600 && Math.abs(y - navY) > 6) { navBar.classList.toggle("away", y > navY && y > vh * .4); navY = y; }
-    lastY = y;
     let at = 1;
     while (at < levels.length - 1 && levels[at][0] < y) at++;
     const [a, b] = [levels[at - 1], levels[at]], k = Math.max(0, Math.min(1, (y - a[0]) / (b[0] - a[0] || 1))), s = k * k * (3 - 2 * k);
-    const free = vh * (1 - (a[1] + (b[1] - a[1]) * s) * (vw0 <= 600 ? .8 : 1) - .035 * lift), line = footTop - y;
-    const caught = Math.max(0, Math.min(1, 1 - (line - free) / (vh * .5)));
-    rise.style.transform = `translateY(${Math.min(free, line) - riseOffset}px)`;
-    dome.style.opacity = (a[2] + (b[2] - a[2]) * s) * (1 - caught) + caught;
-    crest.style.opacity = caught;
+    const line = footTop - y, foot2 = Math.max(0, Math.min(1, (vh - line) / (vh * .9)));
+    // The wash is twice the screen tall: this is how far down it the screen's foot has come.
+    const reach = .72 + (a[1] + (b[1] - a[1]) * s) * .75 + .5 * foot2 * foot2;
+    rise.style.transform = `translateY(${(1 - reach) * vh}px)`;
   };
   new ResizeObserver(() => { lightDirty = true; if (!queued) { queued = true; requestAnimationFrame(frame); } }).observe(document.body);
   const frame = () => {
     queued = false;
     const vh = vh0;
     moveLight(vh);
-    if (lift > .004 && !queued) { queued = true; requestAnimationFrame(frame); }
-    if (!pulled) {
+    if (!pulled && !pinned) {
       const r = puller.getBoundingClientRect();
       puller.style.setProperty("--p", 6 + 56 * Math.max(0, Math.min(1, (vh * .8 - r.top) / (vh * .55))) + "%");
     }
     if (!pinned) return;
-    // Each scene plays by scroll position alone, so scrolling back plays it backwards.
-    const along = pin => { const r = pin.getBoundingClientRect(); return r.bottom < -vh || r.top > vh * 2 ? null : Math.max(0, Math.min(1, -r.top / (r.height - vh))); };
-    const ease = v => { v = Math.max(0, Math.min(1, v)); return v * v * (3 - 2 * v); };
-    const heldFor = (pin, travel) => { const r = pin.getBoundingClientRect(); return r.bottom < -vh || r.top > vh * 2 ? null : Math.max(0, Math.min(1, (pin.stop - r.top) / (travel * vh))); };
-    const wiped = heldFor(cleanPin, 1.3);
-    const tidied = heldFor(hidePin, 1.1);
-    if (tidied !== null) playHide(tidied < .16 ? 0 : tidied < .44 ? 1 : tidied < .72 ? 2 : 3);
-    if (wiped !== null && !compared) setCompare(100 - 100 * ease((wiped - .1) / .74));
-    const k = along(splitPin);
-    if (k !== null) {
-      turned = ease((k - .42) / .4);
+    // Everything plays by scroll position alone, so scrolling back plays it backwards.
+    const clamp = v => Math.max(0, Math.min(1, v));
+    const ease = v => { v = clamp(v); return v * v * (3 - 2 * v); };
+    // Between things, the next screen rises inside the same phone, under one line.
+    const paint = (list, line, risen, showing, on, leaves, mid, tall) => {
+      list.forEach((chap, i) => {
+        chap.style.setProperty("--o", showing[i]);
+        chap.style.setProperty("--ty", (i < on ? -14 : i > on ? 14 : leaves[i] ? -14 : 14) * (1 - showing[i]) + "px");
+        chap.style.setProperty("--clip", risen[i] < 1 ? `inset(${(1 - risen[i]) * 100}% -8px -8px -8px)` : "none");
+        chap.classList.toggle("now", i === on);
+        chap.classList.toggle("under", i < list.length - 1 && risen[i + 1] >= 1);
+      });
+      const moving = risen.find(v => v > 0 && v < 1);
+      line.style.opacity = moving === undefined ? 0 : 1;
+      if (moving !== undefined) line.style.transform = `translateY(${mid + tall / 2 - 8 - moving * (tall - 14)}px)`;
+    };
+    const duoBox = duoRun.getBoundingClientRect();
+    if (duoBox.bottom > -vh && duoBox.top < vh * 2) {
+      const q = Math.max(0, Math.min(2.2, (duoTop - duoBox.top) / vh));
+      if (!pulled) puller.style.setProperty("--p", 6 + 94 * ease(q / 1.05) + "%");
+      paint(duoChaps, duoSeam, [1, ease((q - 1.2) / .35)], [1 - clamp((q - 1.2) / .17), clamp((q - 1.38) / .17)], q < 1.38 ? 0 : 1, [q > 1.2, false], duoMid, duoTall);
+    }
+    const newsBox = newsRun.getBoundingClientRect();
+    if (newsBox.bottom > -vh && newsBox.top < vh * 2) {
+      const q = Math.max(0, Math.min(2.2, (newsTop - newsBox.top) / vh));
+      feedUI.style.setProperty("--m", ease((q - .15) / .75));
+      paint(newsChaps, newsSeam, [1, ease((q - 1.2) / .35)], [1 - clamp((q - 1.2) / .17), clamp((q - 1.38) / .17)], q < 1.38 ? 0 : 1, [q > 1.2, false], newsMid, newsTall);
+    }
+    const box = trio.getBoundingClientRect();
+    if (box.bottom < -vh || box.top > vh * 2) return;
+    const p = Math.max(0, Math.min(4, (stageTop - box.top) / vh));
+    if (!compared) setCompare(100 - 100 * ease((p - .05) / .9));
+    playHide((v => v < .12 ? 0 : v < .42 ? 1 : v < .72 ? 2 : 3)((p - 1.55) / .85));
+    paint(chaps, seam, [1, ease((p - 1.1) / .35), ease((p - 2.5) / .35)], [1 - clamp((p - 1.1) / .17), clamp((p - 1.28) / .17) * (1 - clamp((p - 2.5) / .17)), clamp((p - 2.68) / .17)], p < 1.28 ? 0 : p < 2.68 ? 1 : 2, [p > 1.1, p > 2.5, false], phoneMid, phoneTall);
+    const k = (p - 2.85) / 1.15;
+    {
+      turned = innerWidth >= 1100 ? ease((k - .42) / .4) : ease((k - .25) / .38);
       splitSection.style.setProperty("--t", turned);
       splitSection.style.setProperty("--mid", Math.min(1, Math.sin(Math.PI * turned) * 2.4));
       splitSection.classList.toggle("side", turned > .5);
