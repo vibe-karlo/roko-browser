@@ -112,7 +112,14 @@ struct ContextBar: View {
 /// The band: the same place on screen as a page's bar, down into the home
 /// indicator's strip, on the band's graphite.
 private struct ScreenBarSurface: ViewModifier {
-    @State private var bottomInset: CGFloat = 34
+    @State private var bottomInset = Self.windowInset
+
+    /// The window's, not this view's: the keyboard and this view's own padding change
+    /// the view's, and measuring that here froze the app as the keyboard closed.
+    private static var windowInset: CGFloat {
+        let window = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first
+        return window?.safeAreaInsets.bottom ?? 34
+    }
 
     func body(content: Content) -> some View {
         content
@@ -127,7 +134,8 @@ private struct ScreenBarSurface: ViewModifier {
                     .ignoresSafeArea(edges: [.bottom, .horizontal])
                     .allowsHitTesting(false)
             }
-            .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { bottomInset = $0 }
+            // Read again only as the screen turns: nothing here changes the bar's width.
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { _ in bottomInset = Self.windowInset }
             // As far into the strip as a page's bar goes, on whatever the strip's depth is.
             .padding(.bottom, max(bottomInset - 20, 9) - bottomInset)
     }
