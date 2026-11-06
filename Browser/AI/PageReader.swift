@@ -55,6 +55,36 @@ enum PageReader {
         return source
     }()
 
+    // Readability credits a paragraph's nearest ancestors only. Where each section of a
+    // story has its own deep wrappers (bbc.co.uk, Ars Technica), one section outscores
+    // the story and the rest is lost. So when a page's one <article> says much more than
+    // was read, its sections are laid side by side and read again. A wrapper with a
+    // button or a form stays shut: that's a paywall's box, not the story.
+    private static let parsing = """
+    const parsed = (page) => { try { return new Readability(page).parse(); } catch (e) { return null; } };
+    const words = (text) => text.replace(/\\s+/g, " ").trim();
+    const parseArticle = () => {
+      const found = parsed(document.cloneNode(true));
+      const copy = document.cloneNode(true);
+      const articles = copy.querySelectorAll("article");
+      if (articles.length !== 1) return found;
+      const story = [...articles[0].querySelectorAll("p")].filter(p => !p.closest("figure,a,li,header,blockquote") && words(p.textContent));
+      const held = story.reduce((sum, p) => sum + words(p.textContent).length, 0);
+      const read = found ? words(found.textContent).length : 0;
+      if (story.length < 3 || read >= held * 0.9) return found;
+      let home = story[0].parentElement;
+      while (home !== articles[0] && !story.every(p => home.contains(p))) home = home.parentElement;
+      const blocks = "p,h2,h3,h4,ul,ol,blockquote";
+      for (const section of [...home.children]) {
+        if (!/^(DIV|SECTION)$/.test(section.tagName) || !story.some(p => section.contains(p)) || section.querySelector("form,button,input")) continue;
+        section.replaceWith(...[...section.querySelectorAll(blocks)].filter(el => !el.parentElement.closest(blocks + ",figure,a,li")));
+      }
+      copy.body.replaceChildren(home);
+      const again = parsed(copy);
+      return again && words(again.textContent).length > read ? again : found;
+    };
+    """
+
     // Readability's textContent glues adjacent blocks together ("…tontos?Silvia Leal…"),
     // so walk its cleaned HTML and keep each block on its own.
     private static let extract = """
@@ -75,8 +105,7 @@ enum PageReader {
       line.append(a.cloneNode(true));
       alone.replaceWith(line);
     }
-    let article = null;
-    try { article = new Readability(document.cloneNode(true)).parse(); } catch (e) {}
+    const article = forMail ? parsed(document.cloneNode(true)) : parseArticle();
     const blocks = [], links = [];
     if (article && article.content) {
       const doc = new DOMParser().parseFromString(article.content, "text/html");
@@ -113,7 +142,7 @@ enum PageReader {
 
     static func read(_ webView: WKWebView, forMail: Bool = false) async throws -> ReadablePage {
         let result = try await webView.callAsyncJavaScript(
-            readability + "\n" + extract, arguments: ["forMail": forMail], contentWorld: .world(name: "reader"))
+            readability + "\n" + parsing + "\n" + extract, arguments: ["forMail": forMail], contentWorld: .world(name: "reader"))
         guard let fields = result as? [String: Any] else {
             throw ClaudeError(message: "This page has no readable text.")
         }
@@ -134,14 +163,17 @@ enum PageReader {
     /// What Readability takes for paragraphs and isn't. Anywhere: "Advertisement",
     /// the NYT's note about checking your access, a photo's credit. Above the
     /// first real paragraph, short lines that aren't sentences: "44 minutes
-    /// ago", "Daniela RelphRoyal correspondent", "Reuters".
+    /// ago", "Daniela RelphRoyal correspondent", "Reuters". What the BBC writes
+    /// for screen readers goes too: "Image source, Getty", and a caption's label.
     /// A mail's opening stays: a short line there may be what it's for, like a sign-in code.
     nonisolated static func withoutFurniture(_ text: String, forMail: Bool = false) -> String {
         let furniture: Set<String> = ["advertisement", "skip advertisement", "reklama", "oglas", "continue reading", "read more",
                                       "pročitajte više", "share", "save", "podijeli"]
-        var lines = text.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { line in
+        var lines = text.components(separatedBy: "\n").map {
+            $0.trimmingCharacters(in: .whitespaces).replacing(#/^(Image|Figure|Media) caption, /#, with: "")
+        }.filter { line in
             let plain = line.lowercased()
-            guard !line.isEmpty, !furniture.contains(plain), !plain.hasPrefix("you have a preview view of this article") else { return false }
+            guard !line.isEmpty, !furniture.contains(plain), !plain.hasPrefix("you have a preview view of this article"), !plain.hasPrefix("image source, ") else { return false }
             // A newsletter's small print: Reader has its own way to leave the list.
             if plain.count < 200, plain.contains("unsubscribe") || plain.contains("odjavi") { return false }
             return plain.count > 40 || plain.firstMatch(of: /\b(getty images|reuters|afp|associated press|pa media|epa|shutterstock|alamy|pixsell|hina)\b/) == nil
@@ -163,8 +195,7 @@ enum PageReader {
     /// paragraphs, lists, quotes, code and links, without the page around it.
     /// The whole page's text when it has no article.
     private static let markdownScript = """
-    let article = null;
-    try { article = new Readability(document.cloneNode(true)).parse(); } catch (e) {}
+    const article = parseArticle();
     const root = article && article.content
       ? new DOMParser().parseFromString(article.content, "text/html").body
       : document.body;
@@ -217,7 +248,7 @@ enum PageReader {
 
     static func markdown(_ webView: WKWebView) async -> String? {
         let result = try? await webView.callAsyncJavaScript(
-            readability + "\n" + markdownScript, contentWorld: .world(name: "reader"))
+            readability + "\n" + parsing + "\n" + markdownScript, contentWorld: .world(name: "reader"))
         guard let text = (result as? String)?
             .replacingOccurrences(of: #"[ \t]+\n"#, with: "\n", options: .regularExpression)
             .replacingOccurrences(of: #"\n{3,}"#, with: "\n\n", options: .regularExpression)

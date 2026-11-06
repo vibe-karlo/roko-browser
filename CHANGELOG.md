@@ -24,6 +24,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - News' lead picture could turn into a strange zoomed crop moments after it appeared, a tail fin and a red band where there had been a whole plane. The article's share picture was replacing the feed's, and a second picture of another shape drew too large and off centre. Both are fixed: pictures now fill their frame on their own, and the share picture only replaces a feed's thumbnail, as on BBC. The same goes for the picture above an article in Reader.
 - A story you've read in News showed its site's icon through its dimmed picture.
 - An unsafe page has a way out: Go back, or Close this tab. Reader and a summary that fail offer Try again, and Reader the page itself, instead of grey text.
+- Notify Me could announce old text as news on a page that writes its text with scripts and then moves itself on: it read the page mid-move, and the next reading differed. It now waits for the page to settle.
+- Reader could leave out whole sections of an article, or start it halfway through, without saying so: on Ars Technica, and on bbc.co.uk. It now keeps the whole story when a page's sections are wrapped separately, and so does Copy as Markdown. BBC articles also lose the "Image source" and "Image caption" labels written for screen readers.
+- A BBC story could open as the web page, with "Couldn't read this article here" in Reader, or read with parts of it missing. Outside the UK, bbc.co.uk moves itself to bbc.com about a second after loading, just when Reader went to read it. Reader now waits for the page it ends up on, and keeps trying while a slow page is still coming.
 - Sideways, To-do's list ended in a fade with hard edges, and its last row showed under the bar.
 - The "Today" strip above the bar sat a little high: it's now midway between the page and the bar.
 - On iPhone Duo, the switcher's bottom row sat off-centre and touched the home indicator.
