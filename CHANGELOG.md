@@ -34,7 +34,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Muted videos that loop by themselves wait until they're near the screen before they download. Blocking autoplay in WebKit doesn't stop muted video, and CNN's front page used 8 MB or more on them before you scrolled; it now takes about 2 MB.
 
 ### Fixed
-- Pay-or-consent walls are recognised in more languages and wordings ("Rifiuta e abbonati", "Deny & surf ad-free"), so roko no longer presses a no that leads to a payment page. It presses the wall's real yes button, not a word "consent" linked in its text, and presses again where a wall asks twice.
+- Pay-or-consent walls are recognised in more languages and wordings ("Rifiuta e abbonati", "Deny & surf ad-free"), so roko no longer presses a no that leads to a payment page. It presses the wall's real yes button, not a word "consent" linked in its text, and presses again where a wall asks twice. A no that leads to an account form counts too ("Disagree and create account"), and a no that lands on a page of its own, accept or pay, gets its accept pressed.
+- An ad strip pinned along the bottom, one picture with no words or links, folds away, as on Focus, whose ad server also has its photos and can't be blocked.
 - A link from another app no longer lands under the day's first Today, or any other panel. Today waits for your next return.
 - A page locked behind a wall still standing isn't unlocked by roko any more. Lists hide plain page parts too, which was taken as proof an overlay had gone, and Corriere, let go while its wall was up, ran out of memory in a second.
 - A page that crashes twice in a row gets one more try without what roko changes on it, its requests still blocked, before "This page keeps stopping".

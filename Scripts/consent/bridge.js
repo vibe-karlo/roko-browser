@@ -40,8 +40,9 @@ const COOKIE_WORDS = /cookie|kolačić|kolacic|kolačiće|keks|galleta|biscott/i
 
 // A pop-up whose only no costs money ("Reject and Pay", "Rifiuta e abbonati", "Deny & surf
 // ad-free"): rejecting means paying, so it's a wall, and pressing reject would only lead
-// to the payment page. In any of the languages below, a word for no and a word for paying.
-const SAY_NO = /\b(reject|refuse|decline|deny)\b|rifiut|rechaz|ablehn|refus|rejeit|recus|odbij|weiger|odrzu|odmít/i;
+// to the payment page, or an account form ("Disagree and create account"). In any of the
+// languages below, a word for no and a word for paying or signing up.
+const SAY_NO = /\b(reject|refuse|decline|deny|disagree)\b|rifiut|rechaz|ablehn|refus|rejeit|recus|odbij|weiger|odrzu|odmít/i;
 const payToRejectLabel = (words) => (SAY_NO.test(words) && WALL_PAY.test(words)) || /\bpay to (reject|refuse|decline)\b/i.test(words);
 const shown = (el) => typeof el.checkVisibility !== 'function' || el.checkVisibility({ checkVisibilityCSS: true });
 // Some walls ask twice (Il Messaggero: "press again to continue, 1/2"): while the same
@@ -77,7 +78,7 @@ const acceptBeside = () => biggestFirst(buttonsOnPage().filter((b) => isYes(labe
 // and an "accept only necessary" isn't a yes.
 const WALL_YES = /\b(accept|agree|consent|allow)\b|acept|aceit|accett|accept|akzept|zustimm|einverstanden|prihvać|prihvac|slažem|slazem|akkoord|zgadzam|souhlas/i;
 const WALL_NOT_YES = /necess|essential|notwendig|erforderlich|nužn|nuzn|only|solo|nur\b|manag|setting|prefer|einstell|option|custom|personal|gestion|ajust|configur|detail|learn|more/i;
-const WALL_PAY = /subscri|suscri|abonn|abbon|\babo\b|\bpay\b|\bpaga|\bpago\b|bezahl|kaufen|\bbuy\b|purchase|\bpur\b|pretplat|assin|ad[- ]?free|werbefrei|sans pub|sin (anuncios|publi)|senza pubbl|contentpass/i;
+const WALL_PAY = /subscri|suscri|abonn|abbon|\babo\b|\bpay\b|\bpaga|\bpago\b|bezahl|kaufen|\bbuy\b|purchase|\bpur\b|pretplat|assin|ad[- ]?free|werbefrei|sans pub|sin (anuncios|publi)|senza pubbl|contentpass|create (an )?account|créer un compte|crear (una )?cuenta|konto erstellen|crea (un )?account/i;
 const WALL_WORDS = /cookie|kolačić|kolacic|consent|tracking|privacy|partner|personal|datos|daten|données|donnees|dati\b|podat|werbung|publicidad|pubblicit|publicité|adverts/i;
 const WALL_BUTTONS = 'button, a, [role="button"], input[type="button"], input[type="submit"]';
 
@@ -96,6 +97,14 @@ const pinnedBoxes = (el) => {
 };
 
 // The yes button of such a wall, or null.
+// Some sites take a no to a page of its own: accept, or pay (Corriere dello Sport's /preview).
+// A whole page like that has no pinned box, so it's known by being short and saying so.
+const CONSENT_WORDS = /consen|einwillig|zustimm|cookie/i;
+const wholePageWall = () => {
+    const text = document.body ? document.body.innerText || '' : '';
+    return text.length < 4000 && CONSENT_WORDS.test(text);
+};
+
 const paidWall = (mainFrame) => {
     const buttons = [...document.querySelectorAll(WALL_BUTTONS)].filter((b) => {
         const rect = b.getBoundingClientRect();
@@ -106,7 +115,7 @@ const paidWall = (mainFrame) => {
     for (const yes of biggestFirst(buttons)) {
         const words = label(yes);
         if (!WALL_YES.test(words) || WALL_NOT_YES.test(words) || WALL_PAY.test(words)) continue;
-        for (const box of mainFrame ? pinnedBoxes(yes) : [document.body]) {
+        for (const box of mainFrame ? [...pinnedBoxes(yes), ...(wholePageWall() ? [document.body] : [])] : [document.body]) {
             if (pay.some((b) => box.contains(b)) && WALL_WORDS.test((box.innerText || '').slice(0, 3000))) return yes;
         }
     }
