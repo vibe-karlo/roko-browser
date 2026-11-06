@@ -365,6 +365,15 @@ struct TodayView: View {
             .contentShape(.rect)
         }
         .buttonStyle(RowButtonStyle())
+        .storyMenu {
+            Button("Show Less News Like This") {
+                Task {
+                    await FeedStore.shared.showLess([story])
+                    today.applyLess()
+                    browser.showToast("Showing less like this")
+                }
+            }
+        }
         .padding(.bottom, 6)
     }
 
@@ -375,7 +384,7 @@ struct TodayView: View {
             return Calendar.current.isDateInToday(date) ? "today"
                 : Calendar.current.isDateInYesterday(date) ? "yesterday" : date.formatted(.dateTime.day().month(.abbreviated))
         }
-        return date.formatted(.relative(presentation: .named))
+        return min(date, .now).formatted(.relative(presentation: .named))
     }
 
     private func open(_ url: URL) {

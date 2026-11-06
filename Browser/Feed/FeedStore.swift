@@ -409,8 +409,8 @@ final class FeedStore {
     func markUnread(_ links: [URL]) { setRead(links, at: nil) }
 
     /// Off the page now, and what's like it from now on. You asked, so the page may move.
-    func showLess(_ item: FeedItem) async {
-        NewsLess.chosen.insert(NewsLess.entry(for: item.stories.map(\.story), among: recent.map(\.story.title)), at: 0)
+    func showLess(_ shown: [NewsStory]) async {
+        NewsLess.chosen.insert(NewsLess.entry(for: shown, among: recent.map(\.story.title)), at: 0)
         await regroup()
         rebuild()
     }

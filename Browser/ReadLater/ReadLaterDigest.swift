@@ -317,7 +317,7 @@ final class DigestModel: Identifiable {
             for (index, page) in readable {
                 try Task.checkCancellation()
                 if page.text.count > perPage { shortened = true }
-                let session = LanguageModelSession(model: model, instructions: Self.condensing)
+                let session = LanguageModelSession(model: model, instructions: Self.condensing(language))
                 let points = try await session.respond(to: "Title: \(page.title)\nSite: \(page.site)\n\n\(page.text.prefix(perPage))",
                                                        generating: PageNotes.self).content.points
                 notes.append((index + 1, points.map { "- \($0)" }.joined(separator: "\n")))
@@ -333,7 +333,9 @@ final class DigestModel: Identifiable {
             // ("May contain sensitive content") even for an interest rate rise.
             let session = LanguageModelSession(model: model, instructions: Self.appleComparing(language))
             var written = ""
-            for try await snapshot in session.streamResponse(to: prompt) {
+            // Said last too: told only at the start, it followed the articles' language about half the time.
+            let reminder = language.map { "\n\n\($0.instruction) Whatever language the articles are in." } ?? ""
+            for try await snapshot in session.streamResponse(to: prompt + reminder) {
                 written = snapshot.content
                 text = Self.namingSites(headings.markdown(fromLines: written, sites: pages.map(\.site)), from: pages)
             }
@@ -381,10 +383,12 @@ final class DigestModel: Identifiable {
         return prompt
     }
 
-    private static let condensing = """
-        You read a saved web page for someone who will read a summary of several pages at once. \
-        Only facts from the page. Write in the page's own language.
+    private static func condensing(_ language: WritingLanguage?) -> String {
         """
+        You read a saved web page for someone who will read a summary of several pages at once. \
+        Only facts from the page. \(language?.instruction ?? "Write in the page's own language.")
+        """
+    }
 
     private static func appleInstructions(_ language: WritingLanguage?) -> String {
         """

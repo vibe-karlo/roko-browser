@@ -143,6 +143,18 @@ nonisolated enum NewsLess {
         Set(TodayNews.stems(title).map { String($0.prefix(5)) })
     }
 
+    /// Gone from the page: asked about, or sharing two of its telling words.
+    static func hides(_ story: NewsStory, in entries: [Entry]) -> Bool {
+        entries.contains { $0.links.contains(story.link) } || closeness(of: story.title, to: entries) >= 2
+    }
+
+    /// Not gone, but not to lead: one telling word in common. Those last, the rest as they were.
+    static func sunk(_ stories: [NewsStory], in entries: [Entry]) -> [NewsStory] {
+        guard !entries.isEmpty else { return stories }
+        let kept = stories.filter { !hides($0, in: entries) }
+        return kept.filter { closeness(of: $0.title, to: entries) == 0 } + kept.filter { closeness(of: $0.title, to: entries) > 0 }
+    }
+
     /// How many telling words a headline shares with the entry closest to it.
     static func closeness(of title: String, to entries: [Entry]) -> Int {
         let words = stems(title)
