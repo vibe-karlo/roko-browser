@@ -15,6 +15,8 @@ struct LiveBand: View {
     /// Its height above the home indicator.
     static func height(minimized: Bool) -> CGFloat { minimized ? 30 : 66 }
 
+    @Environment(\.liveBandOverBar) private var overBar
+
     private var items: [BrowserModel.LiveItem] { browser.liveItems }
     private var page: Int { min(browser.livePage, max(items.count - 1, 0)) }
     private var minimized: Bool { browser.bandShowsStrip }
@@ -35,7 +37,7 @@ struct LiveBand: View {
         }
         .frame(height: Self.height(minimized: minimized))
         .frame(maxWidth: .infinity)
-        .overlay(alignment: .top) { dots }
+        .overlay(alignment: overBar ? .bottom : .top) { dots }
         .clipped()
         .contentShape(.rect)
         .offset(y: pull)
@@ -48,6 +50,9 @@ struct LiveBand: View {
             }
             .onEnded(ended))
         .sensoryFeedback(.selection, trigger: minimized)
+        .accessibilityAction(named: "Make the band smaller") {
+            withAnimation(.snappy(duration: 0.25)) { browser.collapseBand() }
+        }
         .sensoryFeedback(.selection, trigger: page)
         .environment(\.colorScheme, .dark)
     }
@@ -90,7 +95,9 @@ struct LiveBand: View {
                         .frame(width: 4, height: 4)
                 }
             }
-            .padding(.top, 4)
+            // Over the bar, under the row and midway to it: at its top they sat hard
+            // against the page. Sideways that's the home indicator's place, so on top.
+            .padding(overBar ? .bottom : .top, overBar ? 1.5 : 4)
             .allowsHitTesting(false)
         }
     }
@@ -156,7 +163,7 @@ private func leadButton(_ label: String, action: @escaping () -> Void, @ViewBuil
     Button(action: action) {
         content()
             .foregroundStyle(.black)
-            .frame(width: 38, height: 38)
+            .frame(width: 32, height: 32)
             .background(.white, in: .circle)
     }
     .accessibilityLabel(label)
@@ -235,7 +242,7 @@ private struct MediaRow: View {
                 .accessibilityLabel("AirPlay")
             CollapseButton()
         }
-        .padding(.horizontal, 16)
+        .modifier(LiveRowMargins())
         .frame(maxHeight: .infinity)
         .contextMenu {
             Button { browser.select(tab) } label: { Label("Go to Tab", image: "phosphor/tab") }
@@ -290,7 +297,7 @@ private struct ParkingRow: View {
             }
             CollapseButton()
         }
-        .padding(.horizontal, 16)
+        .modifier(LiveRowMargins())
         .frame(maxHeight: .infinity)
         .contextMenu {
             Button(role: .destructive) { Parking.shared.end() } label: { Label("End Parking", image: "phosphor/close") }
@@ -333,7 +340,7 @@ private struct TodoRow: View {
             }
             CollapseButton()
         }
-        .padding(.horizontal, 16)
+        .modifier(LiveRowMargins())
         .frame(maxHeight: .infinity)
         .sensoryFeedback(.success, trigger: ticked)
     }
@@ -347,10 +354,31 @@ private struct TodoRow: View {
 
 /// Folds the band into its thin strip: the same as pulling it down, which
 /// near the bottom edge iOS can take for Reachability.
+extension EnvironmentValues {
+    /// The band holds the bar as well, so its rows share the bar's margins.
+    @Entry var liveBandOverBar = false
+}
+
+private struct LiveRowMargins: ViewModifier {
+    @Environment(\.liveBandOverBar) private var overBar
+
+    func body(content: Content) -> some View {
+        content.padding(.horizontal, overBar ? BottomBar.dockedInset : 16)
+    }
+}
+
+/// Not with the bar under it: a chevron down stacked on the bar's chevron up reads
+/// as one control arguing with itself. With the bar folded away it's the way to
+/// make the row smaller; pulling it down works either way.
 private struct CollapseButton: View {
     @Environment(BrowserModel.self) private var browser
+    @Environment(\.liveBandOverBar) private var overBar
 
     var body: some View {
+        if !overBar || browser.isBarCollapsed { button.transition(.opacity) }
+    }
+
+    private var button: some View {
         Button { withAnimation(.snappy(duration: 0.25)) { browser.collapseBand() } } label: {
             Image(systemName: "chevron.down")
                 .font(.system(size: 12, weight: .bold))

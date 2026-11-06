@@ -76,6 +76,9 @@ nonisolated enum WebResearcher {
         }
     }
 
+    /// Far enough into a page: a site that inlines its styles names its picture past 140 KB.
+    private static let headLimit = 300_000
+
     /// One page's share image, read from its head alone: for answers Claude
     /// wrote from pages it read on its own servers.
     static func shareImage(of url: URL) async -> URL? {
@@ -87,7 +90,7 @@ nonisolated enum WebResearcher {
         do {
             for try await byte in bytes {
                 head.append(byte)
-                if head.count % 8_192 == 0, head.range(of: end) != nil || head.count >= 60_000 { break }
+                if head.count % 8_192 == 0, head.range(of: end) != nil || head.count >= headLimit { break }
             }
         } catch {}
         return shareImage(String(decoding: head, as: UTF8.self), base: url)
@@ -110,7 +113,7 @@ nonisolated enum WebResearcher {
 
     /// The page's og:image (or twitter:image), when it has one.
     static func shareImage(_ html: String, base: URL) -> URL? {
-        let head = String(html.prefix(60_000))
+        let head = String(html.prefix(headLimit))
         for pattern in [#"<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']+)["']"#,
                         #"<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["'](?:og:image|twitter:image)["']"#] {
             if let raw = matches(pattern, in: head).first?.first,
@@ -158,18 +161,6 @@ nonisolated enum WebResearcher {
     }
 
     private static func decodeEntities(_ text: String) -> String {
-        guard text.contains("&") else { return text }
-        var result = text
-        for (entity, character) in ["&amp;": "&", "&quot;": "\"", "&#39;": "'", "&#x27;": "'", "&apos;": "'",
-                                    "&lt;": "<", "&gt;": ">", "&nbsp;": " ", "&#x2F;": "/"] {
-            result = result.replacingOccurrences(of: entity, with: character)
-        }
-        // Numeric entities: &#8217; and &#x2019;
-        for match in matches(#"&#(x?)([0-9a-fA-F]+);"#, in: result).reversed() {
-            let value = match[0].isEmpty ? UInt32(match[1]) : UInt32(match[1], radix: 16)
-            guard let value, let scalar = Unicode.Scalar(value) else { continue }
-            result = result.replacingOccurrences(of: "&#\(match[0])\(match[1]);", with: String(Character(scalar)))
-        }
-        return result
+        PageHeadlines.decode(text)
     }
 }

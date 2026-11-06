@@ -19,7 +19,11 @@ nonisolated struct ReadLaterPage: Codable, Identifiable, Equatable {
     var image: String?
     /// Where the share picture came from, for the Mac's list (with sync on).
     var imageURL: URL?
+    /// Why it was saved: a `SavedTopic`, chosen once and kept. Nil until then.
+    /// Plain text, so a topic that's gone from a later version can't lose the list.
+    var reason: String?
 
+    var topic: SavedTopic { reason.flatMap(SavedTopic.init) ?? .other }
     var isRead: Bool { readAt != nil }
     var words: Int { SavedStats.words(in: text) }
     /// Minutes to read the page itself, at 230 words a minute.
@@ -38,8 +42,8 @@ final class ReadLater {
     /// each was written from: opened again with nothing new, one shows at once
     /// and costs nothing. The last dozen.
     private(set) var digests: [Digest] = []
-    /// Unread pages on one subject, for a summary of each.
-    private(set) var groups: [ReadLaterGroup] = []
+    /// Topics are being chosen for pages without one.
+    private(set) var isSorting = false
 
     nonisolated struct Digest: Codable {
         let pageIDs: [UUID]
@@ -52,9 +56,6 @@ final class ReadLater {
     private nonisolated struct Saved: Codable {
         var pages: [ReadLaterPage]
         var digests: [Digest]?
-        var groups: [ReadLaterGroup]?
-        /// The unread pages the groups were found among.
-        var groupedFrom: [UUID]?
     }
 
     static let folder = URL.applicationSupportDirectory.appending(path: "read-later")
@@ -65,8 +66,6 @@ final class ReadLater {
               let saved = try? JSONDecoder().decode(Saved.self, from: data) else { return }
         pages = saved.pages
         digests = saved.digests ?? []
-        groups = saved.groups ?? []
-        groupedFrom = Set(saved.groupedFrom ?? [])
     }
 
     var unread: [ReadLaterPage] { pages.filter { !$0.isRead } }
@@ -96,6 +95,7 @@ final class ReadLater {
         (page.image, page.imageURL) = await picture(for: page.id, webView: webView)
         pages.insert(page, at: 0)
         persist()
+        sortNew()
         return "Saved to Read Later"
     }
 
@@ -105,6 +105,8 @@ final class ReadLater {
         guard !contains(story.link) else { return }
         var page = ReadLaterPage(url: story.link, title: story.title, site: story.host, text: text)
         page.imageURL = story.image
+        // From the news, so it's news: no need to ask.
+        page.reason = SavedTopic.news.rawValue
         pages.insert(page, at: 0)
         persist()
         let id = page.id
@@ -184,24 +186,35 @@ final class ReadLater {
         group.pages.compactMap(page)
     }
 
-    /// Works the groups out again when the unread pages have changed since:
-    /// one small model call, kept with the list.
-    func regroup() async {
-        let candidates = unread.filter { $0.text.count > 200 }
-        let ids = Set(candidates.map(\.id))
-        guard ids != groupedFrom, !isGrouping else { return }
-        isGrouping = true
-        defer { isGrouping = false }
-        let found = await ReadLaterGroups.find(candidates)
-        // Changed again meanwhile: the next look starts over.
-        guard Set(unread.filter { $0.text.count > 200 }.map(\.id)) == ids else { return }
-        groups = found
-        groupedFrom = ids
-        persist()
+    /// Chooses a topic for each page that has none, one at a time and newest
+    /// first, unread before read, as the model is slow. A page it couldn't answer
+    /// for now waits for the next look at the list. Doesn't sync: each device
+    /// sorts for itself.
+    func sortNew() {
+        guard !isSorting else { return }
+        for index in pages.indices where pages[index].reason == nil {
+            pages[index].reason = SavedTopics.evident(from: pages[index].url)?.rawValue
+        }
+        guard SavedTopics.canAsk, pages.contains(where: { $0.reason == nil }) else { return }
+        isSorting = true
+        Task(priority: .utility) {
+            var unanswered = Set<UUID>()
+            while true {
+                let waiting = pages.filter { $0.reason == nil && !unanswered.contains($0.id) && !reading.contains($0.id) }
+                guard let page = waiting.first(where: { !$0.isRead }) ?? waiting.first else { break }
+                if let topic = await SavedTopics.topic(of: page), let index = pages.firstIndex(where: { $0.id == page.id }) {
+                    pages[index].reason = topic.rawValue
+                    write()
+                } else {
+                    unanswered.insert(page.id)
+                }
+            }
+            isSorting = false
+        }
     }
 
-    @ObservationIgnored private var groupedFrom: Set<UUID> = []
-    @ObservationIgnored private var isGrouping = false
+    /// Pages from elsewhere with their text still being fetched: not sorted without it.
+    @ObservationIgnored private var reading = Set<UUID>()
 
     // MARK: From the Mac
 
@@ -232,6 +245,11 @@ final class ReadLater {
 
     /// Fetches a page saved elsewhere and keeps its text and picture, as saving it here would.
     private func read(_ id: UUID) async {
+        reading.insert(id)
+        defer {
+            reading.remove(id)
+            sortNew()
+        }
         guard let page = page(id),
               let (data, _) = try? await URLSession.quick.data(from: page.url) else { return }
         let html = String(decoding: data, as: UTF8.self)
@@ -253,12 +271,16 @@ final class ReadLater {
     }
 
     private func persist() {
-        let saved = Saved(pages: pages, digests: digests, groups: groups, groupedFrom: Array(groupedFrom))
+        write()
+        RokoSync.readLaterChanged()
+    }
+
+    private func write() {
+        let saved = Saved(pages: pages, digests: digests)
         let file = Self.file
         Task.detached(priority: .utility) {
             if let data = try? JSONEncoder().encode(saved) { try? data.write(to: file, options: .atomic) }
         }
-        RokoSync.readLaterChanged()
     }
 
     /// The same page whatever its fragment.

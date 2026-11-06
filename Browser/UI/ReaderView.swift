@@ -123,18 +123,39 @@ struct ReaderView: View {
     @Environment(BrowserModel.self) private var browser
     @Namespace private var switchSpace
     let model: ReaderModel
+    /// The side a swipe has reached. It only counts once the swipe has settled:
+    /// a peek at the next side writes no summary and loads no page.
+    @State private var shown: ReaderModel.Side? = .reader
+
+    private var sides: [ReaderModel.Side] {
+        guard model.story != nil else { return [.reader] }
+        return model.offersSummary || model.side == .summary ? [.reader, .summary, .page] : [.reader, .page]
+    }
 
     var body: some View {
-        ZStack {
-            article.opacity(model.side == .page ? 0 : 1)
-            if model.pageOpened, let story = model.story {
-                ArticlePage(url: story.link, html: story.isMail ? Newsletters.original(of: story.link) : nil, openLink: browser.openPage)
-                    .opacity(model.side == .page ? 1 : 0)
-                    .allowsHitTesting(model.side == .page)
+        ScrollView(.horizontal) {
+            HStack(spacing: 0) {
+                ForEach(sides, id: \.self) { side in
+                    view(of: side)
+                        .containerRelativeFrame(.horizontal)
+                        .frame(maxHeight: .infinity)
+                        .id(side)
+                        .accessibilityHidden(shown != side)
+                }
             }
+            .scrollTargetLayout()
+        }
+        .scrollTargetBehavior(.paging)
+        .scrollPosition(id: $shown)
+        .scrollIndicators(.hidden)
+        .onScrollPhaseChange { _, phase in
+            if phase == .idle, let shown, shown != model.side { model.show(shown) }
+        }
+        .onChange(of: model.side) { _, side in
+            if shown != side { withAnimation(.snappy(duration: 0.28)) { shown = side } }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if let story = model.story { storyBar(story) }
+            if let story = model.story { storyBar(story) } else { closeBar }
         }
         .onDisappear { model.summary?.cancel() }
         .presentationDetents([.large])
@@ -142,64 +163,82 @@ struct ReaderView: View {
         .presentationCornerRadius(28)
     }
 
-    private var article: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                if model.side == .summary, let story = model.story {
-                    summaryBody(story)
-                } else if let page = model.page, !page.isArticle {
-                    Text("Nothing to read here")
-                        .font(.system(.title3, weight: .semibold))
-                        .foregroundStyle(Theme.ink)
-                    Text("Reader Mode works on articles and posts. This page looks like a homepage or a list of links.")
-                        .foregroundStyle(Theme.secondaryInk)
-                } else if let page = model.page {
-                    storyPicture
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(page.title)
-                            .font(.system(.title, weight: .semibold))
-                            .foregroundStyle(Theme.ink)
-                        Text(page.site.isEmpty ? model.host : page.site)
-                            .font(.subheadline)
-                            .foregroundStyle(Theme.secondaryInk)
-                        }
-                    .padding(.bottom, 6)
-
-                    ForEach(Array(model.paragraphs.enumerated()), id: \.offset) { _, paragraph in
-                        Text(paragraph)
-                            .font(.system(size: 19))
-                            .lineSpacing(6)
-                            .foregroundStyle(Theme.ink)
-                            .tint(Theme.ink)
-                            .textSelection(.enabled)
-                    }
-                    .environment(\.openURL, OpenURLAction { url in
-                        browser.openPage(url)
-                        return .handled
-                    })
-                    if let leave = model.story?.unsubscribe {
-                        Button("Unsubscribe") { browser.openPage(leave) }
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(Theme.secondaryInk)
-                            .frame(minHeight: 44)
-                    }
-                } else if let failure = model.failure {
-                    Text(failure).foregroundStyle(Theme.secondaryInk)
-                } else {
-                    if let story = model.story {
-                        storyPicture
-                        Text(story.title)
-                            .font(.system(.title, weight: .semibold))
-                            .foregroundStyle(Theme.ink)
-                    }
-                    StatusLine(text: "Preparing the article")
-                }
+    @ViewBuilder
+    private func view(of side: ReaderModel.Side) -> some View {
+        switch side {
+        case .reader:
+            column { readerBody }
+        case .summary:
+            column { if let story = model.story { summaryBody(story) } }
+        case .page:
+            if model.pageOpened, let story = model.story {
+                ArticlePage(url: story.link, html: story.isMail ? Newsletters.original(of: story.link) : nil, openLink: browser.openPage)
+            } else {
+                column { StatusLine(text: model.story?.isMail == true ? "Opening the email" : "Opening the page") }
             }
-            .frame(maxWidth: 640, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 24)
-            .padding(.top, 30)
-            .padding(.bottom, 60)
+        }
+    }
+
+    /// A side of text: its own scroll, so each keeps its place.
+    private func column(@ViewBuilder _ content: () -> some View) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18, content: content)
+                .frame(maxWidth: 640, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 24)
+                .padding(.top, 30)
+                .padding(.bottom, 60)
+        }
+    }
+
+    @ViewBuilder
+    private var readerBody: some View {
+        if let page = model.page, !page.isArticle {
+            Text("Nothing to read here")
+                .font(.system(.title3, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+            Text("Reader Mode works on articles and posts. This page looks like a homepage or a list of links.")
+                .foregroundStyle(Theme.secondaryInk)
+        } else if let page = model.page {
+            storyPicture
+            VStack(alignment: .leading, spacing: 6) {
+                Text(page.title)
+                    .font(.system(.title, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                Text(page.site.isEmpty ? model.host : page.site)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.secondaryInk)
+                }
+            .padding(.bottom, 6)
+
+            ForEach(Array(model.paragraphs.enumerated()), id: \.offset) { _, paragraph in
+                Text(paragraph)
+                    .font(.system(size: 19))
+                    .lineSpacing(6)
+                    .foregroundStyle(Theme.ink)
+                    .tint(Theme.ink)
+                    .textSelection(.enabled)
+            }
+            .environment(\.openURL, OpenURLAction { url in
+                browser.openPage(url)
+                return .handled
+            })
+            if let leave = model.story?.unsubscribe {
+                Button("Unsubscribe") { browser.openPage(leave) }
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.secondaryInk)
+                    .frame(minHeight: 44)
+            }
+        } else if let failure = model.failure {
+            Text(failure).foregroundStyle(Theme.secondaryInk)
+        } else {
+            if let story = model.story {
+                storyPicture
+                Text(story.title)
+                    .font(.system(.title, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+            }
+            StatusLine(text: "Preparing the article")
         }
     }
 
@@ -245,38 +284,39 @@ struct ReaderView: View {
         switch engine {
         case "Claude": "Written by Claude"
         case "Apple Intelligence": "Written by Apple Intelligence, privately in Apple's cloud"
+        case DigestModel.pickedOnDevice: "The page's own sentences, picked on this iPhone"
+        case DigestModel.pickedInCloud: "The page's own sentences, picked privately in Apple's cloud"
         default: "Written on this iPhone"
         }
     }
 
     // MARK: The bar
 
-    /// Always in reach: the story's three sides, one switch. Beside them, put it
-    /// aside, or take the page into a tab of its own.
+    /// Always in reach: out on the left, as on every screen here; the story's three
+    /// sides, one switch; then put it aside, or take the page into a tab of its own.
     private func storyBar(_ story: NewsStory) -> some View {
         let saved = ReadLater.shared.contains(story.link)
         return HStack(spacing: 0) {
+            barButton(.close, label: "Close", tint: Theme.ink) { browser.reader = nil }
+            Spacer(minLength: 0)
+            HStack(spacing: 2) {
+                ForEach(sides, id: \.self) { side in
+                    switchWord(name(of: side, in: story), isOn: (shown ?? model.side) == side) {
+                        shown = side
+                        model.show(side)
+                    }
+                }
+            }
+            .animation(.snappy(duration: 0.28), value: shown)
+            Spacer(minLength: 0)
             // A newsletter has no address to save or open: its text and its email are here.
             if story.isMail {
-                Color.clear.frame(width: 52, height: Theme.barHeight)
+                Color.clear.frame(width: 44, height: Theme.barHeight)
             } else {
                 barButton(.readLater, label: saved ? "Saved to Read Later" : "Save to Read Later", tint: saved ? Theme.accentText : Theme.ink) {
                     ReadLater.shared.save(story, text: model.page?.text ?? "")
                 }
                 .disabled(saved)
-            }
-            Spacer(minLength: 0)
-            HStack(spacing: 2) {
-                switchWord("Reader", isOn: model.side == .reader) { model.show(.reader) }
-                if model.offersSummary || model.side == .summary {
-                    switchWord("Summary", isOn: model.side == .summary) { model.show(.summary) }
-                }
-                switchWord(story.isMail ? "Email" : "Page", isOn: model.side == .page) { model.show(.page) }
-            }
-            Spacer(minLength: 0)
-            if story.isMail {
-                Color.clear.frame(width: 52, height: Theme.barHeight)
-            } else {
                 barButton(.openLink, label: "Open in a tab", tint: Theme.ink) { browser.openOriginal(of: story) }
             }
         }
@@ -287,8 +327,29 @@ struct ReaderView: View {
         .padding(.bottom, 4)
         .background(Theme.panel)
         .background(alignment: .top) {
-            if model.side != .page { FadeEdge(color: Theme.panel) }
+            if shown != .page { FadeEdge(color: Theme.panel) }
         }
+    }
+
+    private func name(of side: ReaderModel.Side, in story: NewsStory) -> String {
+        switch side {
+        case .reader: "Reader"
+        case .summary: "Summary"
+        case .page: story.isMail ? "Email" : "Page"
+        }
+    }
+
+    /// A page's Reader, with no sides to switch: only the way out.
+    private var closeBar: some View {
+        barButton(.close, label: "Close", tint: Theme.ink) { browser.reader = nil }
+            .frame(width: Theme.barHeight + 8, height: Theme.barHeight + 8)
+            .barSurface(cornerRadius: Theme.barRadius)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Theme.gutter)
+            .padding(.top, 10)
+            .padding(.bottom, 4)
+            .background(Theme.panel)
+            .background(alignment: .top) { FadeEdge(color: Theme.panel) }
     }
 
     private func switchWord(_ title: String, isOn: Bool, action: @escaping () -> Void) -> some View {
@@ -298,7 +359,7 @@ struct ReaderView: View {
             Text(title)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(isOn ? Theme.ink : Theme.secondaryInk)
-                .padding(.horizontal, 13)
+                .padding(.horizontal, 11)
                 .frame(height: 38)
                 .background {
                     if isOn { Capsule().fill(Theme.raised).matchedGeometryEffect(id: "side", in: switchSpace) }
@@ -314,7 +375,7 @@ struct ReaderView: View {
         Button(action: action) {
             Glyph(glyph, size: 18)
                 .foregroundStyle(tint)
-                .frame(width: 52, height: Theme.barHeight)
+                .frame(width: 44, height: Theme.barHeight)
                 .contentShape(.rect)
         }
         .buttonStyle(GlyphButtonStyle())

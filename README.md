@@ -674,6 +674,10 @@ and sites on another country's ending. A filter can still miss one, and suggesti
 two letters of a match. Chrome doesn't rank inside its top 1,000, so the order is the script's: the
 country's own ending, then how big a site is worldwide and how many countries have it.
 
+**What you use comes first.** `HistoryIndex` keeps a `use` for each page: its visits, counted at full weight for four days and down to a
+tenth after three months. The bar's search takes the best-used matches rather than the newest, and points from `use` lift a site or page
+in the ranking. With nothing typed, the bar lists the pages you use most. A reload or a visit within five minutes isn't a new visit.
+
 `TopSites` inflates the phone's two lists the first time the bar is typed in, about 310 addresses, and
 checks them by prefix. These suggestions cost a launch nothing and use no network. They rank under
 the search unless what's typed has a dot, because the bar's first row sets what Return does and

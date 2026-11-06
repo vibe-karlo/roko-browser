@@ -14,6 +14,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - Stories from feeds that give two dates, The Guardian's among them, had no date.
+- In Croatian, Serbian and Bosnian, comparisons and Summary now use the sites' own sentences, picked by the model, rather than an English translation or a rewrite, which had turned "arrested" into "killed". The credit line says so.
+- Headlines and articles no longer show codes like `&scaron;`, and rewrites drop names the sources never gave.
 - Reader no longer starts with a byline, a picture credit or "44 minutes ago".
 
 ### Website
@@ -39,6 +41,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Sites' own anti-adblock walls are beaten before they come up, on about 8,200 sites, with uBlock Origin's site rules (GPL-3.0): a small change to the page before it runs, such as BILD's `"adBlockWallEnabled":true` turned false. Only a site with a rule pays for it. Its ads stay blocked, where before the page went blank and its ads were let through.
 
 ### Changed
+- The bar now lies in a band under the page, on a dim shade of the site's colour, and the page is a rounded card above it. To-do, Shopping, News and Today dock the same way, Split View parts on the same surface, and the loading line grows from the middle of the card's edge.
+- The live row waits as a strip while the bar is up and opens when it folds away; the bar's field says Search, and the tab card always shows the page on screen.
+- The bar puts first what you open most and have opened lately, typing or not. Every match counts, so a page you often open is no longer lost behind newer ones that also match.
 - Muted videos that loop by themselves wait until they're near the screen before they download. Blocking autoplay in WebKit doesn't stop muted video, and CNN's front page used 8 MB or more on them before you scrolled; it now takes about 2 MB.
 
 ### Fixed

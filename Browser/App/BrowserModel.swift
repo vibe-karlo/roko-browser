@@ -60,7 +60,10 @@ final class BrowserModel {
     /// What was said, once + is let go, for the launcher to take as typed.
     var voiceResult: String?
     var isBarCollapsed = false {
-        didSet { if isBarCollapsed { showsLaunchField = false } }
+        didSet {
+            if isBarCollapsed { showsLaunchField = false }
+            if isBarCollapsed != oldValue { bandOpenedOverBar = false }
+        }
     }
     /// Just launched: the bar's capsule stands open as a search field, as Apple
     /// asks of a browser, until the page is scrolled or the bar is opened.
@@ -739,18 +742,30 @@ final class BrowserModel {
     /// Only today's quiet to-dos and not opened: the band stays a thin strip.
     var bandShowsStrip: Bool {
         bandMinimized || (!liveItems.contains(where: \.isLoud) && !todayExpanded)
+            // One full-height thing at a time. The row waits as a
+            // strip while the bar is up and takes its place once it folds away.
+            || (barInBand && !isBarCollapsed && !bandOpenedOverBar)
     }
 
     /// The thin strip opened into the band.
     func expandBand() {
+        if barInBand && !isBarCollapsed { bandOpenedOverBar = true }
         if liveItems.contains(where: \.isLoud) { bandMinimized = false } else { todayExpanded = true }
     }
 
     /// The band pulled down into the strip.
     func collapseBand() {
+        if bandOpenedOverBar {
+            bandOpenedOverBar = false
+            return
+        }
         if liveItems.contains(where: \.isLoud) { bandMinimized = true } else { todayExpanded = false }
     }
 
+    /// The bar lies in the band under the page.
+    var barInBand = false
+    /// The strip opened by hand with the bar up; the next scroll puts it back.
+    var bandOpenedOverBar = false
     /// Which of them the band shows, swiped sideways.
     var livePage = 0
     /// Pulled down: a thin strip, still live; a tap brings the band back.
@@ -1498,6 +1513,13 @@ final class BrowserModel {
         }
     }
 
+    /// What you open most, for a bar with nothing typed. The first moment after launch,
+    /// before the index is built, it's simply the newest.
+    func mostUsedHistory(limit: Int) -> [HistoryIndex.Hit] {
+        guard !PrivacyLock.shared.isLocked else { return [] }
+        return historyIndex.isReady ? historyIndex.mostUsed(limit: limit) : history(matching: "", limit: limit)
+    }
+
     /// On every device: entry by entry, so the removal syncs.
     /// Pages visited since `since` (all of them by default), gone from history.
     func clearHistory(since: Date = .distantPast) {
@@ -1515,6 +1537,13 @@ extension BrowserModel: BrowserTabDelegate {
         // Went to another page while hiding (a swipe back): the mode was for that one.
         if tab.id == selectedID, hidingItems != nil { finishHidingItems() }
         offerApp(for: tab, url: url)
+        // The bar's tab card shows this page, once it has had a moment to paint.
+        if tab.id == selectedID {
+            Task {
+                try? await Task.sleep(for: .seconds(1))
+                await tab.captureSnapshot()
+            }
+        }
         // Private pages leave nothing on disk, icons included.
         guard !tab.isPrivate else { return }
         if let webView = tab.webView {

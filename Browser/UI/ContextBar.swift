@@ -31,7 +31,21 @@ struct ContextBar: View {
     /// The title when the whole one doesn't fit beside the accessory.
     var shortTitle: String? = nil
     @Environment(BrowserModel.self) private var browser
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var capsuleFrame: CGRect = .zero
+
+    /// In a band as the page's bar is, on an upright phone. Sideways
+    /// and on an open Duo, where these screens are columns, it floats.
+    private var docked: Bool { verticalSizeClass != .compact && !browser.uprightFoldOpen }
+
+    @ViewBuilder
+    private var capsule: some View {
+        if docked {
+            Capsule().fill(.white.opacity(0.14))
+        } else {
+            Capsule().fill(Theme.raised)
+        }
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -58,9 +72,9 @@ struct ContextBar: View {
                 .background {
                     if !(morphs && browser.panel == .command) {
                         if let fieldSpace {
-                            Capsule().fill(Theme.raised).matchedGeometryEffect(id: "field", in: fieldSpace)
+                            capsule.matchedGeometryEffect(id: "field", in: fieldSpace)
                         } else {
-                            Capsule().fill(Theme.raised)
+                            capsule
                         }
                     }
                 }
@@ -78,12 +92,10 @@ struct ContextBar: View {
                 place(trailing)
             }
         }
-        .frame(height: Theme.barHeight + 8)
-        .barSurface(cornerRadius: Theme.barRadius)
-        .padding(.horizontal, Theme.gutter)
-        .padding(.bottom, 4)
-        // What scrolls under the bar dissolves above it rather than being sliced by its edge.
-        .background(alignment: .top) { if fades { FadeEdge(color: Theme.canvas, height: 40).offset(y: 12) } }
+        .frame(height: docked ? Theme.barHeight : Theme.barHeight + 8)
+        .modifier(ScreenBarSurface(docked: docked))
+        // What scrolls under the floating bar dissolves above it rather than being sliced by its edge.
+        .background(alignment: .top) { if fades && !docked { FadeEdge(color: Theme.canvas, height: 40).offset(y: 12) } }
     }
 
     /// A round button as the page bar's ⌃ is, or the same space kept empty,
@@ -94,14 +106,45 @@ struct ContextBar: View {
             Button(action: slot.action) {
                 Glyph(slot.glyph, size: 16, weight: 2)
                     .frame(width: 38, height: 38)
-                    .background(Theme.raised, in: .circle)
+                    .background(docked ? AnyShapeStyle(.clear) : AnyShapeStyle(Theme.raised), in: .circle)
                     .frame(width: 64, height: Theme.barHeight)
                     .contentShape(.rect)
+                    // Its ends on the same line as a page's bar.
+                    .padding(.horizontal, docked ? 6 : 0)
             }
             .buttonStyle(GlyphButtonStyle())
             .accessibilityLabel(slot.label)
         } else {
-            Color.clear.frame(width: 64, height: Theme.barHeight)
+            Color.clear.frame(width: docked ? 76 : 64, height: Theme.barHeight)
+        }
+    }
+}
+
+/// The floating bar's surface, or the band: the same place on screen as a page's
+/// bar, down into the home indicator's strip, on the band's graphite.
+private struct ScreenBarSurface: ViewModifier {
+    let docked: Bool
+
+    func body(content: Content) -> some View {
+        if docked {
+            content
+                .foregroundStyle(Theme.ink)
+                .environment(\.colorScheme, .dark)
+                .padding(.top, 5)
+                .background(alignment: .top) {
+                    LinearGradient(colors: [Color(uiColor: UIColor(hex: 0x131211)), Color(uiColor: UIColor(hex: 0x201E1C))],
+                                   startPoint: .top, endPoint: .bottom)
+                        .clipShape(BandFloor())
+                        .padding(.top, -BandFloor.lip)
+                        .ignoresSafeArea(edges: .bottom)
+                        .allowsHitTesting(false)
+                }
+                .padding(.bottom, -20)
+        } else {
+            content
+                .barSurface(cornerRadius: Theme.barRadius)
+                .padding(.horizontal, Theme.gutter)
+                .padding(.bottom, 4)
         }
     }
 }

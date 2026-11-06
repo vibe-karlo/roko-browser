@@ -41,6 +41,7 @@ final class TodayModel {
     /// On opening: the calendar (instant, it's on the phone) and the weather
     /// (one small request) every time; the news when it's half an hour old.
     func appeared() {
+        applyLess()
         events = TodayCalendar.events()
         let stale = refreshedAt.map { Date.now.timeIntervalSince($0) > Self.staleAfter || !Calendar.current.isDateInToday($0) } ?? true
         if stale {
@@ -78,7 +79,9 @@ final class TodayModel {
         if let newWeather { self.weather = newWeather }
 
         // Whole sites compete for Top stories; each followed page keeps its own section.
+        let less = NewsLess.chosen
         let siteStories = TodayNews.recent(sources.filter { !$0.isSection }.flatMap { byID[$0.id] ?? [] })
+            .filter { !NewsLess.hides($0, in: less) && NewsLess.closeness(of: $0.title, to: less) == 0 }
         var picked: [NewsStory] = []
         // Nothing came back (offline, say): what was there stays.
         if !siteStories.isEmpty {
@@ -93,11 +96,11 @@ final class TodayModel {
             let stories = byID[source.id] ?? []
             if stories.isEmpty { return followed.first { $0.id == source.id } }  // keep the last when a read fails
             return FollowedSection(id: source.id, title: source.title, host: source.host,
-                                   stories: TodayNews.varied(TodayNews.recent(stories, hours: 72), count: 4, perSite: 4))
+                                   stories: TodayNews.varied(NewsLess.sunk(TodayNews.recent(stories, hours: 72), in: less), count: 4, perSite: 4))
         }
         let everything = byID.values.flatMap { $0 }
         for topic in topics {
-            let stories = await TodayNews.about(topic, in: everything)
+            let stories = await TodayNews.about(topic, in: NewsLess.sunk(everything, in: less))
             sections.append(FollowedSection(id: "topic:" + topic, title: topic, host: nil, stories: stories))
         }
         followed = sections
@@ -144,6 +147,17 @@ final class TodayModel {
     func weatherPlaceChanged() {
         weather = nil
         Task { await freshenWeather() }
+    }
+
+    /// Asked to see less, here or in News: off the page now, not at the next refresh.
+    func applyLess() {
+        let less = NewsLess.chosen
+        guard !less.isEmpty else { return }
+        // As a refresh would: Top stories leads, and what's like it doesn't lead.
+        top.removeAll { NewsLess.hides($0, in: less) || NewsLess.closeness(of: $0.title, to: less) > 0 }
+        followed = followed.map { section in
+            FollowedSection(id: section.id, title: section.title, host: section.host, stories: NewsLess.sunk(section.stories, in: less))
+        }
     }
 
     /// Sources or topics changed: show the new set's stories.
