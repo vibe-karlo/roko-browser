@@ -775,6 +775,14 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        // Out of sight it sleeps instead, with its history, and loads when it's
+        // selected: iOS has just taken this memory back, and three pages asking
+        // for it again at once could lose the page on screen too.
+        guard webView.window != nil else {
+            hibernation += 1
+            tearDown(webView)
+            return
+        }
         // iOS reclaimed the page's memory; reloading brings it back. Once a
         // minute at most: a page that brings WebKit down every time would
         // otherwise reload forever and drain the battery.
