@@ -40,17 +40,33 @@ struct BottomBar: View {
     private var expanded: some View {
         let layout = upright ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
         return layout {
-            Button { browser.showTabs() } label: {
-                TabThumbnails(tabs: recentTabs, count: browser.tabs.count, quiet: docked)
+            // On a page opened from Saved, back: through the tab's pages, then to the list.
+            // Swipe up still has the tabs.
+            Button {
+                if let fromSaved {
+                    if fromSaved.canGoBack { fromSaved.webView?.goBack() } else { browser.returnToSaved(from: fromSaved) }
+                } else {
+                    browser.showTabs()
+                }
+            } label: {
+                Group {
+                    if fromSaved != nil {
+                        Glyph(.back, size: docked ? 20 : 18, weight: 2)
+                            // Its ink as far from the edge as the chevron's on the right.
+                            .padding(.leading, docked ? -6 : 0)
+                    } else {
+                        TabThumbnails(tabs: recentTabs, count: browser.tabs.count, quiet: docked)
+                    }
+                }
                     // Docked, the two ends sit the same visible distance from the edges,
                     // whatever their widths: the fan's ink is 32 wide, the chevron's 16.
-                    .frame(width: docked ? 32 : nil)
+                    .frame(width: docked ? 32 : nil, alignment: .leading)
                     .padding(.leading, docked ? Self.dockedInset : 0)
                     .frame(width: upright ? 56 : docked ? 72 : 64, height: upright ? 64 : Theme.barHeight, alignment: docked ? .leading : .center)
                     .contentShape(.rect)
             }
             .buttonStyle(GlyphButtonStyle())
-            .accessibilityLabel("Tabs, \(browser.tabs.count) open")
+            .accessibilityLabel(fromSaved.map { $0.canGoBack ? "Back" : "Back to Saved" } ?? "Tabs, \(browser.tabs.count) open")
             // Hold: close them all, with Undo in the switcher that opens.
             .contextMenu {
                 let closing = browser.tabsToCloseAll.count
@@ -191,6 +207,7 @@ struct BottomBar: View {
 
     static let dockedInset: CGFloat = 30
 
+
     @State private var pressedAt: Date?
     @GestureState private var touching = false
     @State private var holdTask: Task<Void, Never>?
@@ -251,6 +268,9 @@ struct BottomBar: View {
     }
 
     private var isPrivate: Bool { browser.selectedTab?.isPrivate == true }
+
+    /// The tab on screen, when it was opened from Saved.
+    private var fromSaved: BrowserTab? { browser.selectedTab.flatMap { $0.savedPlace == nil ? nil : $0 } }
 
     private var launchField: Bool { browser.showsLaunchField && browser.selectedTab != nil }
 

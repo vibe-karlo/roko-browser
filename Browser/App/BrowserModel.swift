@@ -170,6 +170,8 @@ final class BrowserModel {
     /// The saved page open beside the list. It keeps its place there until
     /// another is opened or the list closes, and only then counts as read.
     private(set) var savedBeside: UUID?
+    /// Where Saved was left, for the list to take up as it opens.
+    var savedPlaceToRestore: SavedPlace?
     /// One of roko's own screens has the leading half of an open Duo, the page the trailing one.
     var screenBeside: Bool {
         uprightFoldOpen && selectedTab != nil && split == nil
@@ -212,7 +214,14 @@ final class BrowserModel {
         func contains(_ id: BrowserTab.ID?) -> Bool { id == top || id == bottom }
     }
 
-    private(set) var split: Split?
+    private(set) var split: Split? {
+        // Two pages side by side: back no longer leaves one for the list.
+        didSet {
+            guard let split else { return }
+            tab(split.top)?.savedPlace = nil
+            tab(split.bottom)?.savedPlace = nil
+        }
+    }
 
     /// The tab whose page meets the status bar: the top half of a split.
     var topTab: BrowserTab? { split.flatMap { tab($0.top) } ?? selectedTab }
@@ -1264,7 +1273,7 @@ final class BrowserModel {
     }
 
     /// A saved page, in a new tab: it counts as read.
-    func openSaved(_ page: ReadLaterPage) {
+    func openSaved(_ page: ReadLaterPage, searching: String = "") {
         if readLaterBeside, uprightFoldOpen {
             finishSavedBeside()
             savedBeside = page.id
@@ -1276,6 +1285,18 @@ final class BrowserModel {
         digest = nil
         panel = .none
         open(page.url, inNewTab: true)
+        selectedTab?.savedPlace = SavedPlace(page: page.id, query: searching)
+    }
+
+    /// Back to the list, where it was left. The tab has done its job, and stays among
+    /// the closed tabs; it goes once the list covers it, so no other page shows meanwhile.
+    func returnToSaved(from tab: BrowserTab) {
+        savedPlaceToRestore = tab.savedPlace
+        withAnimation(.snappy(duration: 0.32)) { panel = .readLater }
+        Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            close(tab)
+        }
     }
 
     // MARK: Feed

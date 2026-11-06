@@ -14,6 +14,8 @@ struct WebViewHost: UIViewRepresentable {
     var onScrollDirection: (_ down: Bool) -> Void
     /// A page pinched in, as if to step back from it: the tab switcher.
     var onPinchTabs: () -> Void = {}
+    /// Swiped back on the first page of a tab opened from Saved.
+    var onBackToSaved: () -> Void = {}
     /// Any touch on a page, with the page touched (Split View: its half
     /// becomes the one in use).
     var onTouch: (WKWebView) -> Void = { _ in }
@@ -346,7 +348,7 @@ struct WebViewHost: UIViewRepresentable {
                 swipeArmed = false
                 swipeArrow.begin(back: back, at: pan.location(in: container).y, in: container.bounds)
             case .changed:
-                let possible = back ? webView.canGoBack : webView.canGoForward
+                let possible = back ? canGoBack(webView) : webView.canGoForward
                 swipeArrow.follow(abs(dx) / swipeDistance, back: back, possible: possible)
                 let armed = possible && abs(dx) >= swipeDistance
                 if armed != swipeArmed {
@@ -355,17 +357,27 @@ struct WebViewHost: UIViewRepresentable {
                 }
             case .ended:
                 let fast = abs(pan.velocity(in: webView).x) > 900 && abs(dx) > 50
-                let possible = back ? webView.canGoBack : webView.canGoForward
+                let possible = back ? canGoBack(webView) : webView.canGoForward
                 swipeArrow.end(went: possible && (swipeArmed || fast))
                 guard possible, swipeArmed || fast else { return }
                 // Only if the swipe didn't start on something that scrolls sideways itself.
                 Task { [weak webView] in
                     guard let webView, await PageWatch.call(webView, "ownsSideways") as? Bool != true else { return }
-                    if back { webView.goBack() } else { webView.goForward() }
+                    if !back {
+                        webView.goForward()
+                    } else if webView.canGoBack {
+                        webView.goBack()
+                    } else {
+                        parent.onBackToSaved()
+                    }
                 }
             default:
                 swipeArrow.end(went: false)
             }
+        }
+
+        private func canGoBack(_ webView: WKWebView) -> Bool {
+            webView.canGoBack || parent.tab.savedPlace != nil
         }
 
         @objc private func touched(_ touch: UITapGestureRecognizer) {

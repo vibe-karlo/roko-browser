@@ -1107,6 +1107,7 @@ private struct PagePane: View {
                     if browser.isBarCollapsed != down { browser.isBarCollapsed = down }
                 },
                 onPinchTabs: { browser.showTabs(fresh: false) },
+                onBackToSaved: { browser.returnToSaved(from: tab) },
                 onTouch: { webView in
                     guard let touched = browser.tabs.first(where: { $0.webView === webView }),
                           browser.split?.contains(touched.id) == true, browser.selectedID != touched.id else { return }

@@ -45,6 +45,8 @@ final class BrowserTab: NSObject, Identifiable {
     private(set) var wantsDesktopSite = false
     /// The tab whose page opened this one as a window: back there when it closes.
     @ObservationIgnored var opener: BrowserTab.ID?
+    /// Opened from Saved: the bar offers the way back, and back goes there past the tab's first page.
+    var savedPlace: SavedPlace?
     /// The language this tab's pages are translated into, if any. Stays on for
     /// the pages you open next in the tab, until you show the original.
     private(set) var translation: TranslationTarget?

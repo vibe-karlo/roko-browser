@@ -72,8 +72,15 @@ struct ToolsSheet: View {
 
     private func addressRow(_ tab: BrowserTab) -> some View {
         HStack(spacing: 0) {
-            iconButton(.back, "Back") { tab.webView?.goBack(); browser.panel = .none }
-                .disabled(!tab.canGoBack)
+            iconButton(.back, "Back") {
+                if tab.canGoBack {
+                    tab.webView?.goBack()
+                    browser.panel = .none
+                } else {
+                    browser.returnToSaved(from: tab)
+                }
+            }
+            .disabled(!tab.canGoBack && tab.savedPlace == nil)
             iconButton(.forward, "Forward") { tab.webView?.goForward(); browser.panel = .none }
                 .disabled(!tab.canGoForward)
 

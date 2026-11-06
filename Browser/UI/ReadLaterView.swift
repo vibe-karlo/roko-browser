@@ -7,8 +7,8 @@ import SwiftUI
 /// makes a shelf that swipes sideways, so one full group can't bury the others.
 /// Search looks through all of it. Tap a page to read it (it counts as read);
 /// touch and hold to remove it or mark it read or not, or outside a shelf, swipe.
-/// The bar's middle writes one summary across everything unread. Pull down past
-/// the top to close.
+/// The bar's middle searches; its right writes one summary across everything unread.
+/// Pull down past the top to close.
 struct ReadLaterView: View {
     @Environment(BrowserModel.self) private var browser
     private var store: ReadLater { .shared }
@@ -18,6 +18,8 @@ struct ReadLaterView: View {
     @Namespace private var switchSpace
     /// Left at the top by the reader, not by the list moving under them.
     @State private var isAtTop = true
+    /// The page just come back from, for its shelf to show it.
+    @State private var returningTo: UUID?
     @State private var isSearching = false
     @State private var query = ""
     /// What the search found, and what for: nothing found isn't said until it has looked.
@@ -38,7 +40,8 @@ struct ReadLaterView: View {
 
     var body: some View {
         ScrollViewReader { scroller in
-            list
+            list(scroller)
+                .onAppear { takeUpWhereLeft(scroller) }
                 // A list keeps the rows on screen in place as others move, so pages being
                 // sorted, or the other grouping, would carry someone at the top down the page.
                 .onChange(of: sections.map { "\($0.id) \($0.pages.count)" }) {
@@ -47,7 +50,26 @@ struct ReadLaterView: View {
         }
     }
 
-    private var list: some View {
+    /// Back from a page opened here: the search it was found by, or its group, and on
+    /// a shelf the column it's in (it may have moved along, now that it's read).
+    private func takeUpWhereLeft(_ scroller: ScrollViewProxy) {
+        guard let place = browser.savedPlaceToRestore else { return }
+        browser.savedPlaceToRestore = nil
+        if !place.query.isEmpty {
+            isSearching = true
+            query = place.query
+        }
+        guard place.query.isEmpty, let section = sections.first(where: { $0.pages.contains { $0.id == place.page } }) else { return }
+        isAtTop = false
+        returningTo = place.page
+        scroller.scrollTo(section.id, anchor: .top)
+        Task {
+            try? await Task.sleep(for: .seconds(1))
+            returningTo = nil
+        }
+    }
+
+    private func list(_ scroller: ScrollViewProxy) -> some View {
         List {
             header
                 .id("top")
@@ -58,7 +80,7 @@ struct ReadLaterView: View {
                     .foregroundStyle(Theme.secondaryInk)
                     .plainRow(top: 30, bottom: 0)
             }
-            if store.pages.count >= 2 {
+            if store.pages.count >= 2 || isSearching {
                 tools.plainRow(top: 0, bottom: 18)
             }
             if isSearching, !words.isEmpty {
@@ -67,7 +89,7 @@ struct ReadLaterView: View {
                 // One page is nothing to gather.
                 if store.pages.count >= 2 {
                     ForEach(sections) { section in
-                        heading(section).plainRow(top: 8, bottom: 12)
+                        heading(section).id(section.id).plainRow(top: 8, bottom: 12)
                         rows(section.pages)
                     }
                 } else {
@@ -83,8 +105,10 @@ struct ReadLaterView: View {
             // Above the keyboard it would only sit on the results.
             if !isTyping {
                 ContextBar(leading: .init(glyph: .close, label: "Close", action: close),
-                           glyph: .summarize, title: "Summarize all",
-                           launch: summarize, morphs: false)
+                           glyph: .search, title: "Search",
+                           launch: { search(scroller) },
+                           trailing: unread.isEmpty ? nil : .init(glyph: .summarize, label: "Summarize all", action: summarize),
+                           morphs: false)
             }
         }
         .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas) }
@@ -146,7 +170,7 @@ struct ReadLaterView: View {
 
     // MARK: Gathering
 
-    /// Topic or date and the way into search, or the search itself in their place.
+    /// Topic or date, or the search in their place.
     private var tools: some View {
         HStack(spacing: 8) {
             if isSearching {
@@ -158,7 +182,8 @@ struct ReadLaterView: View {
                         .submitLabel(.search)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
-                        .onAppear { isTyping = true }
+                        // Not for a search come back to: its results are what's wanted.
+                        .onAppear { isTyping = query.isEmpty }
                 }
                 .padding(.horizontal, 14)
                 .frame(height: 38)
@@ -179,17 +204,6 @@ struct ReadLaterView: View {
             } else {
                 groupingSwitch
                 Spacer(minLength: 0)
-                Button {
-                    withAnimation(.snappy(duration: 0.28)) { isSearching = true }
-                } label: {
-                    Glyph(.search, size: 18)
-                        .foregroundStyle(Theme.secondaryInk)
-                        // Its edge on the margin the headings' Summarize keeps to.
-                        .frame(width: 44, height: 44, alignment: .trailing)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(GlyphButtonStyle())
-                .accessibilityLabel("Search saved pages")
             }
         }
     }
@@ -247,21 +261,27 @@ struct ReadLaterView: View {
         let columns = stride(from: 0, to: pages.count, by: Self.columnLength).map {
             Array(pages[$0..<min($0 + Self.columnLength, pages.count)])
         }
-        return ScrollView(.horizontal) {
-            LazyHStack(alignment: .top, spacing: 18) {
-                ForEach(columns.indices, id: \.self) { index in
-                    VStack(alignment: .leading, spacing: 18) {
-                        ForEach(columns[index]) { page in row(page) }
+        return ScrollViewReader { shelf in
+            ScrollView(.horizontal) {
+                LazyHStack(alignment: .top, spacing: 18) {
+                    ForEach(columns.indices, id: \.self) { index in
+                        VStack(alignment: .leading, spacing: 18) {
+                            ForEach(columns[index]) { page in row(page) }
+                        }
+                        .containerRelativeFrame(.horizontal) { width, _ in width - 62 }
                     }
-                    .containerRelativeFrame(.horizontal) { width, _ in width - 62 }
                 }
+                .scrollTargetLayout()
             }
-            .scrollTargetLayout()
+            .contentMargins(.horizontal, 22, for: .scrollContent)
+            .scrollTargetBehavior(.viewAligned)
+            .scrollIndicators(.hidden)
+            .scrollClipDisabled()
+            .onAppear {
+                guard let returningTo, let column = columns.firstIndex(where: { $0.contains { $0.id == returningTo } }) else { return }
+                shelf.scrollTo(column, anchor: .leading)
+            }
         }
-        .contentMargins(.horizontal, 22, for: .scrollContent)
-        .scrollTargetBehavior(.viewAligned)
-        .scrollIndicators(.hidden)
-        .scrollClipDisabled()
     }
 
     /// Its name, how many, and a summary of those pages alone.
@@ -334,7 +354,7 @@ struct ReadLaterView: View {
             }
         }
         primaryAction: {
-            withAnimation(.snappy(duration: 0.32)) { browser.openSaved(page) }
+            withAnimation(.snappy(duration: 0.32)) { browser.openSaved(page, searching: isSearching ? words : "") }
         }
         .menuOrder(.fixed)
         .buttonStyle(RowButtonStyle())
@@ -358,11 +378,21 @@ struct ReadLaterView: View {
     }
 
     private func summarize() {
-        guard !unread.isEmpty else {
-            browser.showToast(store.pages.isEmpty ? "Save a page first" : "Everything here is read")
+        browser.summarizeSaved()
+    }
+
+    /// The field at the top of the list, wherever the list was left.
+    private func search(_ scroller: ScrollViewProxy) {
+        guard !store.pages.isEmpty else {
+            browser.showToast("Save a page first")
             return
         }
-        browser.summarizeSaved()
+        // A field that's on its way takes the keys as it appears; asked now, it never gets them.
+        if isSearching { isTyping = true }
+        withAnimation(.snappy(duration: 0.28)) {
+            isSearching = true
+            scroller.scrollTo("top", anchor: .top)
+        }
     }
 
     private func close() {
@@ -422,4 +452,10 @@ extension View {
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
     }
+}
+
+/// Where a page was opened from in Saved, to go back to.
+struct SavedPlace {
+    let page: UUID
+    let query: String
 }

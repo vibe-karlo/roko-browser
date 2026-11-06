@@ -29,7 +29,8 @@ models fall short.
 **Read later.** Save a page from its tools or by typing "save for later", or from the Mac. Its
 text is kept, so it can be summarized offline. Pages on one subject are gathered under its name,
 with a summary of just them a tap away; Summarize all does every unread page at once. Each point
-is marked with the page it comes from.
+is marked with the page it comes from. A page opened from the list has a back arrow in the bar, which ends
+at the group or search you left.
 
 **Clean pages.** Ads, trackers and cookie banners are gone before the page draws: consent pop-ups
 are answered with "reject", and subscription walls that freeze scrolling get it back. What's left
