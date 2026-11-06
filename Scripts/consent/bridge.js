@@ -44,6 +44,19 @@ const COOKIE_WORDS = /cookie|kolačić|kolacic|kolačiće|keks|galleta|biscott/i
 const SAY_NO = /\b(reject|refuse|decline|deny)\b|rifiut|rechaz|ablehn|refus|rejeit|recus|odbij|weiger|odrzu|odmít/i;
 const payToRejectLabel = (words) => (SAY_NO.test(words) && WALL_PAY.test(words)) || /\bpay to (reject|refuse|decline)\b/i.test(words);
 const shown = (el) => typeof el.checkVisibility !== 'function' || el.checkVisibility({ checkVisibilityCSS: true });
+// Some walls ask twice (Il Messaggero: "press again to continue, 1/2"): while the same
+// yes is still there, it's pressed again, a few times at most.
+const pressUntilGone = (find, button) => {
+    button.click();
+    let presses = 1;
+    const again = () => {
+        const next = find();
+        if (!next || presses++ >= 4) return;
+        next.click();
+        setTimeout(again, 700);
+    };
+    setTimeout(again, 700);
+};
 const buttonsOnPage = () => [...document.querySelectorAll('button, a, [role="button"], input[type="button"]')]
     .filter((b) => label(b).length <= 60 && shown(b));
 const payToReject = () => buttonsOnPage().some((b) => payToRejectLabel(label(b)));
@@ -168,7 +181,7 @@ export function start(AutoConsent, filterCompactRules, compactRules) {
             if (reply.type === 'optOut') reply = await post({ type: 'rokoWall', cmp: message.cmp });
             const button = acceptBeside();
             if (button) {
-                button.click();
+                pressUntilGone(acceptBeside, button);
                 accepted = true;
                 countSaved(1);
                 return;
@@ -270,7 +283,7 @@ export function start(AutoConsent, filterCompactRules, compactRules) {
                 if (!button) return;
                 accepted = true;
                 await post({ type: 'rokoWall', cmp: 'roko-paid-wall' });
-                button.click();
+                pressUntilGone(() => paidWall(mainFrame), button);
                 countSaved(1);
             }, delay);
         }
