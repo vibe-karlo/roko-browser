@@ -10,6 +10,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Follow in News from any page's tools, or "follow" in the bar: the section you're on or the whole site. Sites without a feed are followed from their sitemap, their page's data or their page.
 - Newsletters in News: by their feed, or a private address to subscribe with or forward to.
 - Links work in Reader, written-out addresses and linked words alike, in newsletters and articles. They open in a tab.
+- Don't show a site: hold a story in News or Today for "Don't Show" and its site, or for an event, which of its sites. Nothing from it shows again, whatever brought it, and it's no longer followed. The News sources sheet lists them to take back, and following the site again does too.
 - Words to keep out of News, whichever site a story is from. Topics also look across the web through Bing.
 - A page opened from Saved has a way back: an arrow in the bar, in the tabs button's place, that goes back through the tab's pages and then to Saved. Swipe up on the bar still has the tabs. The list opens at the group or search you left, and the page's tab closes.
 - Saved's bar now searches the list, since it holds what you keep as well as what you mean to read. Summarize all moved to the button on its right, and shows while there's something unread.

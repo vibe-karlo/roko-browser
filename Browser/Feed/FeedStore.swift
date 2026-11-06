@@ -280,6 +280,7 @@ final class FeedStore {
         let reading = recent.map { ($0.story, Self.textFile(for: $0.id)) }
         let terms = NewsBlocks.chosen
         let less = NewsLess.chosen
+        let hidden = NewsHiddenSites.chosen
         let hosts = Set(NewsSite.chosen.map(\.host))
         let topics = NewsTopics.chosen
         // Off the main thread: with words to block, it reads each story's kept text.
@@ -288,6 +289,7 @@ final class FeedStore {
             var lowered = Set<URL>()
             let blocked = Set(reading.filter { story, file in
                 if story.isMail { return false }
+                if NewsHiddenSites.hides(story.host, in: hidden) { return true }
                 // What a topic or site brought goes when it does.
                 if !hosts.contains(story.host), !topics.contains(where: { TodayNews.names($0, story) }) { return true }
                 if lessLinks.contains(story.link) { return true }
@@ -413,6 +415,17 @@ final class FeedStore {
         NewsLess.chosen.insert(NewsLess.entry(for: shown, among: recent.map(\.story.title)), at: 0)
         await regroup()
         rebuild()
+    }
+
+    /// Nothing more from this site, here or in Today: off the page now, and no longer followed.
+    func dontShow(host: String) async {
+        NewsHiddenSites.chosen.insert(host, at: 0)
+        let hidden = [host]
+        let followed = NewsSite.chosen.contains { NewsHiddenSites.hides($0.host, in: hidden) }
+        if followed { NewsSite.chosen.removeAll { NewsHiddenSites.hides($0.host, in: hidden) } }
+        await regroup()
+        rebuild()
+        if followed { TodayModel.shared.sitesChanged() } else { TodayModel.shared.applyLess() }
     }
 
     private func setRead(_ links: [URL], at date: Date?) {

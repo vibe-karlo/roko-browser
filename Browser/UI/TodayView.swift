@@ -371,6 +371,12 @@ struct TodayView: View {
                     browser.showToast("Showing less like this")
                 }
             }
+            Button("Don't Show \(story.host)") {
+                Task {
+                    await FeedStore.shared.dontShow(host: story.host)
+                    browser.showToast("News won't show \(story.host)")
+                }
+            }
         }
         .padding(.bottom, 6)
     }
@@ -539,6 +545,7 @@ struct NewsSitesSheet: View {
     @State private var blocks = NewsBlocks.chosen
     @State private var block = ""
     @State private var less = NewsLess.chosen
+    @State private var hiddenSites = NewsHiddenSites.chosen
     @State private var address = ""
     @State private var topic = ""
     @State private var finding = false
@@ -625,6 +632,22 @@ struct NewsSitesSheet: View {
                         Text("Stories like these sink or leave News for two months. Swipe to remove one.")
                     }
                 }
+
+                if !hiddenSites.isEmpty {
+                    Section {
+                        ForEach(hiddenSites, id: \.self) { host in
+                            HStack(spacing: 12) {
+                                SiteIcon(host: host, size: 20, remote: true)
+                                Text(host)
+                            }
+                        }
+                        .onDelete { hiddenSites.remove(atOffsets: $0) }
+                    } header: {
+                        Text("Not shown")
+                    } footer: {
+                        Text("Nothing from these sites shows in News or Today, whatever it's about. Swipe to remove one.")
+                    }
+                }
             }
             .scrollContentBackground(.hidden)
             .background(Theme.panel)
@@ -636,7 +659,9 @@ struct NewsSitesSheet: View {
                         // Typed and not added yet: what was typed was meant.
                         addTopic()
                         addBlock()
-                        if chosen != NewsSite.chosen || topics != NewsTopics.chosen || blocks != NewsBlocks.chosen || less != NewsLess.chosen {
+                        if chosen != NewsSite.chosen || topics != NewsTopics.chosen || blocks != NewsBlocks.chosen || less != NewsLess.chosen || hiddenSites != NewsHiddenSites.chosen {
+                            // Before the sites: one followed here comes off this list.
+                            NewsHiddenSites.chosen = hiddenSites
                             NewsSite.chosen = chosen
                             NewsTopics.chosen = topics
                             NewsBlocks.chosen = blocks

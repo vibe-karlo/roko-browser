@@ -265,6 +265,24 @@ struct FeedView: View {
                     browser.showToast("Showing less like this")
                 }
             }
+            // One site, or for an event, which of them.
+            let hosts = Array(Set(item.stories.map(\.story.host))).sorted()
+            if hosts.count == 1 {
+                Button("Don't Show \(hosts[0])") { dontShow(hosts[0]) }
+            } else {
+                Menu("Don't Show a Site") {
+                    ForEach(hosts, id: \.self) { host in
+                        Button(host) { dontShow(host) }
+                    }
+                }
+            }
+        }
+    }
+
+    private func dontShow(_ host: String) {
+        Task {
+            await store.dontShow(host: host)
+            browser.showToast("News won't show \(host)")
         }
     }
 

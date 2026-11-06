@@ -54,7 +54,29 @@ nonisolated struct NewsSite: Codable, Equatable, Hashable, Identifiable, Sendabl
 
     static var chosen: [NewsSite] {
         get { UserDefaults.standard.data(forKey: key).flatMap { try? JSONDecoder().decode([NewsSite].self, from: $0) } ?? [] }
-        set { UserDefaults.standard.set(try? JSONEncoder().encode(newValue), forKey: key) }
+        set {
+            UserDefaults.standard.set(try? JSONEncoder().encode(newValue), forKey: key)
+            // Followed again: wanted again.
+            let hidden = NewsHiddenSites.chosen
+            let kept = hidden.filter { host in !newValue.contains { $0.host == host } }
+            if kept != hidden { NewsHiddenSites.chosen = kept }
+        }
+    }
+}
+
+/// Sites not to show at all, asked for on one of their stories: gone from News and
+/// Today, whatever brought them there, until taken off the list or followed again.
+nonisolated enum NewsHiddenSites {
+    static let key = "feed.hiddenSites"
+
+    static var chosen: [String] {
+        get { UserDefaults.standard.stringArray(forKey: key) ?? [] }
+        set { UserDefaults.standard.set(newValue, forKey: key) }
+    }
+
+    /// The site itself or any part of it: hiding bbc.com hides sport.bbc.com too.
+    static func hides(_ host: String, in hidden: [String]) -> Bool {
+        hidden.contains { host == $0 || host.hasSuffix("." + $0) }
     }
 }
 

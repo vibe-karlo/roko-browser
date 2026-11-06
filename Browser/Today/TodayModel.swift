@@ -75,7 +75,9 @@ final class TodayModel {
         let pool = topics.isEmpty ? [] : TodayNews.topicPool.filter { extra in !sources.contains { $0.id == extra.id } }
         async let weather = freshWeather(inBackground: inBackground)
         async let read = TodayNews.stories(of: sources + pool)
-        let (newWeather, byID) = await (weather, read)
+        let (newWeather, fresh) = await (weather, read)
+        let hidden = NewsHiddenSites.chosen
+        let byID = fresh.mapValues { $0.filter { !NewsHiddenSites.hides($0.host, in: hidden) } }
         if let newWeather { self.weather = newWeather }
 
         // Whole sites compete for Top stories; each followed page keeps its own section.
@@ -151,6 +153,14 @@ final class TodayModel {
 
     /// Asked to see less, here or in News: off the page now, not at the next refresh.
     func applyLess() {
+        let hidden = NewsHiddenSites.chosen
+        if !hidden.isEmpty {
+            top.removeAll { NewsHiddenSites.hides($0.host, in: hidden) }
+            followed = followed.map { section in
+                FollowedSection(id: section.id, title: section.title, host: section.host,
+                                stories: section.stories.filter { !NewsHiddenSites.hides($0.host, in: hidden) })
+            }
+        }
         let less = NewsLess.chosen
         guard !less.isEmpty else { return }
         // As a refresh would: Top stories leads, and what's like it doesn't lead.
