@@ -18,8 +18,8 @@ struct SummaryView: View {
     /// The title and summary show only once the card has come to rest.
     @State private var textShown = false
     /// No canvas under the footer or the status bar while the light is up and
-    /// on through its flood. Set here, so it never flickers solid for the frame
-    /// between the light going and the flood starting.
+    /// on through its sweep. Set here, so it never flickers solid for the frame
+    /// between the light going and the sweep starting.
     @State private var edgesClear = false
     /// How far down the summary the reader is, for the line above the bar.
     @State private var readProgress = 0.0
@@ -47,7 +47,7 @@ struct SummaryView: View {
                     .ignoresSafeArea()
 
                 // roko's light while it works: there as the card flies in, rising as
-                // the page is read, flooding the screen as the summary starts.
+                // the page is read, carrying off the top as the summary starts.
                 if appeared {
                     WorkingGlow(progress: model.progress, isActive: showsLight,
                                 finished: !model.isWorking && !model.isClosing && !model.phase.isFailure)
@@ -95,8 +95,8 @@ struct SummaryView: View {
                 withAnimation(.easeInOut(duration: 0.9)) { edgesClear = true }
                 return
             }
-            let flooded = !model.isClosing && !model.phase.isFailure
-            DispatchQueue.main.asyncAfter(deadline: .now() + (flooded ? WorkingGlow.floodDuration : 0)) {
+            let swept = !model.isClosing && !model.phase.isFailure
+            DispatchQueue.main.asyncAfter(deadline: .now() + (swept ? WorkingGlow.sweepDuration : 0)) {
                 guard !showsLight else { return }
                 withAnimation(.easeInOut(duration: 0.9)) { edgesClear = false }
             }
@@ -193,7 +193,7 @@ struct SummaryView: View {
             .padding(.top, 10)
             .overlay(alignment: .top) { ReadingLine(progress: readProgress, tint: PageKind.of(model.text).tint) }
             // See-through while the light is up, so its brightest part shows.
-            // At the light's own pace, so no dark band crosses it as it sinks or floods.
+            // At the light's own pace, so no dark band crosses it as it sinks or sweeps.
             .background(Theme.canvas.opacity(edgesClear ? 0 : 1))
             .background(alignment: .top) { FadeEdge(color: Theme.canvas).opacity(edgesClear ? 0 : 1) }
     }

@@ -9,7 +9,7 @@ struct DigestView: View {
     let model: DigestModel
     @State private var readProgress = 0.0
     /// No canvas under the footer or the status bar while the light is up and
-    /// on through its flood (as in Browse for Me).
+    /// on through its sweep (as in Browse for Me).
     @State private var edgesClear = true
 
     var body: some View {
@@ -80,7 +80,7 @@ struct DigestView: View {
                 withAnimation(.easeInOut(duration: 0.9)) { edgesClear = true }
                 return
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + (model.phase.isFailure ? 0 : WorkingGlow.floodDuration)) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + (model.phase.isFailure ? 0 : WorkingGlow.sweepDuration)) {
                 guard !model.isWorking else { return }
                 withAnimation(.easeInOut(duration: 0.9)) { edgesClear = false }
             }

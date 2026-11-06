@@ -19,9 +19,9 @@ struct BrowseForMeView: View {
     /// How far down the answers the reader is, for the line above the bar.
     @State private var readProgress = 0.0
     /// No canvas under the footer or the status bar: while the light is up,
-    /// and on through its flood when an answer arrives. Set here, not worked
+    /// and on through its sweep when an answer arrives. Set here, not worked
     /// out from the answer's state, so it never flickers solid for the frame
-    /// between the work ending and the flood starting.
+    /// between the work ending and the sweep starting.
     @State private var edgesClear = true
 
     private var latest: BrowseForMeModel { session.latest }
@@ -51,9 +51,9 @@ struct BrowseForMeView: View {
                 withAnimation(.easeInOut(duration: 0.9)) { edgesClear = true }
                 return
             }
-            // A flood first, when the answer arrived; otherwise at the light's own pace.
-            let flooded = !session.showsSearch && !latest.phase.isFailure
-            DispatchQueue.main.asyncAfter(deadline: .now() + (flooded ? WorkingGlow.floodDuration : 0)) {
+            // A sweep first, when the answer arrived; otherwise at the light's own pace.
+            let swept = !session.showsSearch && !latest.phase.isFailure
+            DispatchQueue.main.asyncAfter(deadline: .now() + (swept ? WorkingGlow.sweepDuration : 0)) {
                 guard !latest.isWorking else { return }
                 withAnimation(.easeInOut(duration: 0.9)) { edgesClear = false }
             }
