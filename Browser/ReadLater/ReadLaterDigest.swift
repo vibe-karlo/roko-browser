@@ -317,7 +317,7 @@ final class DigestModel: Identifiable {
             for (index, page) in readable {
                 try Task.checkCancellation()
                 if page.text.count > perPage { shortened = true }
-                let session = LanguageModelSession(model: model, instructions: Self.condensing)
+                let session = LanguageModelSession(model: model, instructions: Self.condensing(language))
                 let points = try await session.respond(to: "Title: \(page.title)\nSite: \(page.site)\n\n\(page.text.prefix(perPage))",
                                                        generating: PageNotes.self).content.points
                 notes.append((index + 1, points.map { "- \($0)" }.joined(separator: "\n")))
@@ -333,9 +333,11 @@ final class DigestModel: Identifiable {
             // ("May contain sensitive content") even for an interest rate rise.
             let session = LanguageModelSession(model: model, instructions: Self.appleComparing(language))
             var written = ""
-            for try await snapshot in session.streamResponse(to: prompt) {
+            // Said last too: told only at the start, it followed the articles' language about half the time.
+            let reminder = language.map { "\n\n\($0.instruction) Whatever language the articles are in." } ?? ""
+            for try await snapshot in session.streamResponse(to: prompt + reminder) {
                 written = snapshot.content
-                text = Self.namingSites(headings.markdown(fromLines: written), from: pages)
+                text = Self.namingSites(headings.markdown(fromLines: written, sites: pages.map(\.site)), from: pages)
             }
             AITrace.log("compare wrote: \(written)")
             return
@@ -381,10 +383,12 @@ final class DigestModel: Identifiable {
         return prompt
     }
 
-    private static let condensing = """
-        You read a saved web page for someone who will read a summary of several pages at once. \
-        Only facts from the page. Write in the page's own language.
+    private static func condensing(_ language: WritingLanguage?) -> String {
         """
+        You read a saved web page for someone who will read a summary of several pages at once. \
+        Only facts from the page. \(language?.instruction ?? "Write in the page's own language.")
+        """
+    }
 
     private static func appleInstructions(_ language: WritingLanguage?) -> String {
         """
@@ -423,44 +427,45 @@ final class DigestModel: Identifiable {
 
     private static func appleComparing(_ language: WritingLanguage?) -> String {
         """
-        You compare how several news sites report one event, for a phone. \(language?.instruction ?? "Write in the language of the articles.") \
-        Only what the articles say, each thing once. Never guess why a site wrote something. Answer in lines \
-        of exactly this form, the numbers in brackets being the articles it comes from:
+        You tell someone what several news articles about one event say, for a phone. \(language?.instruction ?? "Write in the language of the articles.") \
+        Write one account of the event from all the articles together, never one per article. Write about the event and its details, not about the articles or how they compare. Only what the articles say, each thing \
+        once. Never guess why a site wrote something. Answer in lines of exactly this form, the numbers in brackets being the \
+        articles it comes from:
 
         GIST: what happened, in one or two plain sentences
-        SAME [1,2]: a main fact the articles share
-        DIFF [1,2]: different numbers, names or causes, one disputing another, or a plainly different emphasis, saying what each one says
-        ONLY [2]: something that matters which only one article has
+        POINT [1,2]: a fact or detail from the articles, with its names and numbers
+        DIFF [1,2]: one site's name says one thing, another site's name says something else that can't also be true
 
-        One GIST. One to four SAME lines. DIFF lines only where they really differ: none if they don't, \
-        and never make a difference up. At most three ONLY lines. Each line at most 30 words. In the sentences, \
-        call a site by the name in brackets after its title, never "article 2" or "the first article". Nothing else.
+        One GIST. Three to six POINT lines, the most important first, each a new fact, never repeating the GIST or another line, \
+        including what only one article has. DIFF lines come last, only where two articles really contradict each other: most \
+        stories have none, and never make one up. A detail only one article gives is a POINT, not a DIFF, and so is the same thing in \
+        other words. Each line at most 30 words. Call a site by the name in brackets after its title, never "article 2" or "the \
+        first article". Nothing else.
         """
     }
 
     private static func claudeComparing(_ language: WritingLanguage?, headings: ComparisonHeadings) -> String {
         """
-        You compare how several news sites report one event, for a phone browser. \(language?.instruction ?? "Write in the language of the articles.") \
-        Only what the articles say, each thing once, in your own words.
+        You tell someone what several news articles about one event say, for a phone browser. \(language?.instruction ?? "Write in the language of the articles.") \
+        Write about the event and its details, not about the articles or how they compare. Only what the articles say, each thing \
+        once, in your own words.
 
-        Format, in Markdown (angle brackets mark what you write; keep the headings exactly as they are):
+        Format, in Markdown (angle brackets mark what you write; keep the last heading exactly as it is):
 
         @ article
         > <what happened, one or two sentences>
-        ## [check] \(headings.agree)
-        - **<key term>:** <point, one sentence of at most 25 words>[[<article numbers>]]
+        ## [<topic>] <theme, two to five words>
+        - **<key term>:** <a fact or detail with its names and numbers, one sentence of at most 25 words>[[<article numbers>]]
         ## [compare] \(headings.differ)
         - **<key term>:** <what each one says, at most 35 words>[[<article numbers>]]
-        ## [star] \(headings.onlyOne)
-        - **<key term>:** <point, one sentence of at most 25 words>[[<article number>]]
 
-        Rules: where they differ means different numbers, names or causes, one disputing what another \
-        says, or a plainly different emphasis. Leave out that heading if they don't differ, and the \
-        last one if no article adds anything that matters; never make a difference up, and never guess \
-        why a site wrote something. One to four points under a heading. End every point with the numbers \
-        of the articles it comes from in double brackets, as [[2]] or [[1,3]], using the numbers the \
-        articles are given. In the sentences, call a site by the name in brackets after its title, never \
-        "article 2" or "the first article". No "!! " or "%% " lines. No emoji. No preamble, no sign-off.
+        Rules: one to three themes of the story itself, most important first, two to four points each, including what only one \
+        article has. The word in brackets after "##" only chooses the theme's icon: pick the closest from [\(AnswerTopic.vocabulary)], \
+        or leave the brackets empty. The last heading is only for real conflicts: contradictions, or different numbers, names or \
+        causes. Most stories have none, so leave it out; a different emphasis isn't a conflict, never make one up, and never guess why \
+        a site wrote something. End every point with the numbers of the articles it comes from in double brackets, as [[2]] or \
+        [[1,3]], using the numbers the articles are given. Say which site only when a detail needs it, by the name in brackets after \
+        its title, never "article 2" or "the first article". No "!! " or "%% " lines. No emoji. No preamble, no sign-off.
         """
     }
 
@@ -490,35 +495,60 @@ final class DigestModel: Identifiable {
 /// Fixed, so what they mean doesn't depend on the model. Croatian, as roko's
 /// news is, and English for the rest.
 nonisolated struct ComparisonHeadings {
-    let agree, differ, onlyOne: String
+    let story, differ: String
 
-    static let english = ComparisonHeadings(agree: "All agree", differ: "Where they differ", onlyOne: "Only one has it")
-    static let croatian = ComparisonHeadings(agree: "Svi se slažu", differ: "Gdje se razlikuju", onlyOne: "Ima samo jedan")
+    static let english = ComparisonHeadings(story: "What they report", differ: "Where they differ")
+    static let croatian = ComparisonHeadings(story: "Što pišu", differ: "Gdje se razlikuju")
 
     static func `for`(_ language: WritingLanguage?) -> ComparisonHeadings {
         language?.code.hasPrefix("hr") == true ? croatian : english
     }
 
-    /// What Apple's models write ("SAME [1,2]: …"), in the app's Markdown. A
+    /// What Apple's models write ("POINT [1,2]: …"), in the app's Markdown. A
     /// line that isn't of the form, as one being written isn't yet, is left out.
-    func markdown(fromLines draft: String) -> String {
+    /// A point without numbers comes from all of them, and has to prove it. A conflict
+    /// has to name both sides: this model finds "kuhinjski" against "kuhinjskim" a
+    /// difference, and one that can't say who says what is none worth a note.
+    func markdown(fromLines draft: String, sites: [String]) -> String {
         var gist: String?
         var sections: [String: [String]] = [:]
+        let allOfThem = sites.indices.map { String($0 + 1) }.joined(separator: ",")
+        var said: [Set<String>] = []
         for line in draft.split(separator: "\n") {
-            // The numbers come before the word about as often as after it: "[1,2] SAME:".
-            guard let match = line.firstMatch(of: /^\W*(?:\[([\d,\s]*)\]\W*)?(GIST|SAME|DIFF|ONLY)\W*(?:\[([\d,\s]*)\])?\W*:\s*(.+)$/) else { continue }
-            let kind = String(match.2), body = String(match.4)
-            if kind == "GIST" {
-                gist = gist ?? body
-            } else if let numbers = match.1 ?? match.3 {
-                sections[kind, default: []].append("- \(body)[[\(numbers)]]")
+            // The numbers come before the word about as often as after it: "[1,2] POINT:", and
+            // "[1][2] POINT 3:". Often there's no word at all, only numbers: that's a point.
+            let kind: String, before: Substring, after: Substring, written: Substring
+            if let match = line.firstMatch(of: /^\W*((?:\[[\d,\s]*\]\W*)*)(GIST|POINT|DIFF)[^\w\[]*(?:\d+[^\w\[]*)?((?:\[[\d,\s]*\][^\w\[]*)*)(.+)$/) {
+                (kind, before, after, written) = (String(match.2), match.1, match.3, match.4)
+            } else if let match = line.firstMatch(of: /^\W*((?:\[[\d,\s]*\]\W*)+)(.+)$/) {
+                (kind, before, after, written) = ("POINT", match.1, "", match.2)
+            } else {
+                continue
             }
+            // Its sources again, in words: "(index.hr) Osam policajaca … (1,2)".
+            let body = written.replacing(/^\([^)]*\)\s*/, with: "").replacing(/\s*\([\d,\s]+\)\.?\s*$/, with: "").trimmingCharacters(in: .whitespaces)
+            // Only its numbers so far, as it's being written.
+            guard body.contains(where: \.isLetter) else { continue }
+            let opening = body.prefix(1).uppercased() + body.dropFirst()
+            if kind == "GIST" {
+                gist = gist ?? opening
+                continue
+            }
+            if kind == "DIFF", Set(sites.filter { !$0.isEmpty && body.lowercased().contains($0.lowercased()) }).count < 2 { continue }
+            if kind == "POINT" {
+                // It tends to go through the articles in turn, saying the same again.
+                let words = TodayNews.stems(body)
+                guard (sections[kind]?.count ?? 0) < 6, !said.contains(where: { $0.intersection(words).count * 5 >= words.count * 3 }) else { continue }
+                said.append(words)
+            }
+            let numbers = (before + "," + after).matches(of: /\d+/).map { String($0.0) }
+            sections[kind, default: []].append("- \(opening)[[\(numbers.isEmpty ? allOfThem : numbers.joined(separator: ","))]]")
         }
         // Nothing whole yet: empty, so the screen goes on saying it's working.
         guard gist != nil || !sections.isEmpty else { return "" }
         var lines = ["@ article"]
         if let gist { lines.append("> \(gist)") }
-        for (kind, heading, icon) in [("SAME", agree, "check"), ("DIFF", differ, "compare"), ("ONLY", onlyOne, "star")] {
+        for (kind, heading, icon) in [("POINT", story, "news"), ("DIFF", differ, "compare")] {
             if let points = sections[kind] { lines += ["## [\(icon)] \(heading)"] + points }
         }
         return lines.joined(separator: "\n")

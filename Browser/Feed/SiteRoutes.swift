@@ -1,4 +1,5 @@
 import Foundation
+import NaturalLanguage
 
 /// The ways to follow a site beyond a feed it declares: the feed a platform
 /// keeps at a known address, what a page says about itself for search engines,
@@ -201,8 +202,12 @@ nonisolated enum SiteRoutes {
         var parts = URLComponents(string: "https://www.bing.com/news/search")
         let (language, country) = await Audience.isCroatian ? ("hr", "hr") : (Locale.current.language.languageCode?.identifier ?? "en", Locale.current.region?.identifier.lowercased() ?? "us")
         parts?.queryItems = [.init(name: "format", value: "rss"), .init(name: "q", value: "\"\(topic)\""),
-                             .init(name: "setlang", value: language), .init(name: "cc", value: country)]
+                             .init(name: "setlang", value: language), .init(name: "cc", value: country),
+                             // Newest first: left to rank, it sends what's best on the words, from years back.
+                             .init(name: "qft", value: "sortbydate=\"1\"")]
         guard let url = parts?.url else { return [] }
+        let croatian = await Audience.isCroatian
+        let languages = Set(Locale.preferredLanguages.compactMap { Locale(identifier: $0).language.languageCode?.identifier } + ["en"] + (croatian ? ["hr", "bs", "sr"] : []))
         var request = URLRequest(url: url, timeoutInterval: 10)
         // Only a desktop browser is given the feed; a phone gets a web page.
         request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
@@ -219,6 +224,15 @@ nonisolated enum SiteRoutes {
                                    published: story.published, summary: story.summary)
             result.image = story.image
             return result
-        }
+        }.filter { readable($0.title, in: languages) }
+    }
+
+    /// Whatever the country asked for, Bing also sends other languages: Formula 1 in
+    /// Indonesian and Spanish. Only a headline it's sure of is turned away.
+    private nonisolated static func readable(_ title: String, in languages: Set<String>) -> Bool {
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(title)
+        guard let (language, confidence) = recognizer.languageHypotheses(withMaximum: 1).first, confidence >= 0.6 else { return true }
+        return languages.contains(language.rawValue)
     }
 }

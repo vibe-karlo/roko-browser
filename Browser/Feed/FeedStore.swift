@@ -91,8 +91,16 @@ final class FeedStore {
     @ObservationIgnored private var isReading = false
     /// Articles' own pictures, sharper than their feeds' thumbnails, for those shown large.
     @ObservationIgnored private var largePictures: [URL: URL] = [:]
-    /// Stories mentioning a blocked word, as of the last look.
+    /// Stories not to show, as of the last look: mentioning a blocked word, asked to
+    /// see less of, or from a site or topic no longer followed.
     @ObservationIgnored private var blocked = Set<URL>()
+    /// Stories a little like one asked to see less of: last on the page, never leading.
+    @ObservationIgnored private var lowered = Set<URL>()
+    /// Stories whose pages have been asked for a picture, while roko's open.
+    @ObservationIgnored private var picturesLookedFor = Set<URL>()
+    private static let picturesPerRead = 36
+    /// Sources changed while reading the old ones: read again when that's done.
+    @ObservationIgnored private var readsAgain = false
 
     private static var file: URL { URL.applicationSupportDirectory.appending(path: "feed.json") }
     private static let textFolder = URL.applicationSupportDirectory.appending(path: "feed-text")
@@ -155,9 +163,18 @@ final class FeedStore {
     /// `immediately` when asked for, so what comes back shows at once.
     func refresh(immediately: Bool = false, inBackground: Bool = false) async {
         if immediately { isReading = false }
-        guard !isRefreshing else { return }
+        guard !isRefreshing else {
+            if immediately { readsAgain = true }
+            return
+        }
         isRefreshing = true
-        defer { isRefreshing = false }
+        defer {
+            isRefreshing = false
+            if readsAgain {
+                readsAgain = false
+                Task { await refresh(immediately: true) }
+            }
+        }
         let sources = NewsSite.chosen
         let topics = NewsTopics.chosen
         // Topics are looked for in the major feeds too, as in Today.
@@ -165,15 +182,16 @@ final class FeedStore {
         let byID = await TodayNews.stories(of: sources + pool, keepingBodies: true)
         var read = sources.flatMap { byID[$0.id] ?? [] }
         let everything = byID.values.flatMap { $0 }
-        for topic in topics {
-            read += await TodayNews.about(topic, in: everything, count: 12)
-        }
-        // And each topic across the web, not only among the sites read here.
-        read += await withTaskGroup(of: [NewsStory].self) { group in
-            for topic in topics { group.addTask { await SiteRoutes.search(topic) } }
-            var found: [NewsStory] = []
-            for await stories in group { found += TodayNews.recent(stories, hours: 48).prefix(10) }
+        // Each topic across the web too, not only among the sites read here.
+        let web = await withTaskGroup(of: (String, [NewsStory]).self) { group in
+            for topic in topics { group.addTask { (topic, await SiteRoutes.search(topic)) } }
+            var found: [String: [NewsStory]] = [:]
+            for await (topic, stories) in group { found[topic] = stories }
             return found
+        }
+        // One look at both: search brings pages that only rank for the words.
+        for topic in topics {
+            read += await TodayNews.about(topic, in: everything + (web[topic] ?? []), count: 20)
         }
         read += await Newsletters.fetch(inBackground: inBackground)
         // Nothing came back (offline, say): what was there stays.
@@ -182,11 +200,35 @@ final class FeedStore {
             publish()
             return
         }
+        if !inBackground { read = await withPictures(read) }
         merge(read)
         refreshedAt = .now
         await regroup()
         publish()
         persist()
+    }
+
+    /// A sitemap or a search names no pictures, but each story's page does, in its head.
+    /// The newest few at a time, once each: what's found is kept with the story.
+    private func withPictures(_ read: [NewsStory]) async -> [NewsStory] {
+        let pictured = Set(stories.filter { $0.story.image != nil }.map(\.id))
+        let wanted = TodayNews.recent(read.filter { $0.image == nil && !$0.isMail && !pictured.contains($0.link) && !picturesLookedFor.contains($0.link) }, hours: 48)
+            .sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
+            .prefix(Self.picturesPerRead)
+        picturesLookedFor.formUnion(wanted.map(\.link))
+        var found: [URL: URL] = [:]
+        for start in stride(from: 0, to: wanted.count, by: 6) {
+            let batch = wanted.dropFirst(start).prefix(6)
+            await withTaskGroup(of: (URL, URL?).self) { group in
+                for story in batch { group.addTask { (story.link, await WebResearcher.shareImage(of: story.link)) } }
+                for await (link, picture) in group { found[link] = picture }
+            }
+        }
+        return read.map { story in
+            var story = story
+            if story.image == nil { story.image = found[story.link] }
+            return story
+        }
     }
 
     private func merge(_ read: [NewsStory]) {
@@ -197,6 +239,8 @@ final class FeedStore {
             story.content = nil
             story.links = nil
             if var existing = known[story.link] {
+                // What a page gave stays: the next read of a sitemap won't name it either.
+                story.image = story.image ?? existing.story.image
                 existing.story = story
                 known[story.link] = existing
             } else {
@@ -235,14 +279,27 @@ final class FeedStore {
     private func regroup() async {
         let reading = recent.map { ($0.story, Self.textFile(for: $0.id)) }
         let terms = NewsBlocks.chosen
+        let less = NewsLess.chosen
+        let hosts = Set(NewsSite.chosen.map(\.host))
+        let topics = NewsTopics.chosen
         // Off the main thread: with words to block, it reads each story's kept text.
-        (blocked, candidates) = await Task.detached(priority: .userInitiated) {
-            // Nothing to look for: no story's text needs reading.
-            let blocked = terms.isEmpty ? Set<URL>() : Set(reading.filter { story, file in
+        (blocked, lowered, candidates) = await Task.detached(priority: .userInitiated) {
+            let lessLinks = Set(less.flatMap(\.links))
+            var lowered = Set<URL>()
+            let blocked = Set(reading.filter { story, file in
+                if story.isMail { return false }
+                // What a topic or site brought goes when it does.
+                if !hosts.contains(story.host), !topics.contains(where: { TodayNews.names($0, story) }) { return true }
+                if lessLinks.contains(story.link) { return true }
+                let closeness = NewsLess.closeness(of: story.title, to: less)
+                if closeness >= 2 { return true }
+                if closeness == 1 { lowered.insert(story.link) }
+                // Nothing to look for: no story's text needs reading.
+                guard !terms.isEmpty else { return false }
                 let text = (try? String(contentsOf: file, encoding: .utf8)) ?? ""
                 return NewsBlocks.mention(terms, in: [story.title, story.summary ?? "", text].joined(separator: " "))
             }.map(\.0.link))
-            return (blocked, StoryGroups.candidates(reading.map(\.0).filter { !blocked.contains($0.link) && !$0.isMail }))
+            return (blocked, lowered, StoryGroups.candidates(reading.map(\.0).filter { !blocked.contains($0.link) && !$0.isMail }))
         }.value
         // Verdicts on groups that are gone would only pile up.
         verdicts = verdicts.filter { key, _ in candidates.contains { Self.key($0) == key } }
@@ -328,13 +385,17 @@ final class FeedStore {
         }
         let items = groups.map { FeedItem.group($0) } + byLink.values.filter { !grouped.contains($0.id) }.map { FeedItem.story($0) }
         let unread = items.filter { $0.stories.contains { !$0.isRead } }
+        let sunk = unread.filter { $0.stories.allSatisfy { lowered.contains($0.id) } }
+        let sunkIDs = Set(sunk.map(\.id))
+        let standing = unread.filter { !sunkIDs.contains($0.id) }
         // What most sites covered leads, or failing that the newest event with a picture.
-        var leading = unread.filter { $0.sites >= 3 }.sorted { $0.coverage > $1.coverage }
-        if leading.isEmpty, let first = unread.filter({ $0.sites >= 2 && $0.picture != nil }).max(by: { $0.coverage < $1.coverage }) {
+        var leading = standing.filter { $0.sites >= 3 }.sorted { $0.coverage > $1.coverage }
+        if leading.isEmpty, let first = standing.filter({ $0.sites >= 2 && $0.picture != nil }).max(by: { $0.coverage < $1.coverage }) {
             leading = [first]
         }
         let led = Set(leading.map(\.id))
-        blocks = FeedLayout.compose(leading + unread.filter { !led.contains($0.id) }.sorted { $0.when > $1.when })
+        blocks = FeedLayout.compose(leading + standing.filter { !led.contains($0.id) }.sorted { $0.when > $1.when }
+                                    + sunk.sorted { $0.when > $1.when }, neverLeading: sunkIDs)
         readItems = items.filter { $0.stories.allSatisfy(\.isRead) }.sorted { $0.when > $1.when }
     }
 
@@ -346,6 +407,13 @@ final class FeedStore {
     }
 
     func markUnread(_ links: [URL]) { setRead(links, at: nil) }
+
+    /// Off the page now, and what's like it from now on. You asked, so the page may move.
+    func showLess(_ shown: [NewsStory]) async {
+        NewsLess.chosen.insert(NewsLess.entry(for: shown, among: recent.map(\.story.title)), at: 0)
+        await regroup()
+        rebuild()
+    }
 
     private func setRead(_ links: [URL], at date: Date?) {
         let links = Set(links)
@@ -441,7 +509,8 @@ final class FeedStore {
 
     func comparison(of pages: [ReadLaterPage]) -> ReadLater.Digest? {
         let ids = Set(pages.map(\.id))
-        return comparisons.last { Set($0.pageIDs) == ids }
+        // Not one in the old shape, led by what they agree on: it's written again in the new.
+        return comparisons.last { Set($0.pageIDs) == ids && !$0.text.contains("All agree") && !$0.text.contains("Svi se slažu") }
     }
 
     func keep(_ comparison: ReadLater.Digest) {
