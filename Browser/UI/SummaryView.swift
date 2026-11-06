@@ -222,10 +222,17 @@ private struct SummaryText: View {
         Group {
             switch model.phase {
             case .failed(let message):
-                Text(message)
-                    .font(.body)
-                    .foregroundStyle(Theme.secondaryInk)
-                    .transition(.opacity)
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(message)
+                        .font(.body)
+                        .foregroundStyle(Theme.secondaryInk)
+                    Button("Try again") { model.retry() }
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                        .buttonStyle(.plain)
+                        .frame(minHeight: 44)
+                }
+                .transition(.opacity)
             default:
                 if model.text.isEmpty {
                     StatusLine(text: model.phase == .reading ? "Reading the page" : "Writing the summary",

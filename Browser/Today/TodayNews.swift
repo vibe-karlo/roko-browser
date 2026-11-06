@@ -68,10 +68,35 @@ nonisolated struct NewsSite: Codable, Equatable, Hashable, Identifiable, Sendabl
 /// Today, whatever brought them there, until taken off the list or followed again.
 nonisolated enum NewsHiddenSites {
     static let key = "feed.hiddenSites"
+    private static let wasFollowedKey = "feed.hiddenSites.followed"
 
     static var chosen: [String] {
         get { UserDefaults.standard.stringArray(forKey: key) ?? [] }
         set { UserDefaults.standard.set(newValue, forKey: key) }
+    }
+
+    /// What hiding a site stopped following, so taking the site back follows it again.
+    /// A page of a site is kept whole: nobody should have to remember its address.
+    static var wasFollowed: [NewsSite] {
+        get { UserDefaults.standard.data(forKey: wasFollowedKey).flatMap { try? JSONDecoder().decode([NewsSite].self, from: $0) } ?? [] }
+        set { UserDefaults.standard.set(try? JSONEncoder().encode(newValue), forKey: wasFollowedKey) }
+    }
+
+    /// Stops following what's on this site, keeping it for taking back.
+    static func hide(_ host: String) {
+        chosen.removeAll { $0 == host }
+        chosen.insert(host, at: 0)
+        let hidden = [host]
+        let following = NewsSite.chosen.filter { hides($0.host, in: hidden) }
+        wasFollowed += following
+        NewsSite.chosen.removeAll { hides($0.host, in: hidden) }
+    }
+
+    /// What hiding these stopped following, to follow again.
+    static func takeBack(_ hosts: [String]) -> [NewsSite] {
+        let back = wasFollowed.filter { hides($0.host, in: hosts) }
+        wasFollowed.removeAll { hides($0.host, in: hosts) }
+        return back
     }
 
     /// The site itself or any part of it: hiding bbc.com hides sport.bbc.com too.

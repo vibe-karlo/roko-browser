@@ -35,7 +35,16 @@ final class ReaderModel: Identifiable {
         offersSummary = someModel && story.map { FeedStore.shared.canSummarize($0.link) || ClaudeClient.configured != nil } ?? false
     }
 
+    /// What opened it, to try again.
+    @ObservationIgnored private var reload: (() async -> Void)?
+
+    func retry() {
+        failure = nil
+        Task { await reload?() }
+    }
+
     func load() async {
+        reload = { [weak self] in await self?.load() }
         guard let story else { return }
         if let found = await FeedStore.shared.readable(story) {
             page = found
@@ -70,10 +79,13 @@ final class ReaderModel: Identifiable {
     }
 
     func load(from webView: WKWebView) async {
+        reload = { [weak self, weak webView] in
+            if let webView { await self?.load(from: webView) }
+        }
         do {
             page = try await PageReader.read(webView)
         } catch {
-            failure = error.localizedDescription
+            failure = "Couldn't read this page here."
         }
     }
 
@@ -230,7 +242,7 @@ struct ReaderView: View {
                     .frame(minHeight: 44)
             }
         } else if let failure = model.failure {
-            Text(failure).foregroundStyle(Theme.secondaryInk)
+            ReaderFailure(model: model, message: failure)
         } else {
             if let story = model.story {
                 storyPicture
@@ -274,7 +286,7 @@ struct ReaderView: View {
                 }
             }
         } else if let failure = model.failure {
-            Text(failure).foregroundStyle(Theme.secondaryInk)
+            ReaderFailure(model: model, message: failure)
         } else {
             StatusLine(text: model.page == nil ? "Preparing the article" : "Writing the summary")
         }
@@ -437,6 +449,29 @@ private struct ArticlePage: UIViewRepresentable {
             } else {
                 decisionHandler(.allow)
             }
+        }
+    }
+}
+
+/// Reader couldn't get the text: what happened, and the two ways on from it.
+private struct ReaderFailure: View {
+    @Environment(BrowserModel.self) private var browser
+    let model: ReaderModel
+    let message: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(message).foregroundStyle(Theme.secondaryInk)
+            HStack(spacing: 24) {
+                Button("Try again") { model.retry() }
+                Button("Open the page") {
+                    if model.story != nil { model.show(.page) } else { browser.reader = nil }
+                }
+            }
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(Theme.ink)
+            .buttonStyle(.plain)
+            .frame(minHeight: 44)
         }
     }
 }

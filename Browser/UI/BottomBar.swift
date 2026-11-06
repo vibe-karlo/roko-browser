@@ -90,6 +90,21 @@ struct BottomBar: View {
                             .foregroundStyle(docked ? Color.white.opacity(0.72) : Theme.secondaryInk)
                             .padding(.horizontal, 14)
                             .transition(.opacity)
+                        } else if let site {
+                            // Which site this is, always in view: a look-alike page shows its real name here.
+                            HStack(spacing: 6) {
+                                if isPrivate {
+                                    Glyph(.eyeClosed, size: 17)
+                                        .offset(y: 1.5)
+                                }
+                                Text(site)
+                                    .font(.system(size: 15))
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                            .foregroundStyle(docked ? Color.white.opacity(0.72) : Theme.secondaryInk)
+                            .padding(.horizontal, 14)
+                            .transition(.opacity)
                         } else if isPrivate {
                             HStack(spacing: 6) {
                                 // Centred on the word's lowercase letters, not its
@@ -106,6 +121,7 @@ struct BottomBar: View {
                     }
                     .animation(.easeOut(duration: 0.2), value: isPrivate)
                     .animation(.easeOut(duration: 0.2), value: launchField)
+                    .animation(.easeOut(duration: 0.2), value: site)
                     .opacity(browser.voiceListening ? 0 : 1)
                     Image(systemName: "mic.fill")
                         .font(.system(size: 17, weight: .semibold))
@@ -113,8 +129,8 @@ struct BottomBar: View {
                         .opacity(browser.voiceListening ? 1 : 0)
                 }
                 .animation(.snappy(duration: 0.15), value: browser.voiceListening)
-                    .frame(width: launchField ? nil : 104, height: 38)
-                    .frame(maxWidth: launchField ? .infinity : nil)
+                    .frame(width: wide ? nil : 104, height: 38)
+                    .frame(maxWidth: wide ? .infinity : nil)
                     .background {
                         // Becomes the launcher's field: there only while the launcher isn't,
                         // and only on a page (a screen over it has its own bar).
@@ -141,7 +157,7 @@ struct BottomBar: View {
             .scaleEffect(browser.voiceListening ? 1.06 : 1)
             .animation(.snappy(duration: 0.2), value: browser.voiceListening)
             // Takes the room from the spacers either side of it.
-            .layoutPriority(launchField ? 1 : 0)
+            .layoutPriority(wide ? 1 : 0)
             .gesture(holdToTalk.updating($touching) { _, touching, _ in touching = true })
             // A hold cut short (an alert, a call, Control Center) never ends: reset it
             // once the touch is gone, so the next hold works and the microphone stops.
@@ -157,7 +173,8 @@ struct BottomBar: View {
                 }
             }
             .accessibilityElement()
-            .accessibilityLabel(launchField ? (isPrivate ? "Private search or address" : "Search or enter address") : isPrivate ? "Private search" : "New tab")
+            .accessibilityLabel(launchField ? (isPrivate ? "Private search or address" : "Search or enter address")
+                                : site.map { "On \($0). Search or enter address" } ?? (isPrivate ? "Private search" : "New tab"))
             .accessibilityHint(Preferences.holdToTalk ? "Hold to speak" : "")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { browser.showCommandBar() }
@@ -259,6 +276,15 @@ struct BottomBar: View {
     private var fromSaved: BrowserTab? { browser.selectedTab.flatMap { $0.savedPlace == nil ? nil : $0 } }
 
     private var launchField: Bool { browser.showsLaunchField && browser.selectedTab != nil }
+
+    /// The site the page on screen is from, in the capsule once it's no longer the search field.
+    private var site: String? {
+        guard !launchField, let host = browser.selectedTab?.url?.displayHost, !host.isEmpty else { return nil }
+        return host
+    }
+
+    /// The capsule holds words, not just the +.
+    private var wide: Bool { launchField || site != nil }
 
     private var onPage: Bool {
         browser.screenBeside || ![.today, .todos, .shopping, .readLater, .feed].contains(browser.panel) && browser.browseForMe == nil && browser.summary == nil && browser.digest == nil

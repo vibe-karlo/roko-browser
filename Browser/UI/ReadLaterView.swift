@@ -131,11 +131,7 @@ struct ReadLaterView: View {
             found = matches
             searchedFor = words
         }
-        .onScrollGeometryChange(for: Bool.self) { geometry in
-            geometry.contentOffset.y < -geometry.contentInsets.top - 90
-        } action: { _, pulled in
-            if pulled { close() }
-        }
+        .pullsDownToClose { close() }
         .onScrollPhaseChange { _, phase, context in
             guard phase == .idle else { return }
             isAtTop = context.geometry.contentOffset.y <= -context.geometry.contentInsets.top + 8
@@ -320,7 +316,7 @@ struct ReadLaterView: View {
     private func row(_ page: ReadLaterPage) -> some View {
         Menu {
             Button(page.isRead ? "Mark as unread" : "Mark as read") { toggleRead(page) }
-            Button("Remove", role: .destructive) { ReadLater.shared.remove(page.id) }
+            Button("Remove", role: .destructive) { remove(page) }
         } label: {
             HStack(alignment: .top, spacing: 14) {
                 SavedPicture(page: page)
@@ -361,11 +357,17 @@ struct ReadLaterView: View {
         .accessibilityHint("Touch and hold to remove it, or to mark it read")
     }
 
+    private func remove(_ page: ReadLaterPage) {
+        guard let removed = ReadLater.shared.remove(page.id) else { return }
+        browser.offerUndo("Removed from Saved") { ReadLater.shared.restore(removed) }
+    }
+
     /// A row outside a shelf, where swiping is free to mean something.
     private func swipeableRow(_ page: ReadLaterPage) -> some View {
         row(page)
-            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                Button(role: .destructive) { ReadLater.shared.remove(page.id) } label: { Text("Remove") }
+            // Not by a full swipe: one that long is too easily an accident.
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                Button(role: .destructive) { remove(page) } label: { Text("Remove") }
             }
             .swipeActions(edge: .leading, allowsFullSwipe: true) {
                 Button { toggleRead(page) } label: { Text(page.isRead ? "Unread" : "Read") }

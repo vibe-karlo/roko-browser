@@ -1066,6 +1066,30 @@ final class BrowserModel {
     private var lastOutsideLink: Date?
     var linkJustArrived: Bool { lastOutsideLink.map { Date.now.timeIntervalSince($0) < 2 } ?? false }
 
+    /// Something just removed, a tap from coming back: the switcher's Reopen, for the rest of the app.
+    struct UndoOffer: Identifiable {
+        let id = UUID()
+        let text: String
+        let undo: () -> Void
+    }
+    private(set) var undoOffer: UndoOffer?
+    private var undoTask: Task<Void, Never>?
+
+    func offerUndo(_ text: String, undo: @escaping () -> Void) {
+        undoOffer = UndoOffer(text: text, undo: undo)
+        undoTask?.cancel()
+        undoTask = Task {
+            try? await Task.sleep(for: .seconds(6))
+            if !Task.isCancelled { undoOffer = nil }
+        }
+    }
+
+    func takeUndo() {
+        undoOffer?.undo()
+        undoOffer = nil
+        undoTask?.cancel()
+    }
+
     func showToast(_ text: String) {
         toast = text
         toastTask?.cancel()
@@ -1500,8 +1524,13 @@ final class BrowserModel {
 
     /// Forgets a page: every visit to that address, or to any address on that
     /// site when `wholeSite` (as the launcher's site row stands for all of them).
-    func forget(_ url: URL, wholeSite: Bool = false) {
-        guard let context else { return }
+    /// What was forgotten, to put back: address, title, last visit, visits.
+    typealias ForgottenPage = (url: String, title: String, visitedAt: Date, visitCount: Int)
+
+    @discardableResult
+    func forget(_ url: URL, wholeSite: Bool = false) -> [ForgottenPage] {
+        guard let context else { return [] }
+        var forgotten: [ForgottenPage] = []
         let host = url.displayHost
         let all = (try? context.fetch(FetchDescriptor<HistoryEntry>())) ?? []
         // The launcher shows the same page under two addresses as one row
@@ -1510,8 +1539,23 @@ final class BrowserModel {
         for entry in all {
             let onSite = URL(string: entry.url)?.displayHost == host
             if wholeSite ? onSite : entry.url == url.absoluteString || (onSite && titles.contains(entry.title)) {
+                forgotten.append((entry.url, entry.title, entry.visitedAt, entry.visitCount))
                 context.delete(entry)
             }
+        }
+        try? context.save()
+        historyIndex.rebuild(from: context.container)
+        return forgotten
+    }
+
+    func remember(_ pages: [ForgottenPage]) {
+        guard let context else { return }
+        for page in pages {
+            guard let url = URL(string: page.url) else { continue }
+            let entry = HistoryEntry(url: url, title: page.title)
+            entry.visitedAt = page.visitedAt
+            entry.visitCount = page.visitCount
+            context.insert(entry)
         }
         try? context.save()
         historyIndex.rebuild(from: context.container)

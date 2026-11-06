@@ -10,7 +10,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Follow in News from any page's tools, or "follow" in the bar: the section you're on or the whole site. Sites without a feed are followed from their sitemap, their page's data or their page.
 - Newsletters in News: by their feed, or a private address to subscribe with or forward to.
 - Links work in Reader, written-out addresses and linked words alike, in newsletters and articles. They open in a tab.
-- Don't show a site: hold a story in News or Today for "Don't Show" and its site, or for an event, which of its sites. Nothing from it shows again, whatever brought it, and it's no longer followed. The News sources sheet lists them to take back, and following the site again does too.
+- Don't show a site: hold a story in News or Today for "Don't Show" and its site, or for an event, which of its sites. Nothing from it shows again, whatever brought it, and it stops following it if you did. Undo takes it back at once; the News sources sheet lists them to take back later, and either follows it again if you did.
 - Words to keep out of News, whichever site a story is from. Topics also look across the web through Bing.
 - A page opened from Saved has a way back: an arrow in the bar, in the tabs button's place, that goes back through the tab's pages and then to Saved. Swipe up on the bar still has the tabs. The list opens at the group or search you left, and the page's tab closes.
 - Saved's bar now searches the list, since it holds what you keep as well as what you mean to read. Summarize all moved to the button on its right, and shows while there's something unread.
@@ -18,6 +18,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ### Fixed
 - News' lead picture could turn into a strange zoomed crop moments after it appeared, a tail fin and a red band where there had been a whole plane. The article's share picture was replacing the feed's, and a second picture of another shape drew too large and off centre. Both are fixed: pictures now fill their frame on their own, and the share picture only replaces a feed's thumbnail, as on BBC. The same goes for the picture above an article in Reader.
 - A story you've read in News showed its site's icon through its dimmed picture.
+- An unsafe page has a way out: Go back, or Close this tab. Reader and a summary that fail offer Try again, and Reader the page itself, instead of grey text.
 - Sideways, To-do's list ended in a fade with hard edges, and its last row showed under the bar.
 - The "Today" strip above the bar sat a little high: it's now midway between the page and the bar.
 - On iPhone Duo, the switcher's bottom row sat off-centre and touched the home indicator.
@@ -51,6 +52,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Sites' own anti-adblock walls are beaten before they come up, on about 8,200 sites, with uBlock Origin's site rules (GPL-3.0): a small change to the page before it runs, such as BILD's `"adBlockWallEnabled":true` turned false. Only a site with a rule pays for it. Its ads stay blocked, where before the page went blank and its ads were let through.
 
 ### Changed
+- Removing something can be taken back: a page from Saved, a to-do, a page or site from history, and a site from News all offer Undo for a few seconds. A full swipe no longer removes a page from Saved.
+- The bar shows which site the page is from, once its field has stepped aside. The + is still in the switcher.
+- News and Saved have a way in: the switcher's menu has both, and with nothing pinned the launcher lists News, Saved and Today. "news" or "saved" typed in full opens roko's own, and the row is called Saved.
+- Cancelling the launcher from the switcher returns to the switcher, with Reopen still there. A tap anywhere empty closes the launcher, not only its edges.
+- Pulling down to close News, Saved, To-do or Today happens as you let go, and says so past the line: moved back first, it stays.
 - Turned sideways, the new bar is under the page there too, in place of the column beside it. The page is a rounded card with the band's colour around it, and the bar folds away as you scroll. To-do, Today, Saved and roko's other screens have the same band.
 - On iPhone Duo slightly open, the new bar replaces the floating one: the band runs across and its controls stay on one half. To-do, Today, Saved and the other screens have it on any open Duo too, and the switcher's row keeps off the bend.
 - The tab switcher has less on it. Its bottom row is the page's bar: private, + and a menu, in the same places. Today, To-do and Settings moved into the menu, with Close All Tabs. The card in front has its name and a close button, the icons floating over its neighbours are gone, and "3 of 12" says where you are.

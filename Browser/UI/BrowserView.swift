@@ -202,7 +202,7 @@ struct BrowserView: View {
                 .animation(.snappy(duration: 0.3), value: showsPlayer)
         }
         .overlay {
-            if browser.panel == .tabs {
+            if browser.panel == .tabs || browser.panel == .command && browser.launcherReturn == .tabs {
                 // Arrives from below; leaves upward, continuing the pull that uncovers the page.
                 // Full screen: its own bottom row replaces the bar it would sit above.
                 TabStackView()
@@ -302,6 +302,31 @@ struct BrowserView: View {
                     .allowsHitTesting(false)
             }
         }
+        .overlay(alignment: .bottom) {
+            if let offer = browser.undoOffer {
+                HStack(spacing: 14) {
+                    Text(offer.text)
+                        .font(.system(size: 15, weight: .medium))
+                    Button("Undo") { browser.takeUndo() }
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.accentText)
+                        .frame(minHeight: 44)
+                        .contentShape(.rect)
+                }
+                .lineLimit(1)
+                .padding(.leading, 18)
+                .padding(.trailing, 16)
+                .barSurface(cornerRadius: 14)
+                .compositingGroup()
+                .padding(.horizontal, Theme.gutter)
+                .padding(.bottom, Theme.barHeight + 20 + playerLift)
+                .staysWithBar(browser)
+                .id(offer.id)
+                .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
+                                        removal: .opacity.animation(.easeOut(duration: 0.12))))
+            }
+        }
+        .animation(.snappy(duration: 0.3), value: browser.undoOffer?.id)
         .overlay(alignment: .bottom) {
             if browser.cookieOffer != nil, browser.panel == .none {
                 // After a few reloads: the page may be broken by its cookie pop-up's answer.
@@ -672,6 +697,9 @@ struct BrowserView: View {
 /// connection and loads the page by itself.
 private struct LoadErrorView: View {
     let error: LoadError
+    let canGoBack: Bool
+    /// Away from a page that won't be shown: back, or with nothing to go back to, out of the tab.
+    let leave: () -> Void
     let retry: () -> Void
     let search: (String) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -739,7 +767,10 @@ private struct LoadErrorView: View {
                         Button("Search instead") { search(host) }
                             .foregroundStyle(Theme.accentText)
                     }
-                    if error.kind != .unsafe {
+                    if error.kind == .unsafe {
+                        Button(canGoBack ? "Go back" : "Close this tab", action: leave)
+                            .foregroundStyle(Theme.accentText)
+                    } else {
                         Button(error.kind == .offline ? "Try now" : "Try again", action: retry)
                             .foregroundStyle(error.kind == .notFound ? Theme.secondaryInk : Theme.accentText)
                     }
@@ -1123,6 +1154,10 @@ private struct PagePane: View {
 
             if let error = tab.loadError {
                 LoadErrorView(error: error,
+                              canGoBack: tab.webView?.canGoBack == true,
+                              leave: {
+                                  if let webView = tab.webView, webView.canGoBack { webView.goBack() } else { browser.close(tab) }
+                              },
                               retry: { if let url = tab.url { tab.load(url) } },
                               search: { browser.open(SearchEngine.current.searchURL(for: $0), inNewTab: false) })
             }

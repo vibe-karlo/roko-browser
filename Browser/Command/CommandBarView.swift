@@ -328,6 +328,12 @@ struct CommandBarView: View {
                     if item.id == "action-todos" && !dueTodos.isEmpty { todoWidget }
                 }
             }
+            // The rest of the list closes the bar, as the page behind it does: the rows
+            // cover that page, and only the thin margins beside them used to answer.
+            .contentShape(.rect)
+            .frame(minHeight: listHeight, alignment: .top)
+            .contentShape(.rect)
+            .onTapGesture { dismiss() }
             .scrollTargetLayout()
             .padding(.horizontal, Self.inset - 4)
         }
@@ -780,11 +786,14 @@ struct CommandBarView: View {
     }
 
     private func forget(_ url: URL, wholeSite: Bool) {
+        var forgotten: [BrowserModel.ForgottenPage] = []
         withAnimation(.snappy(duration: 0.25)) {
-            browser.forget(url, wholeSite: wholeSite)
+            forgotten = browser.forget(url, wholeSite: wholeSite)
             rebuild()
         }
-        browser.showToast(wholeSite ? "Site removed from history" : "Removed from history")
+        browser.offerUndo(wholeSite ? "Site removed from history" : "Removed from history") { [browser] in
+            browser.remember(forgotten)
+        }
     }
 
     /// Parking, in a city roko pays in. Running: the time left, and a tap adds
@@ -949,6 +958,15 @@ struct CommandBarView: View {
                       seenPages.insert("\(url.displayHost)|\(entry.title.isEmpty ? url.path : entry.title)").inserted else { continue }
                 rows.append(CommandItem(id: "recent-\(entry.url)", title: entry.title.isEmpty ? url.displayHost : entry.title,
                                         subtitle: url.displayHost, kind: "", icon: .site(url.displayHost), action: .open(url)))
+            }
+            // Nothing pinned: the way into roko's own places, which nothing else shows.
+            if pins.isEmpty {
+                rows.append(CommandItem(id: "place-feed", title: "News", subtitle: "What you follow, each story once",
+                                        kind: "", icon: .glyph(.news), action: .feed))
+                rows.append(CommandItem(id: "place-saved", title: "Saved", subtitle: "Pages you kept",
+                                        kind: "", icon: .glyph(.readLater), action: .readLater))
+                rows.append(CommandItem(id: "place-today", title: "Today", subtitle: "Weather, calendar, to-dos, news",
+                                        kind: "", icon: .glyph(.today), action: .today))
             }
             items = rows
         }
@@ -1421,8 +1439,8 @@ enum CommandRanker {
             (["news", "my news", "feed", "reader", "vijesti", "novosti"],
              CommandItem(id: "action-feed", title: "News", subtitle: "What you follow, each story once",
                          kind: "Action", icon: .glyph(.news), action: .feed)),
-            (["read later", "reading list", "saved pages", "za kasnije", "spremljeno"],
-             CommandItem(id: "action-read-later", title: "Read Later",
+            (["saved", "saved pages", "read later", "reading list", "za kasnije", "spremljeno"],
+             CommandItem(id: "action-read-later", title: "Saved",
                          subtitle: ReadLater.shared.unread.isEmpty ? "Pages you saved" : "\(ReadLater.shared.unread.count) to read",
                          kind: "Action", icon: .glyph(.readLater), action: .readLater)),
         ]
@@ -1436,7 +1454,7 @@ enum CommandRanker {
             if needsPage && browser.selectedTab == nil { continue }
             // Typed in full, a place in roko (Settings, To-do) is what's meant,
             // not a web search for the word: it goes first, and Return opens it.
-            let isPlace = ["action-settings", "action-todos", "action-today", "action-shopping", "action-read-later", "action-reopen", "action-downloads", "action-split"].contains(item.id)
+            let isPlace = ["action-settings", "action-todos", "action-today", "action-shopping", "action-read-later", "action-feed", "action-reopen", "action-downloads", "action-split"].contains(item.id)
             let exact = words.contains(needle)
             // "save for later" typed in full means this page, not a search for the words.
             if item.id == "action-save-later", exact, needle != "read later" {

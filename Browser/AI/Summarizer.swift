@@ -121,8 +121,24 @@ final class SummaryModel: Identifiable {
     /// shape to fill, they took a museum's opening for a how-to, "You need" and all.
     @ObservationIgnored private var isNews = false
 
+    /// What it was started on, to try again after a failure.
+    @ObservationIgnored private weak var startedWebView: WKWebView?
+    @ObservationIgnored private var startedPage: ReadablePage?
+
+    func retry() {
+        guard phase.isFailure else { return }
+        text = ""
+        phase = .reading
+        if let startedPage {
+            task = Task { await summarize(startedPage) }
+        } else if let startedWebView {
+            task = Task { await run(webView: startedWebView) }
+        }
+    }
+
     func start(webView: WKWebView, url: URL?) {
         self.url = url
+        startedWebView = webView
         if let url, let cached = SummaryCache.entry(for: url) {
             text = cached.text
             engine = cached.engine
@@ -138,6 +154,7 @@ final class SummaryModel: Identifiable {
     func start(page: ReadablePage, url: URL?) {
         self.url = url
         isNews = true
+        startedPage = page
         if let url, let cached = SummaryCache.entry(for: url) {
             text = cached.text
             engine = cached.engine

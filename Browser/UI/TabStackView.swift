@@ -15,6 +15,8 @@ struct TabStackView: View {
     @State private var lift: CGFloat = 0
     /// A tab was thrown away while the switcher is open: offer it back.
     @State private var closedHere = false
+    /// Where the + is on screen, for the launcher to grow out of.
+    @State private var plusFrame: CGRect = .zero
 
     private let returnThreshold: CGFloat = 90
 
@@ -284,7 +286,7 @@ struct TabStackView: View {
     /// move as you come here, on no surface of its own. What isn't about tabs is in the menu.
     private func bottomRow(wide: Bool) -> some View {
         HStack(spacing: 0) {
-            Button { browser.showCommandBar(mode: .privateTab) } label: {
+            Button { browser.showCommandBar(mode: .privateTab, over: .tabs) } label: {
                 Glyph(.eyeClosed, size: 22)
                     .padding(.leading, BottomBar.dockedInset)
                     .frame(width: 72, height: Theme.barHeight, alignment: .leading)
@@ -293,10 +295,15 @@ struct TabStackView: View {
             .buttonStyle(GlyphButtonStyle())
             .accessibilityLabel("New private tab")
             Spacer(minLength: 8)
-            Button { browser.showCommandBar() } label: {
+            Button {
+                browser.launcherOrigin = plusFrame
+                // Over the switcher, which stays: cancelling comes back here, with Reopen still on offer.
+                browser.showCommandBar(over: .tabs)
+            } label: {
                 Glyph(.plus, size: 22, weight: 2)
                     .frame(width: 104, height: 38)
                     .background(.white.opacity(0.14), in: .capsule)
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { plusFrame = $0 }
                     .frame(height: Theme.barHeight)
                     .contentShape(.rect)
             }
@@ -305,6 +312,8 @@ struct TabStackView: View {
             Spacer(minLength: 8)
             Menu {
                 Button { browser.panel = .today } label: { Label("Today", image: "phosphor/today") }
+                Button { browser.panel = .feed } label: { Label("News", image: "phosphor/news") }
+                Button { browser.panel = .readLater } label: { Label("Saved", image: "phosphor/readLater") }
                 Button { browser.panel = .todos } label: { Label(todosLabel, image: "phosphor/todo") }
                 Button { browser.panel = .settings } label: { Label("Settings", image: "phosphor/settings") }
                 if browser.tabs.count > 1 {

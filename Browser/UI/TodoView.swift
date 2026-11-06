@@ -101,11 +101,7 @@ struct TodoView: View {
             }
         }
         // Pull down past the top to close, as Browse for Me does.
-        .onScrollGeometryChange(for: Bool.self) { geometry in
-            geometry.contentOffset.y < -geometry.contentInsets.top - 90
-        } action: { _, pulled in
-            if pulled { close() }
-        }
+        .pullsDownToClose { close() }
     }
 
     // MARK: Sections
@@ -156,9 +152,11 @@ struct TodoView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 if editing == todo.persistentModelID {
-                    TitleEditor(todo: todo) { finished in
+                    TitleEditor(todo: todo) { finished, original in
+                        // Return, then the field losing focus: it finishes once.
+                        guard editing == todo.persistentModelID else { return }
                         editing = nil
-                        if finished.trimmingCharacters(in: .whitespaces).isEmpty { delete(todo) } else { save() }
+                        if finished.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { delete(todo, title: original) } else { save() }
                     }
                 } else {
                     Text(todo.title)
@@ -378,9 +376,26 @@ struct TodoView: View {
         save()
     }
 
-    private func delete(_ todo: Todo) {
+    /// Gone, with Undo. `title`: an emptied to-do's words before they were cleared.
+    private func delete(_ todo: Todo, title: String? = nil) {
+        let words = title ?? todo.title
+        let (day, wholeWeek, done, doneAt, createdAt, time, order) =
+            (todo.day, todo.wholeWeek, todo.done, todo.doneAt, todo.createdAt, todo.time, todo.order)
         withAnimation(.snappy) { context.delete(todo) }
         save()
+        browser.offerUndo("To-do deleted") {
+            // A new one to sync: the old one's deletion has been sent.
+            let back = Todo(title: words, when: .someday)
+            back.day = day
+            back.wholeWeek = wholeWeek
+            back.done = done
+            back.doneAt = doneAt
+            back.createdAt = createdAt
+            back.time = time
+            back.order = order
+            withAnimation(.snappy) { context.insert(back) }
+            try? context.save()
+        }
     }
 
     private func save() {
@@ -478,15 +493,17 @@ struct TodoCircle: View {
 /// A to-do's words, being changed. Return or tapping away keeps them; empty, it goes.
 private struct TitleEditor: View {
     @Bindable var todo: Todo
-    let finish: (String) -> Void
+    /// What's there now, and what was there before editing started.
+    let finish: (String, String) -> Void
     @FocusState private var focused: Bool
+    @State private var original = ""
 
     var body: some View {
         TextField("", text: $todo.title, axis: .vertical)
             .font(.system(size: 17))
             .focused($focused)
             .submitLabel(.done)
-            .onSubmit { finish(todo.title) }
+            .onSubmit { finish(todo.title, original) }
             .onChange(of: todo.title) { _, title in
                 // A vertical field takes Return as a new line: here it finishes.
                 if title.contains("\n") {
@@ -494,8 +511,11 @@ private struct TitleEditor: View {
                     focused = false
                 }
             }
-            .onAppear { focused = true }
-            .onChange(of: focused) { _, now in if !now { finish(todo.title) } }
+            .onAppear {
+                original = todo.title
+                focused = true
+            }
+            .onChange(of: focused) { _, now in if !now { finish(todo.title, original) } }
     }
 }
 

@@ -53,11 +53,7 @@ struct TodayView: View {
         }
         // No footer: pull down past the top to close, as To-do and Browse for
         // Me do. It freshens itself when opened, so it needs no pull to refresh.
-        .onScrollGeometryChange(for: Bool.self) { geometry in
-            geometry.contentOffset.y < -geometry.contentInsets.top - 90
-        } action: { _, pulled in
-            if pulled { browser.panel = .none }
-        }
+        .pullsDownToClose { browser.panel = .none }
         .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas) }
         // The app's bar, for Today: search from here, refresh it.
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -374,7 +370,9 @@ struct TodayView: View {
             Button("Don't Show \(story.host)") {
                 Task {
                     await FeedStore.shared.dontShow(host: story.host)
-                    browser.showToast("News won't show \(story.host)")
+                    browser.offerUndo("News won't show \(story.host)") {
+                        Task { await FeedStore.shared.showAgain(host: story.host) }
+                    }
                 }
             }
         }
@@ -660,6 +658,9 @@ struct NewsSitesSheet: View {
                         addTopic()
                         addBlock()
                         if chosen != NewsSite.chosen || topics != NewsTopics.chosen || blocks != NewsBlocks.chosen || less != NewsLess.chosen || hiddenSites != NewsHiddenSites.chosen {
+                            // Taken off the list: followed again if hiding it stopped that.
+                            let back = NewsHiddenSites.takeBack(NewsHiddenSites.chosen.filter { !hiddenSites.contains($0) })
+                            chosen += back.filter { !chosen.contains($0) }
                             // Before the sites: one followed here comes off this list.
                             NewsHiddenSites.chosen = hiddenSites
                             NewsSite.chosen = chosen

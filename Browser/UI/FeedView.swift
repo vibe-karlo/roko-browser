@@ -90,11 +90,7 @@ struct FeedView: View {
             NewsSitesSheet(showsNewsletters: true) { Task { await store.refresh(immediately: true) } }
                 .presentationBackground(Theme.panel)
         }
-        .onScrollGeometryChange(for: Bool.self) { geometry in
-            geometry.contentOffset.y < -geometry.contentInsets.top - 90
-        } action: { _, pulled in
-            if pulled { close() }
-        }
+        .pullsDownToClose { close() }
     }
 
     // MARK: Header
@@ -268,7 +264,11 @@ struct FeedView: View {
             // One site, or for an event, which of them.
             let hosts = Array(Set(item.stories.map(\.story.host))).sorted()
             if hosts.count == 1 {
-                Button("Don't Show \(hosts[0])") { dontShow(hosts[0]) }
+                Button { dontShow(hosts[0]) } label: {
+                    Text("Don't Show \(hosts[0])")
+                    // Says what else it does: hiding a site you follow also stops following it.
+                    if store.follows(host: hosts[0]) { Text("Also stops following it") }
+                }
             } else {
                 Menu("Don't Show a Site") {
                     ForEach(hosts, id: \.self) { host in
@@ -282,7 +282,9 @@ struct FeedView: View {
     private func dontShow(_ host: String) {
         Task {
             await store.dontShow(host: host)
-            browser.showToast("News won't show \(host)")
+            browser.offerUndo("News won't show \(host)") {
+                Task { await store.showAgain(host: host) }
+            }
         }
     }
 

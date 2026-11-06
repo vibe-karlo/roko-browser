@@ -422,13 +422,21 @@ final class FeedStore {
 
     /// Nothing more from this site, here or in Today: off the page now, and no longer followed.
     func dontShow(host: String) async {
-        NewsHiddenSites.chosen.insert(host, at: 0)
         let hidden = [host]
         let followed = NewsSite.chosen.contains { NewsHiddenSites.hides($0.host, in: hidden) }
-        if followed { NewsSite.chosen.removeAll { NewsHiddenSites.hides($0.host, in: hidden) } }
+        NewsHiddenSites.hide(host)
         await regroup()
         rebuild()
         if followed { TodayModel.shared.sitesChanged() } else { TodayModel.shared.applyLess() }
+    }
+
+    /// Don't Show taken back: its stories return, and it's followed again if it was.
+    func showAgain(host: String) async {
+        NewsHiddenSites.chosen.removeAll { $0 == host }
+        NewsSite.chosen += NewsHiddenSites.takeBack([host])
+        await regroup()
+        rebuild()
+        TodayModel.shared.sitesChanged()
     }
 
     private func setRead(_ links: [URL], at date: Date?) {

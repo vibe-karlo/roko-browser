@@ -140,3 +140,44 @@ private struct ScreenBarSurface: ViewModifier {
             .padding(.bottom, max(bottomInset - 20, 9) - bottomInset)
     }
 }
+
+extension View {
+    /// Pulled down past the top, the screen closes as the finger lifts: moved back
+    /// first, it stays. It says so past the line, and ticks there.
+    func pullsDownToClose(_ close: @escaping () -> Void) -> some View {
+        modifier(PullToClose(close: close))
+    }
+}
+
+private struct PullToClose: ViewModifier {
+    let close: () -> Void
+    @State private var pastLine = false
+    @State private var held = false
+
+    func body(content: Content) -> some View {
+        content
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentOffset.y < -geometry.contentInsets.top - 90
+            } action: { _, past in
+                pastLine = past
+            }
+            .onScrollPhaseChange { old, new in
+                held = new == .interacting
+                if old == .interacting, new != .interacting, pastLine { close() }
+            }
+            .overlay(alignment: .top) {
+                Group {
+                    if pastLine && held {
+                        Text("Release to close")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Theme.secondaryInk)
+                            .padding(.top, 14)
+                            .transition(.opacity)
+                    }
+                }
+                .animation(.easeOut(duration: 0.15), value: pastLine && held)
+                .allowsHitTesting(false)
+            }
+            .sensoryFeedback(.impact(weight: .light), trigger: pastLine) { _, past in past && held }
+    }
+}

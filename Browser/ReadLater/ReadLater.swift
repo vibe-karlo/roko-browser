@@ -163,10 +163,31 @@ final class ReadLater {
         persist()
     }
 
-    func remove(_ id: UUID) {
-        guard let index = pages.firstIndex(where: { $0.id == id }) else { return }
-        if let file = imageURL(of: pages[index]) { try? FileManager.default.removeItem(at: file) }
+    /// A page removed, with what puts it back where it was.
+    struct Removed {
+        let page: ReadLaterPage
+        let index: Int
+        let picture: Data?
+    }
+
+    @discardableResult
+    func remove(_ id: UUID) -> Removed? {
+        guard let index = pages.firstIndex(where: { $0.id == id }) else { return nil }
+        let page = pages[index]
+        var picture: Data?
+        if let file = imageURL(of: page) {
+            picture = try? Data(contentsOf: file)
+            try? FileManager.default.removeItem(at: file)
+        }
         pages.remove(at: index)
+        persist()
+        return Removed(page: page, index: index, picture: picture)
+    }
+
+    func restore(_ removed: Removed) {
+        guard !pages.contains(where: { $0.id == removed.page.id }) else { return }
+        pages.insert(removed.page, at: min(removed.index, pages.count))
+        if let picture = removed.picture, let file = imageURL(of: removed.page) { try? picture.write(to: file) }
         persist()
     }
 
