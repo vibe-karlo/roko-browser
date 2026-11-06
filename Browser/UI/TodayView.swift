@@ -525,11 +525,13 @@ struct NewsSitesSheet: View {
     @State private var mailProblem: String?
     @State private var makingAddress = false
     @State private var confirmsEnding = false
+    @State private var copiedAddress = false
     @Environment(\.dismiss) private var dismiss
     @State private var chosen = NewsSite.chosen
     @State private var topics = NewsTopics.chosen
     @State private var blocks = NewsBlocks.chosen
     @State private var block = ""
+    @State private var less = NewsLess.chosen
     @State private var address = ""
     @State private var topic = ""
     @State private var finding = false
@@ -605,6 +607,17 @@ struct NewsSitesSheet: View {
                 } footer: {
                     Text("Stories mentioning these don't show in News, even from sites you follow. Swipe to remove one.")
                 }
+
+                if !less.isEmpty {
+                    Section {
+                        ForEach(less) { entry in Text(entry.title).lineLimit(2) }
+                            .onDelete { less.remove(atOffsets: $0) }
+                    } header: {
+                        Text("Showing less like")
+                    } footer: {
+                        Text("Stories like these sink or leave News for two months. Swipe to remove one.")
+                    }
+                }
             }
             .scrollContentBackground(.hidden)
             .background(Theme.panel)
@@ -613,10 +626,14 @@ struct NewsSitesSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
-                        if chosen != NewsSite.chosen || topics != NewsTopics.chosen || blocks != NewsBlocks.chosen {
+                        // Typed and not added yet: what was typed was meant.
+                        addTopic()
+                        addBlock()
+                        if chosen != NewsSite.chosen || topics != NewsTopics.chosen || blocks != NewsBlocks.chosen || less != NewsLess.chosen {
                             NewsSite.chosen = chosen
                             NewsTopics.chosen = topics
                             NewsBlocks.chosen = blocks
+                            NewsLess.chosen = less
                             changed()
                         }
                         dismiss()
@@ -637,12 +654,20 @@ struct NewsSitesSheet: View {
                         .truncationMode(.middle)
                         .textSelection(.enabled)
                     Spacer()
-                    Button("Copy") { UIPasteboard.general.string = mailAddress }
+                    Button(copiedAddress ? "Copied" : "Copy") {
+                        UIPasteboard.general.string = mailAddress
+                        copiedAddress = true
+                        Task {
+                            try? await Task.sleep(for: .seconds(1.6))
+                            copiedAddress = false
+                        }
+                    }
+                    .sensoryFeedback(.success, trigger: copiedAddress) { _, copied in copied }
                 }
-                Button("End this address", role: .destructive) { confirmsEnding = true }
-                    .confirmationDialog("End this address? Newsletters sent to it will bounce. What's arrived stays.",
+                Button("Remove this address", role: .destructive) { confirmsEnding = true }
+                    .confirmationDialog("Remove this address? Newsletters sent to it will bounce. What's arrived stays.",
                                         isPresented: $confirmsEnding, titleVisibility: .visible) {
-                        Button("End It", role: .destructive) {
+                        Button("Remove It", role: .destructive) {
                             Task {
                                 await Newsletters.close()
                                 self.mailAddress = nil

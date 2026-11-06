@@ -206,6 +206,7 @@ struct FeedView: View {
             .contentShape(.rect)
         }
         .buttonStyle(RowButtonStyle())
+        .contextMenu { menu(item) }
         .feedSwipes(item, store: store, browser: browser)
         .onAppear { store.wantCheck(item.stories) }
         .onDisappear { store.dropCheck(item.stories) }
@@ -242,11 +243,28 @@ struct FeedView: View {
         }
         // Two buttons in one list row: without this a tap would press both.
         .buttonStyle(.plain)
-        .contextMenu {
-            Button(item.isRead ? "Mark Unread" : "Mark Read") {
-                item.isRead ? store.markUnread([item.id]) : store.markRead([item.id])
+        .contextMenu { menu(.story(item)) }
+    }
+
+    /// Held down: what a swipe does, and the wish to see less of it.
+    @ViewBuilder
+    private func menu(_ item: FeedItem) -> some View {
+        let read = item.stories.allSatisfy(\.isRead)
+        let links = item.stories.map(\.id)
+        Button(read ? "Mark Unread" : "Mark Read") {
+            read ? store.markUnread(links) : store.markRead(links)
+        }
+        if case .story(let story) = item, !story.story.isMail {
+            Button("Save to Read Later") { save(story) }
+        }
+        // A newsletter has its own way out: Unsubscribe.
+        if !item.stories.contains(where: \.story.isMail) {
+            Button("Show Less News Like This") {
+                Task {
+                    await store.showLess(item)
+                    browser.showToast("Showing less like this")
+                }
             }
-            Button("Save to Read Later") { save(item) }
         }
     }
 
@@ -282,6 +300,7 @@ struct FeedView: View {
             .contentShape(.rect)
         }
         .buttonStyle(RowButtonStyle())
+        .contextMenu { menu(item) }
         .feedSwipes(item, store: store, browser: browser)
         .onAppear { store.wantCheck(item.stories) }
         .onDisappear { store.dropCheck(item.stories) }
@@ -340,6 +359,7 @@ struct FeedView: View {
             .contentShape(.rect)
         }
         .buttonStyle(RowButtonStyle())
+        .contextMenu { menu(.story(item)) }
         .feedSwipes(.story(item), store: store, browser: browser)
     }
 
