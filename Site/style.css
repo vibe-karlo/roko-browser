@@ -123,8 +123,6 @@ div>.row:has(span){min-height:54px}
 .board{width:min(640px,100%);margin:clamp(28px,4vw,48px) auto 0;text-align:left}
 .board .shops{justify-content:center;flex-wrap:wrap;padding:0}
 .board .measures button{font-size:clamp(15px,4.2vw,17px)}
-.board .sites{min-height:34px;margin-top:2px;transition:opacity .2s}
-.board .sites.off{opacity:0;pointer-events:none}
 .runs{position:relative;margin-top:clamp(18px,3vw,28px)}
 .run{display:grid;grid-template-columns:1fr auto;gap:7px 12px;align-items:baseline;height:var(--row);padding-top:8px;--row:53px}
 .runs.live{height:calc(var(--n)*53px);transition:height .5s cubic-bezier(.2,.8,.2,1)}

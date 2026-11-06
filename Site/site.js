@@ -306,34 +306,36 @@ if (!still) {
 
 // The scoreboard: one set of rows that moves to its new place for each measure.
 const proofData = {
-  data: {
-    unit: v => v.toFixed(2) + " MB", low: true,
-    note: "All the data the iPhone received in the 40 seconds after opening each page, including about 0.7 MB it uses when idle. One run, on an earlier roko build and before Lens 1.1.",
-    sites: {
-      dailymail: { head: "A third of Chrome's data.", values: { roko: 5.27, safari: 5.32, lens: 7.32, brave: 8.52, firefox: 11.92, edge: 13.20, duckduckgo: 15.04, arc: 15.84, chrome: 16.72 } },
-      forbes: { head: "A seventh of Chrome's data.", values: { roko: 0.96, safari: 4.87, lens: 5.88, firefox: 6.15, duckduckgo: 6.29, edge: 6.31, chrome: 6.99, arc: 13.44, brave: 19.09 } },
-    },
+  speed: {
+    unit: v => v.toFixed(2) + " s", low: true, head: "The fastest of ten browsers.",
+    note: "Time from opening a link until half of the page is drawn, on CNN, Daily Mail, The Guardian, The Independent, Index.hr, the New York Post, The Sun and Wikipedia, sites each browser had opened before. Median of 24 runs each, in random order, measured from the screen.",
+    values: { roko: 1.07, quiche: 1.70, lens: 2.76, arc: 3.41, firefox: 3.47, brave: 3.54, duckduckgo: 4.33, chrome: 4.96, safari: 4.96, edge: 5.46 },
   },
   block: {
-    unit: v => v.toFixed(0) + "%", low: false, head: "Blocks more than Brave.",
-    note: "Of the 122 hosts on d3ward's public ad and tracker list that at least one browser reached, the share each browser stopped. One run each, on a roko test build and Lens 1.1.",
-    values: { roko: 83.6, brave: 66.4, arc: 64.8, lens: 54.9, safari: 44.3, duckduckgo: 24.6, firefox: 13.9, edge: 7.4, chrome: 0 },
+    unit: v => v.toFixed(1) + " a page", low: true, head: "Blocks the most ads and trackers.",
+    note: "Ad and tracker servers reached per page, by Peter Lowe's and Disconnect's lists, which roko doesn't draw on, leaving out cookie consent tools. Average of 40 runs each on 16 sites, from the phone's traffic. A browser stopped at a cookie wall reaches fewer.",
+    values: { roko: 0.7, arc: 0.9, brave: 1.7, duckduckgo: 2.7, quiche: 4.2, firefox: 5.7, safari: 5.7, edge: 9.8, lens: 16.4, chrome: 16.4 },
   },
-  speed: {
-    unit: v => v.toFixed(2) + " s", low: true, head: "Beats Chrome and Safari.",
-    note: "From opening a link to a small test page on local Wi-Fi until it finished loading. Median of 20 runs each for roko 0.1.1 and Lens 1.1, taken in turn, and 3 or 4 for the others.",
-    values: { roko: 1.04, lens: 1.04, edge: 1.23, firefox: 1.25, brave: 1.32, chrome: 1.38, arc: 1.41, safari: 1.55, duckduckgo: 1.84 },
+  clean: {
+    unit: v => v.toFixed(0) + " of 6", low: false, head: "No ads left to scroll past.",
+    note: "Pages with no visible ad, pop-up or wall after five swipes, on CNN, Daily Mail, The Guardian, The Independent, the New York Post and The Sun. One run each, judged by eye.",
+    values: { roko: 6, brave: 3, duckduckgo: 3, lens: 3, quiche: 2, arc: 2, firefox: 1, safari: 0, chrome: 0, edge: 0 },
+  },
+  data: {
+    unit: v => v.toFixed(1) + " MB", low: true, head: "The least data on a first visit.",
+    note: "All the data the iPhone received in the 20 seconds after opening each page for the first time, added up over eight news sites. One run each. A browser stopped at a cookie wall loads less. On later visits, with pages mostly cached, Quiche and Firefox use less.",
+    values: { roko: 32.6, quiche: 37.5, firefox: 39.2, lens: 47.1, duckduckgo: 52.7, chrome: 56.0, safari: 56.4, arc: 63.4, brave: 63.8, edge: 64.5 },
   },
 };
-const proofMethod = " iPhone 17 Pro, iOS 27.2, 5 November 2026. Safari 27.2, Chrome 157, Firefox 159, Edge 156, Brave 1.98, DuckDuckGo 7.244, Arc Search 1.49. Yours will vary. ";
+const proofMethod = " iPhone 17 Pro, iOS 27.2, 5 to 6 November 2026. roko 0.1.2, Safari 27.2, Chrome 157, Firefox 159, Edge 156, Brave 1.98, DuckDuckGo 7.244, Arc Search 1.49, Lens 1.1, Quiche. Yours will vary. ";
 const runs = document.getElementById("runs");
 if (runs) {
   const rows = [...runs.children], head = document.getElementById("proofHead"), note = document.getElementById("proofNote");
-  const measures = [...document.querySelectorAll(".measures button")], sites = [...document.querySelectorAll(".sites button")], siteRow = document.querySelector(".sites");
-  let measure = "data", site = "dailymail";
+  const measures = [...document.querySelectorAll(".measures button")];
+  let measure = "speed";
   const fill = (row, width) => { row.querySelector("i").style.width = width; };
   const show = () => {
-    const m = proofData[measure], view = m.sites ? m.sites[site] : m;
+    const m = proofData[measure], view = m;
     const max = Math.max(...Object.values(view.values));
     const order = Object.keys(view.values).sort((a, b) => m.low ? view.values[a] - view.values[b] : view.values[b] - view.values[a]);
     runs.style.setProperty("--n", order.length);
@@ -349,18 +351,14 @@ if (runs) {
     note.innerHTML = "";
     note.append(m.note + proofMethod);
     const how = document.createElement("a");
-    how.href = "https://github.com/vibe-karlo/roko-browser/tree/main/Scripts/compare";
+    how.href = "https://github.com/vibe-karlo/roko-browser/tree/main/Scripts/compare/real-sites";
     how.textContent = "Run the test yourself.";
     note.append(how);
     for (const b of measures) b.setAttribute("aria-pressed", b.dataset.m === measure);
-    for (const b of sites) b.setAttribute("aria-pressed", b.dataset.s === site);
-    siteRow.classList.toggle("off", measure !== "data");
-    for (const b of sites) b.tabIndex = measure === "data" ? 0 : -1;
   };
   runs.classList.add("live");
   show();
   for (const b of measures) b.addEventListener("click", () => { measure = b.dataset.m; show(); });
-  for (const b of sites) b.addEventListener("click", () => { site = b.dataset.s; show(); });
   // Bars run out once as the board comes into view. They empty only just before
   // it's on screen, and fill on their own if the second signal never arrives.
   if (!still) {

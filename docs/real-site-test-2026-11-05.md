@@ -73,10 +73,17 @@ other way past a wall costs money, roko accepts it, with ads and trackers still 
 
 ## Data
 
-Not a lead for roko. Median MB per run in a 20 s window: Quiche 0.4, Firefox 1.2, roko 1.4, Brave 1.5, DuckDuckGo 1.8,
-Lens 2.0, Edge 2.0, Chrome 2.0, Arc 2.3, Safari 2.4. Totals over the three rounds: Brave 56, Quiche 64, roko 81, others 87 to
-146. roko was high on CNN (8.8 against 2.1 for Chrome). The counters are for the whole phone, and iOS was
-downloading an update during part of the test, so these are rough.
+All the data the iPhone received in 20 s. The counters are for the whole phone, and iOS was downloading an update during
+part of the test, so these are rough.
+
+First visit to eight news sites, added up, one run each: roko 32.6 MB, Quiche 37.5, Firefox 39.2, Lens 47.1, DuckDuckGo 52.7,
+Chrome 56.0, Safari 56.4, Arc 63.4, Brave 63.8, Edge 64.5. A browser stopped at a wall loads less. One of roko's eight was
+Corriere's crash (4.8 MB); without Corriere roko still has the least, at 27.7 MB against Quiche's 30.0.
+
+Return visits, median per run: Quiche 0.4, Firefox 1.2, roko 1.4, Brave 1.5, DuckDuckGo 1.8, Lens 2.0, Edge 2.0, Chrome 2.0,
+Arc 2.3, Safari 2.4. roko's extra was nearly all on CNN (8.8 against 2.1 for Chrome), from decorative looping videos, which
+Chrome and Safari also fetched (about 8 MB) in the round they got that far. Since fixed: CNN takes 1.6 to 2.8 MB on the phone
+until you scroll. These return-visit numbers haven't been measured again across all ten browsers.
 
 ## What to keep in mind
 

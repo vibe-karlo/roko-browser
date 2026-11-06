@@ -361,6 +361,44 @@
   if (document.readyState === "complete") armRefusal();
   else addEventListener("load", armRefusal, { once: true });
 
+  // MARK: Videos that loop by themselves
+
+  // Blocking autoplay in WebKit stops video with sound, not muted video, so a page's
+  // decorative loops all download at once however far down they are (CNN's: 6 MB before
+  // you scroll). Each waits until it's near the screen, then plays as the page meant it to.
+  // Only plain files: a player's stream (blob:) or a video with controls is left alone.
+  const parked = new Map();
+  const isLoop = (video) => video.tagName === "VIDEO" && !video.controls && (video.muted || video.defaultMuted)
+    && (video.loop || video.autoplay) && /^https?:/.test(video.currentSrc || video.src);
+  const nearScreen = (el) => {
+    const rect = el.getBoundingClientRect();
+    return rect.bottom > -innerHeight && rect.top < innerHeight * 2;
+  };
+  const wakeLoops = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting || !parked.has(entry.target)) continue;
+      const video = entry.target, { src, sources } = parked.get(video);
+      parked.delete(video);
+      wakeLoops.unobserve(video);
+      if (src) video.setAttribute("src", src);
+      video.append(...sources);
+      video.preload = "auto";
+      video.load();
+      video.play().catch(() => {});
+    }
+  }, { rootMargin: "100% 0px" });
+  const parkLoop = ({ target: video }) => {
+    if (parked.has(video) || !isLoop(video) || nearScreen(video)) return;
+    parked.set(video, { src: video.getAttribute("src"), sources: [...video.querySelectorAll("source")] });
+    video.removeAttribute("src");
+    for (const source of parked.get(video).sources) source.remove();
+    video.preload = "none";
+    video.load();
+    wakeLoops.observe(video);
+  };
+  document.addEventListener("loadstart", parkLoop, true);
+  document.addEventListener("play", parkLoop, true);
+
   // The first request goes with the next frame, for the first paint. Later
   // ones wait for the page to settle a little: a page building itself asked
   // once a frame, and eleven requests in twelve brought nothing back.

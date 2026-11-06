@@ -6,12 +6,16 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Website
+- The scoreboard now shows the real-site test: speed, ads and trackers reached, clean pages and data on a first visit, across ten browsers, with the method under each.
 - A scoreboard beside the speed section: nine browsers on one iPhone, re-sorting themselves for data used, trackers blocked and time to page, with the method, date and versions under it and a link to the test in `Scripts/compare`.
 - roko has a site in `Site/`, phone first: a live iPhone in true proportions with the bar and a working keyboard, speed numbers, a draggable summary, a before and after slider, Split View with a divider to drag, a made-up page to tap things away on, a private switch to try, hold to speak to try, a to-do widget and a shopping list that really tick, which AI runs where, iPhone Duo in the questions, a link to the code on GitHub, support and the privacy policy.
 - The site has a changelog at `/changes`, linked from the home page's footer: what each public version brought, in short lines.
 
 ### Added
 - Sites' own anti-adblock walls are beaten before they come up, on about 8,200 sites, with uBlock Origin's site rules (GPL-3.0): a small change to the page before it runs, such as BILD's `"adBlockWallEnabled":true` turned false. Only a site with a rule pays for it. Its ads stay blocked, where before the page went blank and its ads were let through.
+
+### Changed
+- Muted videos that loop by themselves wait until they're near the screen before they download. Blocking autoplay in WebKit doesn't stop muted video, and CNN's front page used 8 MB or more on them before you scrolled; it now takes about 2 MB.
 
 ### Fixed
 - A link from another app no longer lands under the day's first Today, or any other panel. Today waits for your next return.

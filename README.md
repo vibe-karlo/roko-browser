@@ -404,6 +404,10 @@ words and an anti-adblock wall in it, `ContentBlocker.pageRefusedToShow` takes t
 the ads list compiled with scripts and their requests let through, kept for that site, then that site's ads.
 A page with no rule is the case for this: the check also runs 1.5 seconds after a wall is hidden.
 
+**Videos that loop by themselves.** `mediaTypesRequiringUserActionForPlayback = .all` doesn't stop muted video.
+`cosmetic-filter.js` holds back a plain muted, looping or autoplaying `<video>` with no controls until it's within
+a screen of view. Streams (`blob:`) and videos with controls are left alone.
+
 **A page that keeps crashing.** Twice in a row within a minute, and `BrowserTab` loads it once more without
 the hiding script or site scripts (`ContentBlocker.loadGently`, until roko is next opened), its requests
 still blocked, before showing "This page keeps stopping".
