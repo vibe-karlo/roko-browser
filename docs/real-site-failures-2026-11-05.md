@@ -18,13 +18,12 @@ did worse than another browser is here, with its cause and what became of it. Re
 | 11 | Tracker reached | The Telegraph | `beacon.viafoura.io` reached | Our copy of the lists was ten days old and didn't have it yet | Fixed by refreshing the lists; they need refreshing before each release |
 | 12 | Link covered | Any | A link from another app on the day's first launch opened under Today | Today opened on launch regardless of the link. Found on Le Monde in the re-test | Fixed in general, tested in the simulator only: the phone had already shown Today that day |
 | 13 | Empty box | Marca, Welt | "Publicidad" strip stuck at the bottom; grey box at the top of the page | Slots holding their own script or style, which the fold-away script counted as text a reader could want, and a close button's hidden words | Fixed in general, confirmed on the phone |
-| 14 | Slow | Daily Mail | 3.2 to 3.9 s in some rounds, 1.2 s in others, against about 1.5 s for Quiche | See below | Open |
+| 14 | Slow | Daily Mail | 3.2 to 3.9 s in some rounds, 1.2 s in others | In a slow run the page commits, paints nothing, and navigates again with 1 s to its first byte; a quick run commits once. It looks like the site's own bounce (Quiche had 3.21 s once too), not proven | Not roko's as far as known |
 
 Checked and not roko's:
 
 - **New York Post, black screen for about 20 s in one run.** The site's own stall: Edge hit the same one a minute later. 2 of 40 runs.
 - **New York Post, 130 MB in that run.** iOS was downloading from `updates.cdn-apple.com` at the time, and the data counters are for the whole phone.
 - **Marca with no styling, 6 November from about 09:10.** Marca's own fault: its phone page came with the wrong stylesheet (`main-cover` instead of `main-cover-mobile`). A plain Chromium browser, Safari and Firefox showed the same page. Brave and DuckDuckGo showed it styled, for a reason not established.
-- **Daily Mail, slow once.** 3.9 s in one round, 1.2 s in the other two.
 - **`www.googletagmanager.com` on The Independent, `cdn.optimizely.com` on CNN, `tags.tiqcdn.com` on The Sun.** EasyPrivacy lets these through on purpose on those sites, or doesn't list them, to keep the pages working. Brave reaches the same ones. Left alone.
 
