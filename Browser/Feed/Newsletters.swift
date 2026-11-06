@@ -60,7 +60,8 @@ enum Newsletters {
         UserDefaults.standard.removeObject(forKey: addressKey)
     }
 
-    /// What's arrived since last time, as stories, and off the server once kept here.
+    /// What's arrived since last time, as stories. Off the server only once they're
+    /// saved (`forgetKept`): until then a closed app would have lost them.
     /// With roko closed there's no web view to read a mail with: its plain text it is.
     static func fetch(inBackground: Bool) async -> [NewsStory] {
         guard let server = AnswerSharing.server, let key = Keychain.inboxKey else { return [] }
@@ -89,12 +90,26 @@ enum Newsletters {
             story.unsubscribe = mail.unsubscribe.flatMap(URL.init(string:))
             story.content = PageReader.withoutFurniture(text, forMail: true)
             stories.append(story)
-            var done = URLRequest(url: server.appending(path: "api/inbox/\(mail.id)"), timeoutInterval: 15)
+            kept.append(mail.id)
+        }
+        return stories
+    }
+
+    /// Fetched but still only in memory: on the server until `forgetKept`.
+    private static var kept: [String] = []
+
+    /// Off the server, now they're saved here. Had roko been closed before this,
+    /// they'd have been fetched again next time and landed on the same stories.
+    static func forgetKept() async {
+        guard let server = AnswerSharing.server, let key = Keychain.inboxKey else { return }
+        let ids = kept
+        kept = []
+        for id in ids {
+            var done = URLRequest(url: server.appending(path: "api/inbox/\(id)"), timeoutInterval: 15)
             done.httpMethod = "DELETE"
             done.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
             _ = try? await URLSession.quick.data(for: done)
         }
-        return stories
     }
 
     static func original(of link: URL) -> String? {

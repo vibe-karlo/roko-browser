@@ -169,6 +169,8 @@ struct CommandBarView: View {
             browser.launcherRows = false
             // Closed without opening it: the preloaded page goes.
             browser.dropPreload()
+            // However it closed, the microphone doesn't stay on.
+            browser.cancelVoice()
         }
         .task {
             guard browser.launcherContext == .web, await CopiedLink.isWaiting() else { return }

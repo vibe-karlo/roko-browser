@@ -91,7 +91,9 @@ struct TabStackView: View {
         let cardHeight = (cardWidth * 0.64).rounded()
         return ScrollViewReader { reader in
             ScrollView {
-                TileGrid(columns: columns, gap: gap) {
+                // Lazily: with every tile made at once, every tab's picture was read at
+                // once, and most were thrown away again before they could be shown.
+                LazyVGrid(columns: Array(repeating: GridItem(.fixed(cardWidth), spacing: gap), count: columns), spacing: 16) {
                     ForEach(browser.tabs) { tab in
                         TabTile(tab: tab, width: cardWidth, height: cardHeight,
                                 isCurrent: tab.id == browser.selectedID,
@@ -114,7 +116,12 @@ struct TabStackView: View {
                     LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: 18)
                 }
             }
-            .onAppear { reader.scrollTo(browser.selectedID, anchor: .center) }
+            .onAppear {
+                // A screen of tiles is more than the dozen pictures a carousel needs.
+                BrowserTab.keepPictures(30)
+                reader.scrollTo(browser.selectedID, anchor: .center)
+            }
+            .onDisappear { BrowserTab.keepPictures(BrowserTab.usualPictures) }
             .animation(.snappy(duration: 0.3), value: browser.tabs.map(\.id))
         }
     }
@@ -529,30 +536,6 @@ private struct TabPicture: View {
             }
         }
         .animation(.easeOut(duration: 0.15), value: tab.thumbnail == nil)
-    }
-}
-
-/// Row under row. One layout for all of them, so a card slides to
-/// its new place when one before it closes.
-private struct TileGrid: Layout {
-    let columns: Int
-    let gap: CGFloat
-    private let rowGap: CGFloat = 16
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        guard let tile = subviews.first?.sizeThatFits(.unspecified) else { return .zero }
-        let rows = CGFloat((subviews.count + columns - 1) / columns)
-        return CGSize(width: tile.width * CGFloat(columns) + gap * CGFloat(columns - 1),
-                      height: tile.height * rows + rowGap * (rows - 1))
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        guard let tile = subviews.first?.sizeThatFits(.unspecified) else { return }
-        for (index, subview) in subviews.enumerated() {
-            let x = bounds.minX + CGFloat(index % columns) * (tile.width + gap)
-            let y = bounds.minY + CGFloat(index / columns) * (tile.height + rowGap)
-            subview.place(at: CGPoint(x: x, y: y), proposal: .unspecified)
-        }
     }
 }
 

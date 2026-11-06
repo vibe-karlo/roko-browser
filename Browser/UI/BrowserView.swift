@@ -492,6 +492,9 @@ struct BrowserView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .background {
                 browser.saveTabs()
+                // Nobody's typing, and nobody's speaking to it.
+                browser.dropPreload()
+                browser.cancelVoice()
                 WatchScheduler.schedule(in: context)
                 TodayModel.scheduleMorningRefresh()
                 FeedStore.scheduleRefresh()

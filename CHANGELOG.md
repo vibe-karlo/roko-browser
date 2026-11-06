@@ -21,6 +21,14 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - roko wears the website's colours: a warm near-black and off-white, warm greys, and one red-orange. Its light is the website's wash with visible grain, full width and brightest at the lower left, in light and dark. It sits quietly behind Today, To-do, Shopping and Read Later, and on Today it rises as you read down.
 
 ### Fixed
+- A memory warning no longer reads every open tab's picture from disk; it lets them go instead.
+- A page iOS reclaims in a tab out of sight waits to be selected, rather than reloading at once with the others.
+- News holds its pictures at the size they're shown: about 15 MB more with News open, down from about 135 MB. They're also kept on disk between visits.
+- An open Duo's tab grid reads only the pictures it shows, and doesn't lose them on screen.
+- A page preloading behind the launcher can't show a dialog or start a download while you type.
+- The microphone stops after 8 seconds with no words and after a minute in all, and whenever the launcher closes or roko leaves the screen. A microphone with no usable format can't stop the app.
+- Newsletters stay on the server until they're saved here, so closing roko mid-refresh can't lose one.
+- News keeps the longer copy of an article, and read marks can't be undone by an older save landing late.
 - News' lead picture could turn into a strange zoomed crop moments after it appeared, a tail fin and a red band where there had been a whole plane. The article's share picture was replacing the feed's, and a second picture of another shape drew too large and off centre. Both are fixed: pictures now fill their frame on their own, and the share picture only replaces a feed's thumbnail, as on BBC. The same goes for the picture above an article in Reader.
 - A story you've read in News showed its site's icon through its dimmed picture.
 - When something goes wrong roko says so, and for long enough to read: a look that found nothing says it couldn't reach your sites rather than that there's no news, and a refused microphone or notification offers Settings.

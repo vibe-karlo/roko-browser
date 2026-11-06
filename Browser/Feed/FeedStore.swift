@@ -209,10 +209,13 @@ final class FeedStore {
         if !inBackground { read = await withPictures(read) }
         refreshFailed = false
         merge(read)
-        refreshedAt = .now
+        // Closed part way: what's in is kept, but it isn't a whole refresh.
+        if !Task.isCancelled { refreshedAt = .now }
         await regroup()
         publish()
         persist()
+        await writing?.value
+        await Newsletters.forgetKept()
     }
 
     /// A sitemap or a search names no pictures, but each story's page does, in its head.
@@ -268,6 +271,9 @@ final class FeedStore {
         Task.detached(priority: .utility) {
             try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             for (file, body, linksFile, links) in writes {
+                // A feed's opening lines never replace the whole article Reader saved here.
+                let size = (try? file.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+                if size >= body.utf8.count { continue }
                 try? body.write(to: file, atomically: true, encoding: .utf8)
                 try? JSONEncoder().encode(links).write(to: linksFile, options: .atomic)
             }
@@ -562,9 +568,22 @@ final class FeedStore {
     private func persist() {
         let saved = Saved(stories: stories, refreshedAt: refreshedAt, verdicts: verdicts, comparisons: comparisons,
                           unsummarized: Array(unsummarized))
-        let file = Self.file
-        Task.detached(priority: .utility) {
-            if let data = try? JSONEncoder().encode(saved) { try? data.write(to: file, options: .atomic) }
+        // One write at a time, the latest last: an older copy landing after a newer
+        // one brought back what you'd just marked read. Saves made during a write
+        // come down to the last of them.
+        toWrite = saved
+        guard writing == nil else { return }
+        writing = Task {
+            while let next = toWrite {
+                toWrite = nil
+                let file = Self.file
+                await Task.detached(priority: .utility) {
+                    if let data = try? JSONEncoder().encode(next) { try? data.write(to: file, options: .atomic) }
+                }.value
+            }
+            writing = nil
         }
     }
+    @ObservationIgnored private var toWrite: Saved?
+    @ObservationIgnored private var writing: Task<Void, Never>?
 }

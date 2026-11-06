@@ -409,6 +409,8 @@ final class BrowserModel {
         }
         BrowserTab.dropThumbnails(except: selectedID)
         WebViewFactory.dropPrewarmed()
+        dropPreload()
+        FeedPictures.dropFromMemory()
         FaviconStore.shared.trimMemory()
     }
 
@@ -564,6 +566,7 @@ final class BrowserModel {
             // reflow when it's shown. The page is drawn before Go, not after.
             if let window = UIApplication.shared.connectedScenes
                 .compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first, let webView = tab.webView {
+                (webView as? EdgeToEdgeWebView)?.preloading = true
                 webView.frame = window.bounds
                 window.insertSubview(webView, at: 0)
             }
@@ -579,10 +582,13 @@ final class BrowserModel {
 
     private func takePreloaded(_ url: URL) -> BrowserTab? {
         preloadWait?.cancel()
-        guard let preloaded, preloaded.url == url else {
+        // A file, which a preload doesn't fetch, left nothing to show: the real tab fetches it.
+        guard let preloaded, preloaded.url == url,
+              preloaded.tab.isLoading || preloaded.tab.webView?.backForwardList.currentItem != nil else {
             dropPreload()
             return nil
         }
+        (preloaded.tab.webView as? EdgeToEdgeWebView)?.preloading = false
         self.preloaded = nil
         return preloaded.tab
     }
@@ -1207,7 +1213,9 @@ final class BrowserModel {
                 try? await Task.sleep(for: .milliseconds(200))
                 let now = Date.now
                 if let last = voice.lastVoiceAt, !voice.partial.isEmpty, now.timeIntervalSince(last) > 1.4 { break }
-                if voice.lastVoiceAt == nil, now.timeIntervalSince(voice.startedAt) > 8 { break }
+                // No words yet, whatever noise there's been. And never for long.
+                if voice.partial.isEmpty, now.timeIntervalSince(voice.startedAt) > 8 { break }
+                if now.timeIntervalSince(voice.startedAt) > 60 { break }
             }
             if !Task.isCancelled { finishVoice() }
         }
