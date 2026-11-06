@@ -15,6 +15,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - A page opened from Saved has a way back: an arrow in the bar, in the tabs button's place, that goes back through the tab's pages and then to Saved. Swipe up on the bar still has the tabs. The list opens at the group or search you left, and the page's tab closes.
 - Saved's bar now searches the list, since it holds what you keep as well as what you mean to read. Summarize all moved to the button on its right, and shows while there's something unread.
 
+### Changed
+- roko wears the website's colours: a warm near-black and off-white, warm greys, and one red-orange. Its light is the website's wash with visible grain, full width and brightest at the lower left, in light and dark. It sits quietly behind Today, To-do, Shopping and Read Later, and on Today it rises as you read down.
+
 ### Fixed
 - News' lead picture could turn into a strange zoomed crop moments after it appeared, a tail fin and a red band where there had been a whole plane. The article's share picture was replacing the feed's, and a second picture of another shape drew too large and off centre. Both are fixed: pictures now fill their frame on their own, and the share picture only replaces a feed's thumbnail, as on BBC. The same goes for the picture above an article in Reader.
 - A story you've read in News showed its site's icon through its dimmed picture.

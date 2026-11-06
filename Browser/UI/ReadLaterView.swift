@@ -112,7 +112,7 @@ struct ReadLaterView: View {
             }
         }
         .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas) }
-        .background(Theme.canvas.ignoresSafeArea())
+        .background { PageLight() }
         .foregroundStyle(Theme.ink)
         // Topics for pages saved elsewhere, and for any it couldn't choose before.
         .task(id: store.pages.map(\.id)) { store.sortNew() }

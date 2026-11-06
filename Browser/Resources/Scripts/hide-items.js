@@ -117,7 +117,7 @@
       if (!box) {
         box = document.createElement("div");
         box.setAttribute("aria-hidden", "true");
-        box.style.cssText = "position:fixed;z-index:2147483647;pointer-events:none;box-sizing:border-box;border:2px solid #FF5B1F;background:rgba(255,91,31,.14);border-radius:6px;opacity:0;transition:left .12s,top .12s,width .12s,height .12s,opacity .12s;";
+        box.style.cssText = "position:fixed;z-index:2147483647;pointer-events:none;box-sizing:border-box;border:2px solid #C94A2E;background:rgba(201,74,46,.14);border-radius:6px;opacity:0;transition:left .12s,top .12s,width .12s,height .12s,opacity .12s;";
       }
       document.documentElement.appendChild(box);
       addEventListener("click", onClick, true);

@@ -11,6 +11,7 @@ struct TodayView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \Todo.createdAt) private var todos: [Todo]
     @State private var today = TodayModel.shared
+    @State private var lightRise = PageRise()
     @State private var choosingSites = false
     @State private var choosingCalendars = false
     @State private var choosingPlace = false
@@ -62,14 +63,15 @@ struct TodayView: View {
                        launch: { browser.showCommandBar(over: .today) },
                        trailing: .init(glyph: .reload, label: "Refresh") { Task { await today.refresh() } })
         }
-        .background {
-            ZStack {
-                Theme.canvas
-                // Morning light, low at the bottom edge. Still: it isn't working on anything.
-                WorkingGlow(progress: 0, isActive: true, breathes: false)
-            }
-            .ignoresSafeArea()
+        // Morning light, low at the bottom edge. It only rises, as you read down.
+        .onScrollGeometryChange(for: Double.self) { geometry in
+            let room = max(geometry.contentSize.height - geometry.containerSize.height, 1)
+            let read = min(max((geometry.contentOffset.y + geometry.contentInsets.top) / room, 0), 1)
+            return (read * 5).rounded() * 0.05
+        } action: { _, rise in
+            if rise > lightRise.level { lightRise.level = rise }
         }
+        .background { RisingPageLight(rise: lightRise) }
         .foregroundStyle(Theme.ink)
         .onAppear {
             today.appeared()
