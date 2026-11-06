@@ -73,6 +73,7 @@ struct BrowserView: View {
                 // two at once (a layout on its way out took its page with it).
                 // Something playing in another tab: the page lifts into a card
                 // and the player sits in the dark band under it (after Lens).
+                // Exploration: the bar lives in the band too, under the live row.
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
                         pages
@@ -83,24 +84,34 @@ struct BrowserView: View {
                             // Sideways, a card: rounded just enough to read as one, as
                             // Split View's side-by-side cards are, so every corner matches.
                             .clipShape(UnevenRoundedRectangle(topLeadingRadius: sideBar ? 16 : 0,
-                                                              bottomLeadingRadius: sideBar || standsOnFold ? 16 : showsPlayer ? 22 : 0,
-                                                              bottomTrailingRadius: sideBar || standsOnFold ? 16 : showsPlayer ? 22 : 0,
+                                                              bottomLeadingRadius: sideBar || standsOnFold ? 16 : showsBand ? 22 : 0,
+                                                              bottomTrailingRadius: sideBar || standsOnFold ? 16 : showsBand ? 22 : 0,
                                                               topTrailingRadius: sideBar ? 16 : 0))
                             .frame(maxHeight: .infinity, alignment: .top)
-                        if !browser.liveItems.isEmpty {
-                            LiveBand()
-                                // Down into the home indicator's strip: on the black band it has room,
-                                // and keeping clear of all of it left a tall empty gap.
-                                .padding(.bottom, max(proxy.safeAreaInsets.bottom - 18, 4))
-                                .transition(.move(edge: .bottom))
+                        if showsBand {
+                            VStack(spacing: 0) {
+                                if !browser.liveItems.isEmpty {
+                                    LiveBand()
+                                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                                }
+                                if barInBand && !browser.isBarCollapsed {
+                                    BandBar()
+                                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                                }
+                            }
+                            // Down into the home indicator's strip: on the black band it has room,
+                            // and keeping clear of all of it left a tall empty gap.
+                            .padding(.bottom, max(proxy.safeAreaInsets.bottom - 18, 4))
+                            .transition(.move(edge: .bottom))
                         }
                     }
                     // Only below: the status bar's strip keeps the page's colour.
-                    .background { (showsPlayer ? Color.black : Color.clear).ignoresSafeArea(edges: .bottom) }
+                    .background { (showsBand ? Color.black : Color.clear).ignoresSafeArea(edges: .bottom) }
                     .ignoresSafeArea(edges: .bottom)
                     .animation(.snappy(duration: 0.3), value: browser.liveItems.isEmpty)
                     .animation(.snappy(duration: 0.25), value: browser.bandShowsStrip)
                     .animation(.snappy(duration: 0.3), value: standsOnFold)
+                    .animation(.snappy(duration: 0.28), value: browser.isBarCollapsed)
                 }
                 // Turned sideways the page is a card between two black strips:
                 // the Dynamic Island's on one side, the bar's on the other.
@@ -157,8 +168,9 @@ struct BrowserView: View {
                 .staysWithBar(browser)
                 .animation(.snappy(duration: 0.28), value: browser.barSide)
                 .ignoresSafeArea(.container, edges: uprightFold != nil ? .horizontal : [])
-                .opacity(sideBar || browser.splitList != nil ? 0 : 1)
-                .allowsHitTesting(!sideBar && browser.splitList == nil)
+                // Exploration: on an upright phone's page the bar is in the band.
+                .opacity(sideBar || barInBand || browser.splitList != nil ? 0 : 1)
+                .allowsHitTesting(!sideBar && !barInBand && browser.splitList == nil)
                 .opacity(browser.launcherShown || browser.panel == .tabs || browser.pageBecomingSummary || browser.hidingItems != nil ? 0 : 1)
                 .allowsHitTesting(browser.hidingItems == nil)
                 // Faded, not folded: folding changes the page's insets, which stops a pull dead.
@@ -169,8 +181,8 @@ struct BrowserView: View {
                 // Typing into a page, the keyboard covers the bar, as in Safari;
                 // risen above it, the bar sat on top of the form being filled in.
                 .ignoresSafeArea(.keyboard, edges: .bottom)
-                // Above the player's band when there is one.
-                .padding(.bottom, showsPlayer ? LiveBand.height(minimized: browser.bandShowsStrip) : 0)
+                // Above the player's band when there is one, where the bar still floats.
+                .padding(.bottom, showsPlayer && !barInBand ? LiveBand.height(minimized: browser.bandShowsStrip) : 0)
                 .animation(.snappy(duration: 0.3), value: showsPlayer)
         }
         .overlay {
@@ -533,7 +545,23 @@ struct BrowserView: View {
         !browser.liveItems.isEmpty && browser.selectedTab != nil
     }
 
-    private var playerLift: CGFloat { showsPlayer ? LiveBand.height(minimized: browser.bandShowsStrip) : 0 }
+    /// Exploration: the bar lives in the band on an upright phone's page. Sideways
+    /// and on an open Duo it stays as it is on main.
+    private var barInBand: Bool {
+        browser.selectedTab != nil && !sideBar && !standsOnFold && uprightFold == nil
+    }
+
+    /// The band under the page: the bar while it isn't folded away, and what's live.
+    private var showsBand: Bool {
+        showsPlayer || barInBand && !browser.isBarCollapsed
+    }
+
+    /// Offers and toasts sit just above the band, not where the floating bar was.
+    private var playerLift: CGFloat {
+        let live = showsPlayer ? LiveBand.height(minimized: browser.bandShowsStrip) : 0
+        guard barInBand else { return live }
+        return live + (browser.isBarCollapsed ? 0 : BandBar.height) - Theme.barHeight - 8
+    }
 
     private var splitHalves: (top: BrowserTab, bottom: BrowserTab?)? {
         if let split = browser.split, let top = browser.tab(split.top), let bottom = browser.tab(split.bottom) {
@@ -549,9 +577,9 @@ struct BrowserView: View {
     private var pages: some View {
         // Picking the second page and showing it are one view, for the same reason.
         if let halves = splitHalves {
-            SplitPages(top: halves.top, bottom: halves.bottom, barTop: sideBar || uprightFold != nil ? .greatestFiniteMagnitude : barTop)
+            SplitPages(top: halves.top, bottom: halves.bottom, barTop: sideBar || barInBand || uprightFold != nil ? .greatestFiniteMagnitude : barTop)
         } else if let tab = browser.selectedTab {
-            PagePane(tab: tab, barTop: sideBar || standsOnFold || uprightFold != nil ? .greatestFiniteMagnitude : barTop)
+            PagePane(tab: tab, barTop: sideBar || barInBand || standsOnFold || uprightFold != nil ? .greatestFiniteMagnitude : barTop)
         }
     }
 
