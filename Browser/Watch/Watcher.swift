@@ -120,8 +120,8 @@ enum Watcher {
         let verdict: (happened: Bool, notification: String)
         if watch.lookFor.isEmpty {
             // Anything new: new lines of real text, not a time or a counter ticking on.
-            let ticked = Set(removed.map(withoutDigits))
-            let news = added.filter { $0.count >= 30 && !ticked.contains(withoutDigits($0)) }
+            let ticked = Set(removed.map(withoutTime))
+            let news = added.filter { $0.count >= 30 && !ticked.contains(withoutTime($0)) }
             guard !news.isEmpty else { return }
             verdict = await WatchJudge.news(in: news) ?? WatchJudge.guess(lookFor: "", added: news)
         } else {
@@ -137,8 +137,19 @@ enum Watcher {
                                 url: watch.url, thread: watch.host)
     }
 
-    private static func withoutDigits(_ line: String) -> String {
-        String(line.unicodeScalars.filter { !CharacterSet.decimalDigits.contains($0) })
+    /// A label saying how long ago, in English or Croatian: "Just now", "1m ago", "2 hr. ago",
+    /// "prije 5 minuta", "upravo". Whole words like "3 hours" need their "ago".
+    private static let timeLabel = #"(just now|moments? ago|an? (minute|hour|day) ago|\d*\s*(s|secs?|seconds?|m|mins?|minutes?|h|hrs?|hours?|d|days?)\.?\s*ago|\d+\s*(s|m|h|d|mins?|hrs?)\.?|upravo|maloprije|prije\s+(\d+\s*|nekoliko\s+)?(sek|min|sat|dan)\p{L}*\.?)"#
+
+    /// A line without what ticks on: its digits, and a time label at its start, at its end
+    /// or set apart by separators, since "Just now" becoming "1m ago" has no digit to take
+    /// away. Only there: "Three hours of talks end" is news, not a label.
+    private static func withoutTime(_ line: String) -> String {
+        var plain = line.lowercased()
+        for pattern in [timeLabel + #"\s*$"#, "^\\s*" + timeLabel + #"\s*[:·|•,–-]"#, #"[·|•]\s*"# + timeLabel + #"\s*(?=[·|•])"#] {
+            plain = plain.replacingOccurrences(of: pattern, with: "", options: .regularExpression)
+        }
+        return String(plain.unicodeScalars.filter { !CharacterSet.decimalDigits.contains($0) })
     }
 }
 
