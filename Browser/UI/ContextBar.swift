@@ -85,7 +85,7 @@ struct ContextBar: View {
         .frame(maxWidth: verticalSizeClass == .compact || browser.uprightFoldOpen ? 480 : nil)
         .keepsOffFold()
         .ignoresSafeArea(.container, edges: browser.uprightFoldOpen ? .horizontal : [])
-        .modifier(ScreenBarSurface(sideways: verticalSizeClass == .compact))
+        .modifier(ScreenBarSurface())
     }
 
     /// A round button as the page bar's ⌃ is, or the same space kept empty,
@@ -112,7 +112,7 @@ struct ContextBar: View {
 /// The band: the same place on screen as a page's bar, down into the home
 /// indicator's strip, on the band's graphite.
 private struct ScreenBarSurface: ViewModifier {
-    var sideways = false
+    @State private var bottomInset: CGFloat = 34
 
     func body(content: Content) -> some View {
         content
@@ -127,7 +127,8 @@ private struct ScreenBarSurface: ViewModifier {
                     .ignoresSafeArea(edges: [.bottom, .horizontal])
                     .allowsHitTesting(false)
             }
-            // Sideways the strip is shallower: as far into it would sit on the home indicator.
-            .padding(.bottom, sideways ? -12 : -20)
+            .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { bottomInset = $0 }
+            // As far into the strip as a page's bar goes, on whatever the strip's depth is.
+            .padding(.bottom, max(bottomInset - 20, 9) - bottomInset)
     }
 }
