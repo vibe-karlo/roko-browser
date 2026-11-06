@@ -154,6 +154,13 @@ struct ToolsSheet: View {
                 ToolRow(glyph: .cook, title: "Cook Mode") { browser.cookThisPage() }
             }
 
+            // Not for private tabs: following keeps the site's address.
+            if !tab.isPrivate, tab.url?.displayHost != nil {
+                ToolRow(glyph: .news, title: "Follow in News", detail: browser.followsThisPage ? "Following" : "") {
+                    browser.followsThisPage ? (browser.panel = .feed) : browser.followPage()
+                }
+            }
+
             // Not for private tabs: the list keeps the page and its text.
             if !tab.isPrivate {
                 ToolRow(glyph: .readLater, title: "Read Later", detail: ReadLater.shared.contains(tab.url) ? "Saved" : "") {

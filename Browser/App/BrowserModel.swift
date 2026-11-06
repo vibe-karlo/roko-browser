@@ -6,7 +6,7 @@ import WebKit
 @Observable
 final class BrowserModel {
     enum Panel: Equatable {
-        case none, command, tabs, tools, settings, notifyMe, todos, today, shopping, readLater, downloads
+        case none, command, tabs, tools, settings, notifyMe, todos, today, shopping, readLater, feed, downloads
     }
 
     enum CommandMode {
@@ -1004,6 +1004,7 @@ final class BrowserModel {
         case "roko://todo": panel = .todos
         case "roko://shopping": panel = .shopping
         case "roko://read-later": panel = .readLater
+        case "roko://feed": panel = .feed
         // The parking timer: the bar, with the time left on top.
         case "roko://parking", "roko://bar": showCommandBar()
         case "roko://parking/extend": Parking.shared.extend()
@@ -1259,11 +1260,70 @@ final class BrowserModel {
         open(page.url, inNewTab: true)
     }
 
+    // MARK: Feed
+
+    /// A story from the feed, in Reader: it counts as read.
+    func read(_ story: NewsStory) {
+        FeedStore.shared.markRead([story.link])
+        let model = ReaderModel(host: story.host, story: story)
+        reader = model
+        Task { await model.load() }
+    }
+
+    /// Several sites' stories about one event, compared: they count as read.
+    func compare(_ stories: [NewsStory]) {
+        FeedStore.shared.markRead(stories.map(\.link))
+        let model = DigestModel(comparing: stories)
+        digest = model
+        model.start()
+    }
+
+    /// A story as the page it came from, in a new tab.
+    func openOriginal(of story: NewsStory) {
+        openPage(story.link)
+    }
+
+    /// Out of the feed to a page of its own, in a new tab.
+    func openPage(_ url: URL) {
+        reader = nil
+        digest = nil
+        panel = .none
+        open(url, inNewTab: true)
+    }
+
+    /// This page's site, or this section of it, is among the sources.
+    var followsThisPage: Bool {
+        guard let url = selectedTab?.url, let host = url.host()?.lowercased() else { return false }
+        let bare = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        let path = url.path(percentEncoded: false).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return NewsSite.chosen.contains { $0.host == bare && ($0.path == nil || path.hasPrefix(($0.path ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "/")))) }
+    }
+
+    /// Follows what this page is. An article: its site. A site's section, "bbc.com/sport":
+    /// that section, if it can be followed, or failing that its site.
+    func followPage() {
+        guard let tab = selectedTab, let url = tab.url, let host = url.host() else { return }
+        panel = .none
+        Task {
+            let isArticle = (try? await tab.webView?.evaluateJavaScript("""
+                ((document.querySelector('meta[property="og:type"]') || {}).content || "") === "article"
+                """) as? Bool) ?? false
+            let hasPath = !url.path(percentEncoded: false).trimmingCharacters(in: CharacterSet(charactersIn: "/")).isEmpty
+            var site: NewsSite?
+            if hasPath, !isArticle { site = await TodayNews.find(url.absoluteString) }
+            if site == nil { site = await TodayNews.find(host) }
+            guard let site else { return showToast("Found no stories to follow here") }
+            if !NewsSite.chosen.contains(where: { $0.id == site.id }) { NewsSite.chosen.append(site) }
+            showToast("Following \(site.name ?? site.host) in News")
+            await FeedStore.shared.refresh(immediately: true)
+        }
+    }
+
     /// A question about the saved pages: Browse for Me, with the digest as what's been said.
     func ask(_ question: String, about digest: DigestModel) {
         let titles = digest.pages.map(\.title).joined(separator: "; ")
-        let session = BrowseSession(question: question,
-                                    context: [(question: "Summarize my saved pages: \(titles)", answer: digest.text)])
+        let asked = digest.isComparison ? "Compare how these sources report it: \(titles)" : "Summarize my saved pages: \(titles)"
+        let session = BrowseSession(question: question, context: [(question: asked, answer: digest.text)])
         self.digest = nil
         panel = .none
         browseForMe = session

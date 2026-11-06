@@ -1028,6 +1028,7 @@ private struct AboutSettings: View {
         ("Article extraction", "Mozilla Readability, © 2010 Arc90 Inc (Apache 2.0)", "https://github.com/mozilla/readability"),
         ("Icons", "Phosphor Icons, © 2023 Phosphor Icons (MIT)", "https://phosphoricons.com"),
         ("Map data", "© OpenStreetMap contributors (ODbL)", "https://www.openstreetmap.org/copyright"),
+        ("Most visited sites", "Chrome UX Report, Google (CC BY 4.0)", "https://developer.chrome.com/docs/crux"),
         ("Weather", "Open-Meteo.com (CC BY 4.0)", "https://open-meteo.com"),
     ]
 

@@ -233,7 +233,7 @@ struct BottomBar: View {
     private var launchField: Bool { browser.showsLaunchField && browser.selectedTab != nil }
 
     private var onPage: Bool {
-        browser.screenBeside || ![.today, .todos, .shopping, .readLater].contains(browser.panel) && browser.browseForMe == nil && browser.summary == nil && browser.digest == nil
+        browser.screenBeside || ![.today, .todos, .shopping, .readLater, .feed].contains(browser.panel) && browser.browseForMe == nil && browser.summary == nil && browser.digest == nil
     }
 
     private var recentTabs: [BrowserTab] {

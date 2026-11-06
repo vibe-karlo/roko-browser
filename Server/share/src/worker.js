@@ -7,12 +7,14 @@
 //   GET    /a/:id            the page
 //   GET    /i/:host          a site's icon, proxied so readers' browsers only talk to us
 //   /api/sync…               roko's own sync of to-dos, shopping and links (src/sync.js)
+//   /api/inbox…              newsletters on their way to the iPhone (src/inbox.js)
 //
 // Answers live in D1. Only a hash of each edit token and of each sharer's IP
 // address is kept: the token to prove an edit, the IP to cap how many pages
 // one address can make in a day.
 
 import { answerPage, FAVICON, homePage, letterIcon, notFoundPage, PICTURE_SCRIPT } from "./page.js";
+import { handleInbox, receiveMail } from "./inbox.js";
 import { handleSync } from "./sync.js";
 
 /** The hash the security policy allows the page's one script by, worked out once. */
@@ -31,9 +33,16 @@ const DAILY_PER_ADDRESS = 100;
 const ID = /^[A-Za-z0-9]{10}$/;
 
 export default {
+  async email(message, env) {
+    await receiveMail(message, env, randomID);
+  },
+
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     try {
+      if (url.pathname === "/api/inbox" || url.pathname.startsWith("/api/inbox/")) {
+        return await handleInbox(request, env, url, { json, randomID, randomToken, sha256 });
+      }
       if (url.pathname === "/api/sync" || url.pathname === "/api/sync/space") {
         return await handleSync(request, env, url, { json, randomID, randomToken, sha256 });
       }

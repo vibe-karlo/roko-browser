@@ -81,8 +81,13 @@ struct ReadLaterView: View {
         HStack(alignment: .center, spacing: 20) {
             if !unread.isEmpty { Pile(pages: Array(unread.prefix(3))) }
             VStack(alignment: .leading, spacing: 4) {
-                Text("Read later")
-                    .font(.system(size: 30, weight: .semibold))
+                // Beside the page on an open Duo it stays a list of its own.
+                if browser.readLaterBeside {
+                    Text("Read later")
+                        .font(.system(size: 30, weight: .semibold))
+                } else {
+                    ReadingSwitch(current: .readLater)
+                }
                 if !unread.isEmpty {
                     Text("\(unread.count) to read, \(unread.map(\.minutes).reduce(0, +)) min")
                         .font(.system(size: 15))
@@ -227,7 +232,7 @@ struct SavedPicture: View {
     }
 }
 
-private extension View {
+extension View {
     /// A row with no list furniture: the canvas behind it, no separator, the page's own margins.
     func plainRow(top: CGFloat, bottom: CGFloat) -> some View {
         listRowInsets(EdgeInsets(top: top, leading: 22, bottom: bottom, trailing: 22))

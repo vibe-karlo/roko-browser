@@ -5,11 +5,22 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- News: what you follow, each event once, on one composed page that ends. Stories several sites covered open as a comparison of what they agree on and where they differ. A story has Reader, Summary and the page itself in one switch.
+- Follow in News from any page's tools, or "follow" in the bar: the section you're on or the whole site. Sites without a feed are followed from their sitemap, their page's data or their page.
+- Newsletters in News: by their feed, or a private address to subscribe with or forward to.
+- Links work in Reader, written-out addresses and linked words alike, in newsletters and articles. They open in a tab.
+- Words to keep out of News, whichever site a story is from. Topics also look across the web through Bing.
+
+### Fixed
+- Stories from feeds that give two dates, The Guardian's among them, had no date.
+- Reader no longer starts with a byline, a picture credit or "44 minutes ago".
+
 ### Website
 - The page is recomposed around one light: it rises as you scroll, peaks behind "Nothing in your way" and ends in the footer, and the headline passes behind the phone. The bar's jobs are a grid of different tiles, and the scoreboard sits beside its claim.
 - On a phone, tapping the bar brings its keys into view, without zooming. On a computer, a QR code carries the beta link to your iPhone.
 - The keyboard reaches every demo and nothing hidden, whole FAQ rows open, and the demo's bar answers Enter and replaces a suggestion when you type. There's a 404 page, and the contact address is karlo@rokobrowser.com.
-- The scoreboard now shows the real-site test: speed, ads and trackers reached, clean pages and data on a first visit, across ten browsers, with the method under each.
+- The scoreboard now shows the real-site test: speed, ads and trackers reached and pages without ads, pop-ups or walls, across ten browsers, with the method under each.
 - A scoreboard beside the speed section: nine browsers on one iPhone, re-sorting themselves for data used, trackers blocked and time to page, with the method, date and versions under it and a link to the test in `Scripts/compare`.
 - roko has a site in `Site/`, phone first: a live iPhone in true proportions with the bar and a working keyboard, speed numbers, a draggable summary, a before and after slider, Split View with a divider to drag, a made-up page to tap things away on, a private switch to try, hold to speak to try, a to-do widget and a shopping list that really tick, which AI runs where, iPhone Duo in the questions, a link to the code on GitHub, support and the privacy policy.
 - The site has a changelog at `/changes`, linked from the home page's footer: what each public version brought, in short lines.
@@ -21,6 +32,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Muted videos that loop by themselves wait until they're near the screen before they download. Blocking autoplay in WebKit doesn't stop muted video, and CNN's front page used 8 MB or more on them before you scrolled; it now takes about 2 MB.
 
 ### Fixed
+- Pay-or-consent walls are recognised in more languages and wordings ("Rifiuta e abbonati", "Deny & surf ad-free"), so roko no longer presses a no that leads to a payment page. It presses the wall's real yes button, not a word "consent" linked in its text.
 - A link from another app no longer lands under the day's first Today, or any other panel. Today waits for your next return.
 - A page locked behind a wall still standing isn't unlocked by roko any more. Lists hide plain page parts too, which was taken as proof an overlay had gone, and Corriere, let go while its wall was up, ran out of memory in a second.
 - A page that crashes twice in a row gets one more try without what roko changes on it, its requests still blocked, before "This page keeps stopping".
@@ -59,6 +71,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Versions go 0.1.x: the number rises only when a build goes to public testing, and private testing moves only the build number. 0.1.1 is on public testing, and the next public version is 0.1.2.
 
 ### Added
+- The bar suggests the most visited sites in your country and in the world as you type an address, for 238 countries, from Chrome's public report with adult, gambling and pirate sites taken out. It adds about 250 KB to the app, loads nothing at launch and uses no network. These rank under the search unless you've typed a dot, so a word you're searching for never starts loading a site. A shop with a site per country offers yours: amazon.de in Germany.
 - "Disable your ad blocker" walls are taken down. A site's own anti-blocking wall is drawn by its own scripts under names that change with every build, which is how it slips past the lists (the New York Post's did). roko now knows one by what it says and how it sits: a dialog, or a big box pinned over the page, talking about ad blockers in English, Croatian, German, French, Spanish, Italian, Dutch or Polish. It goes, with its backdrop, and the page scrolls again. An article about ad blockers isn't pinned and runs longer than a notice, so it stays; a cookie notice doesn't talk about blockers, and is answered as before.
 - Force dark pages, in Settings > Appearance: every site goes dark, using its own dark mode if it has one and leaving a site that's already dark alone. No white flash before a page draws. A switch in a page's Site Settings leaves that site out. Off by default, and off it adds nothing to any page.
 - Search with Qwant, or with an engine of your own: a name and an address with %s where the words go, in Settings > Search engine.

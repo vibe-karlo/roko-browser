@@ -348,11 +348,6 @@ const proofData = {
     note: "How many of six ad-heavy sites showed no ad, pop-up or wall in five swipes down the page: CNN, Daily Mail, The Guardian, The Independent, the New York Post and The Sun. One run each, judged by eye.",
     values: { roko: 6, brave: 3, duckduckgo: 3, lens: 3, quiche: 2, arc: 2, firefox: 1, safari: 0, chrome: 0, edge: 0 },
   },
-  data: {
-    unit: v => v.toFixed(1) + " MB", low: true, head: "The least data on a first visit.",
-    note: "All the data the iPhone received in the 20 seconds after opening each page for the first time, added up over eight news sites. One run each. A browser stopped at a cookie wall loads less. On later visits, with pages mostly cached, Quiche and Firefox use less.",
-    values: { roko: 32.6, quiche: 37.5, firefox: 39.2, lens: 47.1, duckduckgo: 52.7, chrome: 56.0, safari: 56.4, arc: 63.4, brave: 63.8, edge: 64.5 },
-  },
 };
 const proofMethod = " iPhone 17 Pro, iOS 27.2, 5 to 6 November 2026. roko 0.1.2, Safari 27.2, Chrome 157, Firefox 159, Edge 156, Brave 1.98, DuckDuckGo 7.244, Arc Search 1.49, Lens 1.1, Quiche. Yours will vary. ";
 const runs = document.getElementById("runs");

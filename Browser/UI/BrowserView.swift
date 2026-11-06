@@ -428,6 +428,7 @@ struct BrowserView: View {
                 browser.saveTabs()
                 WatchScheduler.schedule(in: context)
                 TodayModel.scheduleMorningRefresh()
+                FeedStore.scheduleRefresh()
                 DailyReminders.update(in: context)
             }
             if phase == .active {
@@ -561,7 +562,7 @@ struct BrowserView: View {
         if browser.cook != nil || uprightFold != nil && browser.reader != nil { return .default }  // the paper follows the theme
         if splitBesideClock { return .lightContent }  // on the black beside the halves
         if browser.summary != nil || browser.browseForMe != nil || browser.panel == .todos || browser.panel == .today
-            || browser.panel == .shopping || browser.panel == .readLater || browser.digest != nil {
+            || browser.panel == .shopping || browser.panel == .readLater || browser.panel == .feed || browser.digest != nil {
             return .default
         }
         if browser.panel == .tabs { return .lightContent }  // the switcher is always dark
@@ -818,15 +819,17 @@ private struct ReaderScreens: ViewModifier {
     let asBook: Bool
     /// Read as the sheet goes away: the book taking over isn't the reader closing.
     @State private var bookTookOver = false
+    /// A story from the feed stays in its sheet, for its switch to the summary and the page.
+    private var showsBook: Bool { asBook && browser.reader?.story == nil }
 
     func body(content: Content) -> some View {
         content
             .onChange(of: asBook, initial: true) { bookTookOver = asBook }
-            .sheet(item: Binding(get: { asBook ? nil : browser.reader }, set: { if !bookTookOver { browser.reader = $0 } })) { model in
+            .sheet(item: Binding(get: { showsBook ? nil : browser.reader }, set: { if !bookTookOver { browser.reader = $0 } })) { model in
                 ReaderView(model: model)
             }
             .overlay {
-                if asBook, let model = browser.reader {
+                if showsBook, let model = browser.reader {
                     BookView(model: model)
                         .transition(.opacity)
                 }
@@ -863,6 +866,12 @@ private struct ReadLaterScreens: ViewModifier {
                 if browser.readLaterBeside || browser.panel == .readLater || browser.panel == .command && browser.launcherReturn == .readLater {
                     ReadLaterView()
                         .besideFold(besideFold, hidden: browser.panel == .tabs)
+                        .transition(.move(edge: .bottom))
+                }
+            }
+            .overlay {
+                if browser.panel == .feed || browser.panel == .command && browser.launcherReturn == .feed {
+                    FeedView()
                         .transition(.move(edge: .bottom))
                 }
             }
