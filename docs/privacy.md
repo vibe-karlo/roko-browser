@@ -1,6 +1,6 @@
 # roko privacy policy
 
-Last updated: 5 November 2026
+Last updated: 6 November 2026
 
 roko is a web browser for iPhone, made by Karlo Koenig. It has no accounts, no ads, no analytics
 and no tracking of its own. What you do in roko stays on your iPhone unless it is listed below.

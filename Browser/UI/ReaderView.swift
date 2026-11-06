@@ -26,6 +26,7 @@ final class ReaderModel: Identifiable {
     /// nobody asked for. So it's tried when tapped; if it can't be written it says
     /// so, and the choice goes once you leave, for this story from then on.
     private(set) var offersSummary: Bool
+    private static let worthSummarizing = 600
 
     init(host: String, story: NewsStory? = nil) {
         self.host = host
@@ -38,6 +39,8 @@ final class ReaderModel: Identifiable {
         guard let story else { return }
         if let found = await FeedStore.shared.readable(story) {
             page = found
+            // A couple of lines, a confirmation mail say: already as short as a summary.
+            if found.text.count < Self.worthSummarizing { offersSummary = false }
             if !found.isArticle { show(.page) }
             if side == .summary { startSummary() }
         } else {

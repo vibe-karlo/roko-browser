@@ -3,7 +3,8 @@ import Foundation
 
 /// `-findProbe site,site`: how each site would be followed, with what it gives,
 /// in the app's own WebKit, in a Debug build. Also `-searchProbe topic,topic`, and
-/// `-readProbe address,address`: what Readability finds there, and its links.
+/// `-readProbe address,address`: what Readability finds there, and its links. And
+/// `-backgroundProbe`: what iOS's wake-up runs, timed, as simulators never wake an app.
 enum FeedProbe {
     static func runIfAsked() {
         let arguments = ProcessInfo.processInfo.arguments
@@ -12,8 +13,14 @@ enum FeedProbe {
             return arguments[index + 1].split(separator: ",").map(String.init)
         }
         let sites = list("-findProbe"), topics = list("-searchProbe"), pages = list("-readProbe")
-        guard !sites.isEmpty || !topics.isEmpty || !pages.isEmpty else { return }
+        let background = arguments.contains("-backgroundProbe")
+        guard !sites.isEmpty || !topics.isEmpty || !pages.isEmpty || background else { return }
         Task {
+            if background {
+                let before = FeedStore.shared.unreadCount, started = Date.now
+                await FeedStore.shared.refresh(inBackground: true)
+                print("BACKGROUND \(Date.now.timeIntervalSince(started)) seconds, to read \(before) -> \(FeedStore.shared.unreadCount), \(NewsSite.chosen.count) sites, \(NewsTopics.chosen.count) topics")
+            }
             for site in sites {
                 guard let found = await TodayNews.find(site) else {
                     print("FIND \(site): nothing")

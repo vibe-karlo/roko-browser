@@ -218,13 +218,8 @@ final class DigestModel: Identifiable {
         func numbers(in text: String) -> Set<String> {
             Set(text.matches(of: /\d[\d.,]*\d/).map { String($0.0).filter(\.isNumber) })
         }
-        // "Article 2" means nothing on screen: the site's name does.
-        let named = text.replacing(/\b(?:[Aa]rticle|[Čč]lanak)\s+(\d)\b/) { match -> String in
-            let index = (Int(match.1) ?? 0) - 1
-            return pages.indices.contains(index) ? pages[index].site : String(match.0)
-        }
         var kept: [String] = []
-        for line in named.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
             guard line.hasPrefix("- ") else {
                 kept.append(line)
                 continue
@@ -241,6 +236,29 @@ final class DigestModel: Identifiable {
             result.append(line)
         }
         return result.joined(separator: "\n")
+    }
+
+    /// "Article 2" means nothing on screen: the site's name does. "Articles 1 and 2"
+    /// keep their "and". Not when the articles say it themselves: "Article 2 of the
+    /// constitution" is about the constitution. As it's written too, so the words
+    /// don't change once it's done.
+    private static func namingSites(_ text: String, from pages: [ReadLaterPage]) -> String {
+        func site(_ number: Substring) -> String? {
+            Int(number).flatMap { pages.indices.contains($0 - 1) ? pages[$0 - 1].site : nil }
+        }
+        let numbered = text.replacing(/\b(?:articles?|članak|članka|članku|članci|članaka|člancima|sources?|izvora?|izvoru|izvori)\s+(\d(?:\s*(?:,|and|&|i)\s*\d)*)\b/.ignoresCase()) { match -> String in
+            let said = String(match.0)
+            let digits = match.1.matches(of: /\d/).map(\.0)
+            guard digits.allSatisfy({ site($0) != nil }),
+                  !pages.contains(where: { $0.text.localizedCaseInsensitiveContains(said) }) else { return said }
+            return String(match.1).replacing(/\d/) { site($0.0) ?? String($0.0) }
+        }
+        // A number on its own in the sentence, which the marks' double brackets aren't.
+        return numbered.replacing(/(^|[^\[])\[(\d(?:\s*,\s*\d)*)\](?!\])/) { match -> String in
+            let digits = match.2.matches(of: /\d/).map(\.0)
+            guard digits.allSatisfy({ site($0) != nil }) else { return String(match.0) }
+            return match.1 + "(" + digits.compactMap(site).joined(separator: ", ") + ")"
+        }
     }
 
     /// One engine's go; false when it isn't available here.
@@ -317,7 +335,7 @@ final class DigestModel: Identifiable {
             var written = ""
             for try await snapshot in session.streamResponse(to: prompt) {
                 written = snapshot.content
-                text = headings.markdown(fromLines: written)
+                text = Self.namingSites(headings.markdown(fromLines: written), from: pages)
             }
             AITrace.log("compare wrote: \(written)")
             return
@@ -329,9 +347,12 @@ final class DigestModel: Identifiable {
 
     private func stream(_ client: ClaudeClient, prompt: String, model: ClaudeClient.Model, language: WritingLanguage?) async throws {
         let system = isComparison ? Self.claudeComparing(language, headings: headings) : Self.claudeInstructions(language)
+        var written = ""
         for try await event in client.stream(system: system, prompt: prompt, model: model,
                                              effort: "low", maxTokens: 4_096) {
-            if case .text(let chunk) = event { text += chunk }
+            guard case .text(let chunk) = event else { continue }
+            written += chunk
+            text = isComparison ? Self.namingSites(written, from: pages) : written
         }
     }
 
@@ -412,7 +433,8 @@ final class DigestModel: Identifiable {
         ONLY [2]: something that matters which only one article has
 
         One GIST. One to four SAME lines. DIFF lines only where they really differ: none if they don't, \
-        and never make a difference up. At most three ONLY lines. Each line at most 30 words. Nothing else.
+        and never make a difference up. At most three ONLY lines. Each line at most 30 words. In the sentences, \
+        call a site by the name in brackets after its title, never "article 2" or "the first article". Nothing else.
         """
     }
 
@@ -437,7 +459,8 @@ final class DigestModel: Identifiable {
         last one if no article adds anything that matters; never make a difference up, and never guess \
         why a site wrote something. One to four points under a heading. End every point with the numbers \
         of the articles it comes from in double brackets, as [[2]] or [[1,3]], using the numbers the \
-        articles are given. No "!! " or "%% " lines. No emoji. No preamble, no sign-off.
+        articles are given. In the sentences, call a site by the name in brackets after its title, never \
+        "article 2" or "the first article". No "!! " or "%% " lines. No emoji. No preamble, no sign-off.
         """
     }
 
