@@ -99,6 +99,18 @@ final class ReadLater {
         return "Saved to Read Later"
     }
 
+    /// A story from the feed, with what's known of its text: the rest, and its
+    /// picture, are read from the page, as for a page saved on the Mac.
+    func save(_ story: NewsStory, text: String) {
+        guard !contains(story.link) else { return }
+        var page = ReadLaterPage(url: story.link, title: story.title, site: story.host, text: text)
+        page.imageURL = story.image
+        pages.insert(page, at: 0)
+        persist()
+        let id = page.id
+        Task { await read(id) }
+    }
+
     /// The page's share picture, kept here so the list has it offline; a
     /// snapshot of the page where it has none (or it won't load).
     private func picture(for id: UUID, webView: WKWebView) async -> (String?, URL?) {
@@ -234,7 +246,7 @@ final class ReadLater {
             try? jpeg.write(to: Self.folder.appending(path: name!), options: .atomic)
         }
         guard let index = pages.firstIndex(where: { $0.id == id }) else { return }
-        pages[index].text = text
+        if pages[index].text.isEmpty { pages[index].text = text }
         if let name { pages[index].image = name }
         pages[index].imageURL = pictureURL
         persist()

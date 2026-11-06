@@ -9,6 +9,12 @@ enum Keychain {
         set { write(newValue, "claude-api-key") }
     }
 
+    /// Opens the newsletter inbox on roko's server.
+    static var inboxKey: String? {
+        get { read("inbox-key") }
+        set { write(newValue, "inbox-key") }
+    }
+
     /// The key to roko's own sync space (to-dos, shopping, links), as "<space>.<secret>".
     static var syncKey: String? {
         get { read("sync-key") }

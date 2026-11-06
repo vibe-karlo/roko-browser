@@ -518,10 +518,18 @@ struct CalendarsSheet: View {
 /// Today's news: well-known sites to tick, any other site or one section of
 /// it by its address ("glas-slavonije.hr/sport/nk-osijek"), and topics.
 struct NewsSitesSheet: View {
+    /// In News: newsletters come here too, not to Today.
+    var showsNewsletters = false
     let changed: () -> Void
+    @State private var mailAddress = Newsletters.address
+    @State private var mailProblem: String?
+    @State private var makingAddress = false
+    @State private var confirmsEnding = false
     @Environment(\.dismiss) private var dismiss
     @State private var chosen = NewsSite.chosen
     @State private var topics = NewsTopics.chosen
+    @State private var blocks = NewsBlocks.chosen
+    @State private var block = ""
     @State private var address = ""
     @State private var topic = ""
     @State private var finding = false
@@ -565,6 +573,8 @@ struct NewsSitesSheet: View {
                          : "A whole site's stories go into Top stories. A page of a site, like one club's news, gets a section of its own with only its stories.")
                 }
 
+                if showsNewsletters, Newsletters.isOffered { newsletterSection }
+
                 Section {
                     ForEach(topics, id: \.self) { topic in Text(topic) }
                         .onDelete { topics.remove(atOffsets: $0) }
@@ -578,7 +588,22 @@ struct NewsSitesSheet: View {
                 } header: {
                     Text("Topics")
                 } footer: {
-                    Text("Stories about each topic from major news sites and yours, picked on this iPhone. Swipe to remove one.")
+                    Text("Stories about each topic from major news sites and yours, picked on this iPhone. News also looks across the web through Bing, which sees the topic. Swipe to remove one.")
+                }
+
+                Section {
+                    ForEach(blocks, id: \.self) { block in Text(block) }
+                        .onDelete { blocks.remove(atOffsets: $0) }
+                    HStack {
+                        TextField("A word or name, e.g. Trump", text: $block)
+                            .autocorrectionDisabled()
+                            .onSubmit(addBlock)
+                        Button("Add", action: addBlock).disabled(block.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                } header: {
+                    Text("Keep out of News")
+                } footer: {
+                    Text("Stories mentioning these don't show in News, even from sites you follow. Swipe to remove one.")
                 }
             }
             .scrollContentBackground(.hidden)
@@ -588,9 +613,10 @@ struct NewsSitesSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
-                        if chosen != NewsSite.chosen || topics != NewsTopics.chosen {
+                        if chosen != NewsSite.chosen || topics != NewsTopics.chosen || blocks != NewsBlocks.chosen {
                             NewsSite.chosen = chosen
                             NewsTopics.chosen = topics
+                            NewsBlocks.chosen = blocks
                             changed()
                         }
                         dismiss()
@@ -599,6 +625,54 @@ struct NewsSitesSheet: View {
             }
         }
         .tint(Theme.accent)
+    }
+
+    private var newsletterSection: some View {
+        Section {
+            if let mailAddress {
+                HStack {
+                    Text(mailAddress)
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
+                    Spacer()
+                    Button("Copy") { UIPasteboard.general.string = mailAddress }
+                }
+                Button("End this address", role: .destructive) { confirmsEnding = true }
+                    .confirmationDialog("End this address? Newsletters sent to it will bounce. What's arrived stays.",
+                                        isPresented: $confirmsEnding, titleVisibility: .visible) {
+                        Button("End It", role: .destructive) {
+                            Task {
+                                await Newsletters.close()
+                                self.mailAddress = nil
+                            }
+                        }
+                    }
+            } else {
+                Button {
+                    makingAddress = true
+                    mailProblem = nil
+                    Task {
+                        mailProblem = await Newsletters.open()
+                        mailAddress = Newsletters.address
+                        makingAddress = false
+                        if mailProblem == nil { changed() }
+                    }
+                } label: {
+                    HStack {
+                        Text("Get a Newsletter Address").foregroundStyle(Theme.ink)
+                        Spacer()
+                        if makingAddress { ProgressView() }
+                    }
+                }
+                .disabled(makingAddress)
+            }
+        } header: {
+            Text("Newsletters")
+        } footer: {
+            Text(mailProblem ?? "Subscribe with this address, or forward newsletters to it, and they arrive in News. Mail waits on roko's server only until this iPhone fetches it. Many newsletters also have a feed: add them above by their address.")
+        }
     }
 
     private func toggle(_ site: NewsSite) {
@@ -617,6 +691,13 @@ struct NewsSitesSheet: View {
             if !chosen.contains(where: { $0.id == site.id }) { chosen.append(site) }
             address = ""
         }
+    }
+
+    private func addBlock() {
+        let name = block.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, !blocks.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) else { return }
+        blocks.append(name)
+        block = ""
     }
 
     private func addTopic() {

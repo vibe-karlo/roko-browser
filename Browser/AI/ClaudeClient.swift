@@ -60,6 +60,10 @@ struct ClaudeClient {
     static let enabledKey = "claude.enabled"
 
     static var configured: ClaudeClient? {
+        #if DEBUG
+        // `-noClaude`: as for someone without a key, whatever's in the Keychain.
+        if ProcessInfo.processInfo.arguments.contains("-noClaude") { return nil }
+        #endif
         guard UserDefaults.standard.object(forKey: enabledKey) as? Bool ?? true else { return nil }
         return Keychain.claudeAPIKey.map { ClaudeClient(apiKey: $0) }
     }

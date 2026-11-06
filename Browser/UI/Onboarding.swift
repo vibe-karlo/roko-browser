@@ -2,14 +2,14 @@ import SwiftUI
 
 /// The first time roko opens: seven short pages, each with a small live
 /// version of the thing it's about, playing by itself, and at most one
-/// choice to make there and then. Warm light rises as roko wakes, follows
-/// you from page to page, and floods the screen as you start browsing.
+/// choice to make there and then. roko's light rises as it wakes, follows
+/// you from page to page, and carries off the top as you start browsing.
 /// Settings → About → Show the Welcome Again brings it back.
 struct Onboarding: View {
     @Environment(BrowserModel.self) private var browser
     @State private var page = 0
     @State private var forward = true
-    /// Start browsing: the light floods up before the welcome lets go.
+    /// Start browsing: the light carries off the top, and roko opens in its wake.
     @State private var flaring = false
 
     static let doneKey = "onboarding.done"
@@ -54,9 +54,21 @@ struct Onboarding: View {
             .padding(.horizontal, 24)
             .padding(.bottom, 12)
         }
-        .background { Atmosphere(page: page, flaring: flaring).ignoresSafeArea() }
         .opacity(flaring ? 0 : 1)
-        .animation(.easeIn(duration: 0.55).delay(0.25), value: flaring)
+        .animation(.easeOut(duration: 0.3), value: flaring)
+        .background {
+            ZStack {
+                Theme.canvas
+                    .opacity(flaring ? 0 : 1)
+                    .animation(.easeIn(duration: 0.55).delay(0.25), value: flaring)
+                // Brightest on the first page, quieter while you read the rest,
+                // moving across as you go from page to page.
+                WorkingGlow(progress: page == 0 ? 0.6 : 0.5, isActive: !flaring, finished: flaring,
+                            across: [0.5, 0.25, 0.75, 0.3, 0.7, 0.4, 0.5][min(page, 6)],
+                            strength: page == 0 ? 1 : 0.8, drifts: true, riseDuration: 1.8)
+            }
+            .ignoresSafeArea()
+        }
         .foregroundStyle(Theme.ink)
         .environment(\.colorScheme, .dark)
         .sensoryFeedback(.selection, trigger: page)
@@ -108,12 +120,13 @@ struct Onboarding: View {
         withAnimation(.snappy(duration: 0.38)) { page -= 1 }
     }
 
-    /// The last page: the light swells over everything, then roko opens.
+    /// The last page: the light carries off the top. The welcome lets go in time
+    /// for its own fade (BrowserView, 0.35 s) to end as the light does.
     private func flare() {
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-        withAnimation(.easeOut(duration: 0.7)) { flaring = true }
+        flaring = true
         Task {
-            try? await Task.sleep(for: .milliseconds(750))
+            try? await Task.sleep(for: .seconds(WorkingGlow.sweepDuration - 0.35))
             finish()
         }
     }
@@ -580,9 +593,9 @@ private struct TodoDemo: View {
     private func row(title: String, time: String?, done: Bool) -> some View {
         HStack(spacing: 12) {
             ZStack {
-                Circle().strokeBorder(done ? Atmosphere.orange : Theme.faintInk, lineWidth: 1.6)
+                Circle().strokeBorder(done ? Theme.accent : Theme.faintInk, lineWidth: 1.6)
                 if done {
-                    Circle().fill(Atmosphere.orange).padding(4)
+                    Circle().fill(Theme.accent).padding(4)
                 }
             }
             .frame(width: 20, height: 20)
@@ -711,67 +724,3 @@ private struct Private: View {
         }
     }
 }
-
-// MARK: - Atmosphere
-
-/// Behind every page: roko's orange as warm light rising from the bottom
-/// edge, drifting slowly, and moving across as you go from page to page.
-/// Brightest on the first page, quieter while you read the rest.
-private struct Atmosphere: View {
-    let page: Int
-    var flaring = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// roko waking: the light rises from nothing in the first moments.
-    @State private var risen = false
-
-    static let orange = Color(red: 1, green: 0x5B / 255, blue: 0x1F / 255)
-    static let amber = Color(red: 1, green: 0xA8 / 255, blue: 0x4A / 255)
-    static let ember = Color(red: 0xB8 / 255, green: 0x2E / 255, blue: 0x0C / 255)
-
-    var body: some View {
-        GeometryReader { proxy in
-            TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
-                let t = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate
-                let drift = sin(t * 2 * .pi / 14) * 0.08
-                let across = [0.5, 0.25, 0.75, 0.3, 0.7, 0.4, 0.5][min(page, 6)]
-                let x = flaring ? 0.5 : across + drift
-                let strength = flaring ? 1.0 : (risen ? (page == 0 ? 0.75 : 0.45) : 0.0)
-                let reach = flaring ? 1.6 : (risen ? 0.62 : 0.3)
-                ZStack {
-                    Theme.canvas
-                    RadialGradient(colors: [Self.amber.opacity(strength), Self.orange.opacity(strength * 0.8),
-                                            Self.ember.opacity(strength * 0.35), .clear],
-                                   center: UnitPoint(x: x, y: flaring ? 0.75 : 1.12), startRadius: 0,
-                                   endRadius: proxy.size.height * reach)
-                    RadialGradient(colors: [Self.orange.opacity(strength * 0.35), .clear],
-                                   center: UnitPoint(x: 1 - x * 0.6, y: 1.05), startRadius: 0,
-                                   endRadius: proxy.size.height * 0.4)
-                }
-                .animation(.easeInOut(duration: 0.9), value: page)
-                .animation(.easeOut(duration: 1.8), value: risen)
-                .animation(.easeOut(duration: 0.7), value: flaring)
-            }
-            .onAppear { risen = true }
-            .overlay { LightGrain().opacity(0.06).blendMode(.overlay) }
-        }
-        .allowsHitTesting(false)
-    }
-}
-
-/// A fine still noise over the light, so the gradient never bands.
-private struct LightGrain: View {
-    var body: some View {
-        Canvas { context, size in
-            var generator = SystemRandomNumberGenerator()
-            for _ in 0..<Int(size.width * size.height / 14) {
-                let x = Double.random(in: 0..<size.width, using: &generator)
-                let y = Double.random(in: 0..<size.height, using: &generator)
-                let shade = Double.random(in: 0...1, using: &generator)
-                context.fill(Path(CGRect(x: x, y: y, width: 1, height: 1)),
-                             with: .color(Color(white: shade)))
-            }
-        }
-        .drawingGroup()
-    }
-}
-

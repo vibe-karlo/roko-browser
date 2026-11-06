@@ -3,7 +3,7 @@
 A fast, private iOS browser in the spirit of Arc Search, with Raycast's command-bar feel.
 SwiftUI around WebKit, no third-party dependencies.
 
-**[Join the TestFlight beta](https://testflight.apple.com/join/M2ZrEUV1)** (iPhone, iOS 27 or later) or see the [website](https://rokobrowser.vercel.app).
+**[Join the TestFlight beta](https://testflight.apple.com/join/M2ZrEUV1)** (iPhone, iOS 27 or later) or see the [website](https://rokobrowser.com).
 
 <p>
   <img src="docs/screens/one-bar.jpg" width="250" alt="The bar answering 250 usd in eur with €223.77">
@@ -275,6 +275,53 @@ the page (typed in full it goes first, above the search).
   is the same in Raycast. A page saved on the Mac is fetched here when it arrives, for its text
   and picture.
 
+## News
+
+`Feed/`, `UI/FeedView.swift`. What you follow, each event once, opened by typing "news". It shares
+a screen with Read Later (News and Saved at the top) and its sources and topics with Today, in
+Sources at the bottom or from Follow in News in a page's tools, which follows the section you're
+on unless the page is an article.
+
+- **Following a site** (`TodayNews.find`, `SiteRoutes`), each tried when the one before finds
+  nothing: a platform's known feed (Reddit, GitHub, Bluesky, Mastodon), feeds the page declares or
+  the usual addresses, for a section its own feed, else the whole site's filtered to the section's
+  address, YouTube's channel feed, the page's JSON-LD or headlines, and the sitemap robots.txt
+  names. Not the page with its scripts run: up to 17 seconds per source per refresh, so sites that
+  need that (hrt.hr) can't be followed. A section's feed with nothing in
+  the last 30 days is passed over. Sites behind a login (X, Instagram, TikTok, LinkedIn, Threads)
+  find nothing.
+- **Topics**: as in Today, plus Bing's news search, which has Croatian sites where Google News has
+  no Croatian edition. Bing only gives a desktop browser the feed. It sees the topic, no cookie.
+- **Blocked words** (`NewsBlocks`): a story mentioning one in its headline, summary or kept text
+  doesn't show, with up to four letters of ending ("Trumpa"); under four letters, the exact word.
+- **Grouping** (`StoryGroups`): headlines sharing what's rare that day are candidates; a story joins
+  a group matching at least half of it; two headlines naming different people don't join; then a
+  model checks each group as it comes on screen, and only then. Only groups spanning two sites.
+- **The page** (`FeedLayout`): what most sites covered leads, ranked by sites, then stories, then
+  age. Rows, pairs, a site's extra stories in its own list, stories with no picture in Briefly,
+  newsletters together. It's laid out as it opens and doesn't move while you read: new stories wait
+  behind "New stories, show them". It ends, two days back (newsletters two weeks).
+- **A story** opens in one sheet, Reader, Summary and Page in one switch, the page live in place and
+  keeping its place. `PageReader.withoutFurniture` takes bylines, picture credits and "44 minutes
+  ago" off Reader's text. Nothing says beforehand what Apple's guardrails will turn down, and trying
+  on every story costs battery, so a summary is written when Summary is tapped. If it can't be, it
+  says so, and Summary goes for that story once you leave it. Apple's models write stories as plain labelled lines: filling
+  the answer's shape, they were turned down more often and took a museum's opening for a how-to.
+  Debug builds take `-noClaude` and `-noSummaries`.
+- **A group** opens a comparison (`DigestModel(comparing:)`): All agree, Where they differ, Only one
+  has it, each point marked with its sources. A point with a number its sources don't have goes, a
+  site running another's text is left out and named, and with no differences there's no such section.
+  Croatian needs Claude. Apple's model ignored the form and wrote it badly, which fails honestly.
+- **Newsletters** (`Newsletters`, `Server/share/src/inbox.js`): many have a feed and are followed
+  like a site. Otherwise a private address: mail waits on the server until the iPhone fetches it,
+  then it's deleted there, 30 days at most. Reader has its text, read with nothing loaded so a
+  tracking pixel doesn't fire there; Email shows the original, images and all, scripts off.
+  To turn it on: a domain on Cloudflare, Email Routing's catch-all sent to the Worker, `MAIL_DOMAIN`
+  in `wrangler.jsonc`, then `npm run deploy`. `node test/inbox.e2e.mjs` tests it against `npm run dev`
+  with `MAIL_DOMAIN` in `.dev.vars`; a Debug build takes `-shareServer http://127.0.0.1:8787`.
+- **With roko closed** a background refresh every couple of hours at most, as iOS allows. To see how a site would be followed in a Debug build, launch
+  with `-findProbe site,site` or `-searchProbe topic,topic`.
+
 ## Notify Me
 
 Like Safari's: in a page's menu, say what to look for (or nothing, for anything new) and how
@@ -536,7 +583,7 @@ times an hour; each ask reads a few rows.
 
 ## Website
 
-`Site/` is the static site at rokobrowser.vercel.app: the page, `/support` and `/privacy` (written out from `docs/privacy.md`). The phone at the top is live DOM at an iPhone's real 402 by 874 shape, sized in its own width (`cqw`), with a working keyboard so a phone's own doesn't cover it: sums, units, times and days until are worked out in `site.js`, rates come from frankfurter.dev and weather from Open-Meteo. The summary, the before and after and Split View are dragged by the same helper in `site.js`, and the page in the hide section is made up, so nothing on it belongs to another site. The headline font comes from Fontshare's servers, because its licence doesn't allow a copy in a public repository. The hold to speak demo plays written words and never touches the microphone. The widget and the shopping list in the bar section are live DOM too, with the app's own labels and sizes, and they really tick. Written for a phone first. Vercel deploys it from GitHub on a push that changes `Site/` (root `vercel.json`).
+`Site/` is the static site at rokobrowser.com: the page, `/support` and `/privacy` (written out from `docs/privacy.md`). The phone at the top is live DOM at an iPhone's real 402 by 874 shape, sized in its own width (`cqw`), with a working keyboard so a phone's own doesn't cover it: sums, units, times and days until are worked out in `site.js`, rates come from frankfurter.dev and weather from Open-Meteo. The summary, the before and after and Split View are dragged by the same helper in `site.js`, and the page in the hide section is made up, so nothing on it belongs to another site. The headline font comes from Fontshare's servers, because its licence doesn't allow a copy in a public repository. The hold to speak demo plays written words and never touches the microphone. The widget and the shopping list in the bar section are live DOM too, with the app's own labels and sizes, and they really tick. Written for a phone first. Vercel deploys it from GitHub on a push that changes `Site/` (root `vercel.json`).
 
 ## Licence
 

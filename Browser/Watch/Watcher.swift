@@ -282,6 +282,35 @@ enum RenderedPage {
         return await PageLines.parse(html)
     }
 
+    /// A newsletter's text, by Readability. Nothing it points at is loaded and none
+    /// of its scripts run: a tracking pixel doesn't fire from being read here.
+    static func readable(html: String) async -> ReadablePage? {
+        let webView = WebViewFactory.makeOffscreen()
+        webView.configuration.defaultWebpagePreferences.allowsContentJavaScript = false
+        if let rule = try? await WKContentRuleListStore.default().compileContentRuleList(
+            forIdentifier: "roko-mail-text", encodedContentRuleList: #"[{"trigger":{"url-filter":".*"},"action":{"type":"block"}}]"#) {
+            webView.configuration.userContentController.add(rule)
+        }
+        let loader = Loader()
+        webView.navigationDelegate = loader
+        webView.loadHTMLString(html, baseURL: nil)
+        _ = await loader.finished(within: 8)
+        return try? await PageReader.read(webView)
+    }
+
+    /// The article on a page, by Readability, off screen: its scripts run, and
+    /// the app's blocking applies. Still read if the page never quite finishes.
+    static func readable(of url: URL) async -> ReadablePage? {
+        let webView = WebViewFactory.makeOffscreen()
+        let loader = Loader()
+        webView.navigationDelegate = loader
+        webView.load(URLRequest(url: url))
+        let finished = await loader.finished(within: 15)
+        if finished { try? await Task.sleep(for: .seconds(1)) }
+        defer { webView.stopLoading() }
+        return try? await PageReader.read(webView)
+    }
+
     private final class Loader: NSObject, WKNavigationDelegate {
         private var continuation: CheckedContinuation<Bool, Never>?
         private var result: Bool?

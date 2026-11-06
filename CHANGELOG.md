@@ -5,6 +5,17 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- News: what you follow, each event once, on one composed page that ends. Stories several sites covered open as a comparison of what they agree on and where they differ. A story has Reader, Summary and the page itself in one switch.
+- Follow in News from any page's tools, or "follow" in the bar: the section you're on or the whole site. Sites without a feed are followed from their sitemap, their page's data or their page.
+- Newsletters in News: by their feed, or a private address to subscribe with or forward to.
+- Links work in Reader, written-out addresses and linked words alike, in newsletters and articles. They open in a tab.
+- Words to keep out of News, whichever site a story is from. Topics also look across the web through Bing.
+
+### Fixed
+- Stories from feeds that give two dates, The Guardian's among them, had no date.
+- Reader no longer starts with a byline, a picture credit or "44 minutes ago".
+
 ### Website
 - The scoreboard now shows the real-site test: speed, ads and trackers reached, clean pages and data on a first visit, across ten browsers, with the method under each.
 - A scoreboard beside the speed section: nine browsers on one iPhone, re-sorting themselves for data used, trackers blocked and time to page, with the method, date and versions under it and a link to the test in `Scripts/compare`.

@@ -9,7 +9,7 @@ struct DigestView: View {
     let model: DigestModel
     @State private var readProgress = 0.0
     /// No canvas under the footer or the status bar while the light is up and
-    /// on through its flood (as in Browse for Me).
+    /// on through its sweep (as in Browse for Me).
     @State private var edgesClear = true
 
     var body: some View {
@@ -80,7 +80,7 @@ struct DigestView: View {
                 withAnimation(.easeInOut(duration: 0.9)) { edgesClear = true }
                 return
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + (model.phase.isFailure ? 0 : WorkingGlow.floodDuration)) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + (model.phase.isFailure ? 0 : WorkingGlow.sweepDuration)) {
                 guard !model.isWorking else { return }
                 withAnimation(.easeInOut(duration: 0.9)) { edgesClear = false }
             }
@@ -96,9 +96,10 @@ struct DigestView: View {
 
     private var statusText: String {
         switch model.phase {
-        case .reading where model.condensed > 0: "Reading page \(min(model.condensed + 1, model.pages.count)) of \(model.pages.count)"
-        case .reading: "Reading what you saved"
-        default: "Writing the summary"
+        case .reading where model.condensed > 0:
+            "Reading \(model.isComparison ? "source" : "page") \(min(model.condensed + 1, model.pages.count)) of \(model.pages.count)"
+        case .reading: model.isComparison ? "Reading each source" : "Reading what you saved"
+        default: model.isComparison ? "Comparing them" : "Writing the summary"
         }
     }
 
@@ -107,7 +108,7 @@ struct DigestView: View {
         ScrollView(.horizontal) {
             HStack(spacing: 8) {
                 ForEach(Array(model.pages.enumerated()), id: \.element.id) { index, page in
-                    Button { browser.openSaved(page) } label: {
+                    Button { open(page) } label: {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(page.title)
                                 .font(.system(size: 13, weight: .medium))
@@ -143,7 +144,7 @@ struct DigestView: View {
     private var footer: some View {
         ContextBar(leading: .init(glyph: .close, label: "Close", action: close),
                    glyph: .browse, title: "Ask",
-                   launch: { browser.showCommandBar(context: .aboutSaved, over: .readLater) },
+                   launch: { browser.showCommandBar(context: .aboutSaved, over: model.isComparison ? .feed : .readLater) },
                    fades: false)
             .padding(.top, 10)
             .overlay(alignment: .top) { ReadingLine(progress: readProgress, tint: PageKind.of(model.text).tint) }
@@ -161,7 +162,16 @@ struct DigestView: View {
 
     private func open(_ url: URL) {
         guard let page = model.pages.first(where: { $0.url == url }) else { return }
-        browser.openSaved(page)
+        self.open(page)
+    }
+
+    /// A saved page in a tab; a compared story in Reader, over the comparison, to come back to.
+    private func open(_ page: ReadLaterPage) {
+        if let story = model.story(of: page) {
+            browser.read(story)
+        } else {
+            browser.openSaved(page)
+        }
     }
 
     private func close() {

@@ -10,6 +10,40 @@ struct ReadablePage: Sendable {
     let isArticle: Bool
     /// The language the page says it's in (`<html lang>`), when it says.
     var declaredLanguage: String? = nil
+    /// Words in the text that link somewhere, when that's known. Addresses written out need no entry.
+    var links: [PageLink] = []
+}
+
+/// Words in a text that link to a page.
+nonisolated struct PageLink: Codable, Hashable, Sendable {
+    let words: String
+    let url: URL
+    /// The paragraph they're in, because the same words may be said earlier without
+    /// the link. Without one, they go on the first place they're said.
+    var block: String? = nil
+
+    /// The links inside an article's paragraphs, as `WebResearcher.articleText` reads them.
+    static func inBlocks(of html: String) -> [PageLink] {
+        WebResearcher.matches(#"(?i)<(p|li|h[1-3])\b[^>]*>([\s\S]*?)</\1>"#, in: html).flatMap { match in
+            match.count == 2 ? anchors(in: match[1], block: WebResearcher.plain(match[1])) : []
+        }
+    }
+
+    /// Those, and the ones outside any paragraph: a mail's button in a table cell.
+    static func anywhere(in html: String) -> [PageLink] {
+        let blocks = inBlocks(of: html)
+        let placed = Set(blocks.map(\.url))
+        return blocks + anchors(in: html, block: nil).filter { !placed.contains($0.url) }
+    }
+
+    private static func anchors(in html: String, block: String?) -> [PageLink] {
+        WebResearcher.matches(#"(?i)<a\b[^>]*?\bhref\s*=\s*["'](https?://[^"']+)["'][^>]*>(.*?)</a>"#, in: html).compactMap { match in
+            guard match.count == 2 else { return nil }
+            let words = WebResearcher.plain(match[1])
+            guard words.count >= 3, let url = URL(string: WebResearcher.plain(match[0])) else { return nil }
+            return PageLink(words: words, url: url, block: block)
+        }
+    }
 }
 
 /// Pulls the article text out of a page with Mozilla's Readability, loaded only
@@ -26,14 +60,23 @@ enum PageReader {
     private static let extract = """
     let article = null;
     try { article = new Readability(document.cloneNode(true)).parse(); } catch (e) {}
-    const blocks = [];
+    const blocks = [], links = [];
     if (article && article.content) {
       const doc = new DOMParser().parseFromString(article.content, "text/html");
       const selector = "h1,h2,h3,h4,p,li,blockquote,pre,figcaption";
       for (const el of doc.body.querySelectorAll(selector)) {
         if (el.parentElement && el.parentElement.closest(selector)) continue;
         const text = el.textContent.replace(/\\s+/g, " ").trim();
-        if (text) blocks.push(text);
+        if (!text) continue;
+        blocks.push(text);
+        for (const a of el.querySelectorAll("a[href]")) {
+          const words = a.textContent.replace(/\\s+/g, " ").trim();
+          let url;
+          try { url = new URL(a.getAttribute("href"), location.href); } catch (e) { continue; }
+          // A footnote's jump down this same page is no use without the page.
+          if (words.length < 3 || !/^https?:$/.test(url.protocol) || (url.hash && url.href.split("#")[0] === location.href.split("#")[0])) continue;
+          links.push({ words: words, url: url.href, block: text });
+        }
       }
     }
     const longBlocks = blocks.filter(b => b.length > 80).length;
@@ -44,6 +87,7 @@ enum PageReader {
       site: (article && article.siteName) || location.hostname,
       text: text,
       isArticle: isArticle,
+      links: links.slice(0, 500),
       lang: document.documentElement.lang || ""
     };
     """
@@ -54,14 +98,39 @@ enum PageReader {
         guard let fields = result as? [String: Any] else {
             throw ClaudeError(message: "This page has no readable text.")
         }
-        let text = (fields["text"] as? String ?? "")
+        let text = withoutFurniture((fields["text"] as? String ?? "")
             .replacingOccurrences(of: #"[ \t]+"#, with: " ", options: .regularExpression)
             .replacingOccurrences(of: #"\n\s*\n+"#, with: "\n\n", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: .whitespacesAndNewlines))
         guard text.count > 200 else { throw ClaudeError(message: "This page has too little text to summarize.") }
         return ReadablePage(title: fields["title"] as? String ?? "", site: fields["site"] as? String ?? "",
                             text: String(text.prefix(200_000)), isArticle: fields["isArticle"] as? Bool ?? false,
-                            declaredLanguage: (fields["lang"] as? String).flatMap { $0.isEmpty ? nil : $0 })
+                            declaredLanguage: (fields["lang"] as? String).flatMap { $0.isEmpty ? nil : $0 },
+                            links: (fields["links"] as? [[String: String]] ?? []).compactMap { link in
+                                guard let words = link["words"], let url = link["url"].flatMap(URL.init(string:)) else { return nil }
+                                return PageLink(words: words, url: url, block: link["block"])
+                            })
+    }
+
+    /// What Readability takes for paragraphs and isn't. Anywhere: "Advertisement",
+    /// the NYT's note about checking your access, a photo's credit. Above the
+    /// first real paragraph, short lines that aren't sentences: "44 minutes
+    /// ago", "Daniela RelphRoyal correspondent", "Reuters".
+    nonisolated static func withoutFurniture(_ text: String) -> String {
+        let furniture: Set<String> = ["advertisement", "skip advertisement", "reklama", "oglas", "continue reading", "read more",
+                                      "pročitajte više", "share", "save", "podijeli"]
+        var lines = text.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { line in
+            let plain = line.lowercased()
+            guard !line.isEmpty, !furniture.contains(plain), !plain.hasPrefix("you have a preview view of this article") else { return false }
+            // A newsletter's small print: Reader has its own way to leave the list.
+            if plain.count < 200, plain.contains("unsubscribe") || plain.contains("odjavi") { return false }
+            return plain.count > 40 || plain.firstMatch(of: /\b(getty images|reuters|afp|associated press|pa media|epa|shutterstock|alamy|pixsell|hina)\b/) == nil
+        }
+        if let first = lines.prefix(8).firstIndex(where: { $0.count >= 80 }) {
+            let kept = lines[..<first].filter { $0.count >= 60 || $0.last.map { ".?!:".contains($0) } == true }
+            lines = Array(kept) + lines[first...]
+        }
+        return lines.joined(separator: "\n\n")
     }
 
     /// The article as Markdown, for notes or an AI chat: its title, headings,

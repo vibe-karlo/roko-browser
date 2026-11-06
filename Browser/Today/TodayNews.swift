@@ -15,6 +15,10 @@ nonisolated struct NewsSite: Codable, Equatable, Hashable, Identifiable, Sendabl
     var page: URL? = nil
     /// What the section is called, "NK Osijek".
     var name: String? = nil
+    /// A sitemap to read, when the site has no feed and nothing in its page to read.
+    var sitemap: URL? = nil
+    /// The feed is the whole site's, and only what's under `path` is wanted.
+    var filtersToPath: Bool? = nil
 
     var id: String { host + (path ?? "") }
     var isSection: Bool { path != nil }
@@ -65,6 +69,33 @@ nonisolated enum NewsTopics {
     }
 }
 
+/// Words the feed leaves out: a story mentioning one doesn't show, whichever
+/// source it's from, "trump" finding "Trump's" and "Trumpa" too. Short ones,
+/// "EU", only as they are: as the start of a word they'd take "Europe" with them.
+nonisolated enum NewsBlocks {
+    static let key = "feed.blocked"
+    /// Letters a word may run on past what was typed: Croatian's endings, "Trumpovim".
+    private static let endings = 4
+
+    static var chosen: [String] {
+        get { UserDefaults.standard.stringArray(forKey: key) ?? [] }
+        set { UserDefaults.standard.set(newValue, forKey: key) }
+    }
+
+    static func mention(_ terms: [String], in text: String) -> Bool {
+        let words = TodayNews.words(of: text)
+        return terms.contains { term in
+            let wanted = TodayNews.words(of: term)
+            guard !wanted.isEmpty, words.count >= wanted.count else { return false }
+            return (0...(words.count - wanted.count)).contains { start in
+                zip(words[start...], wanted).allSatisfy { word, part in
+                    part.count < 4 ? word == part : word.hasPrefix(part) && word.count <= part.count + endings
+                }
+            }
+        }
+    }
+}
+
 /// One story from a feed or a page.
 nonisolated struct NewsStory: Codable, Equatable, Hashable, Identifiable, Sendable {
     let title: String
@@ -73,6 +104,17 @@ nonisolated struct NewsStory: Codable, Equatable, Hashable, Identifiable, Sendab
     let published: Date?
     /// The feed's short description, when it has one: topics are matched on it too.
     var summary: String? = nil
+    /// Its picture, when the feed names one.
+    var image: URL? = nil
+    /// The article's text, when the feed carries it and it was asked for (the feed's, not Today's).
+    var content: String? = nil
+    /// Who a newsletter is from, for its line in the list.
+    var from: String? = nil
+    /// A newsletter's own way to leave its list.
+    var unsubscribe: URL? = nil
+    /// The words in `content` that link somewhere. Like it, kept beside the story, not in it.
+    var links: [PageLink]? = nil
+    var isMail: Bool { link.scheme == "roko-mail" }
     var id: URL { link }
 }
 
@@ -103,13 +145,17 @@ nonisolated enum TodayNews {
         let isSection = !path.isEmpty
         if !isSection, let known = NewsSite.known.first(where: { $0.host == host }) { return known }
 
+        // A platform's own feed, when it keeps one at a known address.
+        if let feed = SiteRoutes.platformFeed(for: url), let found = await stories(from: feed, host: host), found.count >= 3 {
+            return NewsSite(host: host, feed: feed, path: isSection ? "/" + path : nil, name: isSection ? sectionName(path: path, pageTitle: nil) : nil)
+        }
         let html = await text(at: url)
         let declared = html.map { feedLinks(in: $0, base: url) } ?? []
         var candidates: [URL]
         if isSection {
             // A feed the page names for itself, then the usual feed beside it.
             let base = url.absoluteString.hasSuffix("/") ? url : url.appending(path: "")
-            candidates = declared.filter { $0.path(percentEncoded: false).contains("/" + path) }
+            candidates = declared.filter { SiteRoutes.declaresFeedElsewhere(host) || $0.path(percentEncoded: false).contains("/" + path) }
                 + ["feed", "rss", "feed.xml", "rss.xml"].compactMap { URL(string: $0, relativeTo: base)?.absoluteURL }
         } else {
             candidates = declared + ["feed", "rss", "rss.xml", "feed.xml", "index.xml", "feeds/posts/default"]
@@ -117,14 +163,38 @@ nonisolated enum TodayNews {
         }
         let name = isSection ? sectionName(path: path, pageTitle: html.flatMap(pageTitle)) : nil
         for candidate in candidates {
-            if let stories = await stories(from: candidate, host: host), stories.count >= 3 {
+            // A feed nobody's kept up (Jutarnji's football one stopped in July) would look empty.
+            if let stories = await stories(from: candidate, host: host), stories.count >= 3,
+               stories.contains(where: { ($0.published ?? .now) > .now.addingTimeInterval(-30 * 24 * 3600) }) {
                 return NewsSite(host: host, feed: candidate, path: isSection ? "/" + path : nil, name: name)
             }
         }
+        // No feed of its own, but the whole site's has this section's stories in it.
+        if isSection {
+            let whole = declared.filter { !candidates.contains($0) } + ["feed", "rss", "rss.xml", "feed.xml", "index.xml"]
+                .compactMap { URL(string: "/" + $0, relativeTo: url)?.absoluteURL }
+            for feed in whole {
+                let section = await stories(from: feed, host: host)?.filter { $0.link.path(percentEncoded: false).hasPrefix("/" + path + "/") } ?? []
+                if section.count >= 3 {
+                    return NewsSite(host: host, feed: feed, path: "/" + path, name: name, filtersToPath: true)
+                }
+            }
+        }
+        // YouTube names a channel's feed only in the page's data.
+        if let html, SiteRoutes.declaresFeedElsewhere(host), let channel = html.firstMatch(of: /feeds\/videos\.xml\?channel_id=([\w-]+)/)?.1,
+           let feed = URL(string: "https://www.youtube.com/feeds/videos.xml?channel_id=\(channel)"), await stories(from: feed, host: host) != nil {
+            return NewsSite(host: host, feed: feed, path: isSection ? "/" + path : nil, name: name)
+        }
         // No feed: the page itself, if it lists enough stories to follow.
-        if let html, PageHeadlines.parse(html, page: url, host: host).count >= 3 {
+        if let html, SiteRoutes.stories(in: html, page: url, host: host).count >= 3 {
             return NewsSite(host: host, feed: nil, path: isSection ? "/" + path : nil, page: url, name: name)
         }
+        // Or its sitemap, which says what's new if not what it's called.
+        if let map = await SiteRoutes.sitemap(for: url, path: isSection ? "/" + path : nil) {
+            return NewsSite(host: host, feed: nil, path: isSection ? "/" + path : nil, name: name, sitemap: map)
+        }
+        // Not the page with its scripts run: up to 17 seconds in a hidden web view,
+        // per source, per refresh, for the few sites that need it.
         return nil
     }
 
@@ -157,19 +227,23 @@ nonisolated enum TodayNews {
     // MARK: Reading
 
     /// A source's newest stories.
-    @concurrent static func stories(of source: NewsSite) async -> [NewsStory] {
-        if let feed = source.feed { return await stories(from: feed, host: source.host) ?? [] }
-        if let page = source.page, let html = await text(at: page) {
-            return await Task.detached(priority: .utility) { PageHeadlines.parse(html, page: page, host: source.host) }.value
+    @concurrent static func stories(of source: NewsSite, keepingBodies: Bool = false) async -> [NewsStory] {
+        if let feed = source.feed {
+            let read = await stories(from: feed, host: source.host, keepingBodies: keepingBodies) ?? []
+            guard source.filtersToPath == true, let path = source.path else { return read }
+            return read.filter { $0.link.path(percentEncoded: false).hasPrefix(path + "/") }
         }
-        return []
+        if let map = source.sitemap { return await SiteRoutes.stories(fromSitemap: map, host: source.host, path: source.path) }
+        guard let page = source.page else { return [] }
+        guard let html = await text(at: page) else { return [] }
+        return await Task.detached(priority: .utility) { SiteRoutes.stories(in: html, page: page, host: source.host) }.value
     }
 
     /// The stories of several sources, read at once, each source's newest first.
-    @concurrent static func stories(of sources: [NewsSite]) async -> [String: [NewsStory]] {
+    @concurrent static func stories(of sources: [NewsSite], keepingBodies: Bool = false) async -> [String: [NewsStory]] {
         await withTaskGroup(of: (String, [NewsStory]).self) { group in
             for source in sources {
-                group.addTask { (source.id, await stories(of: source)) }
+                group.addTask { (source.id, await stories(of: source, keepingBodies: keepingBodies)) }
             }
             var all: [String: [NewsStory]] = [:]
             for await (id, stories) in group { all[id] = stories }
@@ -284,8 +358,13 @@ nonisolated enum TodayNews {
     }
 
     /// Words that matter, cut to a rough stem: "poginula" and "poginuo" meet as "poginu".
-    private static func stems(_ text: String) -> Set<String> {
+    static func stems(_ text: String) -> Set<String> {
         Set(folded(text).split { !$0.isLetter && !$0.isNumber }.filter { $0.count >= 4 }.map { String($0.prefix(6)) })
+    }
+
+    /// Its words, without case or accents.
+    static func words(of text: String) -> [Substring] {
+        folded(text).split { !$0.isLetter && !$0.isNumber }
     }
 
     private static func folded(_ text: String) -> String {
@@ -369,12 +448,12 @@ nonisolated enum TodayNews {
         }
     }
 
-    @concurrent static func stories(from feed: URL, host: String) async -> [NewsStory]? {
+    @concurrent static func stories(from feed: URL, host: String, keepingBodies: Bool = false) async -> [NewsStory]? {
         var request = URLRequest(url: feed, timeoutInterval: 10)
         request.setValue("Mozilla/5.0 (iPhone) roko", forHTTPHeaderField: "User-Agent")
         guard let (data, response) = try? await URLSession.quick.data(for: request),
               (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
-        return await Task.detached(priority: .utility) { FeedParser.parse(data, host: host) }.value
+        return await Task.detached(priority: .utility) { FeedParser.parse(data, host: host, keepingBodies: keepingBodies) }.value
     }
 }
 
@@ -490,14 +569,17 @@ nonisolated final class FeedParser: NSObject, XMLParserDelegate {
     private var stories: [NewsStory] = []
     private var inItem = false
     private var element = ""
-    private var title = "", link = "", date = "", summary = ""
+    private var title = "", link = "", date = "", summary = "", body = "", image = ""
+    private var imageWidth = 0
+    private let keepingBodies: Bool
 
-    private init(host: String) {
+    private init(host: String, keepingBodies: Bool) {
         self.host = host
+        self.keepingBodies = keepingBodies
     }
 
-    static func parse(_ data: Data, host: String) -> [NewsStory]? {
-        let delegate = FeedParser(host: host)
+    static func parse(_ data: Data, host: String, keepingBodies: Bool = false) -> [NewsStory]? {
+        let delegate = FeedParser(host: host, keepingBodies: keepingBodies)
         let parser = XMLParser(data: data)
         parser.delegate = delegate
         guard parser.parse() || !delegate.stories.isEmpty else { return nil }
@@ -508,12 +590,21 @@ nonisolated final class FeedParser: NSObject, XMLParserDelegate {
                 attributes: [String: String] = [:]) {
         if name == "item" || name == "entry" {
             inItem = true
-            title = ""; link = ""; date = ""; summary = ""
+            title = ""; link = ""; date = ""; summary = ""; body = ""; image = ""; imageWidth = 0
         } else if inItem, name == "link", let href = attributes["href"],
                   attributes["rel"] == nil || attributes["rel"] == "alternate" {
             link = href  // Atom
+        } else if inItem, keepingBodies, ["media:content", "media:thumbnail", "enclosure"].contains(name),
+                  let url = attributes["url"], attributes["type"]?.hasPrefix("image") ?? true {
+            // The Guardian lists 140 and 460 wide: the largest.
+            let width = attributes["width"].flatMap(Int.init) ?? 0
+            if image.isEmpty || width > imageWidth {
+                image = url
+                imageWidth = width
+            }
         }
-        element = name
+        // The Guardian dates each story twice, pubDate and dc:date: run together, neither read.
+        element = ["pubDate", "published", "dc:date"].contains(name) && !date.isEmpty ? "" : name
     }
 
     func parser(_ parser: XMLParser, foundCharacters string: String) {
@@ -533,6 +624,8 @@ nonisolated final class FeedParser: NSObject, XMLParserDelegate {
         case "pubDate", "published", "dc:date": date += text
         case "updated": if date.isEmpty { date += text }
         case "description", "summary": if summary.count < 600 { summary += text }
+        case "content:encoded", "content": if keepingBodies, body.count < 400_000 { body += text }
+        case "News:Image": if keepingBodies { image += text }
         default: break
         }
     }
@@ -543,11 +636,25 @@ nonisolated final class FeedParser: NSObject, XMLParserDelegate {
             let title = PageHeadlines.plain(title)
             if !title.isEmpty, let url = URL(string: link.trimmingCharacters(in: .whitespacesAndNewlines)), url.scheme?.hasPrefix("http") == true {
                 let summary = PageHeadlines.plain(summary)
-                stories.append(NewsStory(title: title, link: url, host: host, published: Self.date(date),
-                                         summary: summary.isEmpty ? nil : String(summary.prefix(300))))
+                var story = NewsStory(title: title, link: url, host: host, published: Self.date(date),
+                                      summary: summary.isEmpty ? nil : String(summary.prefix(300)))
+                if keepingBodies {
+                    let text = WebResearcher.articleText(body, limit: 200_000)
+                    story.content = text.isEmpty ? nil : text
+                    story.links = text.isEmpty ? nil : PageLink.inBlocks(of: body)
+                    story.image = Self.picture(named: image, in: body)
+                }
+                stories.append(story)
             }
         }
         element = ""
+    }
+
+    /// The picture the feed names, else the article's first; https only, as the app's connections are.
+    private static func picture(named image: String, in body: String) -> URL? {
+        let source = image.isEmpty ? body.firstMatch(of: /<img[^>]+src=["']([^"']+)["']/).map { String($0.1) } ?? "" : image
+        guard let url = URL(string: PageHeadlines.decode(source)), url.scheme == "https" else { return nil }
+        return url
     }
 
     private static let rfc822: [DateFormatter] = ["EEE, dd MMM yyyy HH:mm:ss Z", "EEE, dd MMM yyyy HH:mm:ss zzz", "dd MMM yyyy HH:mm:ss Z"]
