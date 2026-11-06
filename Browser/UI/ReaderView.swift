@@ -325,7 +325,7 @@ struct ReaderView: View {
             if story.isMail {
                 Color.clear.frame(width: 44, height: Theme.barHeight)
             } else {
-                barButton(.readLater, label: saved ? "Saved to Read Later" : "Save to Read Later", tint: saved ? Theme.accentText : Theme.ink) {
+                barButton(.readLater, label: saved ? "Saved" : "Save for Later", tint: saved ? Theme.accentText : Theme.ink) {
                     ReadLater.shared.save(story, text: model.page?.text ?? "")
                 }
                 .disabled(saved)

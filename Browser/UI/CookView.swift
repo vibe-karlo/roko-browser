@@ -289,7 +289,7 @@ struct CookView: View {
     private func startTimer(_ seconds: Int) {
         Task {
             if let problem = await timers.start(seconds: seconds, step: model.step, recipe: model.recipe.title) {
-                browser.showToast(problem)
+                browser.showProblem(problem)
             }
         }
     }

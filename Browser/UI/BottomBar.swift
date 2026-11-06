@@ -12,6 +12,12 @@ struct BottomBar: View {
     @State private var capsuleFrame: CGRect = .zero
     /// Tabs switched by swiping the bar; each one ticks.
     @State private var switches = 0
+    /// Swiped at the first or last tab: no further to go, felt as a stop.
+    @State private var stops = 0
+    /// The swipe on the bar so far: its keys lean with the finger, and spring back.
+    @GestureState(reset: { _, transaction in
+        transaction.animation = UIAccessibility.isReduceMotionEnabled ? nil : .spring(duration: 0.3, bounce: 0.2)
+    }) private var swipe = BarSwipe()
 
     var body: some View {
         Group {
@@ -196,6 +202,7 @@ struct BottomBar: View {
             .opacity(docked && browser.selectedTab == nil ? 0 : 1)
             .accessibilityLabel("Page menu")
         }
+        .offset(swipe.lean)
         .frame(height: docked ? Theme.barHeight : Theme.barHeight + 8)
         .overlay(alignment: .bottom) {
             if !docked { ProgressLine(tab: browser.selectedTab) }
@@ -208,6 +215,9 @@ struct BottomBar: View {
         // hold on + never reached the capsule.
         .simultaneousGesture(swipes)
         .sensoryFeedback(.selection, trigger: switches)
+        // Far enough that letting go will do it.
+        .sensoryFeedback(.impact(weight: .light), trigger: swipe.willAct) { _, will in will }
+        .sensoryFeedback(.impact(flexibility: .rigid), trigger: stops)
     }
 
     static let dockedInset: CGFloat = 30
@@ -329,18 +339,50 @@ extension BottomBar {
 
     private var swipes: some Gesture {
         DragGesture(minimumDistance: 24)
+            .updating($swipe) { value, swipe, _ in
+                let dx = value.translation.width
+                let dy = value.translation.height
+                if dy < 0, abs(dy) > abs(dx) {
+                    swipe = BarSwipe(lean: CGSize(width: 0, height: max(dy * 0.3, -14)), willAct: dy < -Self.swipeUp)
+                } else if abs(dx) > abs(dy) {
+                    let free = hasNeighbor(toward: dx)
+                    let reach: CGFloat = free ? 24 : 10
+                    let lean = min(max(dx * (free ? 0.3 : 0.1), -reach), reach)
+                    swipe = BarSwipe(lean: CGSize(width: lean, height: 0), willAct: free && abs(dx) > Self.swipeAcross)
+                } else {
+                    swipe = BarSwipe()
+                }
+            }
             .onEnded { value in
                 let dx = value.translation.width
                 let dy = value.translation.height
-                if dy < -40, abs(dy) > abs(dx) {
+                if dy < -Self.swipeUp, abs(dy) > abs(dx) {
                     browser.showTabs()
-                } else if abs(dx) > 60, abs(dx) > abs(dy) {
-                    let before = browser.selectedID
+                } else if abs(dx) > Self.swipeAcross, abs(dx) > abs(dy) {
+                    guard hasNeighbor(toward: dx) else {
+                        stops += 1
+                        return
+                    }
                     withAnimation(.snappy) { browser.selectNeighbor(offset: dx < 0 ? 1 : -1) }
-                    if browser.selectedID != before { switches += 1 }
+                    switches += 1
                 }
             }
     }
+
+    private static let swipeUp: CGFloat = 40
+    private static let swipeAcross: CGFloat = 60
+
+    /// A tab beyond this one, the way a swipe of this sign goes.
+    private func hasNeighbor(toward dx: CGFloat) -> Bool {
+        guard let index = browser.tabs.firstIndex(where: { $0.id == browser.selectedID }) else { return false }
+        return browser.tabs.indices.contains(index + (dx < 0 ? 1 : -1))
+    }
+}
+
+/// A swipe on the bar, as far as it's gone.
+private struct BarSwipe {
+    var lean = CGSize.zero
+    var willAct = false
 }
 
 /// The floating bar's panel; docked, it sits straight on the band.

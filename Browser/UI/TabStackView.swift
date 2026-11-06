@@ -13,6 +13,8 @@ struct TabStackView: View {
     @State private var focused: BrowserTab.ID?
     /// How far the whole switcher has been pulled up (negative), following the finger.
     @State private var lift: CGFloat = 0
+    /// A second swipe up straight after the one that opened the switcher isn't a throw.
+    @State private var throwsFrom = Date.now.addingTimeInterval(0.5)
     /// A tab was thrown away while the switcher is open: offer it back.
     @State private var closedHere = false
     /// Where the + is on screen, for the launcher to grow out of.
@@ -72,6 +74,7 @@ struct TabStackView: View {
         .onAppear {
             focused = browser.selectedID ?? browser.tabs.last?.id
             closedHere = false
+            throwsFrom = Date.now.addingTimeInterval(0.5)
         }
         // Close All can be taken back only from here, straight after it.
         .onDisappear { browser.closedGroup = nil }
@@ -128,6 +131,7 @@ struct TabStackView: View {
                             titleWidth: (stacks ? stride : cardWidth) - 8, isFocused: tab.id == focused,
                             isBehind: stacks && index < focusedIndex, overlaps: stacks,
                             showsNeighbourIcon: !stacks,
+                            throwsFrom: throwsFrom,
                             open: { open(tab) },
                             close: { close(tab) },
                             closeAll: closeAllAction,
@@ -392,6 +396,7 @@ private struct TabCard: View {
     var overlaps = true
     /// Side by side, each card keeps its icon; laid over each other, only the focused one has a header.
     var showsNeighbourIcon = false
+    var throwsFrom = Date.distantPast
     let open: () -> Void
     let close: () -> Void
     /// Nil with only one tab open.
@@ -475,7 +480,10 @@ private struct TabCard: View {
             }
             .offset(y: throwOffset)
             .opacity(1 + throwOffset / 700)
+            // Far enough that letting go closes it.
+            .sensoryFeedback(.impact(weight: .light), trigger: throwOffset < -closeDistance) { _, past in past }
             .gesture(UpwardPan(
+                notBefore: throwsFrom,
                 changed: { throwOffset = min(0, $0) },
                 ended: { translation, velocity in
                     if -translation > closeDistance || velocity < -900 {
@@ -626,6 +634,7 @@ private struct TabTile: View {
 /// A pan that only starts on a mostly-upward drag. Done in UIKit because a
 /// SwiftUI drag on each card would swallow the carousel's sideways scrolling.
 private struct UpwardPan: UIGestureRecognizerRepresentable {
+    let notBefore: Date
     let changed: (CGFloat) -> Void
     let ended: (_ translation: CGFloat, _ velocity: CGFloat) -> Void
 
@@ -633,6 +642,10 @@ private struct UpwardPan: UIGestureRecognizerRepresentable {
         let pan = UIPanGestureRecognizer()
         pan.delegate = context.coordinator
         return pan
+    }
+
+    func updateUIGestureRecognizer(_ pan: UIPanGestureRecognizer, context: Context) {
+        context.coordinator.notBefore = notBefore
     }
 
     func handleUIGestureRecognizerAction(_ pan: UIPanGestureRecognizer, context: Context) {
@@ -647,8 +660,10 @@ private struct UpwardPan: UIGestureRecognizerRepresentable {
     func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
 
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var notBefore = Date.distantPast
+
         func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
-            guard let pan = recognizer as? UIPanGestureRecognizer else { return false }
+            guard Date.now >= notBefore, let pan = recognizer as? UIPanGestureRecognizer else { return false }
             let velocity = pan.velocity(in: pan.view)
             return velocity.y < 0 && abs(velocity.y) > abs(velocity.x) * 1.2
         }

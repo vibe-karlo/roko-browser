@@ -593,6 +593,26 @@ struct CommandBarView: View {
             } else {
                 // Same spot: the private switch while empty, the clear button once typing.
                 if browser.launcherContext == .web {
+                    // What holding + does, for anyone who hasn't found that. Not beside the
+                    // private switch's own word, where the field's prompt would be cut off.
+                    if browser.commandMode != .privateTab, Preferences.holdToTalk, !browser.voiceListening {
+                        Button {
+                            browser.startVoice()
+                            // No finger to lift: it listens until a pause in the speech.
+                            browser.endVoice()
+                        } label: {
+                            Image(systemName: "mic")
+                                .font(.system(size: 18))
+                                .foregroundStyle(Theme.secondaryInk)
+                                .frame(width: 34, height: 44)
+                                .contentShape(.rect)
+                        }
+                        .buttonStyle(RowButtonStyle())
+                        // A pair with the eye, not two things the field's spacing holds apart.
+                        .padding(.trailing, -12)
+                        .accessibilityLabel("Speak")
+                        .transition(.opacity)
+                    }
                     privateSwitch
                         .transition(.opacity)
                 }
@@ -1121,6 +1141,8 @@ private struct RowIcon: View {
 }
 
 private struct CommandRow: View {
+    /// Read only so the screen redraws when the iPhone's Text Size changes: `Font.scaled` picks it up then.
+    @Environment(\.dynamicTypeSize) private var textSize
     let item: CommandItem
     let isSelected: Bool
 
@@ -1136,7 +1158,7 @@ private struct CommandRow: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.title)
-                    .font(isAnswer ? .system(size: 26, weight: .semibold).monospacedDigit() : .system(size: 16))
+                    .font(isAnswer ? .scaled(26, weight: .semibold).monospacedDigit() : .scaled(16))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
                     // Only an answer shrinks to fit; a long page title just truncates.
@@ -1144,7 +1166,7 @@ private struct CommandRow: View {
                     .textSelection(.disabled)
                 if !item.subtitle.isEmpty {
                     Text(item.subtitle)
-                        .font(.system(size: 13))
+                        .font(.scaled(13))
                         .foregroundStyle(Theme.secondaryInk)
                         .lineLimit(1)
                 }
@@ -1154,7 +1176,7 @@ private struct CommandRow: View {
                 Glyph(mark, size: 14).foregroundStyle(Theme.faintInk)
             } else {
                 Text(item.kind)
-                    .font(.system(size: 12))
+                    .font(.scaled(12))
                     .foregroundStyle(Theme.faintInk)
             }
         }
@@ -1422,7 +1444,7 @@ enum CommandRanker {
              CommandItem(id: "action-shopping", title: "Shopping", subtitle: "Type \u{201C}shopping\u{201D} and what to buy to add it",
                          kind: "Action", icon: .glyph(.basket), action: .shopping)),
             (["read later", "save for later", "reading list", "save page"],
-             CommandItem(id: "action-save-later", title: "Save to Read Later", subtitle: "This page and its text, for later",
+             CommandItem(id: "action-save-later", title: "Save for Later", subtitle: "This page and its text, for later",
                          kind: "Action", icon: .glyph(.readLater), action: .saveForLater)),
             (["downloads", "downloaded", "files", "preuzimanja"],
              CommandItem(id: "action-downloads", title: "Downloads",

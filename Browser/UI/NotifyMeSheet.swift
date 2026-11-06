@@ -111,7 +111,11 @@ struct NotifyMeSheet: View {
         browser.panel = .none
         Task {
             let allowed = await WatchNotifications.requestPermission()
-            browser.showToast(allowed ? (isNew ? "roko will let you know" : "Saved") : "Notifications are off for roko in iOS Settings")
+            if allowed {
+                browser.showToast(isNew ? "roko will let you know" : "Saved")
+            } else {
+                browser.showProblem("Notifications are off for roko", action: "Settings", perform: BrowserModel.openAppSettings)
+            }
             // The page as it is now, to compare every later check with.
             if isNew { await Watcher.begin(watch, in: context) }
             WatchScheduler.schedule(in: context)
