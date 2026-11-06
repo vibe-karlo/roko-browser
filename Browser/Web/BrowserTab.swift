@@ -54,9 +54,17 @@ final class BrowserTab: NSObject, Identifiable {
     /// The tab's picture at full size, standing in for the page before it's live
     /// (the restored tab at launch): as just taken, until its file is written,
     /// then read from disk the first time it's wanted rather than for every tab.
-    var snapshot: UIImage? { taken ?? saved }
+    var snapshot: UIImage? {
+        if let taken { return taken }
+        if !savedWasRead {
+            savedWasRead = true
+            saved = isPrivate ? nil : UIImage(contentsOfFile: snapshotFile.path)
+        }
+        return saved
+    }
     private var taken: UIImage?
-    @ObservationIgnored private lazy var saved: UIImage? = isPrivate ? nil : UIImage(contentsOfFile: snapshotFile.path)
+    @ObservationIgnored private var saved: UIImage?
+    @ObservationIgnored private var savedWasRead = false
     /// A small copy for the tab switcher and the bar: about 3 MB decoded rather
     /// than 10, made off the main thread, kept for the last dozen tabs looked at.
     /// Nil until `loadThumbnail` has read it.
@@ -156,14 +164,14 @@ final class BrowserTab: NSObject, Identifiable {
         // each: never on the main thread.
         Task.detached(priority: .utility) { [weak self] in
             let small = Self.shrink(image)
-            if !isPrivate { try? image.jpegData(compressionQuality: 0.7)?.write(to: file) }
+            if !isPrivate { try? image.jpegData(compressionQuality: 0.7)?.write(to: file, options: .atomic) }
             await MainActor.run { [weak self] in
                 guard let self, self.taken === image else { return }
                 self.showThumbnail(small)
                 // A private tab has no file: its picture stays as taken.
                 if !isPrivate {
                     self.taken = nil
-                    self.saved = UIImage(contentsOfFile: file.path)
+                    self.forgetSaved()
                 }
             }
         }
@@ -249,14 +257,20 @@ final class BrowserTab: NSObject, Identifiable {
         }.value
     }
 
-    /// Swaps the decoded picture (about 10 MB at full resolution) for one read
-    /// lazily from disk, which iOS can drop and reload as needed.
+    /// Lets go of the pictures in memory; the file stands for them, read if one is
+    /// wanted again. Opens no file itself: with iOS short of memory, reading every
+    /// tab's picture to let go of it was the opposite of the point.
     func releaseSnapshotMemory() {
         thumbnail = nil
-        guard !isPrivate, snapshot != nil, FileManager.default.fileExists(atPath: snapshotFile.path),
-              let light = UIImage(contentsOfFile: snapshotFile.path) else { return }
-        saved = light
-        taken = nil
+        guard !isPrivate else { return }
+        forgetSaved()
+        // Fresh and not on disk yet, it's the only copy.
+        if taken != nil, FileManager.default.fileExists(atPath: snapshotFile.path) { taken = nil }
+    }
+
+    private func forgetSaved() {
+        saved = nil
+        savedWasRead = false
     }
 
     func discardSnapshot() {
