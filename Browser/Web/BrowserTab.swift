@@ -59,6 +59,8 @@ final class BrowserTab: NSObject, Identifiable {
     /// than 10, made off the main thread, kept for the last dozen tabs looked at.
     /// Nil until `loadThumbnail` has read it.
     private(set) var thumbnail: UIImage?
+    /// Taken before the page had painted: nothing on it worth showing.
+    private(set) var thumbnailIsBlank = false
     @ObservationIgnored private var loadingThumbnail = false
     private(set) var isLive = false
     /// The colour the page wants around its top edge: its theme-color, else its
@@ -192,6 +194,7 @@ final class BrowserTab: NSObject, Identifiable {
 
     private func showThumbnail(_ image: UIImage?) {
         thumbnail = image
+        thumbnailIsBlank = image?.isOneColour ?? false
         guard image != nil else { return }
         Self.warm.removeAll { $0.tab === self || $0.tab == nil }
         Self.warm.append(WeakTab(tab: self))

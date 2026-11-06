@@ -9,9 +9,12 @@ struct BrowserView: View {
     /// How many times the app has become active: the first is launch itself.
     @State private var activations = 0
     @State private var barTop: CGFloat = 0
+    /// Where the band under the page starts on screen.
+    @State private var bandTop: CGFloat = 0
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.fold) private var fold
     @Environment(\.propped) private var propped
+    @Environment(\.foldBent) private var foldBent
     /// Once it's been dragged, the lower half's hint has done its job.
     @State private var trackpadUsed = false
     /// The strip beside the page, turned sideways, where the bar stands upright.
@@ -38,6 +41,12 @@ struct BrowserView: View {
 
             if sideBar || splitBesideClock || besideFold != nil {
                 Color.black.ignoresSafeArea()
+            }
+
+            // A shut Duo with its clock at the side: the band's colour runs on up the
+            // clock's strip, one surface around the page, not a dark band beside a page-coloured strip.
+            if bandWrapsClock {
+                BandGround(color: browser.selectedTab?.topColor).ignoresSafeArea()
             }
 
             // Propped open, black from the fold down, for the bar to lie on.
@@ -84,54 +93,50 @@ struct BrowserView: View {
                             // Sideways, a card: rounded just enough to read as one, as
                             // Split View's side-by-side cards are, so every corner matches.
                             .clipShape(UnevenRoundedRectangle(topLeadingRadius: sideBar ? 16 : 0,
-                                                              bottomLeadingRadius: sideBar || standsOnFold ? 16 : showsBand ? 22 : 0,
-                                                              bottomTrailingRadius: sideBar || standsOnFold ? 16 : showsBand ? 22 : 0,
-                                                              topTrailingRadius: sideBar ? 16 : 0))
-                            .overlay {
-                                if barInBand && showsBand {
-                                    CardEdgeLip(radius: 22).allowsHitTesting(false)
-                                    CardEdgeProgress(tab: browser.selectedTab, radius: 22)
+                                                              bottomLeadingRadius: sideBar || standsOnFold ? 16 : showsBand && !barInBand ? 22 : 0,
+                                                              bottomTrailingRadius: sideBar || standsOnFold ? 16 : showsBand && !barInBand ? 22 : bandWrapsClock && !showsBand ? 22 : 0,
+                                                              topTrailingRadius: sideBar ? 16 : bandWrapsClock ? 22 : 0))
+                            .frame(maxHeight: .infinity, alignment: .top)
+                        if showsBand && !barInBand {
+                            band(bottomInset: proxy.safeAreaInsets.bottom)
+                        }
+                    }
+                    // The page doesn't resize as the bar folds: the band slides over it and
+                    // draws its rounded foot, and the page learns what's covered from bandTop.
+                    // Animating its frame told every site it had resized, a dozen times a fold.
+                    .overlay(alignment: .bottom) {
+                        if showsBand && barInBand {
+                            band(bottomInset: proxy.safeAreaInsets.bottom)
+                                .background(alignment: .top) {
+                                    BandGround(color: browser.selectedTab?.topColor)
+                                        .clipShape(BandFloor())
+                                        .padding(.top, -BandFloor.lip)
                                         .allowsHitTesting(false)
                                 }
-                            }
-                            .frame(maxHeight: .infinity, alignment: .top)
-                        if showsBand {
-                            VStack(spacing: 0) {
-                                if !browser.liveItems.isEmpty {
-                                    LiveBand()
-                                        .environment(\.liveBandOverBar, barInBand)
-                                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                                .overlay(alignment: .top) {
+                                    ZStack {
+                                        CardEdgeLip(radius: BandFloor.lip)
+                                        CardEdgeProgress(tab: browser.selectedTab, radius: BandFloor.lip)
+                                    }
+                                    .frame(height: BandFloor.lip)
+                                    .offset(y: -BandFloor.lip)
+                                    .allowsHitTesting(false)
                                 }
-                                if barInBand && !browser.isBarCollapsed {
-                                    BottomBar(docked: true)
-                                        .opacity(browser.launcherShown || browser.panel == .tabs || browser.pageBecomingSummary || browser.hidingItems != nil ? 0 : 1)
-                                        .allowsHitTesting(browser.hidingItems == nil)
-                                        .animation(.easeOut(duration: 0.2), value: browser.pageBecomingSummary)
-                                        .animation(.launcher, value: browser.launcherShown)
-                                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                                }
-                            }
-                            // Down into the home indicator's strip: on the dark band it has room,
-                            // and keeping clear of all of it left a tall empty gap.
-                            // With the bar folded the row is last, and its dots need to clear the indicator.
-                            .padding(.bottom, max(proxy.safeAreaInsets.bottom - 21, 4) + (barInBand && browser.isBarCollapsed && !browser.bandShowsStrip ? 9 : 0))
-                            .transition(.move(edge: .bottom))
+                                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { bandTop = $0 }
+                                .transition(.move(edge: .bottom))
                         }
                     }
                     // Only below: the status bar's strip keeps the page's colour.
-                    .background {
-                        if barInBand && showsBand {
-                            BandGround(color: browser.selectedTab?.topColor).ignoresSafeArea(edges: .bottom)
-                        } else {
-                            (showsBand ? Color.black : Color.clear).ignoresSafeArea(edges: .bottom)
-                        }
-                    }
+                    .background { (showsBand && !barInBand ? Color.black : Color.clear).ignoresSafeArea(edges: .bottom) }
                     .ignoresSafeArea(edges: .bottom)
                     .animation(.snappy(duration: 0.3), value: browser.liveItems.isEmpty)
                     .animation(.snappy(duration: 0.25), value: browser.bandShowsStrip)
                     .animation(.snappy(duration: 0.3), value: standsOnFold)
                     .animation(.snappy(duration: 0.28), value: browser.isBarCollapsed)
                 }
+                // Typing into a page, the keyboard covers the band, as it does the floating
+                // bar: its padding reads the safe area, which would lift it over the keyboard.
+                .ignoresSafeArea(.keyboard, edges: .bottom)
                 // Turned sideways the page is a card between two black strips:
                 // the Dynamic Island's on one side, the bar's on the other.
                 // On a Duo, open or shut, the clock runs down the side: the page keeps clear of it.
@@ -565,16 +570,51 @@ struct BrowserView: View {
         !browser.liveItems.isEmpty && browser.selectedTab != nil
     }
 
-    /// Exploration: the bar lives in the band on an upright phone's page. Sideways
-    /// and on an open Duo it stays as it is on main.
+    /// Exploration: the bar lives in the band under a page: on an upright phone and
+    /// on a Duo lying open. Sideways on a phone it has its strip; bent, split or with a
+    /// screen beside the page, a Duo keeps the bar on one half, floating.
     private var barInBand: Bool {
-        browser.selectedTab != nil && !sideBar && !standsOnFold && uprightFold == nil
+        guard browser.selectedTab != nil, !sideBar, !standsOnFold else { return false }
+        return uprightFold == nil || (!foldBent && besideFold == nil && splitHalves == nil)
     }
 
     /// The band under the page: the bar while it isn't folded away, and what's live.
     private var showsBand: Bool {
-        showsPlayer || barInBand && !browser.isBarCollapsed
+        return showsPlayer || barInBand && !browser.isBarCollapsed
     }
+
+    private var bandWrapsClock: Bool { clockBeside && barInBand }
+
+    /// With the band up, it covers the page from its top; with it gone, nothing is covered.
+    private var coveredFrom: CGFloat { showsBand ? bandTop : .greatestFiniteMagnitude }
+
+    /// What's live and the bar, down into the home indicator's strip: on the dark band
+    /// it has room, and keeping clear of all of it left a tall empty gap. With the bar
+    /// folded the row is last, and its dots need to clear the indicator.
+    private func band(bottomInset: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            if !browser.liveItems.isEmpty {
+                LiveBand()
+                    .environment(\.liveBandOverBar, barInBand)
+                    // Lying open, a bar's width, not stretched across the screen.
+                    .frame(maxWidth: barInBand && uprightFold != nil ? 480 : nil)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+            if barInBand && !browser.isBarCollapsed {
+                BottomBar(docked: true)
+                    .frame(maxWidth: uprightFold != nil ? 480 : nil)
+                    .opacity(browser.splitList != nil || browser.launcherShown || browser.panel == .tabs || browser.pageBecomingSummary || browser.hidingItems != nil ? 0 : 1)
+                    .allowsHitTesting(browser.hidingItems == nil && browser.splitList == nil)
+                    .animation(.easeOut(duration: 0.2), value: browser.pageBecomingSummary)
+                    .animation(.launcher, value: browser.launcherShown)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .padding(.bottom, max(bottomInset - 25, 9) + (barInBand && browser.isBarCollapsed && !browser.bandShowsStrip ? 13 : 0))
+        .frame(maxWidth: .infinity)
+        .transition(.move(edge: .bottom))
+    }
+
 
     /// Offers and toasts sit just above the band, not where the floating bar was.
     private var playerLift: CGFloat {
@@ -597,9 +637,9 @@ struct BrowserView: View {
     private var pages: some View {
         // Picking the second page and showing it are one view, for the same reason.
         if let halves = splitHalves {
-            SplitPages(top: halves.top, bottom: halves.bottom, barTop: sideBar || barInBand || uprightFold != nil ? .greatestFiniteMagnitude : barTop)
+            SplitPages(top: halves.top, bottom: halves.bottom, barTop: barInBand ? coveredFrom : sideBar || uprightFold != nil ? .greatestFiniteMagnitude : barTop)
         } else if let tab = browser.selectedTab {
-            PagePane(tab: tab, barTop: sideBar || barInBand || standsOnFold || uprightFold != nil ? .greatestFiniteMagnitude : barTop)
+            PagePane(tab: tab, barTop: barInBand ? coveredFrom : sideBar || standsOnFold || uprightFold != nil ? .greatestFiniteMagnitude : barTop)
         }
     }
 
@@ -609,6 +649,7 @@ struct BrowserView: View {
         if browser.showsOnboarding { return .lightContent }  // the welcome is always dark
         if browser.cook != nil || uprightFold != nil && browser.reader != nil { return .default }  // the paper follows the theme
         if splitBesideClock { return .lightContent }  // on the black beside the halves
+        if bandWrapsClock && browser.reader == nil && browser.cook == nil && browser.panel == .none { return .lightContent }  // on the band
         if browser.summary != nil || browser.browseForMe != nil || browser.panel == .todos || browser.panel == .today
             || browser.panel == .shopping || browser.panel == .readLater || browser.panel == .feed || browser.digest != nil {
             return .default

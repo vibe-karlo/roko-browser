@@ -46,7 +46,7 @@ struct BottomBar: View {
                     // whatever their widths: the fan's ink is 32 wide, the chevron's 16.
                     .frame(width: docked ? 32 : nil)
                     .padding(.leading, docked ? Self.dockedInset : 0)
-                    .frame(width: upright ? 56 : 64, height: upright ? 64 : Theme.barHeight, alignment: docked ? .leading : .center)
+                    .frame(width: upright ? 56 : docked ? 72 : 64, height: upright ? 64 : Theme.barHeight, alignment: docked ? .leading : .center)
                     .contentShape(.rect)
             }
             .buttonStyle(GlyphButtonStyle())
@@ -71,7 +71,7 @@ struct BottomBar: View {
                         if launchField && !upright {
                             HStack(spacing: 8) {
                                 Glyph(isPrivate ? .eyeClosed : .search, size: 17)
-                                Text(isPrivate ? "Private search or address" : "Search or enter address")
+                                Text(isPrivate ? "Private search" : "Search")
                                     .font(.system(size: 15))
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.8)
@@ -164,7 +164,7 @@ struct BottomBar: View {
                     .background(docked ? AnyShapeStyle(.clear) : AnyShapeStyle(Theme.raised), in: .circle)
                     // The glyph's ink is 11 inside its 38-point circle.
                     .padding(.trailing, docked ? Self.dockedInset - 11 : 0)
-                    .frame(width: upright ? 56 : 64, height: upright ? 64 : Theme.barHeight, alignment: docked ? .trailing : .center)
+                    .frame(width: upright ? 56 : docked ? 72 : 64, height: upright ? 64 : Theme.barHeight, alignment: docked ? .trailing : .center)
                     .contentShape(.rect)
             }
             .buttonStyle(GlyphButtonStyle())
@@ -186,7 +186,7 @@ struct BottomBar: View {
         .sensoryFeedback(.selection, trigger: switches)
     }
 
-    private static let dockedInset: CGFloat = 22
+    static let dockedInset: CGFloat = 30
 
     @State private var pressedAt: Date?
     @GestureState private var touching = false
@@ -256,7 +256,11 @@ struct BottomBar: View {
     }
 
     private var recentTabs: [BrowserTab] {
-        Array(browser.tabs.sorted { $0.lastActive > $1.lastActive }.prefix(2))
+        // The tab on screen in front, whenever it was last marked active.
+        Array(browser.tabs.sorted { a, b in
+            if (a.id == browser.selectedID) != (b.id == browser.selectedID) { return a.id == browser.selectedID }
+            return a.lastActive > b.lastActive
+        }.prefix(2))
     }
 
 }
@@ -340,16 +344,15 @@ private struct TabThumbnails: View {
     var quiet = false
 
     var body: some View {
-        let shots = tabs.compactMap(\.thumbnail)
         Group {
-            if shots.isEmpty {
+            if tabs.allSatisfy({ $0.thumbnail == nil || $0.thumbnailIsBlank }) {
                 TabsGlyph(count: count)
             } else {
                 ZStack {
-                    ForEach(Array(shots.prefix(2).enumerated().reversed()), id: \.offset) { index, shot in
-                        Image(uiImage: shot)
-                            .resizable()
-                            .scaledToFill()
+                    // By tab, not by picture: a tab with no picture yet moved someone
+                    // else's to the front, and the card showed the wrong page.
+                    ForEach(Array(tabs.prefix(2).enumerated().reversed()), id: \.element.id) { index, tab in
+                        card(tab)
                             .frame(width: quiet ? 20 : 22, height: quiet ? 27 : 30, alignment: .top)
                             .brightness(quiet && index == 1 ? -0.35 : 0)
                             .clipShape(.rect(cornerRadius: 5))
@@ -362,6 +365,16 @@ private struct TabThumbnails: View {
         }
         // Small pictures, read off the main thread: the full ones are ten megabytes each.
         .task(id: tabs.map(\.id)) { for tab in tabs { await tab.loadThumbnail() } }
+    }
+
+    /// Its picture, or with none worth showing, the site's own colour: never a blank sheet.
+    @ViewBuilder
+    private func card(_ tab: BrowserTab) -> some View {
+        if let picture = tab.thumbnail, !tab.thumbnailIsBlank {
+            Image(uiImage: picture).resizable().scaledToFill()
+        } else {
+            Rectangle().fill(tab.topColor?.cardShade ?? Color(white: 0.36))
+        }
     }
 }
 

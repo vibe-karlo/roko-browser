@@ -363,7 +363,7 @@ private struct LiveRowMargins: ViewModifier {
     @Environment(\.liveBandOverBar) private var overBar
 
     func body(content: Content) -> some View {
-        content.padding(.horizontal, overBar ? 22 : 16)
+        content.padding(.horizontal, overBar ? BottomBar.dockedInset : 16)
     }
 }
 

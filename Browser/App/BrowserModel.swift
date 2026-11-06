@@ -1526,6 +1526,13 @@ extension BrowserModel: BrowserTabDelegate {
         // Went to another page while hiding (a swipe back): the mode was for that one.
         if tab.id == selectedID, hidingItems != nil { finishHidingItems() }
         offerApp(for: tab, url: url)
+        // The bar's tab card shows this page, once it has had a moment to paint.
+        if tab.id == selectedID {
+            Task {
+                try? await Task.sleep(for: .seconds(1))
+                await tab.captureSnapshot()
+            }
+        }
         // Private pages leave nothing on disk, icons included.
         guard !tab.isPrivate else { return }
         if let webView = tab.webView {
