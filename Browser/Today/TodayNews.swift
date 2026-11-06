@@ -518,7 +518,7 @@ nonisolated enum TodayNews {
     }
 
     /// Off the main thread: every story's headline, folded, for each topic.
-    @concurrent private static func matching(_ topic: String, in stories: [NewsStory], isClub: Bool, named: String) async -> [NewsStory] {
+    @concurrent private static func naming(_ topic: String, in stories: [NewsStory], isClub: Bool, named: String) async -> [NewsStory] {
         guard let key = words(of: topic).max(by: { $0.count < $1.count }) else { return [] }
         let stem = key.count > 5 ? key.dropLast() : key
         return varied(recent(stories, hours: 48).filter { story in
@@ -535,7 +535,7 @@ nonisolated enum TodayNews {
         // sport pages, or a headline naming the club itself.
         let isClub = words.count > 1 && clubMarks.contains(words[0])
         let named = words.joined(separator: " ")
-        let matching = await matching(topic, in: stories, isClub: isClub, named: named)
+        let matching = await naming(topic, in: stories, isClub: isClub, named: named)
         // Says the whole name: nothing for a model to doubt, and it turned down some of these.
         func saysItAll(_ story: NewsStory) -> Bool { self.words(of: story.title).joined(separator: " ").contains(named) }
         let doubtful = matching.filter { !saysItAll($0) }

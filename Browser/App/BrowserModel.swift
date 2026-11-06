@@ -455,33 +455,53 @@ final class BrowserModel {
         pendingSave?.cancel()
         pendingSave = nil
         guard let context = tabContext else { return }
-        let records = (try? context.fetch(FetchDescriptor<SavedTab>())) ?? []
+        // What each tab is now, against what was last written: most saves are one page.
+        var now: [UUID: SavedFacts] = [:]
+        for (index, tab) in tabs.enumerated() where !tab.isPrivate {
+            guard let url = tab.url else { continue }
+            // A live page's state is encoded by WebKit: once per save.
+            now[tab.id] = SavedFacts(url: url.absoluteString, title: tab.title, order: index,
+                                     lastActive: tab.lastActive, state: tab.interactionState)
+        }
+        guard !savedOnce || now != lastSaved else { return }
+        let touched = Set(now.keys.filter { now[$0] != lastSaved[$0] }).union(lastSaved.keys.filter { now[$0] == nil })
+        // The first time looks at every record, which also clears up any duplicates.
+        // Couldn't read them: written next time, rather than written twice.
+        let wanted = Array(touched)
+        guard let records = try? context.fetch(savedOnce ? FetchDescriptor<SavedTab>(predicate: #Predicate { wanted.contains($0.tabID) })
+                                                         : FetchDescriptor<SavedTab>()) else { return }
         var byID: [UUID: SavedTab] = [:]
         for record in records {
             if byID[record.tabID] == nil { byID[record.tabID] = record } else { context.delete(record) }
         }
-        var open = Set<UUID>()
-        for (index, tab) in tabs.enumerated() where !tab.isPrivate {
-            guard let url = tab.url else { continue }
-            open.insert(tab.id)
-            let address = url.absoluteString
-            // A live page's state is encoded by WebKit: once per save.
-            let state = tab.interactionState
-            guard let record = byID[tab.id] else {
-                context.insert(SavedTab(tabID: tab.id, url: address, title: tab.title, order: index,
-                                        lastActive: tab.lastActive, interactionState: state))
+        for (id, facts) in now where !savedOnce || touched.contains(id) {
+            guard let record = byID[id] else {
+                context.insert(SavedTab(tabID: id, url: facts.url, title: facts.title, order: facts.order,
+                                        lastActive: facts.lastActive, interactionState: facts.state))
                 continue
             }
             // Assigned only when different: an assignment counts as a change.
-            if record.url != address { record.url = address }
-            if record.title != tab.title { record.title = tab.title }
-            if record.order != index { record.order = index }
-            if record.lastActive != tab.lastActive { record.lastActive = tab.lastActive }
-            if record.interactionState != state { record.interactionState = state }
+            if record.url != facts.url { record.url = facts.url }
+            if record.title != facts.title { record.title = facts.title }
+            if record.order != facts.order { record.order = facts.order }
+            if record.lastActive != facts.lastActive { record.lastActive = facts.lastActive }
+            if record.interactionState != facts.state { record.interactionState = facts.state }
         }
-        for (id, record) in byID where !open.contains(id) { context.delete(record) }
+        for (id, record) in byID where now[id] == nil { context.delete(record) }
         if context.hasChanges { try? context.save() }
+        lastSaved = now
+        savedOnce = true
     }
+
+    private struct SavedFacts: Equatable {
+        let url: String
+        let title: String
+        let order: Int
+        let lastActive: Date
+        let state: Data?
+    }
+    @ObservationIgnored private var lastSaved: [UUID: SavedFacts] = [:]
+    @ObservationIgnored private var savedOnce = false
 
     // MARK: Tabs
 

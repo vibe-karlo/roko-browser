@@ -97,7 +97,10 @@ nonisolated struct TodayWeather: Codable, Equatable, Sendable {
         parse.locale = Locale(identifier: "en_US_POSIX")
         let now = Date.now
         var hours: [Hour] = []
-        for index in raw.hourly.time.indices {
+        // Only as far as all of them go: one list shorter than the rest would stop the app.
+        let hourCount = min(raw.hourly.time.count, raw.hourly.temperature_2m.count, raw.hourly.weather_code.count,
+                            raw.hourly.is_day.count, raw.hourly.precipitation_probability.count)
+        for index in 0..<hourCount {
             guard let time = parse.date(from: raw.hourly.time[index]),
                   time > now.addingTimeInterval(-3_600), hours.count < 12 else { continue }
             hours.append(Hour(time: time, temperature: raw.hourly.temperature_2m[index], code: raw.hourly.weather_code[index],

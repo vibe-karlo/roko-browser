@@ -46,7 +46,7 @@ enum Store {
                 // launch for Notify Me or Today): the files are there but sealed.
                 // Nothing is moved; this launch runs with nothing saved.
                 print("Store sealed until the phone is unlocked: running in memory")
-                let memory = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+                let memory = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
                 container = try! ModelContainer(for: schema, configurations: memory)
             } else {
                 // Still not: a damaged file or a full disk. Put the files aside,
@@ -61,7 +61,7 @@ enum Store {
                 if let fresh = try? ModelContainer(for: schema, configurations: local, device) {
                     container = fresh
                 } else {
-                    let memory = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+                    let memory = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
                     container = try! ModelContainer(for: schema, configurations: memory)
                 }
             }
