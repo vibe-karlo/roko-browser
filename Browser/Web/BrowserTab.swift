@@ -385,19 +385,28 @@ final class BrowserTab: NSObject, Identifiable {
         keep(try? await webView.takeSnapshot(configuration: configuration))
     }
 
-    func translate(to target: TranslationTarget?) {
+    /// How it went, once the page has its text. When none of it could be
+    /// translated, the tab goes back to the original and doesn't claim otherwise.
+    @discardableResult
+    func translate(to target: TranslationTarget?) async -> PageTranslator.Outcome {
         let previous = translation
         translation = target
-        guard let webView else { return }
-        Task {
-            if let target {
-                // Switching languages: back to the original text first.
-                if previous != nil { await PageTranslator.shared.restore(webView) }
-                await PageTranslator.shared.translate(webView, to: target)
-            } else {
-                await PageTranslator.shared.restore(webView)
-            }
+        guard let webView else {
+            translation = nil
+            return .failed
         }
+        guard let target else {
+            await PageTranslator.shared.restore(webView)
+            return .translated
+        }
+        // Switching languages: back to the original text first.
+        if previous != nil { await PageTranslator.shared.restore(webView) }
+        let outcome = await PageTranslator.shared.translate(webView, to: target)
+        if outcome == .failed || outcome == .empty, translation == target {
+            translation = nil
+            await PageTranslator.shared.restore(webView)
+        }
+        return outcome
     }
 
     /// What's on screen right now, at full resolution, for the page-to-card
@@ -426,6 +435,14 @@ final class BrowserTab: NSObject, Identifiable {
         webView.pageZoom = level
         PageZoom.remember(level, for: webView.url?.host())
         zoomLevel = level
+    }
+
+    /// Back to the page's own size, and this site forgets the zoom.
+    func resetZoom() {
+        guard let webView else { return }
+        webView.pageZoom = 1
+        PageZoom.remember(1, for: webView.url?.host())
+        zoomLevel = 1
     }
 
     private(set) var zoomLevel: CGFloat = 1

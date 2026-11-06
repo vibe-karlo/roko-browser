@@ -15,6 +15,8 @@ struct ToolsSheet: View {
     @State private var darkPages = true
     /// Shown only on a page that publishes a recipe.
     @State private var hasRecipe = false
+    /// What the page's words are in, once read: there's no translating into that.
+    @State private var pageLanguage: String?
 
     /// What happens to this site's cookie pop-ups, and why.
     private var cookieDetail: String {
@@ -27,21 +29,33 @@ struct ToolsSheet: View {
 
     var body: some View {
         if let tab = browser.selectedTab {
-            ScrollView {
-                VStack(spacing: 14) {
-                    addressRow(tab)
-                    actionTiles(tab)
-                    pageGroup(tab)
-                    blockingCard(tab)
-                    siteGroup(tab)
+            ScrollViewReader { scroller in
+                ScrollView {
+                    VStack(spacing: 14) {
+                        addressRow(tab)
+                        actionTiles(tab)
+                        pageGroup(tab)
+                        blockingCard(tab)
+                        siteGroup(tab).id(Self.siteSettings)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 24)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 24)
+                // Opened at the foot of the sheet, its rows would arrive out of sight. Once they've
+                // opened: until then the list can't scroll past the height it had.
+                .onChange(of: siteSettingsOpen) { _, open in
+                    guard open else { return }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.26) {
+                        guard siteSettingsOpen else { return }
+                        withAnimation(.snappy(duration: 0.25)) { scroller.scrollTo(Self.siteSettings, anchor: .top) }
+                    }
+                }
             }
             .scrollBounceBehavior(.basedOnSize)
             .task(id: tab.url) {
                 guard let webView = tab.webView else { return }
+                pageLanguage = await PageTranslator.shared.language(of: webView)
                 hasRecipe = await RecipeReader.read(webView) != nil
             }
             // Scrolled rows slip away a little under the grabber, not into it.
@@ -67,6 +81,8 @@ struct ToolsSheet: View {
             }
         }
     }
+
+    private static let siteSettings = "siteSettings"
 
     // MARK: Address
 
@@ -110,7 +126,11 @@ struct ToolsSheet: View {
                 browser.panel = .none
                 browser.showToast("Link copied")
             }
-            iconButton(.reload, "Reload") { tab.webView?.reload(); browser.panel = .none }
+            if tab.isLoading {
+                iconButton(.close, "Stop loading") { tab.webView?.stopLoading(); browser.panel = .none }
+            } else {
+                iconButton(.reload, "Reload") { tab.webView?.reload(); browser.panel = .none }
+            }
         }
         .padding(.horizontal, 6)
         .frame(height: 60)
@@ -188,10 +208,21 @@ struct ToolsSheet: View {
                 Spacer()
                 HStack(spacing: 0) {
                     zoomButton("−", "Zoom out") { tab.stepZoom(-1) }
-                    Text("\(Int((tab.zoomLevel * 100).rounded()))%")
-                        .font(.system(size: 14, weight: .medium).monospacedDigit())
-                        .frame(width: 50)
+                        .disabled(PageZoom.isAtLimit(tab.zoomLevel, direction: -1))
+                    // Tapped: back to the page's own size.
+                    Button { tab.resetZoom() } label: {
+                        Text("\(Int((tab.zoomLevel * 100).rounded()))%")
+                            .font(.system(size: 14, weight: .medium).monospacedDigit())
+                            .foregroundStyle(Theme.ink)
+                            .frame(width: 50, height: 38)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(RowButtonStyle())
+                    .disabled(tab.zoomLevel == 1)
+                    .accessibilityLabel("Page zoom \(Int((tab.zoomLevel * 100).rounded())) percent")
+                    .accessibilityHint(tab.zoomLevel == 1 ? "" : "Back to 100 percent")
                     zoomButton("+", "Zoom in") { tab.stepZoom(1) }
+                        .disabled(PageZoom.isAtLimit(tab.zoomLevel, direction: 1))
                 }
                 .background(Theme.panel, in: .capsule)
             }
@@ -222,59 +253,95 @@ struct ToolsSheet: View {
         .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.edge))
     }
 
-    /// Translate into the language used last (or the one the page is in now);
-    /// tapping it again brings back the original. With more than one chosen in
-    /// Settings, a long press offers the others.
+    /// Tap the row: translate into the language used last, or back to the original.
+    /// With more than one to choose from, the capsule lists them. A language the page
+    /// is already in isn't offered.
+    @ViewBuilder
     private func translateRow(_ tab: BrowserTab) -> some View {
-        let targets = TranslationTarget.allCases
-        let shown = tab.translation ?? targets.first ?? TranslationTarget(rawValue: "en")
+        // The one it's translated into stays listed: read now, the page says it's in that.
+        let choices = TranslationTarget.allCases.filter { $0 == tab.translation || $0.language != pageLanguage }
         let isOn = tab.translation != nil
-        return HStack(spacing: 14) {
-            Glyph(.translate).foregroundStyle(Theme.secondaryInk).frame(width: 24)
-            Text(isOn ? "Translated" : "Translate").font(.system(size: 16))
-            Spacer()
-            Menu {
-                ForEach(targets.filter { $0 != shown }) { target in
-                    Button(target.name) { translate(tab, to: target) }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Text(shown.name)
-                        .font(.system(size: 14, weight: isOn ? .semibold : .regular))
-                        .foregroundStyle(isOn ? Theme.accent : Theme.ink)
-                    if targets.count > 1 {
-                        // More are a long press away.
-                        Glyph(.chevronUp, size: 10, weight: 2)
-                            .rotationEffect(.degrees(180))
-                            .foregroundStyle(Theme.secondaryInk)
+        if let shown = tab.translation ?? choices.first {
+            HStack(spacing: 14) {
+                Button {
+                    if isOn {
+                        Task { await tab.translate(to: nil) }
+                        browser.panel = .none
+                        browser.showToast("Showing the original")
+                    } else {
+                        translate(tab, to: shown)
                     }
+                } label: {
+                    HStack(spacing: 14) {
+                        Glyph(.translate).foregroundStyle(Theme.secondaryInk).frame(width: 24)
+                        Text(isOn ? "Show Original" : "Translate").font(.system(size: 16)).foregroundStyle(Theme.ink)
+                        Spacer(minLength: 0)
+                        if choices.count < 2 {
+                            Text(shown.name)
+                                .font(.system(size: 13))
+                                .foregroundStyle(isOn ? Theme.accentText : Theme.faintInk)
+                        }
+                    }
+                    .padding(.vertical, 12)
+                    // As tall as Page Zoom's row while the capsule's beside it.
+                    .frame(minHeight: choices.count > 1 ? 54 : nil)
+                    .contentShape(.rect)
                 }
-                .padding(.horizontal, 14)
-                .frame(height: 38)
-                .background(Theme.panel, in: .capsule)
-                .contentShape(.capsule)
-            } primaryAction: {
-                if isOn {
-                    tab.translate(to: nil)
-                    browser.panel = .none
-                    browser.showToast("Showing the original")
-                } else {
-                    translate(tab, to: shown)
+                .buttonStyle(RowButtonStyle())
+                .accessibilityLabel(isOn ? "Show original" : "Translate to \(shown.name)")
+                if choices.count > 1 {
+                    Menu {
+                        ForEach(choices) { target in
+                            Button(target.name) { translate(tab, to: target) }
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(shown.name)
+                                .font(.system(size: 14, weight: isOn ? .semibold : .regular))
+                                .foregroundStyle(isOn ? Theme.accentText : Theme.ink)
+                            Glyph(.chevronUp, size: 10, weight: 2)
+                                .rotationEffect(.degrees(180))
+                                .foregroundStyle(Theme.secondaryInk)
+                        }
+                        .padding(.horizontal, 14)
+                        .frame(height: 38)
+                        .background(Theme.panel, in: .capsule)
+                        .contentShape(.capsule)
+                    }
+                    .menuIndicator(.hidden)
+                    .menuOrder(.fixed)
+                    .accessibilityLabel("Language, \(shown.name)")
                 }
             }
-            .menuIndicator(.hidden)
-            .accessibilityLabel(isOn ? "Show original" : "Translate to \(shown.name)")
-            .accessibilityHint(targets.count > 1 ? "Touch and hold for other languages" : "")
+            .padding(.horizontal, 16)
+        } else {
+            // Every language chosen in Settings is the one this page is in.
+            HStack(spacing: 14) {
+                Glyph(.translate).foregroundStyle(Theme.faintInk).frame(width: 24)
+                Text("Translate").font(.system(size: 16)).foregroundStyle(Theme.faintInk)
+                Spacer(minLength: 0)
+                Text("Already in \(TranslationTarget.allCases.first?.name ?? "your language")")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.faintInk)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .accessibilityElement(children: .combine)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
     }
 
     private func translate(_ tab: BrowserTab, to target: TranslationTarget) {
         TranslationTarget.used(target)
-        tab.translate(to: target)
         browser.panel = .none
         browser.showToast("Translating to \(target.name)")
+        Task {
+            switch await tab.translate(to: target) {
+            case .translated: browser.showToast("Translated to \(target.name)")
+            case .partly: browser.showToast("Translated part of this page")
+            case .empty: browser.showToast("Nothing to translate here")
+            case .failed: browser.showToast("Couldn't translate this page")
+            }
+        }
     }
 
     private var downloadsDetail: String {
@@ -354,31 +421,27 @@ struct ToolsSheet: View {
             .buttonStyle(RowButtonStyle())
 
             if siteSettingsOpen, let host = tab.url?.host() {
-                toggleRow(glyph: .blocking, title: "Block ads and trackers",
-                          detail: URL(string: "https://\(host)")?.displayHost ?? host, isOn: Binding(
-                    get: { blockingOn },
-                    set: { on in
-                        blockingOn = on
-                        ContentBlocker.shared.setAllowed(host: host, !on)
-                        tab.webView?.reload()
-                    }))
+                // Blocking off for the site, or a kind of it off in Settings: these do nothing
+                // here, and say so, rather than stay on and describe what isn't happening.
+                let popupsHeld = heldBack(by: .popups)
+                let cookiesHeld = heldBack(by: .cookies)
                 toggleRow(glyph: .popup, title: "Block pop-ups",
-                          detail: popupsOn ? "Newsletter and promo overlays hidden" : "Allowed on this site", isOn: Binding(
-                    get: { popupsOn },
+                          detail: popupsHeld ?? (popupsOn ? "Newsletter and promo overlays hidden" : "Allowed on this site"), isOn: Binding(
+                    get: { popupsHeld == nil && popupsOn },
                     set: { on in
                         popupsOn = on
                         ContentBlocker.shared.setAllowed(host: host, category: .popups, !on)
                         tab.webView?.reload()
                     }))
-                    .disabled(!blockingOn || !ContentBlocker.shared.isEnabled(.popups))
-                toggleRow(glyph: .cookie, title: "Reject cookies", detail: cookieDetail, isOn: Binding(
-                    get: { rejectingCookies },
+                    .disabled(popupsHeld != nil)
+                toggleRow(glyph: .cookie, title: "Reject cookies", detail: cookiesHeld ?? cookieDetail, isOn: Binding(
+                    get: { cookiesHeld == nil && rejectingCookies },
                     set: { on in
                         rejectingCookies = on
                         ConsentHandler.shared.setAccepted(on ? nil : .chosen, for: host)
                         cookieReason = on ? nil : .chosen
                     }))
-                    .disabled(!blockingOn || !ContentBlocker.shared.isEnabled(.cookies))
+                    .disabled(cookiesHeld != nil)
                 if ForceDark.isOn {
                     toggleRow(glyph: .forceDark, title: "Force dark",
                               detail: darkPages ? "This site is dark" : "Off on this site", isOn: Binding(
@@ -405,6 +468,12 @@ struct ToolsSheet: View {
         .padding(.vertical, 2)
         .background(Theme.raised, in: .rect(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.edge))
+    }
+
+    /// Why a kind of blocking isn't running on this site, if something above it has it off.
+    private func heldBack(by category: ContentBlocker.Category) -> String? {
+        if !blockingOn { return "Off with blocking" }
+        return ContentBlocker.shared.isEnabled(category) ? nil : "Off in Settings"
     }
 
     private func toggleRow(glyph: Glyph.Kind, title: String, detail: String, isOn: Binding<Bool>) -> some View {

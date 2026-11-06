@@ -454,12 +454,13 @@ if (!still) {
   });
   document.fonts?.ready.then(() => { measure(); frame(); });
   // A scene's pictures are ready before it arrives, so none of them pops in mid-scroll.
-  new IntersectionObserver((near, io) => {
+  // They wait until the page itself has loaded, so they never hold up the first screen.
+  addEventListener("load", () => new IntersectionObserver((near, io) => {
     for (const { isIntersecting, target } of near) if (isIntersecting) {
       io.unobserve(target);
       for (const img of target.querySelectorAll("img")) { img.loading = "eager"; img.decode?.().catch(() => {}); }
     }
-  }, { rootMargin: "400% 0px" }).observe(duoRun);
+  }, { rootMargin: "400% 0px" }).observe(duoRun));
   // A keyboard reaching a demo that isn't showing brings it into view.
   stage.addEventListener("focusin", e => {
     if (!pinned) return;
@@ -482,15 +483,23 @@ if (!still) {
   lightBox.append(rise); document.body.append(lightBox);
   document.documentElement.classList.add("lit");
   {
-    const w = 480, h = 960, wash = new ImageData(w, h);
+    const w = 480, h = 960, wash = new ImageData(w, h), px = wash.data;
     const stops = [[0, 15, 15, 14], [.14, 30, 15, 20], [.34, 62, 20, 25], [.58, 108, 30, 26], [.8, 146, 44, 30], [1, 172, 54, 32]];
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const off = Math.hypot((x / w - .44) * .95, y / h * 2 - 1.62), t = Math.exp(-((off / .8) ** 2.3));
+    // A pixel's colour depends only on its distance from the heart, so the colours are worked out once and looked up.
+    const steps = 4096, far = 3, ramp = new Float32Array((steps + 1) * 3);
+    for (let s = 0; s <= steps; s++) {
+      const t = Math.exp(-((s / steps * far / .64) ** 1.15));
       let i = 0;
       while (i < stops.length - 2 && t > stops[i + 1][0]) i++;
-      const [from, to] = [stops[i], stops[i + 1]], k = (t - from[0]) / (to[0] - from[0]), at = (x + y * w) * 4, n = (Math.random() - .5) * 2.4;
-      for (let c = 0; c < 3; c++) wash.data[at + c] = from[c + 1] + (to[c + 1] - from[c + 1]) * k + n;
-      wash.data[at + 3] = 255;
+      const from = stops[i], to = stops[i + 1], k = (t - from[0]) / (to[0] - from[0]);
+      for (let c = 0; c < 3; c++) ramp[s * 3 + c] = from[c + 1] + (to[c + 1] - from[c + 1]) * k;
+    }
+    for (let y = 0, at = 0; y < h; y++) {
+      const down = y / h * 2 - 1.62;
+      for (let x = 0; x < w; x++, at += 4) {
+        const across = (x / w - .44) * .95, s = ((across * across + down * down) / far * steps | 0) * 3, n = (Math.random() - .5) * 2.4;
+        px[at] = ramp[s] + n; px[at + 1] = ramp[s + 1] + n; px[at + 2] = ramp[s + 2] + n; px[at + 3] = 255;
+      }
     }
     rise.width = w; rise.height = h;
     rise.getContext("2d").putImageData(wash, 0, 0);
@@ -649,6 +658,12 @@ if (runs) {
     before.observe(runs);
     new IntersectionObserver(([e], o) => { if (e.isIntersecting) { o.disconnect(); run(); } }, { threshold: 0.2 }).observe(runs);
   }
+}
+
+// The meters' small animations rest while they're off screen.
+{
+  const seen = new IntersectionObserver(all => { for (const e of all) e.target.classList.toggle("parked", !e.isIntersecting); });
+  for (const m of document.querySelectorAll(".meter")) seen.observe(m);
 }
 
 // The nav says which part you're in, with its type and nothing bolted on.
