@@ -880,8 +880,7 @@ private struct ClearDataSettings: View {
                              WKWebsiteDataTypeServiceWorkerRegistrations])
         }
         if cache {
-            types.formUnion([WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache, WKWebsiteDataTypeFetchCache,
-                             WKWebsiteDataTypeOfflineWebApplicationCache])
+            types.formUnion([WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache, WKWebsiteDataTypeFetchCache])
         }
         if !types.isEmpty { await WKWebsiteDataStore.default().removeData(ofTypes: types, modifiedSince: since) }
         cleared = true

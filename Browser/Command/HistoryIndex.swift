@@ -69,6 +69,11 @@ final class HistoryIndex {
         Array(hits.sorted { $0.use > $1.use }.prefix(limit))
     }
 
+    /// Gone now: the list is rebuilt from here at once, before a fresh read could finish.
+    func remove(urls: Set<String>) {
+        hits.removeAll { urls.contains($0.url) }
+    }
+
     /// A page just visited: to the front.
     func note(url: String, title: String, visitCount: Int, visitedAt: Date) {
         hits.removeAll { $0.url == url }

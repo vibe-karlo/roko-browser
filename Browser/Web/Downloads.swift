@@ -364,7 +364,7 @@ private final class PreviewSource: NSObject, QLPreviewControllerDataSource {
 }
 
 /// Lets a progress report through four times a second, and always the last.
-private final class ProgressGate: @unchecked Sendable {
+nonisolated private final class ProgressGate: @unchecked Sendable {
     private let lock = NSLock()
     private var last = Date.distantPast
 

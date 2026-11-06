@@ -900,8 +900,7 @@ struct LoadError: Equatable {
     }
 
     init(_ error: NSError) {
-        let failing = (error.userInfo[NSURLErrorFailingURLErrorKey] as? URL)
-            ?? (error.userInfo[NSURLErrorFailingURLStringErrorKey] as? String).flatMap(URL.init(string:))
+        let failing = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL
         let kind: Kind = switch error.code {
         case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost, NSURLErrorDataNotAllowed,
              NSURLErrorInternationalRoamingOff: .offline

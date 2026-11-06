@@ -401,7 +401,7 @@ struct FeedView: View {
             .contentShape(.rect)
         }
         .buttonStyle(RowButtonStyle())
-        .storyMenu { menu(.story(item)) }
+        .storyMenu(inCard: true) { menu(.story(item)) }
         .feedSwipes(.story(item), store: store, browser: browser)
     }
 
@@ -483,9 +483,11 @@ private struct FeedPile: View {
 extension View {
     /// A story's long-press menu. Held up, the story has room around it in its
     /// rounded shape, its text clear of the edge; on the page it stays where it was.
-    func storyMenu(@ViewBuilder _ menu: () -> some View) -> some View {
+    /// A line of a card lifts square: the row's flat sides are part of the card, and
+    /// round corners showed the gap the row left behind.
+    func storyMenu(inCard: Bool = false, @ViewBuilder _ menu: () -> some View) -> some View {
         padding(8)
-            .contentShape(.contextMenuPreview, .rect(cornerRadius: 16, style: .continuous))
+            .contentShape(.contextMenuPreview, .rect(cornerRadius: inCard ? 0 : 16, style: .continuous))
             .contextMenu { menu() }
             .padding(-8)
     }

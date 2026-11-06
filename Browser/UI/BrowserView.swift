@@ -301,7 +301,7 @@ struct BrowserView: View {
                     .barSurface(cornerRadius: 14)
                     .compositingGroup()
                     .padding(.horizontal, Theme.gutter)
-                    .padding(.bottom, Theme.barHeight + 20 + playerLift)
+                    .padding(.bottom, browser.panel == .command ? 8 : Theme.barHeight + 20 + playerLift)
                     // Never across the bend of an open Duo.
                     .staysWithBar(browser)
                     .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
@@ -330,7 +330,8 @@ struct BrowserView: View {
                 .barSurface(cornerRadius: 14)
                 .compositingGroup()
                 .padding(.horizontal, Theme.gutter)
-                .padding(.bottom, Theme.barHeight + 20 + playerLift)
+                // In the launcher there's no bar to clear: just above the keyboard.
+                .padding(.bottom, browser.panel == .command ? 8 : Theme.barHeight + 20 + playerLift)
                 .staysWithBar(browser)
                 .id(offer.id)
                 .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),

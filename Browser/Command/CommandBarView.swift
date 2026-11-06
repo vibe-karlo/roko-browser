@@ -86,7 +86,7 @@ struct CommandBarView: View {
     /// Search. Fixed, so it's known before anything is laid out and no keyboard
     /// (the system's, SwiftKey, one that says its size late) can move it.
     private var fieldTarget: CGRect {
-        let screen = UIScreen.main.bounds
+        let screen = UIApplication.screenBounds
         // On a Duo bent open, the half the field keeps to (as keepsOffFold picks
         // it). Lying flat there's no bend to avoid: one panel across it.
         if let fold, foldBent, fold.height > fold.width {
@@ -825,8 +825,9 @@ struct CommandBarView: View {
             forgotten = browser.forget(url, wholeSite: wholeSite)
             rebuild()
         }
-        browser.offerUndo(wholeSite ? "Site removed from history" : "Removed from history") { [browser] in
+        browser.offerUndo(wholeSite ? "Site removed from history" : "Removed from history") {
             browser.remember(forgotten)
+            rebuild()
         }
     }
 
@@ -1735,5 +1736,13 @@ nonisolated enum ParkingQuery {
         let needle = query.trimmingCharacters(in: .whitespaces).lowercased()
         // From "parki" on: "park" alone is as likely a park, and this asks where you are.
         return needle.count >= 5 && words.contains { $0.hasPrefix(needle) || needle == $0 }
+    }
+}
+
+extension UIApplication {
+    /// The screen roko is on, turned as it's held.
+    static var screenBounds: CGRect {
+        let scene = shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        return scene?.screen.bounds ?? .zero
     }
 }

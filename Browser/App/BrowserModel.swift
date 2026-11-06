@@ -1580,6 +1580,7 @@ final class BrowserModel {
             }
         }
         try? context.save()
+        historyIndex.remove(urls: Set(forgotten.map(\.url)))
         historyIndex.rebuild(from: context.container)
         return forgotten
     }
@@ -1592,6 +1593,7 @@ final class BrowserModel {
             entry.visitedAt = page.visitedAt
             entry.visitCount = page.visitCount
             context.insert(entry)
+            historyIndex.note(url: page.url, title: page.title, visitCount: page.visitCount, visitedAt: page.visitedAt)
         }
         try? context.save()
         historyIndex.rebuild(from: context.container)

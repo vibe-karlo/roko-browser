@@ -79,7 +79,7 @@ enum CopiedLink {
         // Posted for changes made in this app, not for another app's or a Mac's.
         observer = NotificationCenter.default.addObserver(forName: UIPasteboard.changedNotification, object: nil,
                                                           queue: .main) { _ in
-            MainActor.assumeIsolated { ownCounts.insert(UIPasteboard.general.changeCount) }
+            MainActor.assumeIsolated { _ = ownCounts.insert(UIPasteboard.general.changeCount) }
         }
     }
 
@@ -310,7 +310,7 @@ struct PasteControl: UIViewRepresentable {
 
         private func build() {
             control?.removeFromSuperview()
-            var configuration = UIPasteControl.Configuration()
+            let configuration = UIPasteControl.Configuration()
             configuration.displayMode = .labelOnly
             configuration.cornerStyle = .fixed
             configuration.cornerRadius = 10

@@ -37,6 +37,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - News, Saved, To-do, Today and the launcher's rows follow the iPhone's Text Size, up to half as large again. With Reduce Motion on, screens fade in rather than slide.
 - A mic in the launcher's field, for those who haven't found that holding + listens. Refresh is on News' bar, and Today has just the one. News sources is called Sources wherever it's opened, and the page menu says Save for Later.
 - The launcher's top row no longer sat half behind its field as the keyboard rose.
+- A page removed from the launcher goes at once, not the next time it opens, and Removed from history sits just above the keyboard rather than across a row. Held, a story in a News card lifts square, with no gap at its corners.
 - An unsafe page has a way out: Go back, or Close this tab. Reader and a summary that fail offer Try again, and Reader the page itself, instead of grey text.
 - Notify Me could announce old text as news on a page that writes its text with scripts and then moves itself on: it read the page mid-move, and the next reading differed. It now waits for the page to settle.
 - Reader could leave out whole sections of an article, or start it halfway through, without saying so: on Ars Technica, and on bbc.co.uk. It now keeps the whole story when a page's sections are wrapped separately, and so does Copy as Markdown. BBC articles also lose the "Image source" and "Image caption" labels written for screen readers.

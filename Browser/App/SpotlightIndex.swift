@@ -1,4 +1,4 @@
-import CoreSpotlight
+@preconcurrency import CoreSpotlight
 import SwiftData
 import UniformTypeIdentifiers
 
@@ -23,7 +23,8 @@ enum SpotlightIndex {
         guard fingerprint != UserDefaults.standard.string(forKey: key) else { return }
         UserDefaults.standard.set(fingerprint, forKey: key)
         let index = CSSearchableIndex.default()
-        index.deleteAllSearchableItems { _ in index.indexSearchableItems(items) }
+        let indexing = items
+        index.deleteAllSearchableItems { _ in index.indexSearchableItems(indexing) }
     }
 
     /// A result was tapped: its page, or the list it's on.
