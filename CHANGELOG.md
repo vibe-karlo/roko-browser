@@ -17,6 +17,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Reader no longer starts with a byline, a picture credit or "44 minutes ago".
 
 ### Website
+- A black page with the app's own light: a dome rising from the bottom edge, drawn once and only moved, whose crest catches at the footer. It replaces the page-long gradient.
+- "Still see it?" is a scene too: scrolling taps the page clean, and a real tap takes over. "Smart when you ask" lines its titles, text and phones up across the pair.
+- Phones scroll cleanly: a swipe on a demo no longer grabs its divider, Safari's toolbar no longer jumps the scenes, and the nav is a full-width bar that folds away going down.
 - One gradient now runs the whole page, near-black at the top and ember at the footer, in place of a gradient per section, so no section can seam against the next. Content has a maximum width on big screens. The clean-page comparison uses a new pair of real captures: Allrecipes' pancake recipe with roko's blocking off and on.
 - "Nothing in your way" is now a scene: the cookie wall wipes away to the pancakes as you scroll, and the light comes up with it. "Two pages at once" turns the phone sideways as you scroll, with each page staying upright, and the divider can still be dragged either way.
 - The page is recomposed around one light: it rises as you scroll, peaks behind "Nothing in your way" and ends in the footer, and the headline passes behind the phone. The bar's jobs are a grid of different tiles, and the scoreboard sits beside its claim.
