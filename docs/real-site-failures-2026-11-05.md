@@ -19,6 +19,7 @@ did worse than another browser is here, with its cause and what became of it. Re
 | 12 | Link covered | Any | A link from another app on the day's first launch opened under Today | Today opened on launch regardless of the link. Found on Le Monde in the re-test | Fixed in general, tested in the simulator only: the phone had already shown Today that day |
 | 13 | Empty box | Marca, Welt | "Publicidad" strip stuck at the bottom; grey box at the top of the page | Slots holding their own script or style, which the fold-away script counted as text a reader could want, and a close button's hidden words | Fixed in general, confirmed on the phone |
 | 15 | Data, wall | The Mirror | 12 to 13 MB where Brave used 2, and in some runs its wall stays up | Ad-Shield reloads its ads through its own hosts, with videos. Blocking its host only moves it to another (html-load.com, then magicalblouse.com), and blocking its addresses brings up "Please allow ads" over a blank page, so both were undone. Why the wall sometimes stays isn't known | Open |
+| 16 | Visible ad | Focus | An "Anzeige" strip at the bottom and a sponsored box in the page, once its wall is answered | Not established | Open |
 | 14 | Slow | Daily Mail | 3.2 to 3.9 s in some rounds, 1.2 s in others | In a slow run the page commits, paints nothing, and navigates again with 1 s to its first byte; a quick run commits once. It looks like the site's own bounce (Quiche had 3.21 s once too), not proven | Not roko's as far as known |
 
 Checked and not roko's:
