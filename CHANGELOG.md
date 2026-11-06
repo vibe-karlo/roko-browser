@@ -21,6 +21,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - roko wears the website's colours: a warm near-black and off-white, warm greys, and one red-orange. Its light is the website's wash with visible grain, full width and brightest at the lower left, in light and dark. It sits quietly behind Today, To-do, Shopping and Read Later, and on Today it rises as you read down.
 
 ### Fixed
+- A watched page that stopped reading plainly, behind bot protection, was never checked again. It's now read with its scripts running once a check has been missed. Pages read out of sight are laid out at a phone's width, so ones that lay out by width lose nothing.
 - Notify Me no longer takes a live headline's time label for news: "Just now" becoming "1m ago", in English or Croatian. A line that only mentions time, like "Three hours of talks end", still counts.
 - A memory warning no longer reads every open tab's picture from disk; it lets them go instead.
 - A page iOS reclaims in a tab out of sight waits to be selected, rather than reloading at once with the others.
