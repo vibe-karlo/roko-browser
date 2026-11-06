@@ -23,7 +23,7 @@
   "vars": {
     // Where "Answered by roko" links to: the App Store page, once there is one.
     "APP_URL": "/",
-    // The link's own address, e.g. "https://roko.app". Empty: whatever address served it.
+    // The link's own address, e.g. "https://rokobrowser.com". Empty: whatever address served it.
     "PUBLIC_URL": "",
     // An address for "Report" under each page. Empty: no Report link.
     "REPORT_EMAIL": "karlo@growthstudio.hr",
@@ -33,5 +33,5 @@
     // "true" lets search engines list shared pages. Link previews work either way.
     "INDEXABLE": "false"
   }
-  // At deploy: "routes": [{ "pattern": "roko.app", "custom_domain": true }]
+  // At deploy: "routes": [{ "pattern": "rokobrowser.com", "custom_domain": true }]
 }

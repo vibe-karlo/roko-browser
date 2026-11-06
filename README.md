@@ -538,7 +538,7 @@ Deploying, once there's a domain:
 1. Add the domain to a Cloudflare account, then on this Mac: `cd Server/share && npm install
    && npx wrangler login`.
 2. `npx wrangler d1 create roko-shares`, and put the id it prints in `wrangler.jsonc`.
-3. In `wrangler.jsonc`: set `PUBLIC_URL` (e.g. `https://roko.app`), `REPORT_EMAIL` if pages
+3. In `wrangler.jsonc`: set `PUBLIC_URL` (e.g. `https://rokobrowser.com`), `REPORT_EMAIL` if pages
    should have a Report link, and uncomment `routes` with the domain.
 4. `npx wrangler secret put ADDRESS_SALT` with any long random string, then `npm run deploy`.
 5. In `project.yml`, set `SHARE_SERVER` to the same address, then `xcodegen generate` and build.
