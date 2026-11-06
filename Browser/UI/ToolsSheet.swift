@@ -52,7 +52,9 @@ struct ToolsSheet: View {
                     }
                 }
             }
-            .scrollBounceBehavior(.basedOnSize)
+            // From inside the list too, not only by the grabber: pulled down at its top, the menu closes.
+            .pullsDownToClose(distance: 60) { browser.panel = .none }
+            .scrollBounceBehavior(.always)
             .task(id: tab.url) {
                 guard let webView = tab.webView else { return }
                 pageLanguage = await PageTranslator.shared.language(of: webView)
@@ -190,7 +192,7 @@ struct ToolsSheet: View {
 
             // Not for private tabs: the list keeps the page and its text.
             if !tab.isPrivate {
-                ToolRow(glyph: .readLater, title: "Read Later", detail: ReadLater.shared.contains(tab.url) ? "Saved" : "") {
+                ToolRow(glyph: .readLater, title: "Save for Later", detail: ReadLater.shared.contains(tab.url) ? "Saved" : "") {
                     ReadLater.shared.contains(tab.url) ? (browser.panel = .readLater) : browser.saveForLater()
                 }
             }

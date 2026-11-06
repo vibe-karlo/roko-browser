@@ -16,7 +16,7 @@ final class LinkPreview: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
-        let screen = view.window?.windowScene?.screen.bounds ?? UIScreen.main.bounds
+        let screen = UIApplication.screenBounds
         preferredContentSize = CGSize(width: screen.width, height: (screen.height * 0.62).rounded())
         guard let webView = page.webView else { return }
         webView.removeFromSuperview()

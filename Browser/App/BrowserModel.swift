@@ -732,7 +732,7 @@ final class BrowserModel {
             if floating {
                 if let reading, reading.id != tab.id, tabs.contains(where: { $0.id == reading.id }) { select(reading) }
             } else {
-                showToast("This video can't play in a window")
+                showProblem("This video can't play in a window")
             }
         }
     }
@@ -1111,9 +1111,12 @@ final class BrowserModel {
     var linkJustArrived: Bool { lastOutsideLink.map { Date.now.timeIntervalSince($0) < 2 } ?? false }
 
     /// Something just removed, a tap from coming back: the switcher's Reopen, for the rest of the app.
+    /// Or something that went wrong, with the one thing that helps if there is one.
     struct UndoOffer: Identifiable {
         let id = UUID()
         let text: String
+        var action: String? = "Undo"
+        var isProblem = false
         let undo: () -> Void
     }
     private(set) var undoOffer: UndoOffer?
@@ -1126,6 +1129,23 @@ final class BrowserModel {
             try? await Task.sleep(for: .seconds(6))
             if !Task.isCancelled { undoOffer = nil }
         }
+    }
+
+    /// Not a confirmation: it stays long enough to read, feels different, and can carry a way out.
+    func showProblem(_ text: String, action: String? = nil, perform: @escaping () -> Void = {}) {
+        toast = nil
+        toastTask?.cancel()
+        undoOffer = UndoOffer(text: text, action: action, isProblem: true, undo: perform)
+        undoTask?.cancel()
+        undoTask = Task {
+            try? await Task.sleep(for: .seconds(5))
+            if !Task.isCancelled { undoOffer = nil }
+        }
+    }
+
+    /// iOS's page for roko, for what only the iPhone's Settings can allow.
+    static func openAppSettings() {
+        if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
     }
 
     func takeUndo() {
@@ -1181,7 +1201,9 @@ final class BrowserModel {
         guard !voiceListening else { return }
         guard VoiceInput.isAuthorized else {
             Task {
-                if !(await VoiceInput.authorize()) { showToast("Allow the microphone and speech in Settings") }
+                if !(await VoiceInput.authorize()) {
+                    showProblem("Allow the microphone and speech", action: "Settings", perform: Self.openAppSettings)
+                }
             }
             return
         }
@@ -1202,11 +1224,12 @@ final class BrowserModel {
             tick.impactOccurred()
             voiceListening = true
             voiceResult = nil
-            showCommandBar()
+            // Asked from the launcher's own mic: it's already open, set up as it should be.
+            if panel != .command { showCommandBar() }
         } catch is VoiceBusy {
             // Let go a moment ago and still hearing the end of it: this hold waits.
         } catch {
-            showToast("Couldn't start listening")
+            showProblem("Couldn't start listening")
         }
     }
 
@@ -1259,7 +1282,7 @@ final class BrowserModel {
             guard session == voiceSession else { return }
             voiceListening = false
             guard let heard, !heard.isEmpty else {
-                if panel == .command { showToast("Didn't catch that") }
+                if panel == .command { showProblem("Didn't catch that") }
                 return
             }
             let meaning = VoiceCommand.interpret(heard) { stem in
@@ -1421,7 +1444,7 @@ final class BrowserModel {
             var site: NewsSite?
             if hasPath, !isArticle { site = await TodayNews.find(url.absoluteString) }
             if site == nil { site = await TodayNews.find(host) }
-            guard let site else { return showToast("Found no stories to follow here") }
+            guard let site else { return showProblem("Found no stories to follow here") }
             if !NewsSite.chosen.contains(where: { $0.id == site.id }) { NewsSite.chosen.append(site) }
             showToast("Following \(site.name ?? site.host) in News")
             await FeedStore.shared.refresh(immediately: true)
@@ -1443,7 +1466,7 @@ final class BrowserModel {
         guard let webView = selectedTab?.webView else { return }
         panel = .none
         Task {
-            guard let markdown = await PageReader.markdown(webView) else { return showToast("Nothing to copy on this page") }
+            guard let markdown = await PageReader.markdown(webView) else { return showProblem("Nothing to copy on this page") }
             UIPasteboard.general.string = markdown
             showToast("Copied as Markdown")
         }
@@ -1460,7 +1483,7 @@ final class BrowserModel {
         Task {
             guard let recipe = await RecipeReader.read(webView) else {
                 panel = .none
-                return showToast("No recipe found on this page")
+                return showProblem("No recipe found on this page")
             }
             presentAfterPanelCloses { self.cook = CookModel(recipe: recipe) }
         }
@@ -1590,7 +1613,7 @@ final class BrowserModel {
             }
         }
         try? context.save()
-        historyIndex.remove(Set(forgotten.map(\.url)))
+        historyIndex.remove(urls: Set(forgotten.map(\.url)))
         historyIndex.rebuild(from: context.container)
         return forgotten
     }
@@ -1603,6 +1626,7 @@ final class BrowserModel {
             entry.visitedAt = page.visitedAt
             entry.visitCount = page.visitCount
             context.insert(entry)
+            historyIndex.note(url: page.url, title: page.title, visitCount: page.visitCount, visitedAt: page.visitedAt)
         }
         try? context.save()
         historyIndex.rebuild(from: context.container)
@@ -1715,7 +1739,7 @@ extension BrowserModel: BrowserTabDelegate {
             }
             var more: [UIAction] = []
             if !tab.isPrivate {
-                more.append(UIAction(title: "Add to Read Later", image: icon("readLater")) { _ in self?.savePeekForLater() })
+                more.append(UIAction(title: "Save for Later", image: icon("readLater")) { _ in self?.savePeekForLater() })
             }
             more.append(UIAction(title: "Copy Link", image: icon("link")) { _ in
                 UIPasteboard.general.url = link
@@ -1811,7 +1835,7 @@ extension BrowserModel: BrowserTabDelegate {
         // The page you're on now, which may have moved on since the offer.
         let url = selectedTab?.url.flatMap { AppLinks.installedApp(for: $0) == offer.app ? $0 : nil } ?? offer.url
         Task {
-            if await !AppLinks.open(url) { showToast("\(offer.app.name) doesn't open this page") }
+            if await !AppLinks.open(url) { showProblem("\(offer.app.name) doesn't open this page") }
         }
     }
 

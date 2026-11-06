@@ -21,7 +21,7 @@ struct ReadingSwitch: View {
             withTransaction(transaction) { browser.panel = panel }
         } label: {
             Text(title)
-                .font(.system(size: 30, weight: .semibold))
+                .font(.scaled(30, weight: .semibold))
                 .foregroundStyle(panel == current ? Theme.ink : Theme.faintInk)
                 .contentShape(.rect)
         }
@@ -36,6 +36,8 @@ struct ReadingSwitch: View {
 /// left to save. Pull down past the top to close.
 struct FeedView: View {
     @Environment(BrowserModel.self) private var browser
+    /// Read only so the screen redraws when the iPhone's Text Size changes: `Font.scaled` picks it up then.
+    @Environment(\.dynamicTypeSize) private var textSize
     private var store: FeedStore { .shared }
     @State private var showsSources = false
     @State private var showsRead = false
@@ -48,13 +50,20 @@ struct FeedView: View {
         List {
             header.plainRow(top: 26, bottom: 22)
             if !store.followsAnything {
-                Text("Nothing followed yet. Choose a few sites, or follow one from its page's tools.")
-                    .font(.system(size: 17))
+                Text("Nothing followed yet. Add a few in Sources below, or follow a site from its page menu.")
+                    .font(.scaled(17))
                     .foregroundStyle(Theme.secondaryInk)
                     .plainRow(top: 8, bottom: 0)
             } else if store.blocks.isEmpty, store.readItems.isEmpty {
-                StatusLine(text: store.isRefreshing || !store.hasBeenLaidOut ? "Reading what you follow" : "Nothing new in the last two days")
-                    .plainRow(top: 8, bottom: 0)
+                Group {
+                    if store.isRefreshing || !store.hasBeenLaidOut {
+                        StatusLine(text: "Reading what you follow")
+                    } else {
+                        Text(store.refreshFailed ? "Couldn't reach your sites" : "Nothing new in the last two days")
+                            .foregroundStyle(Theme.faintInk)
+                    }
+                }
+                .plainRow(top: 8, bottom: 0)
             }
             ForEach(store.blocks) { block in blockView(block) }
             if !store.blocks.isEmpty || !store.readItems.isEmpty {
@@ -73,7 +82,12 @@ struct FeedView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             ContextBar(leading: .init(glyph: .close, label: "Close", action: close),
                        glyph: .news, title: "Sources",
-                       launch: { showsSources = true }, morphs: false)
+                       launch: { showsSources = true },
+                       trailing: store.followsAnything
+                           ? .init(glyph: .reload, label: "Look for new stories", spins: store.isRefreshing) {
+                               Task { await store.refresh(immediately: true) }
+                           } : nil,
+                       morphs: false)
                 .padding(.top, 10)
                 // Stories end at the bar: none carries on below it.
                 .background(Theme.canvas)
@@ -99,24 +113,31 @@ struct FeedView: View {
         VStack(alignment: .leading, spacing: 4) {
             ReadingSwitch(current: .feed)
             if store.followsAnything {
-                Button {
-                    if store.hasNewer {
-                        withAnimation(.snappy(duration: 0.3)) { store.showNewer() }
-                    } else {
-                        Task { await store.refresh(immediately: true) }
+                // A button only when it says what a tap does: refreshing is on the bar.
+                if store.hasNewer || (store.refreshFailed && !store.isRefreshing) {
+                    Button {
+                        if store.hasNewer {
+                            withAnimation(.snappy(duration: 0.3)) { store.showNewer() }
+                        } else {
+                            Task { await store.refresh(immediately: true) }
+                        }
+                    } label: {
+                        statusLine.contentShape(Rectangle().inset(by: -8))
                     }
-                } label: {
-                    Text(status)
-                        .font(.system(size: 15))
-                        .foregroundStyle(Theme.secondaryInk)
-                        .monospacedDigit()
-                        .frame(minHeight: 28)
-                        .contentShape(.rect)
+                    .buttonStyle(RowButtonStyle())
+                } else {
+                    statusLine
                 }
-                .buttonStyle(RowButtonStyle())
-                .accessibilityHint("Looks for new stories")
             }
         }
+    }
+
+    private var statusLine: some View {
+        Text(status)
+            .font(.scaled(15))
+            .foregroundStyle(Theme.secondaryInk)
+            .monospacedDigit()
+            .frame(minHeight: 28)
     }
 
     private var status: String {
@@ -124,6 +145,7 @@ struct FeedView: View {
         if store.isRefreshing { return "Looking…" }
         let count = store.unreadCount
         let left = count == 1 ? "1 to read" : "\(count) to read"
+        if store.refreshFailed { return left + ", couldn't update. Try again" }
         guard let refreshed = store.refreshedAt else { return left }
         return left + ", updated " + refreshed.formatted(.relative(presentation: .named))
     }
@@ -132,13 +154,13 @@ struct FeedView: View {
     private var ending: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(store.unreadCount == 0 ? "All read" : "That's everything")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.scaled(15, weight: .semibold))
                 .foregroundStyle(Theme.secondaryInk)
             Spacer(minLength: 12)
             if !store.readItems.isEmpty {
                 Button { withAnimation(.snappy(duration: 0.3)) { showsRead.toggle() } } label: {
                     Text(showsRead ? "Hide read" : "Show \(store.readItems.count) read")
-                        .font(.system(size: 15))
+                        .font(.scaled(15))
                         .foregroundStyle(Theme.secondaryInk)
                         .frame(minHeight: 44)
                         .contentShape(.rect)
@@ -192,7 +214,7 @@ struct FeedView: View {
                         .opacity(read ? 0.6 : 1)
                 }
                 Text(title(of: item))
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.scaled(22, weight: .semibold))
                     .foregroundStyle(read ? Theme.secondaryInk : Theme.ink)
                     .lineLimit(3)
                     .multilineTextAlignment(.leading)
@@ -219,7 +241,7 @@ struct FeedView: View {
                     .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.edge))
                     .opacity(item.isRead ? 0.6 : 1)
                 Text(item.story.title)
-                    .font(.system(size: 15, weight: item.isRead ? .regular : .medium))
+                    .font(.scaled(15, weight: item.isRead ? .regular : .medium))
                     .foregroundStyle(item.isRead ? Theme.secondaryInk : Theme.ink)
                     .lineLimit(3, reservesSpace: true)
                     .multilineTextAlignment(.leading)
@@ -227,7 +249,7 @@ struct FeedView: View {
                 HStack(spacing: 6) {
                     SiteIcon(host: item.story.host, size: 13, remote: true)
                     Text(ago(item.when))
-                        .font(.system(size: 13))
+                        .font(.scaled(13))
                         .foregroundStyle(Theme.faintInk)
                         .lineLimit(1)
                 }
@@ -251,7 +273,7 @@ struct FeedView: View {
             read ? store.markUnread(links) : store.markRead(links)
         }
         if case .story(let story) = item, !story.story.isMail {
-            Button("Save to Read Later") { save(story) }
+            Button("Save for Later") { save(story) }
         }
         // A newsletter has its own way out: Unsubscribe.
         if !item.stories.contains(where: \.story.isMail) {
@@ -308,7 +330,7 @@ struct FeedView: View {
                 .opacity(read ? 0.6 : 1)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(title(of: item))
-                        .font(.system(size: 16, weight: read ? .regular : .medium))
+                        .font(.scaled(16, weight: read ? .regular : .medium))
                         .foregroundStyle(read ? Theme.secondaryInk : Theme.ink)
                         .lineLimit(3)
                         .multilineTextAlignment(.leading)
@@ -339,7 +361,7 @@ struct FeedView: View {
         if hidden > 0 {
             Button { withAnimation(.snappy(duration: 0.3)) { _ = openLists.insert(key) } } label: {
                 Text("\(hidden) more")
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.scaled(15, weight: .medium))
                     .foregroundStyle(Theme.secondaryInk)
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     .contentShape(.rect)
@@ -351,7 +373,7 @@ struct FeedView: View {
 
     private func listHeading(@ViewBuilder _ title: () -> some View) -> some View {
         title()
-            .font(.system(size: 17, weight: .semibold))
+            .font(.scaled(17, weight: .semibold))
             .foregroundStyle(Theme.ink)
             .frame(maxWidth: .infinity, alignment: .leading)
             .panelRow(.init(isFirst: true, isLast: false))
@@ -363,14 +385,14 @@ struct FeedView: View {
         Button { browser.read(item.story) } label: {
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.story.title)
-                    .font(.system(size: 15, weight: item.isRead ? .regular : .medium))
+                    .font(.scaled(15, weight: item.isRead ? .regular : .medium))
                     .foregroundStyle(item.isRead ? Theme.secondaryInk : Theme.ink)
                     .lineLimit(3)
                     .multilineTextAlignment(.leading)
                 HStack(spacing: 6) {
                     if showsSite { SiteIcon(host: item.story.host, size: 13, remote: true) }
                     Text((showsSite ? (item.story.from ?? item.story.host) + " · " : "") + ago(item.when))
-                        .font(.system(size: 13))
+                        .font(.scaled(13))
                         .foregroundStyle(Theme.faintInk)
                         .lineLimit(1)
                 }
@@ -379,7 +401,7 @@ struct FeedView: View {
             .contentShape(.rect)
         }
         .buttonStyle(RowButtonStyle())
-        .storyMenu { menu(.story(item)) }
+        .storyMenu(inCard: true) { menu(.story(item)) }
         .feedSwipes(.story(item), store: store, browser: browser)
     }
 
@@ -391,7 +413,7 @@ struct FeedView: View {
             HStack(spacing: 6) {
                 SiteIcon(host: story.story.host, size: 13, remote: true)
                 Text(story.story.host + " · " + ago(story.when))
-                    .font(.system(size: 13))
+                    .font(.scaled(13))
                     .foregroundStyle(Theme.faintInk)
                     .lineLimit(1)
             }
@@ -402,7 +424,7 @@ struct FeedView: View {
                     SiteIcon(host: host, size: 14, remote: true)
                 }
                 Text("\(hosts.count) sites")
-                    .font(.system(size: 13))
+                    .font(.scaled(13))
                     .foregroundStyle(Theme.faintInk)
                     .padding(.leading, 3)
                     .lineLimit(1)
@@ -428,7 +450,7 @@ struct FeedView: View {
 
     private func save(_ item: FeedStory) {
         ReadLater.shared.save(item.story, text: store.keptText(of: item.id) ?? "")
-        browser.showToast("Saved to Read Later")
+        browser.showToast("Saved")
     }
 
     private func close() {
@@ -461,9 +483,11 @@ private struct FeedPile: View {
 extension View {
     /// A story's long-press menu. Held up, the story has room around it in its
     /// rounded shape, its text clear of the edge; on the page it stays where it was.
-    func storyMenu(@ViewBuilder _ menu: () -> some View) -> some View {
+    /// A line of a card lifts square: the row's flat sides are part of the card, and
+    /// round corners showed the gap the row left behind.
+    func storyMenu(inCard: Bool = false, @ViewBuilder _ menu: () -> some View) -> some View {
         padding(8)
-            .contentShape(.contextMenuPreview, .rect(cornerRadius: 16, style: .continuous))
+            .contentShape(.contextMenuPreview, .rect(cornerRadius: inCard ? 0 : 16, style: .continuous))
             .contextMenu { menu() }
             .padding(-8)
     }
@@ -484,7 +508,7 @@ private extension View {
             if case .story(let story) = item, !story.story.isMail {
                 Button {
                     ReadLater.shared.save(story.story, text: store.keptText(of: story.id) ?? "")
-                    browser.showToast("Saved to Read Later")
+                    browser.showToast("Saved")
                 } label: { Text("Save") }
                     .tint(Theme.faintInk)
             }

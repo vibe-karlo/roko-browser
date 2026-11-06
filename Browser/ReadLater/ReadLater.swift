@@ -86,17 +86,17 @@ final class ReadLater {
     /// Saves the tab's page with its text, picture and site, or says it's already saved.
     func save(_ tab: BrowserTab) async -> String {
         guard let url = tab.url, let webView = tab.webView else { return "Nothing to save here" }
-        if contains(url) { return "Already in Read Later" }
+        if contains(url) { return "Already saved" }
         let read = try? await PageReader.read(webView)
         var page = ReadLaterPage(url: url, title: read?.title.isEmpty == false ? read!.title : tab.displayTitle,
                              site: url.displayHost, text: read?.text ?? "")
         // Saved twice while the first was still being read.
-        if contains(url) { return "Already in Read Later" }
+        if contains(url) { return "Already saved" }
         (page.image, page.imageURL) = await picture(for: page.id, webView: webView)
         pages.insert(page, at: 0)
         persist()
         sortNew()
-        return "Saved to Read Later"
+        return "Saved"
     }
 
     /// A story from the feed, with what's known of its text: the rest, and its

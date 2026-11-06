@@ -112,8 +112,8 @@ final class HistoryIndex {
         if hits.count > Self.limit { hits.removeLast(hits.count - Self.limit) }
     }
 
-    /// Gone from history: gone from here at once, not when a rebuild finishes.
-    func remove(_ urls: Set<String>) {
+    /// Gone now: the list is rebuilt from here at once, before a fresh read could finish.
+    func remove(urls: Set<String>) {
         if building { removedWhileBuilding.formUnion(urls) }
         hits.removeAll { urls.contains($0.url) }
     }

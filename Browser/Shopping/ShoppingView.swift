@@ -510,7 +510,7 @@ struct ShoppingView: View {
         guard VoiceInput.isAuthorized else {
             Task {
                 if !(await VoiceInput.authorize()) {
-                    browser.showToast(ListLanguage.say("Allow the microphone and speech in Settings",
+                    browser.showProblem(ListLanguage.say("Allow the microphone and speech in Settings",
                                                        "Dopusti mikrofon i govor u Postavkama"))
                 }
             }
@@ -556,7 +556,7 @@ struct ShoppingView: View {
             VoiceInput.expectedWords = nil
             let things = Shopping.spokenItems(said, known: known)
             guard !things.isEmpty else {
-                browser.showToast(ListLanguage.say("Didn't catch that", "Nisam čuo"))
+                browser.showProblem(ListLanguage.say("Didn't catch that", "Nisam čuo"))
                 return
             }
             add(titles: things)

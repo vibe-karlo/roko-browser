@@ -56,6 +56,8 @@ final class FeedStore {
     private(set) var stories: [FeedStory] = []
     private(set) var refreshedAt: Date?
     private(set) var isRefreshing = false
+    /// The last look, asked for here, brought nothing back from anywhere.
+    private(set) var refreshFailed = false
     /// There's a newer layout than the one you're reading.
     private(set) var hasNewer = false
     /// The page: what was unread when it was laid out, in place even once it's
@@ -218,11 +220,13 @@ final class FeedStore {
         read += await Newsletters.fetch(inBackground: inBackground)
         // Nothing came back (offline, say): what was there stays.
         guard !read.isEmpty else {
+            if !inBackground { refreshFailed = followsAnything }
             await regroup()
             publish()
             return
         }
         if !inBackground { read = await withPictures(read) }
+        refreshFailed = false
         merge(read)
         // Closed part way: what's in is kept, but it isn't a whole refresh.
         if !Task.isCancelled { refreshedAt = .now }

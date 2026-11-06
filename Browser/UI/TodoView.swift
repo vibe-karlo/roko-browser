@@ -9,6 +9,8 @@ import SwiftUI
 /// where the thumb is. Pull down past the top to close it.
 struct TodoView: View {
     @Environment(BrowserModel.self) private var browser
+    /// Read only so the screen redraws when the iPhone's Text Size changes: `Font.scaled` picks it up then.
+    @Environment(\.dynamicTypeSize) private var textSize
     @Environment(\.modelContext) private var context
     @Query(sort: \Todo.createdAt) private var todos: [Todo]
     /// Ticked a moment ago: still shown, struck through, so a slip can be undone.
@@ -52,12 +54,12 @@ struct TodoView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide)))
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.scaled(15, weight: .medium))
                     .foregroundStyle(Theme.secondaryInk)
                     .padding(.bottom, 26)
                 if sections.isEmpty {
                     Text("Nothing to do. Add one below.")
-                        .font(.system(size: 17))
+                        .font(.scaled(17))
                         .foregroundStyle(Theme.secondaryInk)
                         .padding(.top, 40)
                         .frame(maxWidth: .infinity)
@@ -110,16 +112,21 @@ struct TodoView: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
                 Text(section.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.scaled(15, weight: .semibold))
                     .foregroundStyle(section == .overdue ? Theme.accentText : Theme.secondaryInk)
                 Spacer()
                 if section == .overdue {
-                    Button("Move to Today") {
+                    Button {
                         withAnimation(.snappy) { items.forEach { $0.schedule(.today) } }
                         save()
+                    } label: {
+                        Text("Move to Today")
+                            .font(.scaled(15, weight: .medium))
+                            .foregroundStyle(Theme.secondaryInk)
+                            .frame(minHeight: 44)
+                            .contentShape(.rect)
                     }
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Theme.secondaryInk)
+                    .buttonStyle(RowButtonStyle())
                 }
             }
             .padding(.bottom, 8)
@@ -160,7 +167,7 @@ struct TodoView: View {
                     }
                 } else {
                     Text(todo.title)
-                        .font(.system(size: 17))
+                        .font(.scaled(17))
                         .foregroundStyle(todo.done ? Theme.secondaryInk : Theme.ink)
                         .strikethrough(todo.done, color: Theme.secondaryInk)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -170,11 +177,11 @@ struct TodoView: View {
                 if section == .later, let day = todo.day {
                     Text(day.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
                          + (todo.timeLabel.map { ", " + $0 } ?? ""))
-                        .font(.system(size: 13))
+                        .font(.scaled(13))
                         .foregroundStyle(Theme.secondaryInk)
                 } else if let time = todo.timeLabel {
                     Text(time)
-                        .font(.system(size: 13).monospacedDigit())
+                        .font(.scaled(13).monospacedDigit())
                         .foregroundStyle(section == .overdue ? Theme.accentText : Theme.secondaryInk)
                 }
             }
@@ -194,11 +201,11 @@ struct TodoView: View {
             } label: {
                 HStack(spacing: 8) {
                     Text("Done")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.scaled(15, weight: .semibold))
                     Text("\(done.count)")
-                        .font(.system(size: 15).monospacedDigit())
+                        .font(.scaled(15).monospacedDigit())
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.scaled(12, weight: .semibold))
                         .rotationEffect(.degrees(showsDone ? 90 : 0))
                     Spacer()
                 }
@@ -222,13 +229,13 @@ struct TodoView: View {
                         .padding(.leading, -11)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(todo.title)
-                                .font(.system(size: 17))
+                                .font(.scaled(17))
                                 .foregroundStyle(Theme.secondaryInk)
                                 .strikethrough(true, color: Theme.secondaryInk)
                             if let at = todo.doneAt {
                                 Text(Calendar.current.isDateInToday(at) ? at.formatted(date: .omitted, time: .shortened)
                                      : at.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
-                                    .font(.system(size: 13))
+                                    .font(.scaled(13))
                                     .foregroundStyle(Theme.faintInk)
                             }
                         }
@@ -280,7 +287,7 @@ struct TodoView: View {
                     Button("Date and Time…") { pickingDate = true }
                 } label: {
                     Text(whenLabel)
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.scaled(15, weight: .medium))
                         .foregroundStyle(Theme.accentText)
                         .lineLimit(1)
                         .fixedSize()
@@ -480,7 +487,7 @@ struct TodoCircle: View {
             if done {
                 Circle().fill(Theme.accent)
                 Image(systemName: "checkmark")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.scaled(11, weight: .bold))
                     .foregroundStyle(Theme.canvas)
                     .transition(.scale(scale: 0.4).combined(with: .opacity))
             }
@@ -500,7 +507,7 @@ private struct TitleEditor: View {
 
     var body: some View {
         TextField("", text: $todo.title, axis: .vertical)
-            .font(.system(size: 17))
+            .font(.scaled(17))
             .focused($focused)
             .submitLabel(.done)
             .onSubmit { finish(todo.title, original) }

@@ -86,7 +86,7 @@ struct CommandBarView: View {
     /// Search. Fixed, so it's known before anything is laid out and no keyboard
     /// (the system's, SwiftKey, one that says its size late) can move it.
     private var fieldTarget: CGRect {
-        let screen = UIScreen.main.bounds
+        let screen = UIApplication.screenBounds
         // On a Duo bent open, the half the field keeps to (as keepsOffFold picks
         // it). Lying flat there's no bend to avoid: one panel across it.
         if let fold, foldBent, fold.height > fold.width {
@@ -336,12 +336,6 @@ struct CommandBarView: View {
                     if item.id == "action-todos" && !dueTodos.isEmpty { todoWidget }
                 }
             }
-            // The rest of the list closes the bar, as the page behind it does: the rows
-            // cover that page, and only the thin margins beside them used to answer.
-            .contentShape(.rect)
-            .frame(minHeight: listHeight, alignment: .top)
-            .contentShape(.rect)
-            .onTapGesture { dismiss() }
             .scrollTargetLayout()
             .padding(.horizontal, Self.inset - 4)
         }
@@ -360,6 +354,10 @@ struct CommandBarView: View {
             }
         }
         .frame(maxHeight: .infinity)
+        // The rest of the list closes the bar, as the page behind it does: the rows
+        // cover that page, and only the thin margins beside them used to answer.
+        .contentShape(.rect)
+        .onTapGesture { dismiss() }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
         // Pulled down past its top by a finger, the list closes the bar, as a sheet
         // would. Only by a finger: while the list lays itself out it can pass
@@ -379,6 +377,15 @@ struct CommandBarView: View {
             geometry.contentOffset.y < -geometry.contentInsets.top - 60
         } action: { _, pulled in
             if pulled, listDragged { dismiss() }
+        }
+        // The keyboard rising shrinks the list under its rows, which left the top row half
+        // behind the field. Not scrolled by anyone: its top row goes back to the slot.
+        .onChange(of: listHeight) {
+            guard !listMoving, !previewing, selection == 0, let top = items.first?.id else { return }
+            if topRow != top { resetTarget = top }
+            var still = Transaction()
+            still.disablesAnimations = true
+            withTransaction(still) { proxy.scrollTo(top, anchor: .top) }
         }
         .onChange(of: scrollRequest) { _, target in
             guard let target else { return }
@@ -587,6 +594,26 @@ struct CommandBarView: View {
             } else {
                 // Same spot: the private switch while empty, the clear button once typing.
                 if browser.launcherContext == .web {
+                    // What holding + does, for anyone who hasn't found that. Not beside the
+                    // private switch's own word, where the field's prompt would be cut off.
+                    if browser.commandMode != .privateTab, Preferences.holdToTalk, !browser.voiceListening {
+                        Button {
+                            browser.startVoice()
+                            // No finger to lift: it listens until a pause in the speech.
+                            browser.endVoice()
+                        } label: {
+                            Image(systemName: "mic")
+                                .font(.system(size: 18))
+                                .foregroundStyle(Theme.secondaryInk)
+                                .frame(width: 34, height: 44)
+                                .contentShape(.rect)
+                        }
+                        .buttonStyle(RowButtonStyle())
+                        // A pair with the eye, not two things the field's spacing holds apart.
+                        .padding(.trailing, -12)
+                        .accessibilityLabel("Speak")
+                        .transition(.opacity)
+                    }
                     privateSwitch
                         .transition(.opacity)
                 }
@@ -790,8 +817,9 @@ struct CommandBarView: View {
             forgotten = browser.forget(url, wholeSite: wholeSite)
             rebuild()
         }
-        browser.offerUndo(wholeSite ? "Site removed from history" : "Removed from history") { [browser] in
+        browser.offerUndo(wholeSite ? "Site removed from history" : "Removed from history") {
             browser.remember(forgotten)
+            rebuild()
         }
     }
 
@@ -1115,6 +1143,8 @@ private struct RowIcon: View {
 }
 
 private struct CommandRow: View {
+    /// Read only so the screen redraws when the iPhone's Text Size changes: `Font.scaled` picks it up then.
+    @Environment(\.dynamicTypeSize) private var textSize
     let item: CommandItem
     let isSelected: Bool
 
@@ -1130,7 +1160,7 @@ private struct CommandRow: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.title)
-                    .font(isAnswer ? .system(size: 26, weight: .semibold).monospacedDigit() : .system(size: 16))
+                    .font(isAnswer ? .scaled(26, weight: .semibold).monospacedDigit() : .scaled(16))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
                     // Only an answer shrinks to fit; a long page title just truncates.
@@ -1138,7 +1168,7 @@ private struct CommandRow: View {
                     .textSelection(.disabled)
                 if !item.subtitle.isEmpty {
                     Text(item.subtitle)
-                        .font(.system(size: 13))
+                        .font(.scaled(13))
                         .foregroundStyle(Theme.secondaryInk)
                         .lineLimit(1)
                 }
@@ -1148,7 +1178,7 @@ private struct CommandRow: View {
                 Glyph(mark, size: 14).foregroundStyle(Theme.faintInk)
             } else {
                 Text(item.kind)
-                    .font(.system(size: 12))
+                    .font(.scaled(12))
                     .foregroundStyle(Theme.faintInk)
             }
         }
@@ -1416,7 +1446,7 @@ enum CommandRanker {
              CommandItem(id: "action-shopping", title: "Shopping", subtitle: "Type \u{201C}shopping\u{201D} and what to buy to add it",
                          kind: "Action", icon: .glyph(.basket), action: .shopping)),
             (["read later", "save for later", "reading list", "save page"],
-             CommandItem(id: "action-save-later", title: "Save to Read Later", subtitle: "This page and its text, for later",
+             CommandItem(id: "action-save-later", title: "Save for Later", subtitle: "This page and its text, for later",
                          kind: "Action", icon: .glyph(.readLater), action: .saveForLater)),
             (["downloads", "downloaded", "files", "preuzimanja"],
              CommandItem(id: "action-downloads", title: "Downloads",
@@ -1716,5 +1746,13 @@ private struct ListeningMark: View {
             .contentShape(.rect)
             .onTapGesture(perform: stop)
             .accessibilityLabel("Stop listening")
+    }
+}
+
+extension UIApplication {
+    /// The screen roko is on, turned as it's held.
+    static var screenBounds: CGRect {
+        let scene = shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        return scene?.screen.bounds ?? .zero
     }
 }

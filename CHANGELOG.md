@@ -29,8 +29,16 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - The microphone stops after 8 seconds with no words and after a minute in all, and whenever the launcher closes or roko leaves the screen. A microphone with no usable format can't stop the app.
 - Newsletters stay on the server until they're saved here, so closing roko mid-refresh can't lose one.
 - News keeps the longer copy of an article, and read marks can't be undone by an older save landing late.
+- Notify Me could announce a cookie notice as news ("New: How cookies work and their uses"): on a page read with its scripts running, a hidden consent dialog was there at one reading and not at the next. Dialogs no longer count as the page. Watches take a fresh reading the next time they're checked.
 - News' lead picture could turn into a strange zoomed crop moments after it appeared, a tail fin and a red band where there had been a whole plane. The article's share picture was replacing the feed's, and a second picture of another shape drew too large and off centre. Both are fixed: pictures now fill their frame on their own, and the share picture only replaces a feed's thumbnail, as on BBC. The same goes for the picture above an article in Reader.
 - A story you've read in News showed its site's icon through its dimmed picture.
+- When something goes wrong roko says so, and for long enough to read: a look that found nothing says it couldn't reach your sites rather than that there's no news, and a refused microphone or notification offers Settings.
+- Done in News sources adds a site you'd typed but not added, or stays open saying it couldn't find it. Edit removes topics, words and hidden sites without a swipe.
+- Swiping the bar now follows the finger, stops with a tick at the first and last tab, and a second swipe up just after opening the tabs can't close one by accident. The page menu closes when pulled down from inside it.
+- News, Saved, To-do, Today and the launcher's rows follow the iPhone's Text Size, up to half as large again. With Reduce Motion on, screens fade in rather than slide.
+- A mic in the launcher's field, for those who haven't found that holding + listens. Refresh is on News' bar, and Today has just the one. News sources is called Sources wherever it's opened, and the page menu says Save for Later.
+- The launcher's top row no longer sat half behind its field as the keyboard rose.
+- A page removed from the launcher goes at once, not the next time it opens, and Removed from history sits just above the keyboard rather than across a row. Held, a story in a News card lifts square, with no gap at its corners.
 - An unsafe page has a way out: Go back, or Close this tab. Reader and a summary that fail offer Try again, and Reader the page itself, instead of grey text.
 - Notify Me could announce old text as news on a page that writes its text with scripts and then moves itself on: it read the page mid-move, and the next reading differed. It now waits for the page to settle.
 - Reader could leave out whole sections of an article, or start it halfway through, without saying so: on Ars Technica, and on bbc.co.uk. It now keeps the whole story when a page's sections are wrapped separately, and so does Copy as Markdown. BBC articles also lose the "Image source" and "Image caption" labels written for screen readers.

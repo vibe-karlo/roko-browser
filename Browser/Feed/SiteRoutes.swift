@@ -200,13 +200,13 @@ nonisolated enum SiteRoutes {
     /// Bing sees the topic, not who's asking: nothing here carries a cookie.
     @concurrent static func search(_ topic: String) async -> [NewsStory] {
         var parts = URLComponents(string: "https://www.bing.com/news/search")
-        let (language, country) = await Audience.isCroatian ? ("hr", "hr") : (Locale.current.language.languageCode?.identifier ?? "en", Locale.current.region?.identifier.lowercased() ?? "us")
+        let (language, country) = Audience.isCroatian ? ("hr", "hr") : (Locale.current.language.languageCode?.identifier ?? "en", Locale.current.region?.identifier.lowercased() ?? "us")
         parts?.queryItems = [.init(name: "format", value: "rss"), .init(name: "q", value: "\"\(topic)\""),
                              .init(name: "setlang", value: language), .init(name: "cc", value: country),
                              // Newest first: left to rank, it sends what's best on the words, from years back.
                              .init(name: "qft", value: "sortbydate=\"1\"")]
         guard let url = parts?.url else { return [] }
-        let croatian = await Audience.isCroatian
+        let croatian = Audience.isCroatian
         let languages = Set(Locale.preferredLanguages.compactMap { Locale(identifier: $0).language.languageCode?.identifier } + ["en"] + (croatian ? ["hr", "bs", "sr"] : []))
         var request = URLRequest(url: url, timeoutInterval: 10)
         // Only a desktop browser is given the feed; a phone gets a web page.

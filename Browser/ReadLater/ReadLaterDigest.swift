@@ -387,7 +387,7 @@ final class DigestModel: Identifiable {
         var answer = ""
         do {
             let session = LanguageModelSession(model: model, instructions: OwnWords.instructions)
-            answer = try await session.respond(to: OwnWords.numbered(offered), options: GenerationOptions(sampling: .greedy)).content
+            answer = try await session.respond(to: OwnWords.numbered(offered), options: GenerationOptions(samplingMode: .greedy)).content
             AITrace.log("picked: \(answer)")
         } catch is CancellationError {
             throw CancellationError()

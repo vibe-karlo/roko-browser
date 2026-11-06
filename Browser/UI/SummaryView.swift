@@ -90,6 +90,12 @@ struct SummaryView: View {
         }
         .animation(.easeInOut(duration: 0.4), value: showsLight)
         .sensoryFeedback(.success, trigger: model.phase == .done)
+        // The words come when the card lands. Should that never be reported, they come anyway.
+        .task {
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !textShown, !model.isClosing else { return }
+            withAnimation(.easeOut(duration: 0.28)) { textShown = true }
+        }
         .onChange(of: showsLight) { _, lit in
             if lit {
                 withAnimation(.easeInOut(duration: 0.9)) { edgesClear = true }

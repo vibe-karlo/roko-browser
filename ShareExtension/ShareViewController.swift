@@ -18,11 +18,11 @@ final class ShareViewController: UIViewController {
         var text: String?
         for provider in providers {
             if link == nil, provider.hasItemConformingToTypeIdentifier(UTType.url.identifier),
-               let url = try? await provider.loadItem(forTypeIdentifier: UTType.url.identifier) as? URL,
+               let url = await loadedURL(from: provider),
                url.scheme == "http" || url.scheme == "https" {
                 link = url
             } else if text == nil, provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier),
-                      let shared = try? await provider.loadItem(forTypeIdentifier: UTType.plainText.identifier) as? String {
+                      let shared = await loadedText(from: provider) {
                 text = shared.trimmingCharacters(in: .whitespacesAndNewlines)
             }
         }
@@ -43,6 +43,18 @@ final class ShareViewController: UIViewController {
         }
         if target.host != nil, let url = target.url { openRoko(url) }
         extensionContext?.completeRequest(returningItems: nil)
+    }
+
+    private func loadedURL(from provider: NSItemProvider) async -> URL? {
+        await withCheckedContinuation { done in
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in done.resume(returning: url) }
+        }
+    }
+
+    private func loadedText(from provider: NSItemProvider) async -> String? {
+        await withCheckedContinuation { done in
+            _ = provider.loadObject(ofClass: String.self) { text, _ in done.resume(returning: text) }
+        }
     }
 
     /// A share extension has no openURL of its own: the app it runs in does,

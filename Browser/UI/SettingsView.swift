@@ -464,7 +464,7 @@ private struct TabsSettings: View {
                 Toggle("Swipe anywhere to go back", isOn: $swipeAnywhere)
                 Toggle("Pinch a page to see your tabs", isOn: $pinchForTabs)
             } footer: {
-                Text("Peek: touch and hold a link to see its page before opening it, open it in the background or add it to Read Later. Swipe: back or forward from anywhere on a page, not just its edge.")
+                Text("Peek: touch and hold a link to see its page before opening it, open it in the background or save it for later. Swipe: back or forward from anywhere on a page, not just its edge.")
             }
             Section {
                 Toggle("Sound and video", isOn: $bandMedia)
@@ -578,7 +578,7 @@ private struct MacSyncSettings: View {
                     Button("Delete from roko's Server", role: .destructive) { confirmDelete = true }
                         .disabled(working)
                 } footer: {
-                    Text("Turning off keeps everything, here and on the server. Deleting takes your to-dos, shopping lists, Read Later and sent links off the server; this iPhone keeps them.")
+                    Text("Turning off keeps everything, here and on the server. Deleting takes your to-dos, shopping lists, saved pages and sent links off the server; this iPhone keeps them.")
                 }
             } else {
                 Section {
@@ -600,7 +600,7 @@ private struct MacSyncSettings: View {
                     .disabled(working)
                     .foregroundStyle(Theme.ink)
                 } footer: {
-                    Text(problem ?? "Your to-dos, shopping lists and Read Later, the same on this iPhone and on your Mac with roko's Raycast extension. Links you send from the Mac open here as tabs. They go through roko's server.")
+                    Text(problem ?? "Your to-dos, shopping lists and saved pages, the same on this iPhone and on your Mac with roko's Raycast extension. Links you send from the Mac open here as tabs. They go through roko's server.")
                 }
                 Section {
                     TextField("Paste a key", text: $joining)
@@ -880,8 +880,7 @@ private struct ClearDataSettings: View {
                              WKWebsiteDataTypeServiceWorkerRegistrations])
         }
         if cache {
-            types.formUnion([WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache, WKWebsiteDataTypeFetchCache,
-                             WKWebsiteDataTypeOfflineWebApplicationCache])
+            types.formUnion([WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache, WKWebsiteDataTypeFetchCache])
         }
         if !types.isEmpty { await WKWebsiteDataStore.default().removeData(ofTypes: types, modifiedSince: since) }
         cleared = true

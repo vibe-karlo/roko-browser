@@ -361,7 +361,7 @@ final class SummaryModel: Identifiable {
         var answer = ""
         do {
             let session = LanguageModelSession(model: model, instructions: OwnWords.instructionsForOne)
-            answer = try await session.respond(to: OwnWords.numbered(offered), options: GenerationOptions(sampling: .greedy)).content
+            answer = try await session.respond(to: OwnWords.numbered(offered), options: GenerationOptions(samplingMode: .greedy)).content
         } catch is CancellationError {
             throw CancellationError()
         } catch {

@@ -11,6 +11,8 @@ import SwiftUI
 /// Pull down past the top to close.
 struct ReadLaterView: View {
     @Environment(BrowserModel.self) private var browser
+    /// Read only so the screen redraws when the iPhone's Text Size changes: `Font.scaled` picks it up then.
+    @Environment(\.dynamicTypeSize) private var textSize
     private var store: ReadLater { .shared }
 
     private var unread: [ReadLaterPage] { store.unread }
@@ -75,8 +77,8 @@ struct ReadLaterView: View {
                 .id("top")
                 .plainRow(top: 26, bottom: store.pages.isEmpty ? 8 : 22)
             if store.pages.isEmpty {
-                Text("Nothing saved yet. Save a page from its tools, or type \u{201C}read later\u{201D} on it.")
-                    .font(.system(size: 17))
+                Text("Nothing saved yet. Save a page from its page menu, or type \u{201C}save page\u{201D} on it.")
+                    .font(.scaled(17))
                     .foregroundStyle(Theme.secondaryInk)
                     .plainRow(top: 30, bottom: 0)
             }
@@ -142,24 +144,25 @@ struct ReadLaterView: View {
 
     /// The pile still to read, fanned like papers set aside, beside how long it would take.
     private var header: some View {
-        HStack(alignment: .center, spacing: 20) {
-            if !unread.isEmpty { Pile(pages: Array(unread.prefix(3))) }
+        // The words where News has them, so the switch doesn't move between the two.
+        HStack(alignment: .top, spacing: 20) {
             VStack(alignment: .leading, spacing: 4) {
                 // Beside the page on an open Duo it stays a list of its own.
                 if browser.readLaterBeside {
-                    Text("Read later")
-                        .font(.system(size: 30, weight: .semibold))
+                    Text("Saved")
+                        .font(.scaled(30, weight: .semibold))
                 } else {
                     ReadingSwitch(current: .readLater)
                 }
                 if !unread.isEmpty {
                     Text("\(unread.count) to read, \(unread.map(\.minutes).reduce(0, +)) min")
-                        .font(.system(size: 15))
+                        .font(.scaled(15))
                         .foregroundStyle(Theme.secondaryInk)
                         .monospacedDigit()
                 }
             }
             Spacer(minLength: 0)
+            if !unread.isEmpty { Pile(pages: Array(unread.prefix(3))) }
         }
         .accessibilityElement(children: .combine)
     }
@@ -173,7 +176,7 @@ struct ReadLaterView: View {
                 HStack(spacing: 8) {
                     Glyph(.search, size: 16).foregroundStyle(Theme.secondaryInk)
                     TextField("Search saved pages", text: $query)
-                        .font(.system(size: 15))
+                        .font(.scaled(15))
                         .focused($isTyping)
                         .submitLabel(.search)
                         .autocorrectionDisabled()
@@ -191,7 +194,7 @@ struct ReadLaterView: View {
                     }
                 } label: {
                     Text("Cancel")
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.scaled(15, weight: .medium))
                         .foregroundStyle(Theme.secondaryInk)
                         .frame(height: 44)
                         .contentShape(.rect)
@@ -209,7 +212,7 @@ struct ReadLaterView: View {
         let pages = found.compactMap(store.page)
         if searchedFor == words {
             Text(pages.isEmpty ? "Nothing saved matches that." : pages.count == 1 ? "1 page" : "\(pages.count) pages")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.scaled(15, weight: .semibold))
                 .foregroundStyle(Theme.secondaryInk)
                 .monospacedDigit()
                 .plainRow(top: 8, bottom: 14)
@@ -225,7 +228,7 @@ struct ReadLaterView: View {
                     withAnimation(.snappy(duration: 0.28)) { grouping = choice }
                 } label: {
                     Text(choice.title)
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.scaled(15, weight: .medium))
                         .foregroundStyle(grouping == choice ? Theme.ink : Theme.secondaryInk)
                         .padding(.horizontal, 14)
                         .frame(height: 34)
@@ -284,18 +287,18 @@ struct ReadLaterView: View {
     private func heading(_ section: SavedSection) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(section.name)
-                .font(.system(size: 17, weight: .semibold))
+                .font(.scaled(17, weight: .semibold))
                 .lineLimit(1)
                 .foregroundStyle(section.isWaiting ? Theme.secondaryInk : Theme.ink)
             Text("\(section.pages.count)")
-                .font(.system(size: 15).monospacedDigit())
+                .font(.scaled(15).monospacedDigit())
                 .foregroundStyle(Theme.faintInk)
             Spacer(minLength: 12)
             if let group = section.group {
                 Button { browser.summarizeSaved(group) } label: {
                     HStack(spacing: 6) {
                         Glyph(.summarize, size: 15, weight: 1.8)
-                        Text("Summarize").font(.system(size: 15, weight: .medium))
+                        Text("Summarize").font(.scaled(15, weight: .medium))
                     }
                     .foregroundStyle(Theme.secondaryInk)
                     .frame(minHeight: 44)
@@ -326,14 +329,14 @@ struct ReadLaterView: View {
                     .opacity(page.isRead ? 0.6 : 1)
                 VStack(alignment: .leading, spacing: 5) {
                     Text(page.title)
-                        .font(.system(size: 16, weight: page.isRead ? .regular : .medium))
+                        .font(.scaled(16, weight: page.isRead ? .regular : .medium))
                         .foregroundStyle(page.isRead ? Theme.secondaryInk : Theme.ink)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                     HStack(spacing: 6) {
                         SiteIcon(host: page.site, size: 13, remote: true)
                         Text(([page.site] + (page.text.isEmpty ? [] : ["\(page.minutes) min"]) + (page.isRead ? ["Read"] : [])).joined(separator: " · "))
-                            .font(.system(size: 13))
+                            .font(.scaled(13))
                             .foregroundStyle(Theme.faintInk)
                             .lineLimit(1)
                     }
