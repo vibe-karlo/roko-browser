@@ -306,14 +306,29 @@ enum RenderedPage {
         webView.navigationDelegate = loader
         webView.load(URLRequest(url: url))
         let finished = await loader.finished(within: 15)
-        if finished { try? await Task.sleep(for: .seconds(1)) }
+        // Past where a page moves itself on: outside the UK, bbc.co.uk goes to
+        // bbc.com about a second after loading, and its own text reads shorter.
+        if finished { try? await Task.sleep(for: .seconds(1.5)) }
         defer { webView.stopLoading() }
-        return try? await PageReader.read(webView)
+        // Too early isn't the end of it while the page is still coming: a move
+        // ends a read under way and leaves half a page parsed, which would read
+        // as an article, and a slow start leaves nothing at all to read yet.
+        let giveUp = Date.now.addingTimeInterval(15)
+        while true {
+            let state = try? await webView.evaluateJavaScript("document.readyState") as? String
+            let settling = (webView.isLoading && loader.isMoving) || state == "loading"
+            let outOfTime = Date.now >= giveUp
+            if !settling || outOfTime, let page = try? await PageReader.read(webView) { return page }
+            guard webView.isLoading, !outOfTime else { return nil }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
     }
 
     private final class Loader: NSObject, WKNavigationDelegate {
         private var continuation: CheckedContinuation<Bool, Never>?
         private var result: Bool?
+        /// A navigation has begun and its page hasn't replaced the one showing.
+        private(set) var isMoving = false
 
         func finished(within seconds: Double) async -> Bool {
             if let result { return result }
@@ -330,9 +345,12 @@ enum RenderedPage {
             continuation = nil
         }
 
+        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { isMoving = true }
+        func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) { isMoving = false }
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { finish(true) }
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { finish(false) }
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            isMoving = false
             finish(false)
         }
     }
