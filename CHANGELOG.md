@@ -25,10 +25,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Reader no longer starts with a byline, a picture credit or "44 minutes ago".
 
 ### Website
+- The site shows the new bar: pages as rounded cards on the band, with the Search capsule, and every screenshot taken again on it.
+- News looks as it does in the app, pictures and all: four sites' reports of one story become one headline as you scroll, then open as one account with numbered sources, and where they differ only if they do.
 - The site is set in Funnel Display, self-hosted, with type rescaled to suit it. The highlight is `#C94A2E`, and the share image is new.
 - The speed numbers show what they measure: both times on one real second, the app's size against Chrome's App Store listing, and CPU going flat while you read.
 - "Type it. It's a to-do." really works: type a line, tap the answer, and it lands on the list.
-- News has its section: four sites' reports of one story become one headline as you scroll, then open as a comparison of what they agree on and where they differ, on made-up outlets.
 - One phone carries "Nothing in your way", "Still see it?" and "Two pages at once": it holds still while the screen and the words around it change, so the run is shorter and no two phones share the screen. "Smart when you ask" does the same with the summary and the answer.
 - A black page with one soft radial glow of red-orange light, with a little plum at its rim, drawn once and only moved. It only rises as you scroll, and replaces the page-long gradient.
 - "Still see it?" is a scene too: scrolling taps the page clean, and a real tap takes over. "Smart when you ask" lines its titles, text and phones up across the pair.
