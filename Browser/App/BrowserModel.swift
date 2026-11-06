@@ -1189,7 +1189,9 @@ final class BrowserModel {
                 try? await Task.sleep(for: .milliseconds(200))
                 let now = Date.now
                 if let last = voice.lastVoiceAt, !voice.partial.isEmpty, now.timeIntervalSince(last) > 1.4 { break }
-                if voice.lastVoiceAt == nil, now.timeIntervalSince(voice.startedAt) > 8 { break }
+                // No words yet, whatever noise there's been. And never for long.
+                if voice.partial.isEmpty, now.timeIntervalSince(voice.startedAt) > 8 { break }
+                if now.timeIntervalSince(voice.startedAt) > 60 { break }
             }
             if !Task.isCancelled { finishVoice() }
         }
