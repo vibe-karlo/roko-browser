@@ -21,6 +21,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - roko wears the website's colours: a warm near-black and off-white, warm greys, and one red-orange. Its light is the website's wash with visible grain, full width and brightest at the lower left, in light and dark. It sits quietly behind Today, To-do, Shopping and Read Later, and on Today it rises as you read down.
 
 ### Fixed
+- Notify Me could announce a cookie notice as news ("New: How cookies work and their uses"): on a page read with its scripts running, a hidden consent dialog was there at one reading and not at the next. Dialogs no longer count as the page. Watches take a fresh reading the next time they're checked.
 - News' lead picture could turn into a strange zoomed crop moments after it appeared, a tail fin and a red band where there had been a whole plane. The article's share picture was replacing the feed's, and a second picture of another shape drew too large and off centre. Both are fixed: pictures now fill their frame on their own, and the share picture only replaces a feed's thumbnail, as on BBC. The same goes for the picture above an article in Reader.
 - A story you've read in News showed its site's icon through its dimmed picture.
 - An unsafe page has a way out: Go back, or Close this tab. Reader and a summary that fail offer Try again, and Reader the page itself, instead of grey text.
