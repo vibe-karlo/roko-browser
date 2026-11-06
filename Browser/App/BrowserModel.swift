@@ -360,6 +360,7 @@ final class BrowserModel {
             // Nor the site lists unpacked on the second letter typed.
             _ = CommandRanker.rank(query: "a", browser: self, suggestions: [])
             try? await Task.sleep(for: .seconds(1.5))
+            await FeedStore.prepare()
             await tidyUp()
         }
         // The bar (and its keyboard) waits for the welcome to finish.

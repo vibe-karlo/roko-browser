@@ -53,7 +53,7 @@ struct FeedView: View {
                     .foregroundStyle(Theme.secondaryInk)
                     .plainRow(top: 8, bottom: 0)
             } else if store.blocks.isEmpty, store.readItems.isEmpty {
-                StatusLine(text: store.isRefreshing ? "Reading what you follow" : "Nothing new in the last two days")
+                StatusLine(text: store.isRefreshing || !store.hasBeenLaidOut ? "Reading what you follow" : "Nothing new in the last two days")
                     .plainRow(top: 8, bottom: 0)
             }
             ForEach(store.blocks) { block in blockView(block) }

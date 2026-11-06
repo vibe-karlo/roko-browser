@@ -34,10 +34,15 @@ nonisolated enum StoryGroups {
             return weight(shared) / min(weight(a), weight(b))
         }
         var groups: [[Int]] = []
+        // A group sharing no word with a story can't take it, so only those that do are
+        // looked at: against every group it was a million comparisons on a busy day.
+        var groupsWith: [String: [Int]] = [:]
         for index in oldestFirst.indices {
             var best: Int?
             var bestScore = 0.0
-            for (number, group) in groups.enumerated() {
+            let nearby = Set(stems[index].flatMap { groupsWith[$0] ?? [] })
+            for number in nearby.sorted() {
+                let group = groups[number]
                 let scores = group.map { score(index, $0) }
                 let matches = scores.filter { $0 >= 0.5 }.count
                 if matches * 2 >= group.count, let top = scores.max(), top > bestScore {
@@ -45,7 +50,10 @@ nonisolated enum StoryGroups {
                     bestScore = top
                 }
             }
-            if let best { groups[best].append(index) } else { groups.append([index]) }
+            if best == nil { groups.append([]) }
+            let joined = best ?? groups.count - 1
+            groups[joined].append(index)
+            for stem in stems[index] { groupsWith[stem, default: []].append(joined) }
         }
         return groups.map { $0.map { oldestFirst[$0] } }.filter(spansSites)
     }
