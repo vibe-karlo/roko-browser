@@ -162,8 +162,6 @@ struct CommandBarView: View {
         .onAppear {
             HitchWatch.note("appeared")
             query = browser.commandPrefill
-            // The field starts growing first; its rows, hidden until halfway
-            // through, are built on the next turn (7 to 17 ms saved before anything moves).
             open()
         }
         .onDisappear {
@@ -699,19 +697,20 @@ struct CommandBarView: View {
             focused = !browser.voiceListening
             return
         }
-        // At once: the field fades in where it lives and the keyboard rises
-        // with it; the rows follow a beat later, built once things are moving.
+        // The rows are built and the keyboard asked for first, then the fade starts a
+        // couple of frames later. Started first, that work stalled its opening frames
+        // and the blur arrived at once. A tap feels the same; the fade doesn't jump.
         HitchWatch.note("opening")
-        withAnimation(.launcher) { browser.launcherShown = true }
+        rebuild()
+        HitchWatch.note("rows built")
         if !browser.voiceListening {
             focused = true
             HitchWatch.note("field focused")
         }
-        DispatchQueue.main.async {
-            rebuild()
-            HitchWatch.note("rows built")
-            // With the dimming behind them, not ahead of it: text never sits on the bare page.
-            withAnimation(.launcher.delay(0.04)) { browser.launcherRows = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.034) {
+            withAnimation(.launcher) { browser.launcherShown = true }
+            // Behind the dimming, not ahead of it: text never sits on the bare page.
+            withAnimation(.launcherRowsIn) { browser.launcherRows = true }
         }
     }
 
@@ -725,8 +724,8 @@ struct CommandBarView: View {
         }
         browser.cancelVoice()
         focused = false
-        withAnimation(.easeIn(duration: 0.1)) { browser.launcherRows = false }
-        withAnimation(.launcher) { browser.launcherShown = false } completion: {
+        withAnimation(.launcherRowsOut) { browser.launcherRows = false }
+        withAnimation(.launcher.delay(0.05)) { browser.launcherShown = false } completion: {
             // Something else opened meanwhile (a notification, Today in the
             // morning, a summary): that stays.
             guard browser.panel == .command else { return }
