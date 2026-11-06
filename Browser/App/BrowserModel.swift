@@ -357,6 +357,8 @@ final class BrowserModel {
             // Pay the calculator's one-time setup (formatters, unit tables) now,
             // not on the first keystroke.
             _ = Calculator.answer("1 km + 1")
+            // Nor the site lists unpacked on the second letter typed.
+            _ = CommandRanker.rank(query: "a", browser: self, suggestions: [])
             try? await Task.sleep(for: .seconds(1.5))
             await tidyUp()
         }
@@ -556,7 +558,8 @@ final class BrowserModel {
         }
         if preloaded?.url == url { return }
         preloadWait = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(250))
+            // Longer than the gap between keys: each one is a web view and a page.
+            try? await Task.sleep(for: .milliseconds(500))
             guard !Task.isCancelled, let self, self.panel == .command else { return }
             self.dropPreload()
             let tab = BrowserTab(url: url)
@@ -571,6 +574,15 @@ final class BrowserModel {
                 window.insertSubview(webView, at: 0)
             }
             self.preloaded = (url, tab)
+        }
+    }
+
+    /// The launcher has gone. If its preloads used up the spare, it's built again
+    /// once things are quiet, for the next new tab.
+    func replaceSpareSoon() {
+        Task {
+            try? await Task.sleep(for: .seconds(1))
+            WebViewFactory.prewarm()
         }
     }
 

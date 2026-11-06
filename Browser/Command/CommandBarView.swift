@@ -169,6 +169,7 @@ struct CommandBarView: View {
             browser.launcherRows = false
             // Closed without opening it: the preloaded page goes.
             browser.dropPreload()
+            browser.replaceSpareSoon()
             // However it closed, the microphone doesn't stay on.
             browser.cancelVoice()
         }
@@ -511,16 +512,7 @@ struct CommandBarView: View {
                     RowIcon(icon: shown.icon)
                 } else {
                     if browser.voiceListening {
-                        // Listening: the mark breathes with the voice; a tap stops it.
-                        Image(systemName: "mic.fill")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Theme.accent)
-                            .scaleEffect(1 + VoiceInput.shared.level * 0.35)
-                            .animation(.easeOut(duration: 0.08), value: VoiceInput.shared.level)
-                            .frame(width: 44, height: 44)
-                            .contentShape(.rect)
-                            .onTapGesture { browser.finishVoice() }
-                            .accessibilityLabel("Stop listening")
+                        ListeningMark { browser.finishVoice() }
                     } else {
                         Glyph(showsPrivate ? .eyeClosed : contextGlyph, size: 18)
                             .foregroundStyle(showsPrivate ? Theme.accent : Theme.secondaryInk)
@@ -1175,7 +1167,7 @@ enum CommandRanker {
         if !TodayCalendar.isAllowed {
             item = CommandItem(id: "calendar", title: "Calendar", subtitle: "Allow it in Today", kind: "Today",
                                icon: .glyph(.calendar), action: .today)
-        } else if let event = TodayCalendar.next() {
+        } else if let event = TodayCalendar.nextSoon() {
             let place = event.location.map { " · \($0)" } ?? ""
             item = CommandItem(id: "calendar", title: event.title, subtitle: TodayCalendar.when(event) + place,
                                kind: "Calendar", icon: .glyph(.calendar),
@@ -1706,5 +1698,23 @@ nonisolated enum ParkingQuery {
         let needle = query.trimmingCharacters(in: .whitespaces).lowercased()
         // From "parki" on: "park" alone is as likely a park, and this asks where you are.
         return needle.count >= 5 && words.contains { $0.hasPrefix(needle) || needle == $0 }
+    }
+}
+
+/// Listening: the mark breathes with the voice; a tap stops it. A view of its own,
+/// so the level changing redraws this and not the launcher, many times a second.
+private struct ListeningMark: View {
+    let stop: () -> Void
+
+    var body: some View {
+        Image(systemName: "mic.fill")
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(Theme.accent)
+            .scaleEffect(1 + VoiceInput.shared.level * 0.35)
+            .animation(.easeOut(duration: 0.08), value: VoiceInput.shared.level)
+            .frame(width: 44, height: 44)
+            .contentShape(.rect)
+            .onTapGesture(perform: stop)
+            .accessibilityLabel("Stop listening")
     }
 }
