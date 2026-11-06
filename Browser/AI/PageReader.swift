@@ -58,11 +58,30 @@ enum PageReader {
     // Readability's textContent glues adjacent blocks together ("…tontos?Silvia Leal…"),
     // so walk its cleaned HTML and keep each block on its own.
     private static let extract = """
+    // What a mail hides isn't for reading: its preview line, a spacer against Gmail's folding.
+    if (forMail) for (const el of document.body.querySelectorAll("[style]")) {
+      const style = el.getAttribute("style").toLowerCase().replace(/\\s/g, "");
+      if (/display:none|visibility:hidden|opacity:0(;|$)|font-size:0(px)?(;|$)|max-height:0(px)?(;|$)/.test(style)
+          || (/(^|;)height:[01]px/.test(style) && style.includes("overflow:hidden"))) el.remove();
+    }
+    // A mail's button is a link alone in a table, which Readability takes for clutter: a line of its own.
+    if (forMail) for (const a of [...document.body.querySelectorAll("a[href]")]) {
+      const words = a.textContent.trim();
+      if (!words) continue;
+      let alone = a;
+      while (alone.parentElement !== document.body && alone.parentElement.textContent.trim() === words) alone = alone.parentElement;
+      if (alone === a) continue;
+      const line = document.createElement("p");
+      line.append(a.cloneNode(true));
+      alone.replaceWith(line);
+    }
     let article = null;
     try { article = new Readability(document.cloneNode(true)).parse(); } catch (e) {}
     const blocks = [], links = [];
     if (article && article.content) {
       const doc = new DOMParser().parseFromString(article.content, "text/html");
+      // A line break is a space between words.
+      for (const br of doc.body.querySelectorAll("br")) br.replaceWith(" ");
       const selector = "h1,h2,h3,h4,p,li,blockquote,pre,figcaption";
       for (const el of doc.body.querySelectorAll(selector)) {
         if (el.parentElement && el.parentElement.closest(selector)) continue;
@@ -92,16 +111,16 @@ enum PageReader {
     };
     """
 
-    static func read(_ webView: WKWebView) async throws -> ReadablePage {
+    static func read(_ webView: WKWebView, forMail: Bool = false) async throws -> ReadablePage {
         let result = try await webView.callAsyncJavaScript(
-            readability + "\n" + extract, contentWorld: .world(name: "reader"))
+            readability + "\n" + extract, arguments: ["forMail": forMail], contentWorld: .world(name: "reader"))
         guard let fields = result as? [String: Any] else {
             throw ClaudeError(message: "This page has no readable text.")
         }
         let text = withoutFurniture((fields["text"] as? String ?? "")
             .replacingOccurrences(of: #"[ \t]+"#, with: " ", options: .regularExpression)
             .replacingOccurrences(of: #"\n\s*\n+"#, with: "\n\n", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines))
+            .trimmingCharacters(in: .whitespacesAndNewlines), forMail: forMail)
         guard text.count > 200 else { throw ClaudeError(message: "This page has too little text to summarize.") }
         return ReadablePage(title: fields["title"] as? String ?? "", site: fields["site"] as? String ?? "",
                             text: String(text.prefix(200_000)), isArticle: fields["isArticle"] as? Bool ?? false,
@@ -116,7 +135,8 @@ enum PageReader {
     /// the NYT's note about checking your access, a photo's credit. Above the
     /// first real paragraph, short lines that aren't sentences: "44 minutes
     /// ago", "Daniela RelphRoyal correspondent", "Reuters".
-    nonisolated static func withoutFurniture(_ text: String) -> String {
+    /// A mail's opening stays: a short line there may be what it's for, like a sign-in code.
+    nonisolated static func withoutFurniture(_ text: String, forMail: Bool = false) -> String {
         let furniture: Set<String> = ["advertisement", "skip advertisement", "reklama", "oglas", "continue reading", "read more",
                                       "pročitajte više", "share", "save", "podijeli"]
         var lines = text.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { line in
@@ -126,7 +146,13 @@ enum PageReader {
             if plain.count < 200, plain.contains("unsubscribe") || plain.contains("odjavi") { return false }
             return plain.count > 40 || plain.firstMatch(of: /\b(getty images|reuters|afp|associated press|pa media|epa|shutterstock|alamy|pixsell|hina)\b/) == nil
         }
-        if let first = lines.prefix(8).firstIndex(where: { $0.count >= 80 }) {
+        if forMail {
+            // Invisible padding after a preview line, and that preview line said again.
+            var seen = Set<String>()
+            lines = lines.filter { line in
+                line.contains { $0.isLetter || $0.isNumber } && (line.count < 20 || seen.insert(line).inserted)
+            }
+        } else if let first = lines.prefix(8).firstIndex(where: { $0.count >= 80 }) {
             let kept = lines[..<first].filter { $0.count >= 60 || $0.last.map { ".?!:".contains($0) } == true }
             lines = Array(kept) + lines[first...]
         }

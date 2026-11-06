@@ -383,7 +383,7 @@ final class FeedStore {
     /// The article to read: from the feed when it gave the whole of it,
     /// otherwise read from the page by Readability, off screen, and kept.
     func readable(_ story: NewsStory) async -> ReadablePage? {
-        let kept = keptText(of: story.link).map(PageReader.withoutFurniture)
+        let kept = keptText(of: story.link).map { PageReader.withoutFurniture($0, forMail: story.isMail) }
         // A newsletter's text is whatever came with it: there's no page to go and read.
         if story.isMail {
             return ReadablePage(title: story.title, site: story.from ?? story.host, text: kept ?? "", isArticle: true, links: Newsletters.links(of: story.link, in: kept ?? ""))

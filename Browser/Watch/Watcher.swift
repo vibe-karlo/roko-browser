@@ -295,7 +295,7 @@ enum RenderedPage {
         webView.navigationDelegate = loader
         webView.loadHTMLString(html, baseURL: nil)
         _ = await loader.finished(within: 8)
-        return try? await PageReader.read(webView)
+        return try? await PageReader.read(webView, forMail: true)
     }
 
     /// The article on a page, by Readability, off screen: its scripts run, and
