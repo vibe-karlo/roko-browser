@@ -46,7 +46,7 @@ async function rate(amount, from, to, stamp) {
     rates[key] ??= (await (await fetch(`https://api.frankfurter.dev/v1/latest?base=${from}&symbols=${to}`)).json()).rates[to];
     if (stamp !== asked) return;
     show(`${(amount * rates[key]).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${to}`, `${tidy(amount)} ${from} at today's rate`, "Rate");
-  } catch { if (stamp === asked) show("Rates need a connection", "roko works it out in the bar", "Rate", true); }
+  } catch { if (stamp === asked) show("Rates need a connection", "Check yours and try again", "Rate", true); }
 }
 
 const holidays = { christmas: [12, 25], "new year": [1, 1], "new years": [1, 1], halloween: [10, 31], "valentine's day": [2, 14], "valentines day": [2, 14] };
@@ -80,7 +80,7 @@ async function weather(place, stamp) {
     if (stamp !== asked) return;
     const code = c.weather_code, sky = code === 0 ? "Clear" : code < 3 ? "Partly cloudy" : code === 3 ? "Cloudy" : code < 50 ? "Fog" : code < 70 ? "Rain" : code < 80 ? "Snow" : code < 90 ? "Showers" : "Storms";
     show(`${Math.round(c.temperature_2m)}° ${sky}`, `Right now in ${geo.name}`, "Weather");
-  } catch { if (stamp === asked) show("Weather needs a connection", "roko shows it in the bar", "Weather", true); }
+  } catch { if (stamp === asked) show("Weather needs a connection", "Check yours and try again", "Weather", true); }
 }
 
 function answer(raw) {
@@ -96,7 +96,7 @@ function answer(raw) {
   if ((m = low.match(/^(?:time in\s+)?(.+?)(?:\s+time)?$/)) && zones[m[1]]) return show(new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: zones[m[1]] }), `Right now in ${m[1].replace(/\b\w/g, c => c.toUpperCase())}`, "Time");
   if (/^[\d\s.()+\-*/x×÷]+$/.test(low) && /\d/.test(low)) { try { return show(tidy(sum(low)), text, "Sum"); } catch {} }
   if (/^(https?:\/\/)?[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(\/\S*)?$/.test(low)) return show(low.replace(/^https?:\/\//, ""), "Opens the site, already loading", "Open", true);
-  if (/\?$/.test(text) || /^(how|what|why|when|where|who|which|is|are|can|should|best)\b/.test(low)) return show(text, "Browse for me: reads the web and answers", "Ask", true);
+  if (/\?$/.test(text) || /^(how|what|why|when|where|who|which|is|are|can|should|best)\b/.test(low)) return show(text, "Browse for Me: reads the web and answers", "Ask", true);
   if (/^(call|buy|email|text|pay|book|remember|pick up|send)\b/.test(low) || /\b(tomorrow|tonight)\b/.test(low)) {
     const when = low.match(/\b(today|tonight|tomorrow)\b/), at = low.match(/\bat (\d{1,2})(?::(\d{2}))?\b/);
     const name = text.replace(/\s+(today|tonight|tomorrow)\b/i, "").replace(/\s+at \d{1,2}(:\d{2})?\b/i, "").replace(/\bpetra\b/i, "Petra");
@@ -105,28 +105,55 @@ function answer(raw) {
   }
   show(text, "Search Google", "Search", true);
 }
-input.addEventListener("input", () => { stopped = true; answer(input.value); });
+input.addEventListener("input", () => { stopped = true; chosen = false; answer(input.value); });
 
 // On a touch screen the keyboard on the page is the keyboard: nothing jumps.
 if (matchMedia("(pointer: coarse)").matches) input.setAttribute("inputmode", "none");
 const kb = document.getElementById("kb");
-let upper = false;
+let upper = false, chosen = false;
+for (const key of kb.querySelectorAll("button")) key.tabIndex = -1;
+const go = () => { out.querySelector("span").textContent = "In roko, Go takes you there"; };
+input.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+// A whole-bar selection or a picked suggestion is replaced by the next key, as in a real bar.
+const fresh = () => chosen || (document.activeElement === input && input.value && input.selectionStart === 0 && input.selectionEnd === input.value.length);
 function put(text) { stopped = true; input.value = text; answer(text); }
 kb.addEventListener("pointerdown", e => e.preventDefault());
 kb.addEventListener("click", e => {
   const k = e.target.closest(".k")?.dataset.k; if (k === undefined) return;
+  // iOS drops the bar's focus on a tap whatever pointerdown says, and the caret goes with it.
+  if (coarse) input.focus({ preventScroll: true });
   if (k === "123" || k === "abc") { for (const l of kb.querySelectorAll(".layer")) l.hidden = l.dataset.l !== k; return; }
   if (k === "shift") { upper = !upper; kb.classList.toggle("up", upper); return; }
-  if (k === "go") { out.querySelector("span").textContent = "In roko, Go takes you there"; return; }
-  if (k === "back") return put(input.value.slice(0, -1));
-  put(input.value + (upper ? k.toUpperCase() : k));
+  if (k === "go") return go();
+  const was = fresh() ? "" : input.value;
+  chosen = false;
+  if (k === "back") return put(was.slice(0, -1));
+  put(was + (upper ? k.toUpperCase() : k));
   if (upper) { upper = false; kb.classList.remove("up"); }
 });
-for (const row of tries) row.addEventListener("click", () => { tryAt++; put(row.dataset.q); });
+for (const row of tries) row.addEventListener("click", () => { tryAt++; put(row.dataset.q); chosen = true; });
 
 // The bar shows itself until someone reaches for it.
 let stopped = still;
-input.addEventListener("focus", () => { if (!stopped) { stopped = true; input.value = ""; answer(""); } });
+const coarse = matchMedia("(pointer: coarse)").matches;
+let selecting = false;
+input.addEventListener("focus", () => {
+  if (!stopped) { stopped = true; input.value = ""; answer(""); }
+  // A tap on the bar has to find the keys: they're the only keyboard a phone gets here.
+  if (coarse) {
+    // Safari's floating toolbar covers about 84 points of the page, and innerHeight doesn't say so.
+    const over = input.closest(".device").getBoundingClientRect().bottom + 84 - innerHeight;
+    const room = input.closest(".field").getBoundingClientRect().top - document.querySelector(".nav").getBoundingClientRect().bottom - 8;
+    if (over > 0) scrollBy(0, Math.min(over, room));
+    return;
+  }
+  selecting = true;
+  input.select();
+});
+// The mouse button coming up would drop the selection the bar just made.
+input.addEventListener("mouseup", e => { if (selecting) e.preventDefault(); selecting = false; });
+input.addEventListener("blur", () => { selecting = false; });
+input.addEventListener("keydown", () => { selecting = false; });
 const hero = document.getElementById("top");
 (async () => {
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -312,7 +339,7 @@ const proofData = {
     values: { roko: 1.07, quiche: 1.70, lens: 2.76, arc: 3.41, firefox: 3.47, brave: 3.54, duckduckgo: 4.33, chrome: 4.96, safari: 4.96, edge: 5.46 },
   },
   block: {
-    unit: v => v.toFixed(1) + " a page", low: true, head: "Blocks the most ads and trackers.",
+    unit: v => v.toFixed(1) + " reached a page", low: true, head: "Blocks the most ads and trackers.",
     note: "Ad and tracker servers reached per page, by Peter Lowe's and Disconnect's lists, which roko doesn't draw on, leaving out cookie consent tools. Average of 40 runs each on 16 sites, from the phone's traffic. A browser stopped at a cookie wall reaches fewer.",
     values: { roko: 0.7, arc: 0.9, brave: 1.7, duckduckgo: 2.7, quiche: 4.2, firefox: 5.7, safari: 5.7, edge: 9.8, lens: 16.4, chrome: 16.4 },
   },
@@ -328,7 +355,8 @@ if (runs) {
   const rows = [...runs.children], head = document.getElementById("proofHead"), note = document.getElementById("proofNote");
   const measures = [...document.querySelectorAll(".measures button")];
   let measure = "speed";
-  const fill = (row, width) => { row.querySelector("i").style.width = width; };
+  const fill = (row, width) => { const bar = row.querySelector("i"); bar.style.width = width; bar.style.minWidth = parseFloat(width) ? "" : "0"; };
+  const reads = document.getElementById("proofReads");
   const show = () => {
     const m = proofData[measure], view = m;
     const max = Math.max(...Object.values(view.values));
@@ -343,6 +371,7 @@ if (runs) {
       fill(row, (value / max * 100) + "%");
     }
     head.textContent = view.head;
+    reads.textContent = m.low ? "Shorter is better." : "Longer is better.";
     note.innerHTML = "";
     note.append(m.note + proofMethod);
     const how = document.createElement("a");
@@ -369,4 +398,33 @@ if (runs) {
     before.observe(runs);
     new IntersectionObserver(([e], o) => { if (e.isIntersecting) { o.disconnect(); run(); } }, { threshold: 0.2 }).observe(runs);
   }
+}
+
+// The nav says which part you're in, with its type and nothing bolted on.
+{
+  const parts = { fast: "#fast", proof: "#fast", smart: "#smart", clean: "#clean" };
+  const links = [...document.querySelectorAll('.nav a.link[href^="#"]')];
+  // One plate slides between the links, so the eye sees where you went from.
+  const slide = document.createElement("i");
+  slide.className = "slide";
+  slide.setAttribute("aria-hidden", "true");
+  const nav = document.querySelector(".nav");
+  nav.prepend(slide);
+  const place = () => {
+    const now = links.find(l => l.hasAttribute("aria-current") && l.offsetWidth);
+    slide.classList.toggle("on", !!now);
+    if (!now) return slide.classList.remove("glide");
+    slide.style.width = now.offsetWidth + 20 + "px";
+    slide.style.transform = `translateX(${now.offsetLeft - 10}px)`;
+    requestAnimationFrame(() => slide.classList.add("glide"));
+  };
+  const seen = new IntersectionObserver(entries => {
+    for (const e of entries) {
+      if (e.isIntersecting) for (const l of links) e.target.id in parts && parts[e.target.id] === l.getAttribute("href") ? l.setAttribute("aria-current", "true") : l.removeAttribute("aria-current");
+    }
+    place();
+  }, { rootMargin: "-45% 0px -50% 0px" });
+  addEventListener("resize", () => { slide.classList.remove("glide"); place(); });
+  document.fonts?.ready.then(() => { slide.classList.remove("glide"); place(); });
+  for (const s of document.querySelectorAll("header.hero,main>section")) seen.observe(s);
 }
