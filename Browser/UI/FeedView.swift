@@ -512,8 +512,8 @@ private struct PanelPlace {
 }
 
 /// A story's picture from its feed; the site's icon on the panel colour
-/// without one. Large, the article's own picture takes over once it's found:
-/// feeds carry thumbnails, soft at the width of the page.
+/// without one. Large, when the feed has only a thumbnail, soft at the width of
+/// the page, the article's own picture takes over once it's found.
 struct FeedPicture: View {
     let story: NewsStory
     var isLarge = false
@@ -526,15 +526,23 @@ struct FeedPicture: View {
             if let image = story.image { picture(image) }
             if let large { picture(large) }
         }
-        .clipped()
+        // Dimmed once read as one thing: layer by layer, the site's icon shows through the picture.
+        .compositingGroup()
         .task(id: story.link) {
-            if isLarge { large = await FeedStore.shared.largePicture(of: story.link) }
+            if isLarge { large = await FeedStore.shared.largePicture(of: story) }
         }
     }
 
+    /// Filled and clipped in a frame of its own. Filling the stack instead, a
+    /// picture of another shape grew it, and the one on top then filled that:
+    /// The Guardian's 346 wide slot drew a banner 527 wide, off centre.
     private func picture(_ url: URL) -> some View {
-        AsyncImage(url: url) { phase in
-            if let picture = phase.image { picture.resizable().scaledToFill() }
-        }
+        Color.clear
+            .overlay {
+                AsyncImage(url: url) { phase in
+                    if let picture = phase.image { picture.resizable().scaledToFill() }
+                }
+            }
+            .clipped()
     }
 }

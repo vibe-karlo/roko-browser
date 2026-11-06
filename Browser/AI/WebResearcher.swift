@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 
 /// The browsing half of Browse for Me when Apple's model writes the answer:
 /// search, open the top results in parallel, and keep their readable text.
@@ -94,6 +95,22 @@ nonisolated enum WebResearcher {
             }
         } catch {}
         return shareImage(String(decoding: head, as: UTF8.self), base: url)
+    }
+
+    /// A picture's width in pixels, from its first bytes: the rest stays unfetched.
+    static func pixelWidth(of url: URL) async -> Int? {
+        guard let (bytes, response) = try? await session.bytes(from: url),
+              (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        var head = Data()
+        do {
+            for try await byte in bytes {
+                head.append(byte)
+                if head.count >= 65_536 { break }
+            }
+        } catch {}
+        guard let source = CGImageSourceCreateWithData(head as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else { return nil }
+        return properties[kCGImagePropertyPixelWidth] as? Int
     }
 
     /// Pictures without repeats: the same file is often shared at several sizes

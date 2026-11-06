@@ -89,8 +89,11 @@ final class FeedStore {
     @ObservationIgnored private var isChecking = false
     @ObservationIgnored private var pendingChecks: [[NewsStory]] = []
     @ObservationIgnored private var isReading = false
-    /// Articles' own pictures, sharper than their feeds' thumbnails, for those shown large.
-    @ObservationIgnored private var largePictures: [URL: URL] = [:]
+    /// Articles' own pictures, sharper than their feeds' thumbnails, for those shown
+    /// large. Nil for a story whose feed's picture will do.
+    @ObservationIgnored private var largePictures: [URL: URL?] = [:]
+    /// In pixels. On the sites tried, thumbnails are 240 wide and the rest 700 or more.
+    private static let properPictureWidth = 600
     /// Stories not to show, as of the last look: mentioning a blocked word, asked to
     /// see less of, or from a site or topic no longer followed.
     @ObservationIgnored private var blocked = Set<URL>()
@@ -496,11 +499,20 @@ final class FeedStore {
         return await readable(story)?.text ?? keptText(of: story.link) ?? story.summary ?? ""
     }
 
-    /// The article's own share picture, once per story.
-    func largePicture(of link: URL) async -> URL? {
-        if let known = largePictures[link] { return known }
-        let found = await WebResearcher.shareImage(of: link)
-        if let found { largePictures[link] = found }
+    /// The article's own share picture, once per story, when its feed's is only a
+    /// thumbnail: BBC's are 240 wide. A proper picture stays, as a share picture is
+    /// a banner for link previews, no sharper copy of it: The Verge's 2700 wide
+    /// would give way to 1200, The Guardian's whole photo to its top half under
+    /// the paper's name.
+    func largePicture(of story: NewsStory) async -> URL? {
+        if let known = largePictures[story.link] { return known }
+        if let image = story.image, let width = await WebResearcher.pixelWidth(of: image), width >= Self.properPictureWidth {
+            largePictures.updateValue(nil, forKey: story.link)
+            return nil
+        }
+        // Not kept when there's none: scrolling away cancels the look, as does a bad connection.
+        let found = await WebResearcher.shareImage(of: story.link)
+        if let found { largePictures[story.link] = found }
         return found
     }
 
