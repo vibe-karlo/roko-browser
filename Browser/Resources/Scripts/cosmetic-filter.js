@@ -234,6 +234,20 @@
       box.setAttribute(MARK, "");
     }
     if (shift) window.scrollBy(0, -shift);
+    foldAdStrips();
+  };
+
+  // A strip pinned along the bottom holding one picture and nothing else: an ad drawn by the
+  // site's own scripts under a made-up name, on its own server (Focus's, where the same server
+  // has its photos, so it can't be blocked). A real toolbar has words or links.
+  const foldAdStrips = () => {
+    for (const el of document.querySelectorAll(`body div:not([${MARK}]), body aside:not([${MARK}])`)) {
+      const height = el.offsetHeight;
+      if (height < 40 || height > 130 || el.offsetWidth < innerWidth * 0.9 || !el.querySelector("img")) continue;
+      if (getComputedStyle(el).position !== "fixed") continue;
+      if (el.getBoundingClientRect().bottom < innerHeight - 4 || (el.textContent || "").trim()) continue;
+      if (el.querySelectorAll("img").length === 1 && !el.querySelector("a,button,input,video,canvas,svg,iframe")) el.setAttribute(MARK, "");
+    }
   };
 
   // Never during a scroll: a pass reads layout, and the scroll needs every frame.

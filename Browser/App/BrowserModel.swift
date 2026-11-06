@@ -1027,12 +1027,15 @@ final class BrowserModel {
         }
     }
 
-    /// A link from another app is what you came for, so it goes over whatever panel is up.
+    /// A link from another app is what you came for, so it goes over whatever is up, sheets too.
     /// That includes the day's first Today, which then waits for your next return.
     private func openFromOutside(_ page: URL) {
         lastOutsideLink = .now
         if panel == .today { TodayModel.forgetIfJustShown() }
         panel = .none
+        reader = nil
+        summary = nil
+        browseForMe = nil
         open(page, inNewTab: true)
     }
 
@@ -1389,8 +1392,9 @@ final class BrowserModel {
     /// SwiftUI drops a sheet presented while another is still sliding away, so
     /// when a sheet panel is open, wait for it to finish closing first.
     private func presentAfterPanelCloses(_ present: @escaping () -> Void) {
-        let wasSheet = panel == .settings
+        let wasSheet = panel == .settings || reader != nil
         panel = .none
+        reader = nil
         guard wasSheet else { return present() }
         Task {
             try? await Task.sleep(for: .milliseconds(450))
