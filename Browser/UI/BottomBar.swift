@@ -116,7 +116,9 @@ struct BottomBar: View {
                         // Becomes the launcher's field: there only while the launcher isn't,
                         // and only on a page (a screen over it has its own bar).
                         // Hidden while the launcher's field stands in its place.
-                        if browser.panel != .command || !onPage {
+                        // Docked it stays, and fades with the bar: it used to return
+                        // only after the fade, popping in around a + already there.
+                        if docked || browser.panel != .command || !onPage {
                             // Docked, the band's colour shows through it.
                             Capsule().fill(docked ? AnyShapeStyle(.white.opacity(0.14)) : AnyShapeStyle(Theme.raised))
                                 // Held: roko's orange fills it from the left as the hold

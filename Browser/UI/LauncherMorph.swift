@@ -1,9 +1,15 @@
 import SwiftUI
 
 extension Animation {
-    /// The bar opening into the launcher and closing back: a quick fade and
-    /// settle in place, nothing travelling across the screen.
-    static let launcher = Animation.easeOut(duration: 0.16)
+    /// The bar opening into the launcher and closing back: a fade and settle in
+    /// place, nothing travelling across the screen. It starts gently: an ease-out
+    /// flooded the blur in over the first two frames, which read as a pop.
+    static let launcher = Animation.timingCurve(0.35, 0, 0.35, 1, duration: 0.26)
+    /// The rows arrive once the blur behind them is dense enough to hide the page's
+    /// text; any sooner, the list and the headline showed through each other.
+    static let launcherRowsIn = Animation.easeOut(duration: 0.14).delay(0.16)
+    /// And on the way out they leave before the blur starts to thin.
+    static let launcherRowsOut = Animation.easeOut(duration: 0.08)
 }
 
 /// The launcher's field appearing where it lives, at the top: it fades in and
