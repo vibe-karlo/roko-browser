@@ -29,6 +29,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - The microphone stops after 8 seconds with no words and after a minute in all, and whenever the launcher closes or roko leaves the screen. A microphone with no usable format can't stop the app.
 - Newsletters stay on the server until they're saved here, so closing roko mid-refresh can't lose one.
 - News keeps the longer copy of an article, and read marks can't be undone by an older save landing late.
+- Typing in the bar searches history faster: each letter looks only through what still matches, and "ps" no longer matches every address.
+- The bar preloads a top hit after a longer pause, and asks the calendar once a minute rather than with every key.
+- News reads its saved stories ahead of time and doesn't work out groups again when nothing has changed. A first look no longer says "Nothing new" before it has laid anything out.
+- Comparing stories and matching topics no longer hold up the screen.
+- A page removed from history can't come back through a rebuild already under way, and a visit during one isn't lost.
+- Three rare answers from weather and YouTube can't stop the app.
 - Notify Me could announce a cookie notice as news ("New: How cookies work and their uses"): on a page read with its scripts running, a hidden consent dialog was there at one reading and not at the next. Dialogs no longer count as the page. Watches take a fresh reading the next time they're checked.
 - News' lead picture could turn into a strange zoomed crop moments after it appeared, a tail fin and a red band where there had been a whole plane. The article's share picture was replacing the feed's, and a second picture of another shape drew too large and off centre. Both are fixed: pictures now fill their frame on their own, and the share picture only replaces a feed's thumbnail, as on BBC. The same goes for the picture above an article in Reader.
 - A story you've read in News showed its site's icon through its dimmed picture.

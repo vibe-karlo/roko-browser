@@ -357,7 +357,10 @@ final class BrowserModel {
             // Pay the calculator's one-time setup (formatters, unit tables) now,
             // not on the first keystroke.
             _ = Calculator.answer("1 km + 1")
+            // Nor the site lists unpacked on the second letter typed.
+            _ = CommandRanker.rank(query: "a", browser: self, suggestions: [])
             try? await Task.sleep(for: .seconds(1.5))
+            await FeedStore.prepare()
             await tidyUp()
         }
         // The bar (and its keyboard) waits for the welcome to finish.
@@ -452,33 +455,53 @@ final class BrowserModel {
         pendingSave?.cancel()
         pendingSave = nil
         guard let context = tabContext else { return }
-        let records = (try? context.fetch(FetchDescriptor<SavedTab>())) ?? []
+        // What each tab is now, against what was last written: most saves are one page.
+        var now: [UUID: SavedFacts] = [:]
+        for (index, tab) in tabs.enumerated() where !tab.isPrivate {
+            guard let url = tab.url else { continue }
+            // A live page's state is encoded by WebKit: once per save.
+            now[tab.id] = SavedFacts(url: url.absoluteString, title: tab.title, order: index,
+                                     lastActive: tab.lastActive, state: tab.interactionState)
+        }
+        guard !savedOnce || now != lastSaved else { return }
+        let touched = Set(now.keys.filter { now[$0] != lastSaved[$0] }).union(lastSaved.keys.filter { now[$0] == nil })
+        // The first time looks at every record, which also clears up any duplicates.
+        // Couldn't read them: written next time, rather than written twice.
+        let wanted = Array(touched)
+        guard let records = try? context.fetch(savedOnce ? FetchDescriptor<SavedTab>(predicate: #Predicate { wanted.contains($0.tabID) })
+                                                         : FetchDescriptor<SavedTab>()) else { return }
         var byID: [UUID: SavedTab] = [:]
         for record in records {
             if byID[record.tabID] == nil { byID[record.tabID] = record } else { context.delete(record) }
         }
-        var open = Set<UUID>()
-        for (index, tab) in tabs.enumerated() where !tab.isPrivate {
-            guard let url = tab.url else { continue }
-            open.insert(tab.id)
-            let address = url.absoluteString
-            // A live page's state is encoded by WebKit: once per save.
-            let state = tab.interactionState
-            guard let record = byID[tab.id] else {
-                context.insert(SavedTab(tabID: tab.id, url: address, title: tab.title, order: index,
-                                        lastActive: tab.lastActive, interactionState: state))
+        for (id, facts) in now where !savedOnce || touched.contains(id) {
+            guard let record = byID[id] else {
+                context.insert(SavedTab(tabID: id, url: facts.url, title: facts.title, order: facts.order,
+                                        lastActive: facts.lastActive, interactionState: facts.state))
                 continue
             }
             // Assigned only when different: an assignment counts as a change.
-            if record.url != address { record.url = address }
-            if record.title != tab.title { record.title = tab.title }
-            if record.order != index { record.order = index }
-            if record.lastActive != tab.lastActive { record.lastActive = tab.lastActive }
-            if record.interactionState != state { record.interactionState = state }
+            if record.url != facts.url { record.url = facts.url }
+            if record.title != facts.title { record.title = facts.title }
+            if record.order != facts.order { record.order = facts.order }
+            if record.lastActive != facts.lastActive { record.lastActive = facts.lastActive }
+            if record.interactionState != facts.state { record.interactionState = facts.state }
         }
-        for (id, record) in byID where !open.contains(id) { context.delete(record) }
+        for (id, record) in byID where now[id] == nil { context.delete(record) }
         if context.hasChanges { try? context.save() }
+        lastSaved = now
+        savedOnce = true
     }
+
+    private struct SavedFacts: Equatable {
+        let url: String
+        let title: String
+        let order: Int
+        let lastActive: Date
+        let state: Data?
+    }
+    @ObservationIgnored private var lastSaved: [UUID: SavedFacts] = [:]
+    @ObservationIgnored private var savedOnce = false
 
     // MARK: Tabs
 
@@ -556,7 +579,8 @@ final class BrowserModel {
         }
         if preloaded?.url == url { return }
         preloadWait = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(250))
+            // Longer than the gap between keys: each one is a web view and a page.
+            try? await Task.sleep(for: .milliseconds(500))
             guard !Task.isCancelled, let self, self.panel == .command else { return }
             self.dropPreload()
             let tab = BrowserTab(url: url)
@@ -571,6 +595,15 @@ final class BrowserModel {
                 window.insertSubview(webView, at: 0)
             }
             self.preloaded = (url, tab)
+        }
+    }
+
+    /// The launcher has gone. If its preloads used up the spare, it's built again
+    /// once things are quiet, for the next new tab.
+    func replaceSpareSoon() {
+        Task {
+            try? await Task.sleep(for: .seconds(1))
+            WebViewFactory.prewarm()
         }
     }
 

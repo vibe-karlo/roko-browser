@@ -107,12 +107,27 @@ final class FeedStore {
     /// Sources changed while reading the old ones: read again when that's done.
     @ObservationIgnored private var readsAgain = false
 
-    private static var file: URL { URL.applicationSupportDirectory.appending(path: "feed.json") }
-    private static let textFolder = URL.applicationSupportDirectory.appending(path: "feed-text")
+    private nonisolated static var file: URL { URL.applicationSupportDirectory.appending(path: "feed.json") }
+    private nonisolated static let textFolder = URL.applicationSupportDirectory.appending(path: "feed-text")
+
+    /// Read ahead of the first look at News, so opening it doesn't wait on the main thread.
+    private static var readAhead: Saved?
+
+    private nonisolated static func readSaved() -> Saved? {
+        guard let data = try? Data(contentsOf: file) else { return nil }
+        return try? JSONDecoder().decode(Saved.self, from: data)
+    }
+
+    /// A while after launch, for someone who follows anything. Opened sooner, it's read then.
+    static func prepare() async {
+        guard !NewsSite.chosen.isEmpty || !NewsTopics.chosen.isEmpty || Newsletters.isOn else { return }
+        readAhead = await Task.detached(priority: .utility) { readSaved() }.value
+        _ = shared
+        readAhead = nil
+    }
 
     private init() {
-        guard let data = try? Data(contentsOf: Self.file),
-              let saved = try? JSONDecoder().decode(Saved.self, from: data) else { return }
+        guard let saved = Self.readAhead ?? Self.readSaved() else { return }
         stories = saved.stories
         refreshedAt = saved.refreshedAt
         verdicts = saved.verdicts
@@ -142,12 +157,16 @@ final class FeedStore {
         Task { try? await BGTaskScheduler.shared.submitTaskRequest(request) }
     }
 
+    /// Set once what's known has been laid out: until then an empty page doesn't mean nothing's new.
+    private(set) var hasBeenLaidOut = false
+
     /// The feed has opened: laid out from what's known, then what's new read.
     func opened() async {
         isReading = false
         hasNewer = false
         await regroup()
         rebuild()
+        hasBeenLaidOut = true
         await refreshIfStale()
     }
 
@@ -290,17 +309,22 @@ final class FeedStore {
     }
 
     private func regroup() async {
-        let reading = recent.map { ($0.story, Self.textFile(for: $0.id)) }
+        let reading = recent.map(\.story)
         let terms = NewsBlocks.chosen
         let less = NewsLess.chosen
         let hidden = NewsHiddenSites.chosen
         let hosts = Set(NewsSite.chosen.map(\.host))
         let topics = NewsTopics.chosen
+        // The same stories and the same choices come to the same groups. Not with
+        // words to block, which also read each story's text, and that can change.
+        let inputs = GroupingInputs(stories: reading, less: less, hidden: hidden, hosts: hosts, topics: topics)
+        if terms.isEmpty, inputs == groupedFrom { return }
+        groupedFrom = inputs
         // Off the main thread: with words to block, it reads each story's kept text.
         (blocked, lowered, candidates) = await Task.detached(priority: .userInitiated) {
             let lessLinks = Set(less.flatMap(\.links))
             var lowered = Set<URL>()
-            let blocked = Set(reading.filter { story, file in
+            let blocked = Set(reading.filter { story in
                 if story.isMail { return false }
                 if NewsHiddenSites.hides(story.host, in: hidden) { return true }
                 // What a topic or site brought goes when it does.
@@ -311,10 +335,10 @@ final class FeedStore {
                 if closeness == 1 { lowered.insert(story.link) }
                 // Nothing to look for: no story's text needs reading.
                 guard !terms.isEmpty else { return false }
-                let text = (try? String(contentsOf: file, encoding: .utf8)) ?? ""
+                let text = (try? String(contentsOf: Self.textFile(for: story.link), encoding: .utf8)) ?? ""
                 return NewsBlocks.mention(terms, in: [story.title, story.summary ?? "", text].joined(separator: " "))
-            }.map(\.0.link))
-            return (blocked, lowered, StoryGroups.candidates(reading.map(\.0).filter { !blocked.contains($0.link) && !$0.isMail }))
+            }.map(\.link))
+            return (blocked, lowered, StoryGroups.candidates(reading.filter { !blocked.contains($0.link) && !$0.isMail }))
         }.value
         // Verdicts on groups that are gone would only pile up.
         verdicts = verdicts.filter { key, _ in candidates.contains { Self.key($0) == key } }
@@ -462,9 +486,18 @@ final class FeedStore {
     // MARK: Articles
 
     /// Long enough to be the article, not a feed's opening lines.
-    private static let wholeArticle = 1_200
+    private nonisolated static let wholeArticle = 1_200
 
-    private static func textFile(for link: URL) -> URL {
+    private struct GroupingInputs: Equatable {
+        let stories: [NewsStory]
+        let less: [NewsLess.Entry]
+        let hidden: [String]
+        let hosts: Set<String>
+        let topics: [String]
+    }
+    @ObservationIgnored private var groupedFrom: GroupingInputs?
+
+    private nonisolated static func textFile(for link: URL) -> URL {
         let hash = SHA256.hash(data: Data(link.absoluteString.utf8)).map { String(format: "%02x", $0) }.joined()
         return textFolder.appending(path: String(hash.prefix(32)) + ".txt")
     }
@@ -510,11 +543,14 @@ final class FeedStore {
     /// plain address where that's enough, without running its scripts.
     func text(of story: NewsStory) async -> String {
         if let kept = keptText(of: story.link), kept.count >= Self.wholeArticle { return kept }
-        if let html = await TodayNews.text(at: story.link) {
-            let text = WebResearcher.articleText(html, limit: 200_000)
-            if text.count >= Self.wholeArticle { return PageReader.withoutFurniture(text) }
-        }
+        if let html = await TodayNews.text(at: story.link), let text = await Self.article(in: html) { return text }
         return await readable(story)?.text ?? keptText(of: story.link) ?? story.summary ?? ""
+    }
+
+    /// Off the main thread: regular expressions over as much as a megabyte of a page.
+    @concurrent private nonisolated static func article(in html: String) async -> String? {
+        let text = WebResearcher.articleText(html, limit: 200_000)
+        return text.count >= wholeArticle ? PageReader.withoutFurniture(text) : nil
     }
 
     /// The article's own share picture, once per story, when its feed's is only a

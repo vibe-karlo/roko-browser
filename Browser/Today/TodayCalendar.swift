@@ -26,14 +26,18 @@ enum TodayCalendar {
 
     /// Asks once; afterwards the answer stands until changed in iOS Settings.
     static func requestAccess() async -> Bool {
-        (try? await store.requestFullAccessToEvents()) ?? false
+        soonest = nil
+        return (try? await store.requestFullAccessToEvents()) ?? false
     }
 
     /// Calendars left out of Today. Kept as the ones left out, so a calendar
     /// added later shows up without a trip here.
     static var hidden: Set<String> {
         get { Set(UserDefaults.standard.stringArray(forKey: "today.hiddenCalendars") ?? []) }
-        set { UserDefaults.standard.set(Array(newValue), forKey: "today.hiddenCalendars") }
+        set {
+            UserDefaults.standard.set(Array(newValue), forKey: "today.hiddenCalendars")
+            soonest = nil
+        }
     }
 
     /// Every calendar with events on this iPhone.
@@ -41,6 +45,25 @@ enum TodayCalendar {
         guard isAllowed else { return [] }
         return store.calendars(for: .event)
     }
+
+    /// `next()` for what asks with every key pressed: read at most once a minute,
+    /// and again as soon as the calendar changes.
+    static func nextSoon() -> TodayEvent? {
+        _ = watchesChanges
+        let now = Date.now
+        if let soonest, now.timeIntervalSince(soonest.readAt) < 60, soonest.event.map({ $0.end > now }) ?? true {
+            return soonest.event
+        }
+        let event = next(now: now)
+        soonest = (event, now)
+        return event
+    }
+
+    private static var soonest: (event: TodayEvent?, readAt: Date)?
+    private static let watchesChanges: Any = NotificationCenter.default.addObserver(
+        forName: .EKEventStoreChanged, object: store, queue: .main) { _ in
+            MainActor.assumeIsolated { soonest = nil }
+        }
 
     /// The next thing on your calendar this week that hasn't ended, all-day
     /// ones only when nothing else is left today.

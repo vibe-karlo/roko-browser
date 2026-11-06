@@ -84,7 +84,10 @@ nonisolated enum YouTube {
         }
         guard let id = renderer["videoId"] as? String else { return nil }
         let length = text("lengthText")
-        let seconds = length.split(separator: ":").reduce(0) { $0 * 60 + (Int($1) ?? 0) }
+        // At most hours, minutes and seconds, each kept small: more would overflow and stop the app.
+        let parts = length.split(separator: ":")
+        guard parts.count <= 3 else { return nil }
+        let seconds = parts.reduce(0) { $0 * 60 + min(Int($1) ?? 0, 100_000) }
         guard (60...45 * 60).contains(seconds) else { return nil }
         let title = text("title")
         guard !title.isEmpty else { return nil }

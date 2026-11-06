@@ -56,7 +56,7 @@ struct FeedView: View {
                     .plainRow(top: 8, bottom: 0)
             } else if store.blocks.isEmpty, store.readItems.isEmpty {
                 Group {
-                    if store.isRefreshing {
+                    if store.isRefreshing || !store.hasBeenLaidOut {
                         StatusLine(text: "Reading what you follow")
                     } else {
                         Text(store.refreshFailed ? "Couldn't reach your sites" : "Nothing new in the last two days")
