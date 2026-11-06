@@ -11,6 +11,7 @@ struct BrowserView: View {
     @State private var barTop: CGFloat = 0
     /// Where the band under the page starts on screen.
     @State private var bandTop: CGFloat = 0
+    @State private var bandHeight: CGFloat = 0
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.fold) private var fold
     @Environment(\.propped) private var propped
@@ -82,10 +83,13 @@ struct BrowserView: View {
                 // two at once (a layout on its way out took its page with it).
                 // Something playing in another tab: the page lifts into a card
                 // and the player sits in the dark band under it (after Lens).
-                // Exploration: the bar lives in the band too, under the live row.
+                // The bar lives in the band too, under the live row.
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
                         pages
+                            // A split's panes are laid out to the space they have, with lists
+                            // that must reach their last row: it stops at the band.
+                            .padding(.bottom, splitHalves != nil && barInBand && showsBand ? bandHeight : 0)
                             .clipShape(RoundedRectangle(cornerRadius: besideFold != nil ? 16 : 0))
                             .padding(.leading, besideFold?.maxX ?? 0)
                             // Propped open, the page ends at the fold.
@@ -122,7 +126,10 @@ struct BrowserView: View {
                                     .offset(y: -BandFloor.lip)
                                     .allowsHitTesting(false)
                                 }
-                                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { bandTop = $0 }
+                                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                                    bandTop = $0.minY
+                                    bandHeight = $0.height
+                                }
                                 .transition(.move(edge: .bottom))
                         }
                     }
@@ -182,7 +189,7 @@ struct BrowserView: View {
                     .transition(.opacity)
                     .accessibilityLabel("Close this page")
                 }
-                // Exploration: on an upright phone's page the bar is in the band.
+                // Under a page, the bar is in the band.
                 if !barInBand { BottomBar() }
             }
                 .animation(.snappy(duration: 0.28), value: browser.isBarCollapsed)
@@ -570,7 +577,7 @@ struct BrowserView: View {
         !browser.liveItems.isEmpty && browser.selectedTab != nil
     }
 
-    /// Exploration: the bar lives in the band under a page: on an upright phone and
+    /// The bar lives in the band under a page: on an upright phone and
     /// on a Duo lying open. Sideways on a phone it has its strip; bent, split or with a
     /// screen beside the page, a Duo keeps the bar on one half, floating.
     private var barInBand: Bool {
@@ -589,7 +596,8 @@ struct BrowserView: View {
     private var coveredFrom: CGFloat { showsBand ? bandTop : .greatestFiniteMagnitude }
 
     /// What's live and the bar, down into the home indicator's strip: on the dark band
-    /// it has room, and keeping clear of all of it left a tall empty gap. With the bar
+    /// it has room, and keeping clear of all of it left a tall empty gap. The capsule stays
+    /// 8 clear of the indicator: closer, it reads as a second pill and crowds the swipe home. With the bar
     /// folded the row is last, and its dots need to clear the indicator.
     private func band(bottomInset: CGFloat) -> some View {
         VStack(spacing: 0) {
@@ -610,7 +618,7 @@ struct BrowserView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .padding(.bottom, max(bottomInset - 25, 9) + (barInBand && browser.isBarCollapsed && !browser.bandShowsStrip ? 13 : 0))
+        .padding(.bottom, max(bottomInset - 20, 9) + (barInBand && browser.isBarCollapsed && !browser.bandShowsStrip ? 8 : 0))
         .frame(maxWidth: .infinity)
         .transition(.move(edge: .bottom))
     }
@@ -620,7 +628,8 @@ struct BrowserView: View {
     private var playerLift: CGFloat {
         let live = showsPlayer ? LiveBand.height(minimized: browser.bandShowsStrip) : 0
         guard barInBand else { return live }
-        return live + (browser.isBarCollapsed ? 0 : Theme.barHeight) - Theme.barHeight - 8
+        // 12 above the band, or 12 above the safe area with no band.
+        return max(live + (browser.isBarCollapsed ? 0 : Theme.barHeight + 5) - Theme.barHeight - 28, -Theme.barHeight - 8)
     }
 
     private var splitHalves: (top: BrowserTab, bottom: BrowserTab?)? {

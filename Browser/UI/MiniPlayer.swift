@@ -355,7 +355,7 @@ private struct TodoRow: View {
 /// Folds the band into its thin strip: the same as pulling it down, which
 /// near the bottom edge iOS can take for Reachability.
 extension EnvironmentValues {
-    /// Exploration: the band has the bar under it, so its rows share the bar's margins.
+    /// The band holds the bar as well, so its rows share the bar's margins.
     @Entry var liveBandOverBar = false
 }
 
@@ -367,14 +367,15 @@ private struct LiveRowMargins: ViewModifier {
     }
 }
 
-/// Over the bar there's none: a chevron down stacked on the bar's chevron up read
-/// as one control arguing with itself, and pulling the row down does the same.
+/// Not with the bar under it: a chevron down stacked on the bar's chevron up reads
+/// as one control arguing with itself. With the bar folded away it's the way to
+/// make the row smaller; pulling it down works either way.
 private struct CollapseButton: View {
     @Environment(BrowserModel.self) private var browser
     @Environment(\.liveBandOverBar) private var overBar
 
     var body: some View {
-        if !overBar { button }
+        if !overBar || browser.isBarCollapsed { button.transition(.opacity) }
     }
 
     private var button: some View {

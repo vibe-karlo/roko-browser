@@ -742,7 +742,7 @@ final class BrowserModel {
     /// Only today's quiet to-dos and not opened: the band stays a thin strip.
     var bandShowsStrip: Bool {
         bandMinimized || (!liveItems.contains(where: \.isLoud) && !todayExpanded)
-            // Exploration: one full-height thing at a time. The row waits as a
+            // One full-height thing at a time. The row waits as a
             // strip while the bar is up and takes its place once it folds away.
             || (barInBand && !isBarCollapsed && !bandOpenedOverBar)
     }
@@ -762,7 +762,7 @@ final class BrowserModel {
         if liveItems.contains(where: \.isLoud) { bandMinimized = true } else { todayExpanded = false }
     }
 
-    /// Exploration: the bar lies in the band, on an upright phone's page.
+    /// The bar lies in the band under the page.
     var barInBand = false
     /// The strip opened by hand with the bar up; the next scroll puts it back.
     var bandOpenedOverBar = false

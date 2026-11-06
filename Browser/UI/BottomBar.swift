@@ -9,7 +9,7 @@ struct BottomBar: View {
     /// top, + in the middle, the page menu at the foot. It has its own strip,
     /// so it stays while you scroll.
     var upright = false
-    /// Exploration: lying in the band under the page, on its colour, with no
+    /// Lying in the band under the page, on its colour, with no
     /// surface of its own. The band folds it away; the card's edge shows loading.
     var docked = false
     /// Where the + capsule is on screen, for the launcher to grow out of.

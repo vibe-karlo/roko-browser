@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Exploration: what the band under the page stands on, a dim shade of the
+/// What the band under the page stands on, a dim shade of the
 /// site's own colour (after Arc's space colour, but the page chooses it), and
 /// a warm graphite for pages with no colour of their own. Always dark, so the bar's
 /// keys read the same on every site.

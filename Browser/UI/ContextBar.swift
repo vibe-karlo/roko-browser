@@ -34,7 +34,7 @@ struct ContextBar: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var capsuleFrame: CGRect = .zero
 
-    /// Exploration: in a band as the page's bar is, on an upright phone. Sideways
+    /// In a band as the page's bar is, on an upright phone. Sideways
     /// and on an open Duo, where these screens are columns, it floats.
     private var docked: Bool { verticalSizeClass != .compact && !browser.uprightFoldOpen }
 
@@ -139,7 +139,7 @@ private struct ScreenBarSurface: ViewModifier {
                         .ignoresSafeArea(edges: .bottom)
                         .allowsHitTesting(false)
                 }
-                .padding(.bottom, -25)
+                .padding(.bottom, -20)
         } else {
             content
                 .barSurface(cornerRadius: Theme.barRadius)
