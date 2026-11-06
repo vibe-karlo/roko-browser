@@ -77,7 +77,8 @@ struct BottomBar: View {
                                     .minimumScaleFactor(0.8)
                                 Spacer(minLength: 0)
                             }
-                            .foregroundStyle(Theme.secondaryInk)
+                            // On the band's capsule the grey fell to about 3:1; this is the bar's main label.
+                            .foregroundStyle(docked ? Color.white.opacity(0.72) : Theme.secondaryInk)
                             .padding(.horizontal, 14)
                             .transition(.opacity)
                         } else if isPrivate && upright {
