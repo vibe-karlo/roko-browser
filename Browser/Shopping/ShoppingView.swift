@@ -121,7 +121,7 @@ struct ShoppingView: View {
             }
         }
         .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas) }
-        .background(Theme.canvas.ignoresSafeArea())
+        .background { PageLight() }
         .foregroundStyle(Theme.ink)
         .onAppear { Shopping.tidy(in: context) }
         .onDisappear { stopListening() }

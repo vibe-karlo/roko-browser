@@ -1,5 +1,37 @@
 import SwiftUI
 
+/// A full page's background, as on the website: the canvas with its wash along the
+/// bottom. Quiet, because this page gets read: the full light is for work under way,
+/// with nothing to read over it. Still, so it does no work; `rise` lifts it.
+struct PageLight: View {
+    var rise = 0.0
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        ZStack {
+            Theme.canvas
+            WorkingGlow(progress: rise, isActive: true, breathes: false, strength: scheme == .dark ? 0.7 : 0.58)
+        }
+        .ignoresSafeArea()
+    }
+}
+
+/// How far a page's light has risen, held apart from the page: when it changes,
+/// only the light redraws and not everything on the page.
+@Observable
+final class PageRise {
+    var level = 0.0
+}
+
+/// A `PageLight` that follows a `PageRise`.
+struct RisingPageLight: View {
+    let rise: PageRise
+
+    var body: some View {
+        PageLight(rise: rise.level)
+    }
+}
+
 /// roko's light, while Browse for Me or a summary works: one light from start to
 /// finish. It rises from the bottom edge as pages are read (`progress`, 0 to 1) and
 /// breathes slowly while it waits, so the wait has something to watch. When the
@@ -71,7 +103,7 @@ final class LightView: UIView {
     /// How long the crest takes to cross; the fade finishes after it's gone.
     private static let crossing: TimeInterval = 0.85
     /// From a low dawn to most of the screen, as a share of its height.
-    private static let lowest = 0.25, highest = 0.85
+    private static let lowest = 0.55, highest = 1.25
     /// Where on the dome its edge seems to be, as a share of the dome's height:
     /// the crest catches there, and stays there as both carry on up.
     private static let edge = 0.62
@@ -97,9 +129,10 @@ final class LightView: UIView {
     init() {
         super.init(frame: .zero)
         isUserInteractionEnabled = false
-        layer.addSublayer(grain)
         layer.addSublayer(risen)
         layer.addSublayer(crest)
+        // Over the light, as on the website: a film you can see in its colour.
+        layer.addSublayer(grain)
         risen.addSublayer(breath)
         breath.addSublayer(dome)
         for sublayer in [risen, breath, dome, crest] {
@@ -107,6 +140,8 @@ final class LightView: UIView {
         }
         crest.anchorPoint = CGPoint(x: 0.5, y: Self.lipAt)
         for sublayer in [grain, risen, crest] { sublayer.opacity = 0 }
+        // Nothing in these overlaps itself, so fading them needs no off-screen pass.
+        for sublayer in [grain, grainRows, grainColumns, risen, breath] { sublayer.allowsGroupOpacity = false }
         grain.addSublayer(grainRows)
         grainRows.addSublayer(grainColumns)
         grainColumns.addSublayer(grainTile)
@@ -210,7 +245,7 @@ final class LightView: UIView {
             dome.removeAllAnimations()
             dome.bounds.size = CGSize(width: bounds.width * 1.9, height: domeHeight(level))
             dome.position.x = bounds.width * across
-            dome.opacity = Float(0.8 + 0.2 * level)
+            dome.opacity = Float(0.95 + 0.05 * level)
             crest.opacity = 0
         }
         guard wanted?.still != true else {
@@ -247,13 +282,13 @@ final class LightView: UIView {
     /// Progress arrives in steps (a page read, then another). Each step is added on
     /// top of those still under way, so they blend into one continuous rise.
     private func climb(to target: Double) {
-        let was = (from: domeHeight(level), opacity: 0.8 + 0.2 * level)
+        let was = (from: domeHeight(level), opacity: 0.95 + 0.05 * level)
         level = target
         guard wanted?.still != true else {
             setNeedsLayout()
             return
         }
-        let height = domeHeight(target), opacity = 0.8 + 0.2 * target
+        let height = domeHeight(target), opacity = 0.95 + 0.05 * target
         quietly {
             dome.bounds.size.height = height
             dome.opacity = Float(opacity)
@@ -406,33 +441,39 @@ private nonisolated struct LightPictures: @unchecked Sendable {
     let dome: CGImage?, crest: CGImage?
 
     private typealias RGBA = SIMD4<Float>
-    /// The warm end of the light's falloff on the light canvas.
-    private static let amber = RGBA(0.96, 0.65, 0.14, 1)
+    /// The warm end of the crest's falloff on the light canvas.
+    private static let sand = RGBA(0.94, 0.70, 0.37, 1)
+    /// The website's light, from its rim to its heart. Over the near-black canvas:
+    /// plum deepening to red-orange.
+    private static let night = ramp([(0, 0x0F0F0E), (0.14, 0x1E0F14), (0.34, 0x3E1419), (0.58, 0x6C1E1A), (0.8, 0x922C1E), (1, 0xAC3620)])
+    /// The same light by day: warm paper deepening to the same red-orange.
+    private static let day = ramp([(0, 0xE8E5E0), (0.14, 0xE7D3C2), (0.34, 0xDFA582), (0.58, 0xD0734F), (0.8, 0xBE4E30), (1, 0xAC3620)])
+
+    private static func ramp(_ stops: [(Float, UInt32)]) -> [(at: Float, color: RGBA)] {
+        stops.map { stop in
+            (stop.0, RGBA(Float((stop.1 >> 16) & 0xFF) / 255, Float((stop.1 >> 8) & 0xFF) / 255, Float(stop.1 & 0xFF) / 255, 1))
+        }
+    }
 
     init(accent: SIMD4<Float>, warms: Bool) {
-        dome = Self.dome(accent, warms: warms)
+        dome = Self.dome(warms ? Self.day : Self.night)
         crest = Self.crest(accent, warms: warms)
     }
 
-    /// The top half of an ellipse centred on the bottom edge, as light coming from
-    /// below the screen rather than a blob on it. Over the light canvas the accent's
-    /// faint tail reads as pink, so there it warms toward amber as it falls off.
-    /// Strong at the edge it rises from: at half strength over the near-black canvas,
-    /// orange reads as rust, not light.
-    private static func dome(_ accent: RGBA, warms: Bool) -> CGImage? {
-        let stops: [(at: Float, strength: Float, warmth: Float)] = [
-            (0, 0.85, 0), (0.16, 0.6, 0.25), (0.34, 0.38, 0.5), (0.52, 0.2, 0.65), (0.72, 0.08, 0.8), (1, 0, 0.8),
-        ]
-        return draw(width: 256, height: 128) { x, y in
-            let across = (x - 0.5) * 2, up = 1 - y
-            let distance = (across * across + up * up).squareRoot()
-            guard distance < 1 else { return .zero }
-            let next = stops.firstIndex { $0.at >= distance } ?? stops.count - 1
-            let a = stops[max(next - 1, 0)], b = stops[next]
-            let share = b.at > a.at ? (distance - a.at) / (b.at - a.at) : 0
-            let warmth = warms ? a.warmth + (b.warmth - a.warmth) * share : 0
-            let shade = accent + (amber - accent) * warmth
-            return premultiplied(shade, a.strength + (b.strength - a.strength) * share)
+    /// The website's wash: nothing at the top of its picture, deepening down to
+    /// its heart at the lower left, across the whole width of the screen.
+    private static func dome(_ ramp: [(at: Float, color: RGBA)]) -> CGImage? {
+        draw(width: 128, height: 64) { x, y in
+            // The layer is wider than the screen: this is where on the screen x falls.
+            let onScreen = (x - 0.5) * 1.9 + 0.5
+            let along = max((y * 0.82 + (1 - onScreen) * 0.3) / 1.14, 0)
+            // Eases into its brightest colour instead of stopping there, which would draw a crease.
+            let heat = min(0.98 * (1 - exp(-3.2 * pow(along, 4))), 1)
+            let next = ramp.firstIndex { $0.at >= heat } ?? ramp.count - 1
+            let a = ramp[max(next - 1, 0)], b = ramp[next]
+            let share = b.at > a.at ? (heat - a.at) / (b.at - a.at) : 0
+            let fade = min(heat / 0.08, 1)
+            return premultiplied(a.color + (b.color - a.color) * share, fade * fade * (3 - 2 * fade))
         }
     }
 
@@ -441,8 +482,8 @@ private nonisolated struct LightPictures: @unchecked Sendable {
     /// Warm white over the near-black canvas; over the light canvas white would read
     /// as a hole, so there it's the accent warmed.
     private static func crest(_ accent: RGBA, warms: Bool) -> CGImage? {
-        let lip = warms ? accent + (amber - accent) * 0.3 : accent + (RGBA(1, 0.93, 0.82, 1) - accent) * 0.6
-        let tail = warms ? accent + (amber - accent) * 0.75 : accent
+        let lip = warms ? accent + (sand - accent) * 0.3 : accent + (RGBA(1, 0.93, 0.82, 1) - accent) * 0.6
+        let tail = warms ? accent + (sand - accent) * 0.75 : accent
         return draw(width: 256, height: 144) { x, y in
             let swell = sin(x * 3.1 + 0.7) * 0.016 + sin(x * 9.1 + 2.1) * 0.005
             let depth = (y - 0.1) * 0.56 - swell
@@ -497,8 +538,8 @@ nonisolated enum Grain {
             for column in 0..<side {
                 let speck = specks[(rows[row] + columns[column]) % side]
                 let index = (row * side + column) * 2
-                pixels[index] = speck > 0 ? UInt8(speck) : 0
-                pixels[index + 1] = UInt8(abs(speck))
+                pixels[index] = speck > 0 ? UInt8(speck) * 3 : 0
+                pixels[index + 1] = UInt8(abs(speck)) * 3
             }
         }
         guard let provider = CGDataProvider(data: Data(pixels) as CFData),
@@ -507,6 +548,6 @@ nonisolated enum Grain {
                                     bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
                                     provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
         else { return nil }
-        return UIImage(cgImage: cgImage, scale: 3, orientation: .up)
+        return UIImage(cgImage: cgImage, scale: 2, orientation: .up)
     }()
 }

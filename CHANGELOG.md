@@ -12,6 +12,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Links work in Reader, written-out addresses and linked words alike, in newsletters and articles. They open in a tab.
 - Words to keep out of News, whichever site a story is from. Topics also look across the web through Bing.
 
+### Changed
+- roko wears the website's colours: a warm near-black and off-white, warm greys, and one red-orange. Its light is the website's wash with visible grain, full width and brightest at the lower left, in light and dark. It sits quietly behind Today, To-do, Shopping and Read Later, and on Today it rises as you read down.
+
 ### Fixed
 - Stories from feeds that give two dates, The Guardian's among them, had no date.
 - In Croatian, Serbian and Bosnian, comparisons and Summary now use the sites' own sentences, picked by the model, rather than an English translation or a rewrite, which had turned "arrested" into "killed". The credit line says so.

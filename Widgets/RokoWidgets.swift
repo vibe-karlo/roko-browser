@@ -22,12 +22,12 @@ struct RokoWidgets: WidgetBundle {
 /// opens roko's bar on it, "Add an hour" writes the next text.
 struct ParkingLiveActivity: Widget {
     /// roko's orange, as in the app (Theme.accent, dark).
-    private static let orange = Color(red: 1, green: 0x5B / 255, blue: 0x1F / 255)
+    private static let orange = Color(red: 0xC9 / 255, green: 0x4A / 255, blue: 0x2E / 255)
 
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: ParkingActivityAttributes.self) { context in
             LockScreen(context: context, orange: Self.orange)
-                .activityBackgroundTint(Color(red: 0x1A / 255, green: 0x1A / 255, blue: 0x1B / 255))
+                .activityBackgroundTint(Color(red: 0x18 / 255, green: 0x17 / 255, blue: 0x16 / 255))
                 .activitySystemActionForegroundColor(.white)
                 .widgetURL(URL(string: "roko://parking"))
         } dynamicIsland: { context in
@@ -157,7 +157,7 @@ struct CookTimerLiveActivity: Widget {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
-            .activityBackgroundTint(Color(red: 0x1A / 255, green: 0x1A / 255, blue: 0x1B / 255))
+            .activityBackgroundTint(Color(red: 0x18 / 255, green: 0x17 / 255, blue: 0x16 / 255))
             .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {

@@ -1,31 +1,30 @@
 import SwiftUI
 import UIKit
 
-/// One palette, from the roko mark ("Warp star, graphite"): neutral graphite
-/// greys with no blue in them, and one signal orange kept for the few things
-/// that must jump out (loading, private mode on, switches, links).
+/// One palette, the website's: a warm near-black and a warm off-white, greys with
+/// no blue in them, and one red-orange kept for the few things that must jump out
+/// (loading, private mode on, switches, links).
 enum Theme {
-    static let canvas = Color(light: 0xE6E6E3, dark: 0x0E0E0F)
-    static let panel = Color(light: 0xF4F4F2, dark: 0x1A1A1B)
-    static let raised = Color(light: 0xFCFCFB, dark: 0x252527)
-    static let ink = Color(light: 0x0E0E0F, dark: 0xE7E7E4)
-    static let secondaryInk = Color(light: 0x5C5C59, dark: 0x8C8C88)
+    static let canvas = Color(light: 0xE8E5E0, dark: 0x0F0F0E)
+    static let panel = Color(light: 0xF5F3EF, dark: 0x181716)
+    static let raised = Color(light: 0xFCFBF9, dark: 0x262523)
+    static let ink = Color(light: 0x0F0F0E, dark: 0xF4F1EB)
+    static let secondaryInk = Color(light: 0x5E5A53, dark: 0xADA89F)
     /// Text read at length (summaries, answers): a step brighter than
     /// secondaryInk, which made long answers a grey wall, and a step under
     /// ink, so the bold terms and numbers in it still stand out.
-    static let bodyInk = Color(light: 0x34342F, dark: 0xB8B8B3)
+    static let bodyInk = Color(light: 0x35322D, dark: 0xBDB8AF)
     // Quiet but still readable: about 4:1 against the panel in both modes.
-    static let faintInk = Color(light: 0x737370, dark: 0x7E7E7A)
-    /// The mark's orange. In light mode a shade deeper, so it holds on white.
-    static let accent = Color(light: 0xE84A10, dark: 0xFF5B1F)
-    /// The mark's orange for words: thin strokes of it read redder than a
-    /// filled shape does, so text gets a step lighter on dark and a warmer
-    /// step on light, and still reads as the same orange as the switches.
-    static let accentText = Color(light: 0xD4570C, dark: 0xFF7A38)
+    static let faintInk = Color(light: 0x75716A, dark: 0x9C978E)
+    /// The one signal colour, the same as the website's: it holds on both canvases.
+    static let accent = Color(light: 0xC94A2E, dark: 0xC94A2E)
+    /// The signal colour for words: thin strokes of it need a step further from
+    /// the canvas to stay readable, darker on light and lighter on dark.
+    static let accentText = Color(light: 0xB8401F, dark: 0xE8765A)
     /// The highlighted row: a neutral lift, not orange, so the accent stays rare.
-    static let selection = Color(light: 0x0E0E0F, dark: 0xE7E7E4).opacity(0.08)
+    static let selection = Color(light: 0x0F0F0E, dark: 0xF4F1EB).opacity(0.08)
     /// The panel's own colour at low opacity: an edge you sense rather than see.
-    static let edge = Color(light: 0x0E0E0F, dark: 0xE7E7E4).opacity(0.08)
+    static let edge = Color(light: 0x0F0F0E, dark: 0xF4F1EB).opacity(0.08)
 
     static let barHeight: CGFloat = 52
     /// The bar is a capsule: its 38-point controls sit 11 points in, so their

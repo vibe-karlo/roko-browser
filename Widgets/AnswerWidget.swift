@@ -83,8 +83,8 @@ private struct AnswerBackground: View {
     @Environment(\.colorScheme) private var scheme
     var body: some View {
         // Theme.panel, light and dark.
-        scheme == .dark ? Color(red: 0x1A / 255, green: 0x1A / 255, blue: 0x1B / 255)
-                        : Color(red: 0xF4 / 255, green: 0xF4 / 255, blue: 0xF2 / 255)
+        scheme == .dark ? Color(red: 0x18 / 255, green: 0x17 / 255, blue: 0x16 / 255)
+                        : Color(red: 0xF5 / 255, green: 0xF3 / 255, blue: 0xEF / 255)
     }
 }
 

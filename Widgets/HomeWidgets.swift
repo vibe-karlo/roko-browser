@@ -13,11 +13,11 @@ nonisolated private extension Color {
         })
     }
 
-    static let panel = Color(light: 0xF4F4F2, dark: 0x1A1A1B)
-    static let ink = Color(light: 0x0E0E0F, dark: 0xE7E7E4)
-    static let secondaryInk = Color(light: 0x5C5C59, dark: 0x8C8C88)
-    static let accent = Color(light: 0xE84A10, dark: 0xFF5B1F)
-    static let accentText = Color(light: 0xD4570C, dark: 0xFF7A38)
+    static let panel = Color(light: 0xF5F3EF, dark: 0x181716)
+    static let ink = Color(light: 0x0F0F0E, dark: 0xF4F1EB)
+    static let secondaryInk = Color(light: 0x5E5A53, dark: 0xADA89F)
+    static let accent = Color(light: 0xC94A2E, dark: 0xC94A2E)
+    static let accentText = Color(light: 0xB8401F, dark: 0xE8765A)
 }
 
 // MARK: Timeline

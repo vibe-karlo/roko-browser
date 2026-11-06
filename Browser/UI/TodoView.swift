@@ -81,7 +81,7 @@ struct TodoView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { bar }
         .overlay(alignment: .top) { StatusBarFade(color: Theme.canvas) }
-        .background(Theme.canvas.ignoresSafeArea())
+        .background { PageLight() }
         .foregroundStyle(Theme.ink)
         .onAppear { DailyReminders.askIfNeeded() }
         .sheet(isPresented: $pickingDate) {

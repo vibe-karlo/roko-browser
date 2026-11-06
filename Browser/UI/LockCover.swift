@@ -31,7 +31,7 @@ struct LockCover: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, 32)
-        .background(Theme.canvas)
+        .background { PageLight() }
         .task(id: scenePhase) {
             // Face ID won't show while roko is still coming to the front.
             guard scenePhase == .active else { return }
