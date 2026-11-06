@@ -16,6 +16,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Saved's bar now searches the list, since it holds what you keep as well as what you mean to read. Summarize all moved to the button on its right, and shows while there's something unread.
 
 ### Fixed
+- Notify Me could announce old text as news on a page that writes its text with scripts and then moves itself on: it read the page mid-move, and the next reading differed. It now waits for the page to settle.
 - Reader could leave out whole sections of an article, or start it halfway through, without saying so: on Ars Technica, and on bbc.co.uk. It now keeps the whole story when a page's sections are wrapped separately, and so does Copy as Markdown. BBC articles also lose the "Image source" and "Image caption" labels written for screen readers.
 - A BBC story could open as the web page, with "Couldn't read this article here" in Reader, or read with parts of it missing. Outside the UK, bbc.co.uk moves itself to bbc.com about a second after loading, just when Reader went to read it. Reader now waits for the page it ends up on, and keeps trying while a slow page is still coming.
 - Sideways, To-do's list ended in a fade with hard edges, and its last row showed under the bar.

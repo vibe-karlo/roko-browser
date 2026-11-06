@@ -277,7 +277,15 @@ enum RenderedPage {
             return nil
         }
         // Loaded is not written: give its scripts a moment to fill it in.
-        try? await Task.sleep(for: .seconds(2))
+        // A page that moves itself on starts over: read halfway, or as the page it
+        // left, its next reading would differ and be announced as news.
+        let giveUp = Date.now.addingTimeInterval(15)
+        var still = Date.now
+        while Date.now < giveUp, Date.now.timeIntervalSince(still) < 2 {
+            let parsing = try? await webView.evaluateJavaScript("document.readyState") as? String == "loading"
+            if (webView.isLoading && loader.isMoving) || parsing == true { still = .now }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
         guard let html = try? await webView.evaluateJavaScript("document.documentElement.outerHTML") as? String else { return nil }
         return await PageLines.parse(html)
     }
