@@ -98,6 +98,10 @@ enum WebViewFactory {
     }
 }
 
+extension WKWebView {
+    var isPreloading: Bool { (self as? EdgeToEdgeWebView)?.preloading == true }
+}
+
 /// Pages run all the way to the bottom edge, as in Safari's full-screen mode.
 /// Left alone, the web view keeps a scroll gap the height of the home indicator
 /// below every page, painted in the page background: a light strip under a
@@ -106,6 +110,10 @@ final class EdgeToEdgeWebView: WKWebView {
     /// An open iPhone Duo in landscape: pages run under the clock's strip too,
     /// and showing or hiding the clock never changes their width.
     static var fillsSides = false
+
+    /// The launcher's top hit, loading behind everything before Go. In the window
+    /// but not to be seen, so it asks nothing of anyone and saves nothing.
+    var preloading = false
 
     override var safeAreaInsets: UIEdgeInsets {
         var insets = super.safeAreaInsets

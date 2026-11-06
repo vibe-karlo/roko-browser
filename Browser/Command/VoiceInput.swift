@@ -23,7 +23,7 @@ final class VoiceInput {
     private(set) var lastVoiceAt: Date?
     private(set) var startedAt = Date.now
 
-    private let engine = AVAudioEngine()
+    private var engine = AVAudioEngine()
     private struct Ear {
         let locale: Locale
         let recognizer: SFSpeechRecognizer
@@ -113,8 +113,17 @@ final class VoiceInput {
         }
         guard !ears.isEmpty else { throw URLError(.cannotConnectToHost) }
 
+        // A new one each time: an engine kept from before AirPods connected, say,
+        // still has the old format, and a tap in the wrong one stops the app.
+        engine = AVAudioEngine()
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
+        // No microphone to speak of: the same, and Swift couldn't catch it.
+        guard format.sampleRate > 0, format.channelCount > 0 else {
+            ears = []
+            try? session.setActive(false, options: .notifyOthersOnDeactivation)
+            throw URLError(.cannotConnectToHost)
+        }
         // The microphone's and the recognizers' callbacks come on their own
         // queues: made outside the main actor (Self.tap, Self.listener), so
         // Swift doesn't stop the app when they arrive there.

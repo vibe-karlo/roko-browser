@@ -26,7 +26,7 @@ enum PageDialogs {
                     buttons: [(String, UIAlertAction.Style)], field: String? = nil) async -> (index: Int, text: String?)? {
         // Nothing on screen to show it over, or something already being shown
         // or taken away: answered as if dismissed, so the page doesn't wait forever.
-        guard webView.window != nil, let top, !top.isBeingDismissed, !top.isBeingPresented,
+        guard webView.window != nil, !webView.isPreloading, let top, !top.isBeingDismissed, !top.isBeingPresented,
               !(top is UIAlertController) else { return nil }
         return await withCheckedContinuation { continuation in
             let alert = PageAlert(title: title, message: message, preferredStyle: .alert)
@@ -48,7 +48,7 @@ enum PageDialogs {
     /// loads, as routers and some work tools do: a name and a password, or nil.
     static func signIn(_ webView: WKWebView, host: String, secure: Bool,
                        name: String?) async -> (name: String, password: String)? {
-        guard webView.window != nil, let top, !top.isBeingDismissed, !top.isBeingPresented,
+        guard webView.window != nil, !webView.isPreloading, let top, !top.isBeingDismissed, !top.isBeingPresented,
               !(top is UIAlertController) else { return nil }
         let site = URL(string: "https://\(host)")?.displayHost ?? host
         let message = secure
@@ -196,7 +196,10 @@ extension BrowserTab {
         let attachment = http?.value(forHTTPHeaderField: "Content-Disposition")?.lowercased().hasPrefix("attachment") ?? false
         // What WebKit can't show (a pass, a calendar file, a zip), or what the
         // site says is to be saved: a file, not a page.
-        return navigationResponse.isForMainFrame && (attachment || !navigationResponse.canShowMIMEType) ? .download : .allow
+        let isFile = navigationResponse.isForMainFrame && (attachment || !navigationResponse.canShowMIMEType)
+        // Only guessed at while typing: it's fetched if Go is pressed.
+        if isFile, webView.isPreloading { return .cancel }
+        return isFile ? .download : .allow
     }
 
     /// Every file goes to Downloads, which keeps it going and lists it.
