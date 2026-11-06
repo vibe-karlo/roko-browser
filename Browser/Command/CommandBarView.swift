@@ -333,12 +333,6 @@ struct CommandBarView: View {
                     if item.id == "action-todos" && !dueTodos.isEmpty { todoWidget }
                 }
             }
-            // The rest of the list closes the bar, as the page behind it does: the rows
-            // cover that page, and only the thin margins beside them used to answer.
-            .contentShape(.rect)
-            .frame(minHeight: listHeight, alignment: .top)
-            .contentShape(.rect)
-            .onTapGesture { dismiss() }
             .scrollTargetLayout()
             .padding(.horizontal, Self.inset - 4)
         }
@@ -357,6 +351,10 @@ struct CommandBarView: View {
             }
         }
         .frame(maxHeight: .infinity)
+        // The rest of the list closes the bar, as the page behind it does: the rows
+        // cover that page, and only the thin margins beside them used to answer.
+        .contentShape(.rect)
+        .onTapGesture { dismiss() }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
         // Pulled down past its top by a finger, the list closes the bar, as a sheet
         // would. Only by a finger: while the list lays itself out it can pass
@@ -376,6 +374,15 @@ struct CommandBarView: View {
             geometry.contentOffset.y < -geometry.contentInsets.top - 60
         } action: { _, pulled in
             if pulled, listDragged { dismiss() }
+        }
+        // The keyboard rising shrinks the list under its rows, which left the top row half
+        // behind the field. Not scrolled by anyone: its top row goes back to the slot.
+        .onChange(of: listHeight) {
+            guard !listMoving, !previewing, selection == 0, let top = items.first?.id else { return }
+            if topRow != top { resetTarget = top }
+            var still = Transaction()
+            still.disablesAnimations = true
+            withTransaction(still) { proxy.scrollTo(top, anchor: .top) }
         }
         .onChange(of: scrollRequest) { _, target in
             guard let target else { return }
