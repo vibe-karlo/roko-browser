@@ -593,6 +593,11 @@ final class BrowserModel {
     var showsOnboarding = !UserDefaults.standard.bool(forKey: Onboarding.doneKey)
         || ProcessInfo.processInfo.arguments.contains("-onboarding")
 
+    /// The first minute's few words over the real browser (FirstMinuteGuide).
+    var guiding = false
+    /// Typing something of their own in the launcher: the guide steps aside for its results.
+    var guideStepsAside = false
+
     /// Done or skipped: straight into the bar, ready to type.
     func finishOnboarding() {
         showsOnboarding = false

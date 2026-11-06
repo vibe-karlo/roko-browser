@@ -146,9 +146,7 @@ struct BrowserView: View {
                 // On a Duo, open or shut, the clock runs down the side: the page keeps clear of it.
                 .ignoresSafeArea(edges: sideways || clockBeside ? [] : .horizontal)
             } else {
-                StartView()
-                    // The bar floats over the page; the start page keeps clear of it.
-                    .safeAreaPadding(.bottom, Theme.barHeight + 4)
+                StartView(docked: uprightFold == nil)
             }
         }
         // Floating over the page rather than inset below it, as in Safari: the
@@ -175,7 +173,15 @@ struct BrowserView: View {
                     .accessibilityLabel("Close this page")
                 }
                 // Under a page, the bar is in the band.
-                if !barInBand { BottomBar() }
+                if browser.selectedTab == nil, uprightFold == nil {
+                    // With nothing open, in the band the start page draws, as under a page.
+                    BottomBar(docked: true)
+                        .frame(maxWidth: verticalSizeClass == .compact ? 480 : nil)
+                        .environment(\.colorScheme, .dark)
+                        .padding(.bottom, verticalSizeClass == .compact ? -12 : -20)
+                } else if !barInBand {
+                    BottomBar()
+                }
             }
                 .animation(.snappy(duration: 0.28), value: browser.isBarCollapsed)
                 // On an open Duo the normal bar, at a bar's width, not stretched
@@ -1470,6 +1476,12 @@ private struct WelcomeCover: ViewModifier {
             .overlay {
                 if browser.showsOnboarding {
                     Onboarding()
+                        .transition(.opacity)
+                }
+            }
+            .overlay {
+                if browser.guiding, !browser.showsOnboarding {
+                    FirstMinuteGuide()
                         .transition(.opacity)
                 }
             }

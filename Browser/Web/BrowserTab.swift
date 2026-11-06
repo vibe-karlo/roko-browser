@@ -81,6 +81,8 @@ final class BrowserTab: NSObject, Identifiable {
     @ObservationIgnored fileprivate var reloads: [(url: URL, at: Date)] = []
     /// When the current page was asked for, for the -perf load timings.
     @ObservationIgnored fileprivate var navigationStarted: CFTimeInterval?
+    /// When the last page started arriving; 0 if none has.
+    @ObservationIgnored private(set) var committedAt: CFTimeInterval = 0
     /// Sound or video playing on the page, or paused there (PageWatch).
     var media: Media? {
         didSet { if media?.playing == true { playerDismissed = false } }
@@ -678,6 +680,7 @@ extension BrowserTab: WKNavigationDelegate, WKUIDelegate {
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        committedAt = CACurrentMediaTime()
         LaunchClock.mark("commit \(webView.url?.host() ?? "-")")
         perf("commit", webView.url)
         media = nil

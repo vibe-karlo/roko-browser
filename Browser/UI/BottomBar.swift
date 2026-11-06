@@ -192,6 +192,8 @@ struct BottomBar: View {
             }
             .buttonStyle(GlyphButtonStyle())
             .disabled(browser.selectedTab == nil)
+            // No page, no page menu: in the band it would be a dead key.
+            .opacity(docked && browser.selectedTab == nil ? 0 : 1)
             .accessibilityLabel("Page menu")
         }
         .frame(height: docked ? Theme.barHeight : Theme.barHeight + 8)
@@ -275,7 +277,8 @@ struct BottomBar: View {
     /// The tab on screen, when it was opened from Saved.
     private var fromSaved: BrowserTab? { browser.selectedTab.flatMap { $0.savedPlace == nil ? nil : $0 } }
 
-    private var launchField: Bool { browser.showsLaunchField && browser.selectedTab != nil }
+    /// With nothing open, the bar is only for this: it's a search field, always.
+    private var launchField: Bool { browser.selectedTab == nil ? docked : browser.showsLaunchField }
 
     /// The site the page on screen is from, in the capsule once it's no longer the search field.
     private var site: String? {

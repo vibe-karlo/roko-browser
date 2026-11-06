@@ -16,6 +16,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Saved's bar now searches the list, since it holds what you keep as well as what you mean to read. Summarize all moved to the button on its right, and shows while there's something unread.
 
 ### Changed
+- A new welcome, in place of seven pages. A short case from the real test: ten browsers racing to draw a page in true time, then the same list sorted for ads and pop-ups. Then the real browser, with a few words over it: tries typed into the real bar, a page that says if it loaded before you tapped Go, a page that shows you the pull to summarize, a receipt of what your first minute really came to, and a way into To-do, Saved, News and Today.
+- With no tab open, the bar sits in its band under a rounded card like every page, as a search field, with Today, News, Saved and To-do within reach of your thumb.
 - roko wears the website's colours: a warm near-black and off-white, warm greys, and one red-orange. Its light is the website's wash with visible grain, full width and brightest at the lower left, in light and dark. It sits quietly behind Today, To-do, Shopping and Read Later, and on Today it rises as you read down.
 
 ### Fixed

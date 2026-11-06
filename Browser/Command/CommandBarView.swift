@@ -181,7 +181,12 @@ struct CommandBarView: View {
         }
         // Offered once: closed without pasting it, it isn't offered again.
         .onDisappear { if hasCopiedLink { CopiedLink.took() } }
+        // The first minute's guide, trying something for you: it types here.
+        .onChange(of: browser.commandPrefill) { _, typed in
+            if browser.guiding, browser.panel == .command { query = typed }
+        }
         .onChange(of: query) {
+            if browser.guiding { browser.guideStepsAside = !query.isEmpty && query != browser.commandPrefill }
             selection = 0
             rebuild()
             // Typing starts the list over at its best match.

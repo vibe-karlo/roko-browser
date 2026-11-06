@@ -1,726 +1,821 @@
 import SwiftUI
 
-/// The first time roko opens: seven short pages, each with a small live
-/// version of the thing it's about, playing by itself, and at most one
-/// choice to make there and then. roko's light rises as it wakes, follows
-/// you from page to page, and carries off the top as you start browsing.
+/// The first time roko opens: why it's here, in numbers, then the browser itself.
+/// The eclipse closes in roko's light and steps aside for one list of ten browsers,
+/// racing in true time, from the test that's on the website; Continue sorts the same
+/// list again for what each one left on the page. Then the light carries off the top
+/// with the real launcher and its keyboard under it, and FirstMinuteGuide takes over.
 /// Settings → About → Show the Welcome Again brings it back.
 struct Onboarding: View {
     @Environment(BrowserModel.self) private var browser
-    @State private var page = 0
-    @State private var forward = true
-    /// Start browsing: the light carries off the top, and roko opens in its wake.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Namespace private var markSpace
+
+    private enum Stage: Int { case wake, speed, clean }
+
+    /// Closing as it appears: from a little past the icon's place, into it.
+    @State private var eclipse = 0.12
+    @State private var stage = Stage.wake
     @State private var flaring = false
+    /// The race has started: every bar runs for as long as that browser took.
+    @State private var racing = false
+    /// True, or not there: reopening the welcome from Settings isn't a launch.
+    @State private var opened: String?
+    @State private var running: Task<Void, Never>?
 
     static let doneKey = "onboarding.done"
+    /// For the first minute's receipt: true, or not on it.
+    fileprivate static var openedIn: String?
 
-    private let count = 7
+    /// docs/real-site-test-2026-11-05.md, as on the website's scoreboard (Site/site.js).
+    private struct Run: Identifiable {
+        let name: String
+        let seconds: Double
+        let cleanSites: Int
+        var id: String { name }
+    }
+
+    private static let runs = [
+        Run(name: "roko", seconds: 1.07, cleanSites: 6), Run(name: "Quiche", seconds: 1.70, cleanSites: 2),
+        Run(name: "Lens", seconds: 2.76, cleanSites: 3), Run(name: "Arc Search", seconds: 3.41, cleanSites: 2),
+        Run(name: "Firefox", seconds: 3.47, cleanSites: 1), Run(name: "Brave", seconds: 3.54, cleanSites: 3),
+        Run(name: "DuckDuckGo", seconds: 4.33, cleanSites: 3), Run(name: "Chrome", seconds: 4.96, cleanSites: 0),
+        Run(name: "Safari", seconds: 4.96, cleanSites: 0), Run(name: "Edge", seconds: 5.46, cleanSites: 0),
+    ]
+    private static let slowest = 5.46
+
+    /// Sideways there's room for the leaders alone. The headline still says how many.
+    private var shown: Int { verticalSizeClass == .compact ? 4 : Self.runs.count }
+    private var rowHeight: CGFloat { verticalSizeClass == .compact ? 32 : 40 }
+
+    private var order: [Run] {
+        let sorted = stage == .clean
+            ? Self.runs.enumerated().sorted { ($0.element.cleanSites, -$0.offset) > ($1.element.cleanSites, -$1.offset) }.map(\.element)
+            : Self.runs
+        return sorted
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            top
-            ZStack {
-                switch page {
-                case 0: Welcome()
-                case 1: OneBar()
-                case 2: Todos()
-                case 3: Splits()
-                case 4: CleanPages()
-                case 5: Summaries()
-                default: Private()
-                }
+        ZStack {
+            if stage == .wake {
+                Eclipse(shift: reduceMotion ? 0.62 : eclipse)
+                    .fill(Theme.ink, style: FillStyle(eoFill: true))
+                    .matchedGeometryEffect(id: "mark", in: markSpace)
+                    .frame(width: 104, height: 104)
+                    .accessibilityLabel("roko")
+            } else {
+                content
+                    .transition(.opacity)
             }
-            .id(page)
-            .transition(.asymmetric(insertion: .move(edge: forward ? .trailing : .leading),
-                                    removal: .move(edge: forward ? .leading : .trailing))
-                .combined(with: .opacity))
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .contentShape(.rect)
-            .gesture(DragGesture(minimumDistance: 30).onEnded { value in
-                guard abs(value.translation.width) > abs(value.translation.height) else { return }
-                if value.translation.width < -60 { next() } else if value.translation.width > 60 { back() }
-            })
-
-            Button(action: next) {
-                Text(page == 0 ? "Get started" : page == count - 1 ? "Start browsing" : "Continue")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.black)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 54)
-                    .background(.white, in: .rect(cornerRadius: 16))
-                    .contentShape(.rect)
-            }
-            .buttonStyle(RowButtonStyle())
-            .padding(.horizontal, 24)
-            .padding(.bottom, 12)
         }
         .opacity(flaring ? 0 : 1)
-        .animation(.easeOut(duration: 0.3), value: flaring)
+        .animation(.easeOut(duration: 0.25), value: flaring)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
             ZStack {
                 Theme.canvas
                     .opacity(flaring ? 0 : 1)
                     .animation(.easeIn(duration: 0.55).delay(0.25), value: flaring)
-                // Brightest on the first page, quieter while you read the rest,
-                // moving across as you go from page to page.
-                WorkingGlow(progress: page == 0 ? 0.6 : 0.5, isActive: !flaring, finished: flaring,
-                            across: [0.5, 0.25, 0.75, 0.3, 0.7, 0.4, 0.5][min(page, 6)],
-                            strength: page == 0 ? 1 : 0.8, drifts: true, riseDuration: 1.8)
+                WorkingGlow(progress: stage == .clean ? 0.45 : 0.25, isActive: !flaring, finished: flaring,
+                            across: stage == .clean ? 0.6 : 0.4, drifts: true, riseDuration: 0.9)
             }
             .ignoresSafeArea()
         }
         .foregroundStyle(Theme.ink)
         .environment(\.colorScheme, .dark)
-        .sensoryFeedback(.selection, trigger: page)
+        .sensoryFeedback(.selection, trigger: stage)
+        .task { await wake() }
+        .onDisappear { running?.cancel() }
     }
 
-    /// Back, how far along, and Skip.
-    private var top: some View {
-        HStack(spacing: 0) {
-            Button(action: back) {
-                Glyph(.back, size: 20)
-                    .frame(width: 44, height: 44)
+    private func wake() async {
+        let elapsed = LaunchClock.elapsed
+        if elapsed < 500 {
+            opened = String(format: "You just opened it in %.2f s.", elapsed / 1000)
+            Self.openedIn = String(format: "%.2f s", elapsed / 1000)
+        }
+        withAnimation(.spring(duration: 0.8, bounce: 0.1)) { eclipse = 0.62 }
+        try? await Task.sleep(for: .seconds(0.85))
+        withAnimation(.spring(duration: 0.5, bounce: 0.08)) { stage = .speed }
+        try? await Task.sleep(for: .seconds(0.35))
+        racing = true
+        guard !reduceMotion else { return }
+        // A tick as roko crosses the line, in true time like everything else here.
+        running = Task {
+            try? await Task.sleep(for: .seconds(Self.runs[0].seconds))
+            if !Task.isCancelled, stage == .speed { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+        }
+    }
+
+    // MARK: The case
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Eclipse(shift: reduceMotion ? 0.62 : eclipse)
+                    .fill(Theme.ink, style: FillStyle(eoFill: true))
+                    .matchedGeometryEffect(id: "mark", in: markSpace)
+                    .frame(width: 22, height: 22)
+                Text("roko").font(.system(size: 20, weight: .bold))
+                Spacer(minLength: 0)
+                Button("Skip", action: flare)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.bodyInk)
+                    .frame(width: 60, height: 44)
+                    .contentShape(.rect)
+                    .padding(.trailing, -14)
+            }
+            .frame(height: 44)
+
+            Group {
+                Text(stage == .clean ? "The fewest ads and pop-ups." : "The fastest of ten browsers.")
+                    .font(.system(size: 34, weight: .bold))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                Text(stage == .clean ? "Ad-heavy sites with no ad, pop-up or wall." : opened ?? "Tap a link. Half the page is there in about a second.")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.bodyInk)
+                    .padding(.top, 8)
+            }
+            .id(stage)
+            .transition(.opacity.animation(.easeIn(duration: 0.2).delay(0.1)))
+            .padding(.top, 10)
+
+            Spacer(minLength: 12)
+            board
+            Spacer(minLength: 12)
+
+            Text(stage == .clean
+                 ? "Six ad-heavy sites, five swipes down each, one run each, judged by eye. iPhone 17 Pro, iOS 27.2, November 2026."
+                 : "Time until half the page is drawn. Median of 24 runs each on eight sites, on iPhone 17 Pro, iOS 27.2, November 2026. Yours will vary.")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
+                .id(stage)
+                .transition(.opacity.animation(.easeIn(duration: 0.2).delay(0.1)))
+                .padding(.bottom, 12)
+
+            Button(action: next) {
+                Text(stage == .clean ? "Start browsing" : "Continue")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .contentTransition(.numericText())
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 54)
+                    .background(Theme.ink, in: .rect(cornerRadius: 16))
                     .contentShape(.rect)
             }
-            .buttonStyle(GlyphButtonStyle())
-            .opacity(page == 0 ? 0 : 1)
-            .disabled(page == 0)
-            .accessibilityLabel("Back")
-            Spacer()
-            HStack(spacing: 5) {
-                ForEach(0..<count, id: \.self) { index in
-                    Capsule()
-                        .fill(index <= page ? Theme.ink : Theme.faintInk.opacity(0.4))
-                        .frame(width: index == page ? 18 : 6, height: 4)
-                }
-            }
-            .animation(.snappy(duration: 0.3), value: page)
-            .accessibilityElement()
-            .accessibilityLabel("Page \(page + 1) of \(count)")
-            Spacer()
-            Button("Skip", action: finish)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Theme.secondaryInk)
-                .frame(width: 60, height: 44)
-                .contentShape(.rect)
-                .opacity(page == count - 1 ? 0 : 1)
+            .buttonStyle(RowButtonStyle())
+            .padding(.bottom, 8)
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 24)
+        .frame(maxWidth: 520)
+    }
+
+    /// One list, sorted again for each thing it measures: each browser keeps its row
+    /// and moves to its new place.
+    private var board: some View {
+        let places = Dictionary(uniqueKeysWithValues: order.enumerated().map { ($0.element.id, $0.offset) })
+        return ZStack(alignment: .top) {
+            ForEach(Self.runs) { run in
+                let place = places[run.id] ?? 0
+                row(run)
+                    .frame(height: rowHeight, alignment: .top)
+                    .offset(y: CGFloat(place) * rowHeight)
+                    .opacity(place < shown ? 1 : 0)
+                    .animation(.spring(duration: 0.55, bounce: 0.08).delay(Double(place) * 0.015), value: stage)
+            }
+        }
+        .frame(height: CGFloat(shown) * rowHeight, alignment: .top)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(stage == .clean
+                            ? "With no ad, pop-up or wall: roko on 6 of 6 sites, Brave, DuckDuckGo and Lens on 3, Safari, Chrome and Edge on none."
+                            : "Half the page drawn: roko in 1.07 seconds, Chrome and Safari in 4.96, Edge in 5.46.")
+    }
+
+    private func row(_ run: Run) -> some View {
+        let isRoko = run.name == "roko"
+        let share = stage == .clean ? Double(run.cleanSites) / 6 : run.seconds / Self.slowest
+        return VStack(spacing: 5) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(run.name)
+                    .font(.system(size: 14, weight: isRoko ? .bold : .regular))
+                    .foregroundStyle(isRoko ? Theme.ink : Theme.bodyInk)
+                Spacer(minLength: 8)
+                ZStack(alignment: .trailing) {
+                    // Its time comes up as its bar arrives, not before.
+                    Text(String(format: "%.2f s", run.seconds))
+                        .opacity(stage == .speed && racing ? 1 : 0)
+                        .animation(stage == .speed && !reduceMotion ? .easeOut(duration: 0.15).delay(run.seconds) : .easeOut(duration: 0.15), value: racing)
+                    Text("\(run.cleanSites) of 6")
+                        .opacity(stage == .clean ? 1 : 0)
+                        .animation(.easeOut(duration: 0.2), value: stage)
+                }
+                .font(.system(size: 14, weight: isRoko ? .semibold : .regular))
+                .monospacedDigit()
+                .foregroundStyle(isRoko ? Theme.ink : Theme.bodyInk)
+            }
+            GeometryReader { proxy in
+                Capsule()
+                    .fill(.white.opacity(0.08))
+                    .overlay(alignment: .leading) {
+                        Capsule()
+                            .fill(isRoko ? Theme.accent : Color.white.opacity(0.42))
+                            // A sliver for none at all: the row's still in the running.
+                            .frame(width: max(racing ? proxy.size.width * share : 0, racing ? 6 : 0))
+                            .animation(stage == .speed && !reduceMotion ? .linear(duration: run.seconds) : .spring(duration: 0.55, bounce: 0.06), value: racing)
+                            .animation(.spring(duration: 0.55, bounce: 0.06), value: stage)
+                    }
+            }
+            .frame(height: 6)
+        }
     }
 
     private func next() {
-        guard page < count - 1 else { return flare() }
-        forward = true
-        withAnimation(.snappy(duration: 0.38)) { page += 1 }
+        if stage == .speed {
+            racing = true
+            withAnimation(.spring(duration: 0.5, bounce: 0.08)) { stage = .clean }
+        } else {
+            flare()
+        }
     }
 
-    private func back() {
-        guard page > 0 else { return }
-        forward = false
-        withAnimation(.snappy(duration: 0.38)) { page -= 1 }
-    }
-
-    /// The last page: the light carries off the top. The welcome lets go in time
-    /// for its own fade (BrowserView, 0.35 s) to end as the light does.
+    /// The light carries off the top, with the real launcher and its keyboard under
+    /// it, in time for the cover's own fade (BrowserView, 0.35 s) to end as the light does.
     private func flare() {
+        guard !flaring else { return }
+        running?.cancel()
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         flaring = true
         Task {
             try? await Task.sleep(for: .seconds(WorkingGlow.sweepDuration - 0.35))
-            finish()
+            UserDefaults.standard.set(true, forKey: Self.doneKey)
+            browser.guiding = true
+            browser.finishOnboarding()
         }
-    }
-
-    private func finish() {
-        UserDefaults.standard.set(true, forKey: Self.doneKey)
-        browser.finishOnboarding()
     }
 }
 
-// MARK: - Page layout
-
-/// A page: its live picture in the upper part, then what it is, a line or
-/// two about it, and its one choice.
-private struct OnboardingPage<Demo: View, Choice: View>: View {
-    let title: String
-    let text: String
-    @ViewBuilder let demo: () -> Demo
-    @ViewBuilder let choice: () -> Choice
-    /// Rises a little as the page arrives; always readable, only its place moves.
-    @State private var risen = false
+/// A few words over the real browser, for its first minute, and only while they're
+/// true: what to try in the launcher, what just happened to the page, what to do to
+/// it next. Everything that happens is the app doing it: a try is typed into the
+/// real field, Go is the real key, the page itself shows the pull, the summary is of
+/// the real page. Whatever you do instead just moves it along. It ends in a receipt
+/// of what really happened and the rest of what's in here, each opening the real
+/// screen, and then it's gone. It costs nothing: it's only here for this minute, and
+/// it redraws only when one of the few things it reads changes.
+struct FirstMinuteGuide: View {
+    @Environment(BrowserModel.self) private var browser
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            demo()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.horizontal, 24)
-            VStack(alignment: .leading, spacing: 10) {
-                Text(title)
-                    .font(.system(size: 32, weight: .bold))
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(text)
-                    .font(.system(size: 16))
-                    // Over the warm light: lighter than the usual grey, to read clearly.
-                    .foregroundStyle(Theme.ink.opacity(0.72))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .offset(y: risen || reduceMotion ? 0 : 10)
-                    .animation(.spring(duration: 0.6, bounce: 0.2).delay(0.08), value: risen)
-            }
-            .offset(y: risen || reduceMotion ? 0 : 18)
-            .animation(.spring(duration: 0.55, bounce: 0.2), value: risen)
-            .onAppear { risen = true }
-            .padding(.horizontal, 24)
-            choice()
-                .padding(.horizontal, 24)
-                .padding(.top, 18)
-            Spacer().frame(height: 22)
-        }
-    }
-}
-
-/// A switch set in one rounded group, as in Settings.
-private struct ChoiceToggle: View {
-    let title: String
-    var detail: String = ""
-    @Binding var isOn: Bool
-
-    var body: some View {
-        Toggle(isOn: $isOn) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.system(size: 16))
-                if !detail.isEmpty {
-                    Text(detail).font(.system(size: 13)).foregroundStyle(Theme.secondaryInk)
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .frame(minHeight: 52)
-    }
-}
-
-private func choiceGroup(@ViewBuilder _ content: () -> some View) -> some View {
-    VStack(spacing: 0) { content() }
-        .background(Theme.raised, in: .rect(cornerRadius: 16))
-}
-
-// MARK: - 1. Welcome
-
-/// roko's eclipse waking up: it grows in from small, its inner disc slides
-/// across like the moon over the sun, and then keeps drifting.
-private struct Welcome: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var awake = false
-    @State private var start = Date.now
-
-    var body: some View {
-        OnboardingPage(title: "Meet roko.",
-                       text: "The browser that answers back. Quick, quiet, and on your side.") {
-            TimelineView(.animation(minimumInterval: 1 / 60, paused: reduceMotion)) { context in
-                let t = context.date.timeIntervalSince(start)
-                // First the eclipse: the disc crosses in over 1.6 s, then it drifts.
-                let entry = min(t / 1.6, 1)
-                let eased = 1 - pow(1 - entry, 3)
-                let drift = sin(max(t - 1.6, 0) * 2 * .pi / 9) * 0.12 * eased
-                let shift = reduceMotion ? 0.62 : 0.05 + eased * 0.57 + drift
-                Eclipse(shift: min(max(shift, 0), 1))
-                    .fill(Theme.ink, style: FillStyle(eoFill: true))
-                    .frame(width: 168, height: 168)
-                    .scaleEffect(awake || reduceMotion ? 1 : 0.82)
-            }
-            .animation(.spring(duration: 1.2, bounce: 0.25), value: awake)
-            .onAppear { start = .now; awake = true }
-            .accessibilityHidden(true)
-        } choice: {
-            EmptyView()
-        }
-    }
-}
-
-// MARK: - 2. One bar
-
-/// The bar typing three things by itself, and what each one gives.
-private struct OneBar: View {
-    @AppStorage("searchEngine") private var engine: SearchEngine = .google
-
-    private struct Example {
-        let typed: String
-        let glyph: Glyph.Kind
-        let answer: String
-        let kind: String
+    private enum Step: Equatable {
+        case ask, opened, story, pull, receipt, more
     }
 
-    private let examples = [
-        Example(typed: "250 usd in eur", glyph: .equals, answer: "€223.77", kind: "Answered in the bar"),
-        Example(typed: "call Petra tomorrow at 10", glyph: .todo, answer: "Call Petra", kind: "To-do · tomorrow 10:00"),
-        Example(typed: "best espresso machine", glyph: .browse, answer: "Browse for Me", kind: "Reads the web and answers"),
+    @State private var step = Step.ask
+    @State private var typing: Task<Void, Never>?
+    @State private var showing: Task<Void, Never>?
+    /// The try that's been typed: Go is next, if Go does something with it.
+    @State private var tried: String?
+    /// What's true about the page just opened.
+    @State private var fact = ""
+    /// How the page's arrival went, for the receipt.
+    @State private var pageTook: String?
+    /// The summary read, for its "3 min read → 20 s".
+    @State private var summary: SummaryModel?
+    /// What had been counted before this minute: the receipt is for this minute alone.
+    @State private var before = SavedStats.totals
+    /// The light carrying off the top as the page arrives in its wake.
+    @State private var sweep = Sweep.none
+    /// The page dipping by itself, with what a real pull shows above it.
+    @State private var dipping = false
+
+    private enum Sweep { case none, up, leaving }
+
+    /// Opened from the rest of what's in here.
+    @State private var visited: Set<String> = []
+    private static let more: [(title: String, detail: String, glyph: Glyph.Kind, panel: BrowserModel.Panel)] = [
+        ("To-do", "Type a task in the bar, with its time.", .todo, .todos),
+        ("Saved", "Keep a page to read later, even offline.", .readLater, .readLater),
+        ("News", "The sites you choose, each story once.", .news, .feed),
+        ("Today", "Weather, your calendar and to-dos each morning.", .today, .today),
     ]
 
+    private static let canAsk = ClaudeClient.configured != nil || AppleModels.cloudIfAvailable != nil || OnDeviceSummarizer.isAvailable
+
+    /// Sites we've measured roko on, with plenty on them for it to take away.
+    private static let site: String = switch Locale.current.region?.identifier {
+    case "HR": "index.hr"
+    case "US": "cnn.com"
+    default: "theguardian.com"
+    }
+    private static let question = "best espresso machine?"
+    private var tries: [(String, Glyph.Kind)] {
+        [("250 usd in eur", .equals),
+         Self.canAsk ? (Self.question, .browse) : ("call mum tomorrow at 10", .todo),
+         (Self.site, .globe)]
+    }
+
     var body: some View {
-        OnboardingPage(title: "Just type. Or say it.",
-                       text: "Open a site, convert 250 dollars, add a to-do or ask anything. Hold + to speak instead.") {
-            TimelineView(.periodic(from: .now, by: 0.07)) { context in
-                demo(at: context.date)
+        ZStack(alignment: .bottom) {
+            if sweep != .none {
+                WorkingGlow(progress: 0.35, isActive: sweep == .up, finished: sweep == .leaving, riseDuration: 0.12)
+                    .environment(\.colorScheme, .dark)
+                    .ignoresSafeArea()
             }
-        } choice: {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Search with")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Theme.secondaryInk)
-                HStack(spacing: 0) {
-                    // The first four: a row has no room for more; Settings has the rest.
-                    ForEach(SearchEngine.builtIn.prefix(4), id: \.self) { option in
-                        Button { withAnimation(.snappy(duration: 0.2)) { engine = option } } label: {
-                            Text(option.name.replacingOccurrences(of: " Search", with: ""))
-                                .font(.system(size: 14, weight: engine == option ? .semibold : .regular))
-                                .foregroundStyle(engine == option ? Theme.ink : Theme.secondaryInk)
-                                .lineLimit(1)
-                                .fixedSize()
-                                .padding(.horizontal, 10)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 40)
-                                .background(engine == option ? Theme.panel : .clear, in: .rect(cornerRadius: 11))
-                                .contentShape(.rect)
-                        }
-                        .buttonStyle(RowButtonStyle())
-                    }
+            if dipping {
+                HStack(spacing: 6) {
+                    Glyph(.summarize, size: 15)
+                    Text("Summarize").font(.system(size: 13, weight: .medium))
                 }
-                .padding(4)
-                .background(Theme.raised, in: .rect(cornerRadius: 15))
-                .sensoryFeedback(.selection, trigger: engine)
+                .foregroundStyle(Theme.ink)
+                .padding(.horizontal, 12)
+                .frame(height: 34)
+                .background(Theme.raised, in: .capsule)
+                .environment(\.colorScheme, .dark)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .padding(.top, 14)
+                .transition(.opacity)
+                .allowsHitTesting(false)
             }
+            if step == .ask, browser.panel == .command, !browser.guideStepsAside {
+                launcherHint.transition(.offset(y: 12).combined(with: .opacity))
+            } else if step == .receipt, browser.panel == .none {
+                FirstMinuteReceipt(lines: receiptLines, saved: savedLine, still: reduceMotion) { step = .more }
+                    .transition(.opacity)
+            } else if step == .more, browser.panel == .none, browser.summary == nil, browser.browseForMe == nil {
+                moreHint.transition(.offset(y: 12).combined(with: .opacity))
+            } else if browser.panel == .none, browser.summary == nil, browser.browseForMe == nil, let words {
+                pageHint(words)
+                    .id(words)
+                    .transition(.offset(y: 12).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(duration: 0.4, bounce: 0.1), value: step)
+        .animation(.spring(duration: 0.4, bounce: 0.1), value: fact)
+        .animation(.spring(duration: 0.4, bounce: 0.1), value: browser.panel)
+        .animation(.spring(duration: 0.4, bounce: 0.1), value: browser.guideStepsAside)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .onChange(of: browser.panel) { was, now in
+            if was == .command, now == .none, browser.selectedTab?.url != nil, step == .ask { pageOpened(at: CACurrentMediaTime()) }
+        }
+        .onChange(of: browser.selectedTab?.url) {
+            if step == .story, onStory { pull() }
+            // Off browsing: what's left of the list can wait for the tabs.
+            if step == .more { browser.guiding = false }
+        }
+        .onChange(of: browser.summary == nil) { _, closed in
+            if !closed {
+                summary = browser.summary
+                showing?.cancel()
+            } else if step == .pull || step == .story {
+                step = .receipt
+            }
+        }
+        .onChange(of: browser.browseForMe == nil) { _, closed in
+            if closed, step == .ask { step = .receipt }
+        }
+        .onDisappear {
+            typing?.cancel()
+            showing?.cancel()
         }
     }
 
-    /// Each example: typed letter by letter, its answer shown, a pause, the next.
-    private func demo(at date: Date) -> some View {
-        let cycle = 4.2
-        let t = date.timeIntervalSinceReferenceDate
-        let index = Int(t / cycle) % examples.count
-        let into = t.truncatingRemainder(dividingBy: cycle)
-        let example = examples[index]
-        let letters = min(example.typed.count, Int(into / 0.06))
-        let typed = String(example.typed.prefix(letters))
-        let answered = letters == example.typed.count && into > Double(example.typed.count) * 0.06 + 0.25
+    // MARK: In the launcher
 
-        return VStack(spacing: 10) {
-            HStack(spacing: 10) {
-                Glyph(.search, size: 17).foregroundStyle(Theme.secondaryInk)
-                (Text(typed) + Text(answered ? "" : "|").foregroundStyle(Theme.accentText))
-                    .font(.system(size: 17))
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 16)
-            .frame(height: 52)
-            .background(Theme.raised, in: .rect(cornerRadius: 18))
-
-            HStack(spacing: 12) {
-                Glyph(example.glyph, size: 20).foregroundStyle(Theme.secondaryInk).frame(width: 24)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(example.answer).font(.system(size: 20, weight: .semibold))
-                    Text(example.kind).font(.system(size: 13)).foregroundStyle(Theme.secondaryInk)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 16)
-            .frame(height: 70)
-            .background(Theme.panel, in: .rect(cornerRadius: 18))
-            .opacity(answered ? 1 : 0.35)
-            .animation(.easeOut(duration: 0.2), value: answered)
-        }
-        .accessibilityHidden(true)
-    }
-}
-
-// MARK: - 3. Clean pages
-
-/// A page with a cookie pop-up and two ads, cleaned before your eyes.
-private struct CleanPages: View {
-    @State private var ads = ContentBlocker.shared.isEnabled(.ads)
-    @State private var cookies = ContentBlocker.shared.isEnabled(.cookies)
-
-    var body: some View {
-        OnboardingPage(title: "No ads. No pop-ups.",
-                       text: "Ads and trackers never load, and cookie banners get a polite no before you ever see them.") {
-            TimelineView(.periodic(from: .now, by: 0.1)) { context in
-                MiniPage(clean: (context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 4.4)) > 1.6,
-                         blocking: ads || cookies)
-            }
-        } choice: {
-            choiceGroup {
-                ChoiceToggle(title: "Block ads and trackers", isOn: Binding(get: { ads }, set: { on in
-                    ads = on
-                    ContentBlocker.shared.setEnabled(.ads, on)
-                    ContentBlocker.shared.setEnabled(.privacy, on)
-                }))
-                ChoiceToggle(title: "Reject cookie pop-ups", isOn: Binding(get: { cookies }, set: { on in
-                    cookies = on
-                    ContentBlocker.shared.setEnabled(.cookies, on)
-                }))
-            }
-        }
-    }
-}
-
-/// A tiny recipe page: an ad, the text, a cookie pop-up over it. Cleaned, the
-/// ads fold away where they are and the pop-up slides off; nothing jumps.
-private struct MiniPage: View {
-    let clean: Bool
-    let blocking: Bool
-
-    private var tidy: Bool { clean && blocking }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
-                Circle().fill(Theme.secondaryInk).frame(width: 9, height: 9)
-                Text("eatathens.com").font(.system(size: 11)).foregroundStyle(Theme.secondaryInk)
-                Spacer()
-                Text("14 blocked")
-                    .font(.system(size: 11, weight: .medium).monospacedDigit())
-                    .foregroundStyle(Theme.secondaryInk)
-                    .opacity(tidy ? 1 : 0)
-            }
-            .padding(.bottom, 10)
-            ad
-            Text("Lemon pasta").font(.system(size: 18, weight: .bold)).padding(.bottom, 10)
-            VStack(alignment: .leading, spacing: 9) {
-                ForEach(0..<4, id: \.self) { line in
-                    Capsule().fill(Theme.faintInk.opacity(0.45))
-                        .frame(maxWidth: line == 3 ? 120 : .infinity)
-                        .frame(height: 6)
-                }
-            }
-            .padding(.bottom, 10)
-            ad
-        }
-        .padding(16)
-        .frame(width: 290)
-        .background(Theme.panel, in: .rect(cornerRadius: 22))
-        .overlay(alignment: .bottom) { popup }
-        .clipShape(.rect(cornerRadius: 22))
-        .animation(.snappy(duration: 0.5), value: tidy)
-        .accessibilityHidden(true)
-    }
-
-    /// Folds to nothing in place when cleaned.
-    private var ad: some View {
-        RoundedRectangle(cornerRadius: 10)
-            .fill(Theme.raised)
-            .overlay(Text("AD").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.faintInk))
-            .frame(height: tidy ? 0 : 38)
-            .opacity(tidy ? 0 : 1)
-            .padding(.bottom, tidy ? 0 : 10)
-    }
-
-    private var popup: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("We value your privacy").font(.system(size: 12, weight: .semibold))
-            Text("We and our 812 partners use cookies to…").font(.system(size: 10)).foregroundStyle(Theme.secondaryInk)
-            HStack {
-                Text("Accept all").font(.system(size: 10, weight: .semibold))
-                    .padding(.horizontal, 10).frame(height: 22)
-                    .background(Theme.ink.opacity(0.85), in: .rect(cornerRadius: 6))
-                    .foregroundStyle(Theme.canvas)
-                Text("Manage").font(.system(size: 10)).foregroundStyle(Theme.secondaryInk)
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.raised, in: .rect(cornerRadius: 14))
-        .padding(10)
-        .offset(y: tidy ? 160 : 0)
-    }
-}
-
-// MARK: - 4. Summaries
-
-/// A page pulled down past the reload point turning into its summary.
-private struct Summaries: View {
-    @AppStorage(Preferences.pullToSummarizeKey) private var pull = true
-
-    var body: some View {
-        OnboardingPage(title: "Pull for the gist.",
-                       text: "Pull down to reload. Keep pulling and the page turns into its summary: the ingredients, the steps, the picks.") {
-            TimelineView(.animation(minimumInterval: 1 / 30)) { context in
-                PullDemo(phase: context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 5) / 5)
-            }
-        } choice: {
-            choiceGroup {
-                ChoiceToggle(title: "Pull further to summarize", isOn: $pull)
-            }
-        }
-    }
-}
-
-/// 0...0.35 the page is pulled down, 0.35...0.5 it shrinks into a card,
-/// 0.5...0.9 the summary reads, then back.
-private struct PullDemo: View {
-    let phase: Double
-
-    var body: some View {
-        let pull = min(phase / 0.35, 1)
-        let summarized = phase > 0.42 && phase < 0.92
-        ZStack(alignment: .top) {
-            // The ring that fills as the pull goes on, then says Summarize.
-            HStack(spacing: 6) {
-                ZStack {
-                    Circle().stroke(Theme.faintInk.opacity(0.4), lineWidth: 2.5)
-                    Circle().trim(from: 0, to: pull).stroke(Theme.ink, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                }
-                .frame(width: 22, height: 22)
-                if pull >= 1 { Text("Summarize").font(.system(size: 13, weight: .semibold)) }
-            }
-            .padding(.horizontal, 10)
-            .frame(height: 34)
-            .background(Theme.raised, in: .capsule)
-            .opacity(summarized ? 0 : (phase < 0.38 ? 1 : 0))
-
-            Group {
-                if summarized { summary } else { page }
-            }
-            .offset(y: summarized ? 0 : 48 * pull)
-        }
-        .frame(maxWidth: 300)
-        .animation(.snappy(duration: 0.4), value: summarized)
-        .accessibilityHidden(true)
-    }
-
-    private var page: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Lemon pasta").font(.system(size: 18, weight: .bold))
-            ForEach(0..<6, id: \.self) { line in
-                Capsule().fill(Theme.faintInk.opacity(0.45))
-                    .frame(maxWidth: line % 3 == 2 ? 140 : .infinity).frame(height: 6)
-            }
-        }
-        .padding(16)
-        .background(Theme.panel, in: .rect(cornerRadius: 22))
-        .transition(.scale(scale: 0.85).combined(with: .opacity))
-    }
-
-    private var summary: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    /// Above the keyboard, clear of the answers under the field.
+    private var launcherHint: some View {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
-                RoundedRectangle(cornerRadius: 5).fill(Theme.panel).frame(width: 30, height: 40)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Lemon pasta").font(.system(size: 15, weight: .semibold))
-                    Text("20 min · serves 2").font(.system(size: 12)).foregroundStyle(Theme.secondaryInk)
-                }
-            }
-            ForEach(["Spaghetti, 200 g", "1 lemon, zest and juice", "Parmesan, a handful"], id: \.self) { item in
-                HStack(spacing: 8) {
-                    Circle().stroke(Theme.faintInk, lineWidth: 1.5).frame(width: 13, height: 13)
-                    Text(item).font(.system(size: 13))
-                }
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.raised, in: .rect(cornerRadius: 22))
-        .transition(.scale(scale: 1.1).combined(with: .opacity))
-    }
-}
-
-// MARK: - To-do
-
-/// Typing a to-do the way you'd say it, and it becoming one: on its day, at
-/// its time, then ticked off.
-private struct Todos: View {
-    @AppStorage(Preferences.bandTodayKey) private var today = true
-
-    var body: some View {
-        OnboardingPage(title: "Say it, and it's a to-do.",
-                       text: "Type \u{201C}call Petra tomorrow at 10\u{201D} in the bar. roko knows the day and the time, reminds you, and keeps today's list under the page.") {
-            TimelineView(.periodic(from: .now, by: 0.05)) { context in
-                TodoDemo(t: context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 6.5))
-            }
-        } choice: {
-            choiceGroup {
-                ChoiceToggle(title: "Today's to-dos under the page", detail: "A thin strip with what's left for today", isOn: $today)
-            }
-        }
-    }
-}
-
-/// 0...1.6 typed, 1.6...2.2 it lifts into the list, 3.4 ticked, 5 struck out.
-private struct TodoDemo: View {
-    let t: Double
-    private let typed = "call Petra tomorrow at 10"
-
-    var body: some View {
-        let letters = min(typed.count, Int(t / 0.055))
-        let landed = t > 1.75
-        let ticked = t > 3.6
-        VStack(spacing: 12) {
-            HStack(spacing: 10) {
-                Glyph(.plus, size: 16).foregroundStyle(Theme.secondaryInk)
-                Text(String(typed.prefix(letters)))
-                    .font(.system(size: 16))
-                    .lineLimit(1)
-                    .opacity(landed ? 0 : 1)
+                GuideMark()
+                Text(tried == Self.site || tried == Self.question ? "Now tap Go."
+                    : verticalSizeClass == .compact ? "Type anything." : "Type anything, or try one.")
+                    .font(.system(size: 15, weight: .medium))
+                    .contentTransition(.opacity)
                 Spacer(minLength: 0)
+                closeButton
             }
-            .padding(.horizontal, 16)
-            .frame(height: 50)
-            .background(Theme.raised, in: .rect(cornerRadius: 18))
-
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Tomorrow")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.secondaryInk)
-                    .padding(.bottom, 8)
-                row(title: "Pick up the dry cleaning", time: nil, done: false)
-                // Unfolds in place under the first: nothing slides over anything.
-                row(title: "Call Petra", time: "10:00", done: ticked)
-                    .frame(height: landed ? 50 : 0, alignment: .top)
-                    .opacity(landed ? 1 : 0)
-                    .clipped()
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.panel, in: .rect(cornerRadius: 20))
-        }
-        .frame(maxWidth: 320)
-        .animation(.spring(duration: 0.5, bounce: 0.25), value: landed)
-        .animation(.snappy(duration: 0.3), value: ticked)
-        .sensoryFeedback(.success, trigger: ticked) { _, now in now }
-        .accessibilityHidden(true)
-    }
-
-    private func row(title: String, time: String?, done: Bool) -> some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle().strokeBorder(done ? Theme.accent : Theme.faintInk, lineWidth: 1.6)
-                if done {
-                    Circle().fill(Theme.accent).padding(4)
-                }
-            }
-            .frame(width: 20, height: 20)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.system(size: 15))
-                    .strikethrough(done, color: Theme.secondaryInk)
-                    .foregroundStyle(done ? Theme.secondaryInk : Theme.ink)
-                if let time { Text(time).font(.system(size: 12).monospacedDigit()).foregroundStyle(Theme.secondaryInk) }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.vertical, 7)
-    }
-}
-
-// MARK: - Split View
-
-/// Two pages at once, the band between them gliding up and down.
-private struct Splits: View {
-    var body: some View {
-        OnboardingPage(title: "Two pages at once.",
-                       text: "A recipe above, the shopping list below. Drag the line between them anywhere, or turn your iPhone to see them side by side.") {
-            TimelineView(.animation(minimumInterval: 1 / 30)) { context in
-                SplitDemo(t: context.date.timeIntervalSinceReferenceDate)
-            }
-        } choice: {
-            EmptyView()
-        }
-    }
-}
-
-private struct SplitDemo: View {
-    let t: Double
-
-    var body: some View {
-        let fraction = 0.5 + sin(t * 2 * .pi / 5) * 0.16
-        GeometryReader { proxy in
-            let total = proxy.size.height
-            let band: CGFloat = 18
-            let top = (total - band) * fraction
-            VStack(spacing: 0) {
-                card(title: "Lemon pasta", lines: 6)
-                    .frame(height: top)
-                    .clipShape(UnevenRoundedRectangle(topLeadingRadius: 22, bottomLeadingRadius: 16,
-                                                      bottomTrailingRadius: 16, topTrailingRadius: 22))
-                Capsule().fill(.white.opacity(0.45)).frame(width: 34, height: 4)
-                    .frame(height: band)
-                shopping
-                    .frame(maxHeight: .infinity)
-                    .clipShape(UnevenRoundedRectangle(topLeadingRadius: 16, bottomLeadingRadius: 22,
-                                                      bottomTrailingRadius: 22, topTrailingRadius: 16))
-            }
-        }
-        .padding(8)
-        .background(Color.black, in: .rect(cornerRadius: 30))
-        .frame(width: 230, height: 300)
-        .environment(\.colorScheme, .dark)
-        .accessibilityHidden(true)
-    }
-
-    private func card(title: String, lines: Int) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.system(size: 15, weight: .bold)).foregroundStyle(.black)
-            ForEach(0..<lines, id: \.self) { line in
-                Capsule().fill(Color.black.opacity(0.13))
-                    .frame(maxWidth: line % 3 == 2 ? 90 : .infinity).frame(height: 5)
-            }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color.white)
-    }
-
-    private var shopping: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Text("Shopping").font(.system(size: 15, weight: .bold)).foregroundStyle(.black)
-            ForEach(["Spaghetti", "Lemons", "Parmesan"], id: \.self) { item in
-                HStack(spacing: 8) {
-                    Circle().strokeBorder(Color.black.opacity(0.3), lineWidth: 1.4).frame(width: 13, height: 13)
-                    Text(item).font(.system(size: 13)).foregroundStyle(.black.opacity(0.8))
-                }
-            }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(white: 0.96))
-    }
-}
-
-// MARK: - 6. Private
-
-/// No account, nothing kept, and private tabs behind Face ID if you like.
-private struct Private: View {
-    @State private var locked = PrivacyLock.shared.isEnabled
-    @State private var spin = false
-
-    var body: some View {
-        OnboardingPage(title: "Yours alone.",
-                       text: "No account and nothing sent about you. Private tabs vanish the moment you close them.") {
-            VStack(spacing: 18) {
-                Glyph(locked ? .lock : .eyeClosed, size: 64)
-                    .contentTransition(.symbolEffect(.replace))
-                    .foregroundStyle(Theme.ink)
-                    .animation(.snappy(duration: 0.3), value: locked)
-                HStack(spacing: 18) {
-                    ForEach(["No account", "No tracking", "Nothing sold"], id: \.self) { item in
-                        Text(item).font(.system(size: 13)).foregroundStyle(Theme.secondaryInk)
+            .padding(.leading, 14)
+            // Sideways, the keyboard leaves room for the words alone.
+            ForEach(verticalSizeClass == .compact ? [] : tries, id: \.0) { text, glyph in
+                Button { type(text) } label: {
+                    HStack(spacing: 12) {
+                        Glyph(glyph, size: 18).foregroundStyle(Theme.secondaryInk)
+                        Text(text).font(.system(size: 16)).lineLimit(1)
+                        Spacer(minLength: 0)
                     }
+                    .padding(.horizontal, 14)
+                    .frame(height: 42)
+                    .background(tried == text ? Theme.selection : .clear, in: .rect(cornerRadius: 12))
+                    .contentShape(.rect)
                 }
-            }
-            .accessibilityHidden(true)
-        } choice: {
-            if PrivacyLock.isAvailable {
-                choiceGroup {
-                    ChoiceToggle(title: "Lock private tabs", detail: "With \(PrivacyLock.method), from each time roko opens",
-                                 isOn: Binding(get: { locked }, set: { on in
-                        if on {
-                            Task { locked = await PrivacyLock.shared.turnOn() }
-                        } else {
-                            PrivacyLock.shared.isEnabled = false
-                            locked = false
-                        }
-                    }))
-                }
+                .buttonStyle(RowButtonStyle())
             }
         }
+        .foregroundStyle(Theme.ink)
+        .padding(6)
+        .barSurface(cornerRadius: 20)
+        .padding(.horizontal, 8)
+        .padding(.bottom, 8)
+        .frame(maxWidth: 480)
+    }
+
+    /// Letter by letter into the real field, so the real answer comes up with it.
+    private func type(_ text: String) {
+        typing?.cancel()
+        tried = text
+        browser.commandPrefill = ""
+        typing = Task {
+            if reduceMotion {
+                browser.commandPrefill = text
+                return
+            }
+            var typed = ""
+            for letter in text {
+                typed.append(letter)
+                browser.commandPrefill = typed
+                try? await Task.sleep(for: .milliseconds(38))
+                if Task.isCancelled { return }
+            }
+        }
+    }
+
+    // MARK: On the page
+
+    private var words: String? {
+        switch step {
+        case .ask, .receipt, .more: nil
+        case .opened: fact.isEmpty ? nil : fact
+        case .story: "Open a story."
+        case .pull: "Pull it down, past reload, until it says Summarize. Then let go."
+        }
+    }
+
+    /// A page of its own, not a site's front page or a section of it, whose summary
+    /// would be stray headlines.
+    private var onStory: Bool {
+        (browser.selectedTab?.url?.pathComponents.count ?? 0) > 2
+    }
+
+    /// Where a toast goes, above the bar. The finger goes straight through it to the page.
+    private func pageHint(_ words: String) -> some View {
+        HStack(spacing: 10) {
+            GuideMark()
+                .allowsHitTesting(false)
+            Text(words)
+                .font(.system(size: 15, weight: .medium))
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .allowsHitTesting(false)
+            // Its tap target reaches past the card without making the card taller.
+            closeButton.padding(.vertical, -12).padding(.trailing, -8)
+        }
+        .foregroundStyle(Theme.ink)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 14)
+        .background {
+            RoundedRectangle(cornerRadius: 18).fill(Theme.panel)
+                .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.edge))
+                .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
+                .allowsHitTesting(false)
+        }
+        .padding(.horizontal, 12)
+        .frame(maxWidth: 480)
+        .padding(.bottom, Theme.barHeight + 24)
+        .onAppear { AccessibilityNotification.Announcement(words).post() }
+    }
+
+    private var closeButton: some View {
+        Button { browser.guiding = false } label: {
+            Glyph(.close, size: 14, weight: 2)
+                .foregroundStyle(Theme.secondaryInk)
+                .frame(width: 40, height: 40)
+                .contentShape(.rect)
+        }
+        .buttonStyle(GlyphButtonStyle())
+        .accessibilityLabel("Stop the tips")
+    }
+
+    // MARK: The rest of it
+
+    /// Each one opens the real screen, and is ticked when you come back.
+    private var moreHint: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
+                GuideMark()
+                Text(visited.count == Self.more.count ? "That's the lot. Enjoy." : "There's more in here.")
+                    .font(.system(size: 15, weight: .medium))
+                    .contentTransition(.opacity)
+                Spacer(minLength: 0)
+                closeButton
+            }
+            .padding(.leading, 14)
+            ForEach(Self.more, id: \.title) { item in
+                Button {
+                    visited.insert(item.title)
+                    browser.panel = item.panel
+                } label: {
+                    HStack(spacing: 12) {
+                        Glyph(item.glyph, size: 20).foregroundStyle(Theme.secondaryInk)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(item.title).font(.system(size: 16))
+                            if verticalSizeClass != .compact {
+                                Text(item.detail)
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(Theme.secondaryInk)
+                            }
+                        }
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        Spacer(minLength: 0)
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.secondaryInk)
+                            .opacity(visited.contains(item.title) ? 1 : 0)
+                    }
+                    .padding(.horizontal, 14)
+                    .frame(height: verticalSizeClass == .compact ? 40 : 54)
+                    .contentShape(.rect)
+                }
+                .buttonStyle(RowButtonStyle())
+            }
+            Text("They all live behind your tabs: swipe up on the bar.")
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.secondaryInk)
+                .padding(.horizontal, 14)
+                .padding(.top, 6)
+                .padding(.bottom, 8)
+        }
+        .foregroundStyle(Theme.ink)
+        .padding(6)
+        .barSurface(cornerRadius: 20)
+        .padding(.horizontal, 12)
+        .frame(maxWidth: 480)
+        .padding(.bottom, Theme.barHeight + 24)
+    }
+
+    // MARK: The receipt
+
+    /// Only what really happened: a line that didn't is left off.
+    private var receiptLines: [FirstMinuteReceipt.Line] {
+        let cookies = SavedStats.totals.cookieBars - before.cookieBars
+        var lines: [FirstMinuteReceipt.Line] = []
+        if let opened = Onboarding.openedIn { lines.append(.init(what: "roko opened", value: opened)) }
+        if let pageTook { lines.append(.init(what: "Page opened", value: pageTook)) }
+        if cookies > 0 { lines.append(.init(what: "Cookie pop-ups answered", value: "\(cookies)")) }
+        if let reading = summary?.readingTime { lines.append(.init(what: "Summary", value: reading)) }
+        return lines
+    }
+
+    private var savedLine: String? {
+        // A few seconds is true, but no total: it's left off until it's worth a line.
+        let seconds = SavedStats.totals.seconds - before.seconds
+        return seconds >= 30 ? SavedStats.duration(seconds) : nil
+    }
+
+    // MARK: Moving along
+
+    /// The page you asked for is up, or on its way, arriving in the wake of the light.
+    /// What's said about its speed is measured: its commit against the moment Go was tapped.
+    private func pageOpened(at go: CFTimeInterval) {
+        guard let tab = browser.selectedTab else { return }
+        step = .opened
+        showing = Task {
+            if !reduceMotion {
+                sweep = .up
+                try? await Task.sleep(for: .milliseconds(60))
+                sweep = .leaving
+                UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+            }
+            // Only this page's commit counts: the launcher preloads for moments, not
+            // minutes, so anything older is what this tab showed before. And a page
+            // that hasn't started by now has nothing to boast of.
+            @MainActor func commit() -> CFTimeInterval? { tab.committedAt > go - 20 ? tab.committedAt : nil }
+            for _ in 0..<30 where commit() == nil {
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+            let took = commit().map { $0 - go }
+            let speed = took.flatMap { $0 <= 0 ? "Loaded before you tapped Go." : $0 < 0.8 ? String(format: "Open in %.2f s.", $0) : nil }
+            pageTook = took.flatMap { $0 <= 0 ? "before you tapped Go" : $0 < 0.8 ? String(format: "%.2f s", $0) : nil }
+            fact = [speed, "Ads and pop-ups, already dealt with."].compactMap(\.self).joined(separator: " ")
+            try? await Task.sleep(for: .seconds(1.2))
+            sweep = .none
+            try? await Task.sleep(for: .seconds(2.6))
+            if Task.isCancelled { return }
+            guard Self.canAsk else {
+                step = .receipt
+                return
+            }
+            if onStory { pull() } else { story() }
+        }
+    }
+
+    /// Waits for a story, but not for ever.
+    private func story() {
+        step = .story
+        showing = Task {
+            try? await Task.sleep(for: .seconds(30))
+            if !Task.isCancelled, step == .story { step = .receipt }
+        }
+    }
+
+    /// The page itself shows the pull: it dips under a finger that isn't there, and
+    /// comes back. A few times, then the guide lets it go.
+    private func pull() {
+        showing?.cancel()
+        step = .pull
+        showing = Task {
+            for wait in [0.8, 3.4, 4.4] {
+                try? await Task.sleep(for: .seconds(wait))
+                if Task.isCancelled { return }
+                if !reduceMotion, let tab = browser.selectedTab {
+                    withAnimation(.easeOut(duration: 0.2)) { dipping = tab.showPull() }
+                    try? await Task.sleep(for: .seconds(0.6))
+                    withAnimation(.easeOut(duration: 0.2)) { dipping = false }
+                }
+            }
+            try? await Task.sleep(for: .seconds(14))
+            if !Task.isCancelled, step == .pull { step = .receipt }
+        }
+    }
+}
+
+/// roko's mark beside its words: it passes through an eclipse each time it speaks.
+private struct GuideMark: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var shift = 0.12
+
+    var body: some View {
+        Eclipse(shift: reduceMotion ? 0.62 : shift)
+            .fill(Theme.ink, style: FillStyle(eoFill: true))
+            .frame(width: 16, height: 16)
+            .onAppear { withAnimation(.spring(duration: 0.7, bounce: 0.15)) { shift = 0.62 } }
+    }
+}
+
+/// What the first minute came to, printed up out of the bar a line at a time, each
+/// line pushing the last one up as paper does. Every figure on it really happened.
+/// A tap or a pull tears it off; left alone, it goes by itself.
+struct FirstMinuteReceipt: View {
+    struct Line: Identifiable {
+        let what: String
+        let value: String
+        var id: String { what }
+    }
+
+    let lines: [Line]
+    let saved: String?
+    let still: Bool
+    let done: () -> Void
+
+    /// Printed so far: the title, the lines, the total, the tip.
+    @State private var printed = 0
+    @State private var torn = false
+    @State private var pull: CGFloat = 0
+
+    private var total: Int { lines.count + (saved == nil ? 2 : 3) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Your first minute")
+                .font(.system(size: 15, weight: .semibold))
+                .padding(.bottom, 2)
+            ForEach(Array(lines.enumerated()), id: \.element.id) { index, line in
+                if printed > index + 1 {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(line.what).foregroundStyle(Theme.bodyInk)
+                        Spacer(minLength: 8)
+                        Text(line.value)
+                            .foregroundStyle(Theme.ink)
+                            .monospacedDigit()
+                            .multilineTextAlignment(.trailing)
+                    }
+                    .font(.system(size: 14))
+                    .transition(.printed)
+                }
+            }
+            if let saved, printed > lines.count + 1 {
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text("Time saved").font(.system(size: 15, weight: .medium))
+                    Spacer(minLength: 8)
+                    Text(saved)
+                        .font(.system(size: 26, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(Color(light: 0xB0601C, dark: 0xE8B98A))
+                }
+                .padding(.top, 6)
+                .transition(.printed)
+            }
+            if printed >= total {
+                Text("One more: hold the search bar and say what you want.")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 6)
+                    .transition(.printed)
+            }
+        }
+        .foregroundStyle(Theme.ink)
+        .padding(.horizontal, 18)
+        .padding(.top, 16)
+        .padding(.bottom, 16 + TornEdge.depth)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            TornEdge().fill(Theme.panel)
+                .overlay(TornEdge().stroke(Theme.edge))
+                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+        }
+        .padding(.horizontal, 28)
+        .frame(maxWidth: 420)
+        .offset(y: torn ? 700 : pull)
+        // Out of the bar's edge, and back into it: never over the bar.
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .clipped()
+        .padding(.bottom, Theme.barHeight + 12)
+        .contentShape(.rect)
+        .onTapGesture { tear() }
+        .gesture(DragGesture(minimumDistance: 8)
+            .onChanged { pull = max($0.translation.height, 0) }
+            .onEnded { value in
+                if value.translation.height > 50 { tear() } else { withAnimation(.spring(duration: 0.35)) { pull = 0 } }
+            })
+        .sensoryFeedback(.impact(weight: .light), trigger: printed)
+        .accessibilityElement(children: .combine)
+        .accessibilityAction(named: "Dismiss") { tear() }
+        .task {
+            if still {
+                printed = total
+            } else {
+                for line in 1...total {
+                    try? await Task.sleep(for: .milliseconds(line == 1 ? 250 : 190))
+                    withAnimation(.spring(duration: 0.3, bounce: 0.05)) { printed = line }
+                }
+            }
+            AccessibilityNotification.Announcement("Your first minute").post()
+            try? await Task.sleep(for: .seconds(9))
+            tear()
+        }
+    }
+
+    private func tear() {
+        guard !torn else { return }
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        withAnimation(.timingCurve(0.5, 0, 0.9, 0.5, duration: still ? 0.01 : 0.4)) { torn = true }
+        Task {
+            try? await Task.sleep(for: .seconds(still ? 0.02 : 0.42))
+            done()
+        }
+    }
+}
+
+/// Paper with its foot torn off: square above, small even teeth below.
+nonisolated struct TornEdge: Shape {
+    static let depth: CGFloat = 7
+
+    func path(in rect: CGRect) -> Path {
+        let teeth = max(Int((rect.width / 14).rounded()), 2)
+        let step = rect.width / CGFloat(teeth)
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY + 10))
+        path.addQuadCurve(to: CGPoint(x: rect.minX + 10, y: rect.minY), control: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX - 10, y: rect.minY))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.minY + 10), control: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - Self.depth))
+        for tooth in stride(from: teeth, to: 0, by: -1) {
+            let right = rect.minX + CGFloat(tooth) * step
+            path.addLine(to: CGPoint(x: right - step / 2, y: rect.maxY))
+            path.addLine(to: CGPoint(x: right - step, y: rect.maxY - Self.depth))
+        }
+        path.closeSubpath()
+        return path
+    }
+}
+
+private extension BrowserTab {
+    /// The page, from its top, dipping as if pulled and coming back: the web view
+    /// moved as one picture, so the page itself never knows. Whether it did.
+    func showPull() -> Bool {
+        guard let webView, !webView.scrollView.isTracking,
+              webView.scrollView.contentOffset.y <= -webView.scrollView.adjustedContentInset.top + 1 else { return false }
+        UIView.animate(withDuration: 0.42, delay: 0, options: [.curveEaseOut, .allowUserInteraction]) {
+            webView.transform = CGAffineTransform(translationX: 0, y: 96)
+        } completion: { _ in
+            UIView.animate(withDuration: 0.5, delay: 0.25, options: [.curveEaseInOut, .allowUserInteraction]) {
+                webView.transform = .identity
+            }
+        }
+        return true
+    }
+}
+
+private extension AnyTransition {
+    /// A line on the receipt, once the paper has made room for it.
+    static var printed: AnyTransition {
+        .opacity.animation(.easeIn(duration: 0.12).delay(0.14))
     }
 }

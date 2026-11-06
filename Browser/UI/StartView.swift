@@ -1,49 +1,120 @@
 import SwiftData
 import SwiftUI
 
-/// What's behind the command bar when no tab is open: your pinned sites,
-/// placed low on the screen where the thumb already is.
+/// What's there when no tab is open: roko at rest in its light, and low on the
+/// screen, where the thumb already is, your pinned sites and the screens of your own
+/// that roko keeps: the way into them with nothing open. Under it the band and the
+/// bar, as under a page. The light holds still: it's two pictures, drawn once, and
+/// nothing runs here.
 struct StartView: View {
     @Environment(BrowserModel.self) private var browser
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    /// In a band like every page. An open Duo keeps the bar floating, on one side of its fold.
+    var docked = true
     @Query(sort: \Pin.order) private var pins: [Pin]
     @Query private var todos: [Todo]
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
+    private static let perRow = 5
+    private var sideways: Bool { verticalSizeClass == .compact }
 
     var body: some View {
-        VStack {
-            if pins.isEmpty && !todos.contains(where: \.isDueNow) {
-                Spacer()
-                Text("Pin a site from its page menu and it lives here.")
-                    .font(.subheadline)
-                    .foregroundStyle(Theme.secondaryInk)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-                Spacer()
-                Spacer()
-            } else {
-                Spacer()
-                LazyVGrid(columns: columns, spacing: 14) {
-                    TodoPin(size: 34) { icon in
-                        icon.frame(maxWidth: .infinity, minHeight: 56).contentShape(.rect)
-                    }
-                    ForEach(pins) { pin in
-                        let name = pin.title.isEmpty ? pin.host : pin.title
-                        Button { browser.open(pin) } label: { PinTile(pin: pin) }
-                            .buttonStyle(RowButtonStyle())
-                            .accessibilityLabel(name)
-                            .contextMenu {
-                                Section(name) {
-                                    Button("Unpin", role: .destructive) { browser.unpin(pin) }
-                                }
-                            }
+        GeometryReader { proxy in
+            let foot = docked ? Theme.barHeight + 5 + max(proxy.safeAreaInsets.bottom - 20, 9) : Theme.barHeight + 4 + proxy.safeAreaInsets.bottom
+            content(width: min(proxy.size.width, 480))
+                .padding(.bottom, 20)
+                .padding(.top, proxy.safeAreaInsets.top)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background {
+                    ZStack {
+                        Theme.canvas
+                        WorkingGlow(progress: 0.15, breathes: false, strength: 0.75, riseDuration: 0.6)
                     }
                 }
-                .padding(.horizontal, Theme.gutter + 4)
-                .padding(.bottom, 28)
+                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: docked ? BandFloor.lip : 0,
+                                                  bottomTrailingRadius: docked ? BandFloor.lip : 0))
+                .overlay(alignment: .bottom) {
+                    if docked { CardEdgeLip(radius: BandFloor.lip).frame(height: BandFloor.lip) }
+                }
+                .padding(.bottom, foot)
+                .background { if docked { BandGround(color: nil) } }
+        }
+        .ignoresSafeArea(edges: [.top, .bottom])
+    }
+
+    private func content(width: CGFloat) -> some View {
+        VStack(spacing: 22) {
+            if sideways {
+                Spacer(minLength: 0)
+            } else {
+                Spacer(minLength: 0)
+                EclipseMark()
+                    .fill(Theme.ink, style: FillStyle(eoFill: true))
+                    .frame(width: 64, height: 64)
+                    .accessibilityHidden(true)
+                Spacer(minLength: 0)
+            }
+            if !pins.isEmpty { pinned(width: width) }
+            screens(width: width)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// Centred as a row, so three pins sit in the middle, not hard against one side.
+    private func pinned(width: CGFloat) -> some View {
+        let cell = (width - 2 * (Theme.gutter + 4)) / CGFloat(Self.perRow)
+        let rows = stride(from: 0, to: pins.count, by: Self.perRow).map { Array(pins[$0..<min($0 + Self.perRow, pins.count)]) }
+        return VStack(spacing: 4) {
+            ForEach(rows.indices, id: \.self) { index in
+                HStack(spacing: 0) {
+                    ForEach(rows[index]) { pin in
+                        let name = pin.title.isEmpty ? pin.host : pin.title
+                        Button { browser.open(pin) } label: {
+                            PinTile(pin: pin).frame(width: cell)
+                        }
+                        .buttonStyle(RowButtonStyle())
+                        .accessibilityLabel(name)
+                        .contextMenu {
+                            Section(name) {
+                                Button("Unpin", role: .destructive) { browser.unpin(pin) }
+                            }
+                        }
+                    }
+                }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Your own screens, each under its own name.
+    private func screens(width: CGFloat) -> some View {
+        let left = todos.filter(\.isDueNow).count
+        return HStack(spacing: 0) {
+            screen("Today", .today, .today)
+            screen("News", .news, .feed)
+            screen("Saved", .readLater, .readLater)
+            screen("To-do", .todo, .todos, count: left)
+        }
+        .frame(width: width - 2 * (Theme.gutter + 4))
+    }
+
+    private func screen(_ name: String, _ glyph: Glyph.Kind, _ panel: BrowserModel.Panel, count: Int = 0) -> some View {
+        Button { browser.panel = panel } label: {
+            VStack(spacing: 6) {
+                if count > 0 {
+                    CountedGlyph(glyph: glyph, count: count, size: 28)
+                } else {
+                    Glyph(glyph, size: 24)
+                        .foregroundStyle(Theme.ink)
+                        .frame(width: 28, height: 28)
+                }
+                Text(name)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.ink.opacity(0.78))
+            }
+            .frame(maxWidth: .infinity, minHeight: 60)
+            .contentShape(.rect)
+        }
+        .buttonStyle(RowButtonStyle())
+        .accessibilityLabel(count > 0 ? "\(name), \(count) left for today" : name)
     }
 }
 
