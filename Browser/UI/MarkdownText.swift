@@ -213,7 +213,9 @@ struct MarkdownText: View {
         if page.kind == .article { page.stats = [] }
         // Nor a count of what the answer itself holds: "5 methods", "3 key
         // numbers". A bare count only means something as a recipe's servings.
-        page.stats.removeAll { Self.countsItself($0, in: page.kind) }
+        // (The kind read first: read inside, it overlaps the change to the page, which aborts.)
+        let kind = page.kind
+        page.stats.removeAll { Self.countsItself($0, in: kind) }
         // Nor an ingredient's amount: "350g pasta" or "3 eggs" up top only
         // repeats a line of the list below, and pushes the time out of view.
         let items = page.sections.flatMap(\.lines).compactMap { line -> (name: String, amount: String)? in

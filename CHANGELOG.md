@@ -16,6 +16,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - Stories from feeds that give two dates, The Guardian's among them, had no date.
+- An answer with a big number at the top could crash roko as it was shown.
 - In Croatian, Serbian and Bosnian, comparisons and Summary now use the sites' own sentences, picked by the model, rather than an English translation or a rewrite, which had turned "arrested" into "killed". The credit line says so.
 - Headlines and articles no longer show codes like `&scaron;`, and rewrites drop names the sources never gave.
 - Reader no longer starts with a byline, a picture credit or "44 minutes ago".
