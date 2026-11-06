@@ -57,10 +57,8 @@ h3{font-size:clamp(24px,2.1vw,30px);line-height:1.12}
 .hero h1{max-width:15ch}
 .hero-sub{margin-top:16px;color:var(--soft);font-size:clamp(17px,1.4vw,19px)}
 .stage{position:relative;z-index:1;display:grid;justify-items:center;margin-top:clamp(32px,min(6vw,6vh),88px);width:100%}
-.flank.left{margin-bottom:18px;color:var(--soft);font-size:15px}
-.flank.left br{display:none}
-.flank.right{margin-top:28px}
-.flank.right p{margin-top:12px;color:#f4f1ebd9;font-size:15px}
+.join{margin-top:28px}
+.join p{margin-top:12px;color:#f4f1ebd9;font-size:15px}
 /* The phone is an iPhone's real shape, 402 by 874 points: everything inside
    is measured in the screen's own width, so it keeps its proportions at any size. */
 .live{--w:min(344px,88vw);text-align:left}
@@ -363,7 +361,7 @@ div>.row:has(span){min-height:54px}
 .tile.lead .talkpage{padding:12px 18px 22px 12px}
 .talk .band{height:70px;padding:0 6px 8px 14px;color:#e7e7e4}
 .fan{position:relative;flex:none;width:50px;height:34px}
-.fan i{position:absolute;left:3px;top:3px;width:21px;height:28px;border-radius:5px;background:#57534e url(/img/page-blur.webp) top/cover;box-shadow:inset 0 0 0 1px #ffffff1f;transform:rotate(-9deg) translateY(2px);filter:brightness(.62)}
+.fan i{position:absolute;left:3px;top:3px;width:21px;height:28px;border-radius:5px;background:#57534e url(/img/page-blur.webp?2) top/cover;box-shadow:inset 0 0 0 1px #ffffff1f;transform:rotate(-9deg) translateY(2px);filter:brightness(.62)}
 .fan i+i{left:12px;transform:rotate(7deg) translateY(-1px);filter:none}
 .talk .band .bk{width:50px;height:44px}
 .talk .band .bk .ic{width:19px;height:19px}
@@ -437,8 +435,8 @@ div>.row:has(span){min-height:54px}
 .feedui li b{color:#e7e7e4;font-weight:600}
 .feedui sup{margin-left:.900cqw;color:#e7e7e4;font-size:2.500cqw;font-weight:600;line-height:0;font-variant-numeric:tabular-nums}
 /* The launcher stands over the page you were on: dimmed and out of focus, as in the app. */
-.ui.launcher{position:relative;isolation:isolate;background:#343537}
-.ui.launcher::before{content:"";position:absolute;inset:-8%;z-index:-1;background:url(/img/page-blur.webp) top/cover;filter:blur(16px) brightness(.27) saturate(.75)}
+.ui.launcher{position:relative;isolation:isolate;overflow:clip;background:#343537}
+.ui.launcher::before{content:"";position:absolute;inset:-8%;z-index:-1;background:url(/img/page-blur.webp?2) top/cover;filter:blur(16px) brightness(.27) saturate(.75)}
 .ui.launcher .field{height:13.600cqw;margin:2.200cqw 2.200cqw 2cqw;padding:0 0 0 4cqw;background:#1b1b1c;border-radius:5.800cqw;box-shadow:inset 0 0 0 .250cqw #ffffff14}
 .ui.launcher .answer{min-height:13.400cqw;background:#ffffff17;border-radius:5.200cqw}
 .fend{position:relative;display:grid;place-items:center;flex:none;width:11cqw;height:100%;color:#c9c6bf}
@@ -525,11 +523,7 @@ footer .need{margin-top:14px;color:#fff;font-size:15px}
   .jobs{grid-template-columns:repeat(6,minmax(0,1fr))}
   .tile{grid-column:span 2}
   .tile.lead{grid-column:span 4}
-  .stage{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:clamp(36px,5vw,84px);align-items:start}
-  .flank.left,.flank.right{margin:clamp(70px,9vh,120px) 0 0}
-  .flank.left br{display:inline}
-  .flank.left{justify-self:end;text-align:right;font:500 clamp(24px,2.1vw,30px)/1.2 var(--display);color:var(--ink)}
-  .flank.right{justify-self:start;text-align:left}
+  .join{order:-1;margin:0 0 clamp(32px,min(5vw,5vh),64px)}
 }
 /* One phone, three things: it holds still in one place and only its screen and the words around it change.
    JS turns this on when motion is welcome and there's room; otherwise the three stack in plain flow. */
