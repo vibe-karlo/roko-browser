@@ -16,6 +16,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Saved's bar now searches the list, since it holds what you keep as well as what you mean to read. Summarize all moved to the button on its right, and shows while there's something unread.
 
 ### Fixed
+- News' lead picture could turn into a strange zoomed crop moments after it appeared, a tail fin and a red band where there had been a whole plane. The article's share picture was replacing the feed's, and a second picture of another shape drew too large and off centre. Both are fixed: pictures now fill their frame on their own, and the share picture only replaces a feed's thumbnail, as on BBC. The same goes for the picture above an article in Reader.
+- A story you've read in News showed its site's icon through its dimmed picture.
 - Sideways, To-do's list ended in a fade with hard edges, and its last row showed under the bar.
 - The "Today" strip above the bar sat a little high: it's now midway between the page and the bar.
 - On iPhone Duo, the switcher's bottom row sat off-centre and touched the home indicator.
