@@ -333,8 +333,9 @@ struct TabStackView: View {
         .keepsOffFold()
         .contentShape(.rect)
         .highPriorityGesture(pullUp)
-        // Centred on the screen and its home indicator, whichever side the clock is.
-        .ignoresSafeArea(.container, edges: .horizontal)
+        // Open, a Duo's page bar is centred on the screen, whichever side the clock is. Shut,
+        // on what the camera leaves, as the card is. The + stays where it was on the page.
+        .ignoresSafeArea(.container, edges: browser.uprightFoldOpen ? .horizontal : [])
     }
 
     /// To-do, with how many are left today while any are.

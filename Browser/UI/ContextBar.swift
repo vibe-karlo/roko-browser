@@ -80,11 +80,11 @@ struct ContextBar: View {
             }
         }
         .frame(height: Theme.barHeight)
-        // On a wide screen, a bar's width, as a page's bar is: in the middle of the
-        // screen, whichever side the clock is, and on one half of a bent Duo.
+        // On a wide screen, a bar's width, where a page's bar is: open, in the middle of the
+        // screen whichever side the clock is, or on one half if bent; shut, clear of the camera.
         .frame(maxWidth: verticalSizeClass == .compact || browser.uprightFoldOpen ? 480 : nil)
         .keepsOffFold()
-        .ignoresSafeArea(.container, edges: .horizontal)
+        .ignoresSafeArea(.container, edges: browser.uprightFoldOpen ? .horizontal : [])
         .modifier(ScreenBarSurface(sideways: verticalSizeClass == .compact))
     }
 
