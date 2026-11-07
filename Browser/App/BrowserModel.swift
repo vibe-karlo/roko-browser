@@ -1601,13 +1601,18 @@ final class BrowserModel {
         guard let context else { return [] }
         var forgotten: [ForgottenPage] = []
         let host = url.displayHost
-        let all = (try? context.fetch(FetchDescriptor<HistoryEntry>())) ?? []
+        let address = url.absoluteString
         // The launcher shows the same page under two addresses as one row
         // (same site, same title): forgetting the row forgets both.
-        let titles = Set(all.filter { $0.url == url.absoluteString && !$0.title.isEmpty }.map(\.title))
-        for entry in all {
+        let exact = (try? context.fetch(FetchDescriptor<HistoryEntry>(predicate: #Predicate { $0.url == address }))) ?? []
+        let titles = Array(Set(exact.map(\.title).filter { !$0.isEmpty }))
+        // Only what may be on the site comes out of the store, not all of history. The host is checked exactly below.
+        let predicate = wholeSite
+            ? #Predicate<HistoryEntry> { $0.url.contains(host) }
+            : #Predicate<HistoryEntry> { $0.url == address || ($0.url.contains(host) && titles.contains($0.title)) }
+        for entry in (try? context.fetch(FetchDescriptor(predicate: predicate))) ?? [] {
             let onSite = URL(string: entry.url)?.displayHost == host
-            if wholeSite ? onSite : entry.url == url.absoluteString || (onSite && titles.contains(entry.title)) {
+            if wholeSite ? onSite : entry.url == address || (onSite && titles.contains(entry.title)) {
                 forgotten.append((entry.url, entry.title, entry.visitedAt, entry.visitCount))
                 context.delete(entry)
             }
@@ -1620,16 +1625,23 @@ final class BrowserModel {
 
     func remember(_ pages: [ForgottenPage]) {
         guard let context else { return }
-        for page in pages {
-            guard let url = URL(string: page.url) else { continue }
-            let entry = HistoryEntry(url: url, title: page.title)
-            entry.visitedAt = page.visitedAt
-            entry.visitCount = page.visitCount
-            context.insert(entry)
-            historyIndex.note(url: page.url, title: page.title, visitCount: page.visitCount, visitedAt: page.visitedAt)
+        // Back in the list now; into the store off the main thread, then the list read afresh.
+        historyIndex.note(pages.map { ($0.url, $0.title, $0.visitCount, $0.visitedAt) })
+        let container = context.container
+        Task {
+            await Task.detached(priority: .userInitiated) {
+                let background = ModelContext(container)
+                for page in pages {
+                    guard let url = URL(string: page.url) else { continue }
+                    let entry = HistoryEntry(url: url, title: page.title)
+                    entry.visitedAt = page.visitedAt
+                    entry.visitCount = page.visitCount
+                    background.insert(entry)
+                }
+                try? background.save()
+            }.value
+            historyIndex.rebuild(from: container)
         }
-        try? context.save()
-        historyIndex.rebuild(from: context.container)
     }
 
     /// Pages matching what's typed, newest first: from the index in memory,

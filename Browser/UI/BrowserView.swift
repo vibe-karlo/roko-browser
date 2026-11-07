@@ -496,6 +496,7 @@ struct BrowserView: View {
                 // Nobody's typing, and nobody's speaking to it.
                 browser.dropPreload()
                 browser.cancelVoice()
+                FeedPictures.dropFromMemory()
                 WatchScheduler.schedule(in: context)
                 TodayModel.scheduleMorningRefresh()
                 FeedStore.scheduleRefresh()
@@ -1010,6 +1011,8 @@ private struct ReadLaterScreens: ViewModifier {
                 if browser.panel == .feed || browser.panel == .command && browser.launcherReturn == .feed {
                     FeedView()
                         .transition(.rises)
+                        // The files stay on disk, so the next visit doesn't fetch them again.
+                        .onDisappear { FeedPictures.dropFromMemory() }
                 }
             }
             .overlay {

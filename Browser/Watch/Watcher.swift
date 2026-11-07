@@ -1,5 +1,6 @@
 import BackgroundTasks
 import FoundationModels
+import Network
 import SwiftData
 import UserNotifications
 import WebKit
@@ -69,8 +70,12 @@ enum Watcher {
                 for await (index, lines) in group { read[index] = lines }
                 return read
             }
+            // Anything read means there's a connection; only with nothing read is it worth asking.
+            let online = read.isEmpty ? await hasConnection() : true
             for (index, watch) in due.enumerated() {
                 guard !Task.isCancelled else { break }
+                // Deleted while this check waited: nothing more to read or tell.
+                guard !isGone(watch) else { continue }
                 var lines = read[index]
                 if watch.needsRendering, let url = URL(string: watch.url) {
                     if let plain = lines, !PageLines.isThin(plain) {
@@ -80,27 +85,41 @@ enum Watcher {
                         watch.snapshot = plain.joined(separator: "\n")
                         watch.readingVersion = PageLines.version
                         watch.lastChecked = .now
+                        watch.renderSucceeded()
                         try? context.save()
                         continue
                     } else {
+                        // Plain text isn't this page's reading, so nothing to compare without this.
+                        guard online, watch.mayRenderNow else { continue }
                         lines = await RenderedPage.lines(of: url)
+                        guard !isGone(watch) else { continue }
+                        if lines == nil { watch.renderFailed() }
                     }
                 }
                 // A page that reads plainly until it won't, with bot protection in front of
                 // it, would never be checked again. Once a whole check has been missed it's
                 // read rendered from now on, its reading taken afresh as above.
-                if lines == nil, !watch.needsRendering, !inBackground, let url = URL(string: watch.url),
-                   force || watch.nextCheck.addingTimeInterval(Double(watch.everyHours) * 3600) <= .now,
-                   let rendered = await RenderedPage.lines(of: url), !PageLines.isThin(rendered) {
-                    watch.needsRendering = true
-                    watch.snapshot = rendered.joined(separator: "\n")
-                    watch.readingVersion = PageLines.version
-                    watch.lastChecked = .now
+                if lines == nil, !watch.needsRendering, !inBackground, online, watch.mayRenderNow, let url = URL(string: watch.url),
+                   force || watch.nextCheck.addingTimeInterval(Double(watch.everyHours) * 3600) <= .now {
+                    let rendered = await RenderedPage.lines(of: url)
+                    guard !isGone(watch) else { continue }
+                    if let rendered, !PageLines.isThin(rendered) {
+                        watch.needsRendering = true
+                        watch.snapshot = rendered.joined(separator: "\n")
+                        watch.readingVersion = PageLines.version
+                        watch.lastChecked = .now
+                        watch.renderSucceeded()
+                        try? context.save()
+                        continue
+                    }
+                    watch.renderFailed()
+                }
+                // Offline, or the page didn't load: it's still due, so next time. A hidden
+                // read that failed is remembered, so coming back to roko doesn't repeat it.
+                guard let lines else {
                     try? context.save()
                     continue
                 }
-                // Offline, or the page didn't load: it's still due, so next time.
-                guard let lines else { continue }
                 await compare(watch, with: lines)
                 // Each as it's done: a page read in a web view takes up to 20
                 // seconds, and roko left before then kept nothing, so the next
@@ -108,11 +127,31 @@ enum Watcher {
                 try? context.save()
             }
         }
-        WatchScheduler.schedule(watches)
+        // Read afresh: the list from the start may hold watches deleted since.
+        WatchScheduler.schedule(in: context)
+    }
+
+    /// Deleted, saved or not. A deleted watch's other properties are not to be touched.
+    private static func isGone(_ watch: Watch) -> Bool {
+        watch.modelContext == nil || watch.isDeleted
+    }
+
+    /// Whether the phone has any way out, to tell a page that failed from no connection.
+    private static func hasConnection() async -> Bool {
+        await withCheckedContinuation { continuation in
+            let monitor = NWPathMonitor()
+            // It answers at once with the current path, then with changes; cancelled, there are none.
+            monitor.pathUpdateHandler = { path in
+                monitor.pathUpdateHandler = nil
+                monitor.cancel()
+                continuation.resume(returning: path.status == .satisfied)
+            }
+            monitor.start(queue: DispatchQueue(label: "roko.watch.connection"))
+        }
     }
 
     private static func compare(_ watch: Watch, with lines: [String]) async {
-        let old = watch.snapshot.split(separator: "\n").map(String.init)
+        watch.renderSucceeded()
         watch.lastChecked = .now
         // Read by an older version of PageLines: taken afresh, not compared.
         guard watch.readingVersion == PageLines.version else {
@@ -120,28 +159,30 @@ enum Watcher {
             watch.readingVersion = PageLines.version
             return
         }
+        let lookFor = watch.lookFor
+        // Off the main thread: a check can land while a page is settling.
+        let change = await Change.between(snapshot: watch.snapshot, and: lines, forAnythingNew: lookFor.isEmpty)
+        guard !isGone(watch) else { return }
+        let old = change.old
         if LaunchClock.isEnabled { print("WATCH \(watch.host): \(lines.count) lines, was \(old.count)") }
         // Far shorter than before: an error page or a wall, not the page. Keep the old reading.
-        guard lines.joined().count * 3 >= old.joined().count else { return }
-        watch.snapshot = lines.joined(separator: "\n")
+        guard !change.isFarShorter else { return }
+        watch.snapshot = change.reading
         guard !old.isEmpty else { return }
 
-        let before = Set(old), after = Set(lines)
-        let added = lines.filter { !before.contains($0) }
-        let removed = old.filter { !after.contains($0) }
+        let added = change.added, removed = change.removed
         if LaunchClock.isEnabled { print("WATCH \(watch.host): \(added.count) added, \(removed.count) removed") }
         let verdict: (happened: Bool, notification: String)
-        if watch.lookFor.isEmpty {
-            // Anything new: new lines of real text, not a time or a counter ticking on.
-            let ticked = Set(removed.map(withoutTime))
-            let news = added.filter { $0.count >= 30 && !ticked.contains(withoutTime($0)) }
-            guard !news.isEmpty else { return }
-            verdict = await WatchJudge.news(in: news) ?? WatchJudge.guess(lookFor: "", added: news)
+        if lookFor.isEmpty {
+            guard !change.news.isEmpty else { return }
+            verdict = await WatchJudge.news(in: change.news) ?? WatchJudge.guess(lookFor: "", added: change.news)
         } else {
             guard !added.isEmpty || !removed.isEmpty else { return }
-            verdict = await WatchJudge.becameTrue(watch.lookFor, before: old, now: lines, removed: removed, added: added)
-                ?? WatchJudge.guess(lookFor: watch.lookFor, added: added)
+            verdict = await WatchJudge.becameTrue(lookFor, before: old, now: lines, removed: removed, added: added)
+                ?? WatchJudge.guess(lookFor: lookFor, added: added)
         }
+        // The model can take a while: deleted meanwhile, it's no longer wanted.
+        guard !isGone(watch) else { return }
         if LaunchClock.isEnabled { print("WATCH \(watch.host): \(verdict.happened ? "news" : "nothing"), \(verdict.notification)") }
         guard verdict.happened, !verdict.notification.isEmpty else { return }
         watch.lastNews = verdict.notification
@@ -150,14 +191,41 @@ enum Watcher {
                                 url: watch.url, thread: watch.host)
     }
 
+    /// What changed between the page's last reading and this one.
+    private nonisolated struct Change: Sendable {
+        let old: [String]
+        let added: [String]
+        let removed: [String]
+        /// For "anything new": new lines of real text, not a time or a counter ticking on.
+        let news: [String]
+        let isFarShorter: Bool
+        /// The new lines as a saved reading.
+        let reading: String
+
+        @concurrent static func between(snapshot: String, and lines: [String], forAnythingNew: Bool) async -> Change {
+            let old = snapshot.split(separator: "\n").map(String.init)
+            let before = Set(old), after = Set(lines)
+            let added = lines.filter { !before.contains($0) }
+            let removed = old.filter { !after.contains($0) }
+            var news: [String] = []
+            if forAnythingNew {
+                let ticked = Set(removed.map(withoutTime))
+                news = added.filter { $0.count >= 30 && !ticked.contains(withoutTime($0)) }
+            }
+            return Change(old: old, added: added, removed: removed, news: news,
+                          isFarShorter: lines.joined().count * 3 < old.joined().count,
+                          reading: lines.joined(separator: "\n"))
+        }
+    }
+
     /// A label saying how long ago, in English or Croatian: "Just now", "1m ago", "2 hr. ago",
     /// "prije 5 minuta", "upravo". Whole words like "3 hours" need their "ago".
-    private static let timeLabel = #"(just now|moments? ago|an? (minute|hour|day) ago|\d*\s*(s|secs?|seconds?|m|mins?|minutes?|h|hrs?|hours?|d|days?)\.?\s*ago|\d+\s*(s|m|h|d|mins?|hrs?)\.?|upravo|maloprije|prije\s+(\d+\s*|nekoliko\s+)?(sek|min|sat|dan)\p{L}*\.?)"#
+    private nonisolated static let timeLabel = #"(just now|moments? ago|an? (minute|hour|day) ago|\d*\s*(s|secs?|seconds?|m|mins?|minutes?|h|hrs?|hours?|d|days?)\.?\s*ago|\d+\s*(s|m|h|d|mins?|hrs?)\.?|upravo|maloprije|prije\s+(\d+\s*|nekoliko\s+)?(sek|min|sat|dan)\p{L}*\.?)"#
 
     /// A line without what ticks on: its digits, and a time label at its start, at its end
     /// or set apart by separators, since "Just now" becoming "1m ago" has no digit to take
     /// away. Only there: "Three hours of talks end" is news, not a label.
-    private static func withoutTime(_ line: String) -> String {
+    private nonisolated static func withoutTime(_ line: String) -> String {
         var plain = line.lowercased()
         for pattern in [timeLabel + #"\s*$"#, "^\\s*" + timeLabel + #"\s*[:·|•,–-]"#, #"[·|•]\s*"# + timeLabel + #"\s*(?=[·|•])"#] {
             plain = plain.replacingOccurrences(of: pattern, with: "", options: .regularExpression)
@@ -176,6 +244,8 @@ nonisolated enum PageLines {
     private static let session: URLSession = {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 10
+        // All plain reads wait for each other: a page trickling in can't hold them for long.
+        configuration.timeoutIntervalForResource = 30
         // Always the page as it is now: a cached copy would hide the change.
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.urlCache = nil
@@ -206,27 +276,27 @@ nonisolated enum PageLines {
         lines.joined().count < 300
     }
 
-    static func lines(from html: String) -> [String] {
+    /// Enough for a page whose size is mostly inline scripts, and for what's left without them.
+    private static let longestPage = 8 << 20, longestBody = 2 << 20
+
+    static func lines(from whole: String) -> [String] {
+        let html = TagScan(whole, atMost: longestPage)
         var lines = productLines(html)
-        for match in WebResearcher.matches(#"<option\b([^>]*)>([\s\S]*?)</option>"#, in: html) {
-            let text = WebResearcher.plain(match[1])
+        for option in html.elements(["option"]) {
+            let text = WebResearcher.plain(option.inner)
             guard !text.isEmpty, text.count <= 60 else { continue }
-            lines.append("Option: " + text + (match[0].contains("disabled") ? " (unavailable)" : ""))
+            lines.append("Option: " + text + (option.attributes.contains("disabled") ? " (unavailable)" : ""))
         }
-        var body = html
-        for tag in ["script", "style", "noscript", "svg", "nav", "header", "footer", "aside"] {
-            body = body.replacingOccurrences(of: "<\(tag)\\b[\\s\\S]*?</\(tag)>", with: " ",
-                                             options: [.regularExpression, .caseInsensitive])
-        }
-        for match in WebResearcher.matches(#"<(p|li|h[1-6]|td|dt|dd|figcaption)\b[^>]*>([\s\S]*?)</\1>"#, in: body) {
-            let text = WebResearcher.plain(match[1])
+        let body = html.removing(["script", "style", "noscript", "svg", "nav", "header", "footer", "aside"], keeping: longestBody)
+        for element in body.elements(["p", "li", "h1", "h2", "h3", "h4", "h5", "h6", "td", "dt", "dd", "figcaption"]) {
+            let text = WebResearcher.plain(element.inner)
             if text.count >= 3 { lines.append(String(text.prefix(400))) }
         }
         // A page built of divs and links (glas-slavonije.hr) has no paragraphs
         // or headings at all: its headlines are the links' text.
         if isThin(lines) {
-            for match in WebResearcher.matches(#"<a\b[^>]*>([\s\S]*?)</a>"#, in: body) {
-                let text = WebResearcher.plain(match[0])
+            for link in body.elements(["a"]) {
+                let text = WebResearcher.plain(link.inner)
                 if (25...400).contains(text.count) { lines.append(text) }
             }
         }
@@ -241,10 +311,10 @@ nonisolated enum PageLines {
     }
 
     /// Products and offers from the page's JSON-LD: "Offer: Linen shirt M 39.95 EUR InStock".
-    private static func productLines(_ html: String) -> [String] {
+    private static func productLines(_ html: TagScan) -> [String] {
         var lines: [String] = []
-        for block in WebResearcher.matches(#"<script[^>]*application/ld\+json[^>]*>([\s\S]*?)</script>"#, in: html) {
-            guard let json = try? JSONSerialization.jsonObject(with: Data(block[0].utf8)) else { continue }
+        for block in html.elements(["script"], holding: "application/ld+json") {
+            guard let json = try? JSONSerialization.jsonObject(with: Data(block.inner.utf8)) else { continue }
             collect(json, product: nil, into: &lines)
         }
         return lines
@@ -285,6 +355,106 @@ nonisolated enum PageLines {
         case "Discontinued": "discontinued"
         default: value
         }
+    }
+}
+
+/// Finds elements in a page in one pass. HTML lets a page leave out `</li>`, `</p>` and `</td>`,
+/// and a pattern looks to the end of the page for each one left out: 88 seconds on 1.1 MB. Here
+/// where the next closing tag is gets remembered, so no stretch of the page is searched twice.
+/// It finds what `<(p|li)\b[^>]*>([\s\S]*?)</\1>` finds, tag names as written (lowercase).
+nonisolated struct TagScan {
+    private let bytes: [UInt8]
+    private static let tagStart = [UInt8(ascii: "<")], tagEnd = [UInt8(ascii: ">")]
+
+    init(_ text: String, atMost limit: Int) {
+        bytes = Array(text.utf8.prefix(limit))
+    }
+
+    private init(bytes: [UInt8]) {
+        self.bytes = bytes
+    }
+
+    /// Every element with one of these names, in order, each searched for after the last ended.
+    /// With `holding`, only opening tags with those words in them count.
+    func elements(_ names: [String], holding needed: String? = nil) -> [(attributes: String, inner: String)] {
+        let tags = names.map { (open: Array("<\($0)".utf8), close: Array("</\($0)>".utf8)) }
+        let needle = needed.map { Array($0.utf8) }
+        var found: [(attributes: String, inner: String)] = []
+        bytes.withUnsafeBufferPointer { page in
+            var nextEnd = -1
+            var nextClose = [Int](repeating: -1, count: tags.count)
+            var at = 0
+            while let start = Self.find(Self.tagStart, in: page, from: at) {
+                at = start + 1
+                guard let which = tags.firstIndex(where: { Self.opens($0.open, at: start, in: page) }) else { continue }
+                let afterName = start + tags[which].open.count
+                if nextEnd < afterName {
+                    nextEnd = Self.find(Self.tagEnd, in: page, from: afterName) ?? page.count
+                }
+                // No tag finishes from here on.
+                guard nextEnd < page.count else { break }
+                if let needle, Self.find(needle, in: UnsafeBufferPointer(rebasing: page[afterName..<nextEnd]), from: 0) == nil { continue }
+                let innerStart = nextEnd + 1
+                if nextClose[which] < innerStart {
+                    nextClose[which] = Self.find(tags[which].close, in: page, from: innerStart) ?? page.count
+                }
+                let innerEnd = nextClose[which]
+                guard innerEnd < page.count else { continue }
+                found.append((Self.text(page, afterName..<nextEnd), Self.text(page, innerStart..<innerEnd)))
+                at = innerEnd + tags[which].close.count
+            }
+        }
+        return found
+    }
+
+    /// The page without these elements, each a space in its place, whatever its case. Unlike
+    /// `elements`, what comes after the name needn't finish the tag. Cut to `limit` at the end.
+    func removing(_ names: [String], keeping limit: Int) -> TagScan {
+        var kept = bytes
+        for name in names {
+            let open = Array("<\(name)".utf8), close = Array("</\(name)>".utf8)
+            let lower = kept.map { (65...90).contains($0) ? $0 + 32 : $0 }
+            var output: [UInt8] = []
+            output.reserveCapacity(kept.count)
+            var copied = 0
+            lower.withUnsafeBufferPointer { page in
+                var at = 0
+                while let start = Self.find(open, in: page, from: at) {
+                    at = start + 1
+                    guard Self.opens(open, at: start, in: page) else { continue }
+                    // None closes: nor will any later one.
+                    guard let end = Self.find(close, in: page, from: start + open.count) else { break }
+                    output.append(contentsOf: kept[copied..<start])
+                    output.append(UInt8(ascii: " "))
+                    copied = end + close.count
+                    at = copied
+                }
+            }
+            output.append(contentsOf: kept[copied...])
+            kept = output
+        }
+        if kept.count > limit { kept.removeLast(kept.count - limit) }
+        return TagScan(bytes: kept)
+    }
+
+    /// `<name` here, and the name ends here (the pattern's `\b`).
+    private static func opens(_ open: [UInt8], at start: Int, in page: UnsafeBufferPointer<UInt8>) -> Bool {
+        let end = start + open.count
+        guard end <= page.count, memcmp(page.baseAddress! + start, open, open.count) == 0 else { return false }
+        guard end < page.count else { return true }
+        let next = page[end]
+        let isWord = next >= 0x80 || next == UInt8(ascii: "_") || (48...57).contains(next) || (65...90).contains(next) || (97...122).contains(next)
+        return !isWord
+    }
+
+    private static func find(_ needle: [UInt8], in page: UnsafeBufferPointer<UInt8>, from: Int) -> Int? {
+        guard from < page.count, let base = page.baseAddress else { return nil }
+        guard let hit = memmem(base + from, page.count - from, needle, needle.count) else { return nil }
+        return base.distance(to: hit.assumingMemoryBound(to: UInt8.self))
+    }
+
+    private static func text(_ page: UnsafeBufferPointer<UInt8>, _ range: Range<Int>) -> String {
+        String(decoding: UnsafeBufferPointer(rebasing: page[range]), as: UTF8.self)
     }
 }
 

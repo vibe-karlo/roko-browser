@@ -112,6 +112,22 @@ final class HistoryIndex {
         if hits.count > Self.limit { hits.removeLast(hits.count - Self.limit) }
     }
 
+    /// Many pages at once (an Undo), each in its place by date: one pass over the list, not
+    /// one per page.
+    func note(_ pages: [(url: String, title: String, visitCount: Int, visitedAt: Date)]) {
+        guard !pages.isEmpty else { return }
+        if building { notedWhileBuilding.append(contentsOf: pages) }
+        var latest: [String: Hit] = [:]
+        for page in pages {
+            latest[page.url] = Hit(url: page.url, title: page.title, visitCount: page.visitCount, visitedAt: page.visitedAt)
+        }
+        var merged = hits.filter { latest[$0.url] == nil }
+        merged.append(contentsOf: latest.values)
+        merged.sort { $0.visitedAt > $1.visitedAt }
+        if merged.count > Self.limit { merged.removeLast(merged.count - Self.limit) }
+        hits = merged
+    }
+
     /// Gone now: the list is rebuilt from here at once, before a fresh read could finish.
     func remove(urls: Set<String>) {
         if building { removedWhileBuilding.formUnion(urls) }
@@ -141,10 +157,9 @@ final class HistoryIndex {
             // What happened while it read stays what happened.
             hits = fresh.filter { !removedWhileBuilding.contains($0.url) }
             building = false
-            for visit in notedWhileBuilding {
-                note(url: visit.url, title: visit.title, visitCount: visit.visitCount, visitedAt: visit.visitedAt)
-            }
+            let noted = notedWhileBuilding
             notedWhileBuilding = []
+            note(noted)
             removedWhileBuilding = []
             isReady = true
             builtAt = .now

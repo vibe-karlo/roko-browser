@@ -23,9 +23,14 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ### Fixed
 - A watched page that stopped reading plainly, behind bot protection, was never checked again. It's now read with its scripts running once a check has been missed. Pages read out of sight are laid out at a phone's width, so ones that lay out by width lose nothing.
 - Notify Me no longer takes a live headline's time label for news: "Just now" becoming "1m ago", in English or Croatian. A line that only mentions time, like "Three hours of talks end", still counts.
+- A watched page that keeps failing to read is no longer read again out of sight each time roko comes back: 3 hours later, then 6, 12 and once a day until it reads. With no connection nothing is tried.
+- A page that leaves out its closing tags can't hold up the other watched pages: 1.1 MB of unclosed list items took 88 seconds to read, and now takes under half a second.
+- Comparing a watched page no longer works on the main thread.
+- A watch deleted during a check isn't read any further and can't notify.
+- Undoing the removal of a whole site from history no longer holds up the screen, and removing a page looks through that site's pages, not all of history.
 - A memory warning no longer reads every open tab's picture from disk; it lets them go instead.
 - A page iOS reclaims in a tab out of sight waits to be selected, rather than reloading at once with the others.
-- News holds its pictures at the size they're shown: about 15 MB more with News open, down from about 135 MB. They're also kept on disk between visits.
+- News holds its pictures at the size they're shown: about 40 to 60 MB more with News open, down from about 135 MB. They're kept on disk between visits and let go of from memory when News closes.
 - An open Duo's tab grid reads only the pictures it shows, and doesn't lose them on screen.
 - A page preloading behind the launcher can't show a dialog or start a download while you type.
 - The microphone stops after 8 seconds with no words and after a minute in all, and whenever the launcher closes or roko leaves the screen. A microphone with no usable format can't stop the app.

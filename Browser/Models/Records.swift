@@ -69,6 +69,10 @@ final class Watch {
     /// Its text only appears once its scripts run, so it's read in a hidden
     /// web view, which only works while roko is open.
     var needsRendering: Bool = false
+    /// Hidden reads failed in a row and when the last did, so a page that keeps
+    /// failing isn't read again each time roko comes back to the screen.
+    var renderFailures: Int = 0
+    var renderFailedAt: Date?
     /// How the snapshot was read (`PageLines.version`): read another way, it's
     /// read afresh rather than compared, which would announce the difference
     /// in reading as news.
@@ -86,6 +90,24 @@ final class Watch {
 
     var nextCheck: Date {
         (lastChecked ?? .distantPast).addingTimeInterval(Double(everyHours) * 3600)
+    }
+
+    /// 3 hours after a failed hidden read, then 6, 12, and a day from then on.
+    var mayRenderNow: Bool {
+        guard let renderFailedAt, renderFailures > 0 else { return true }
+        let hours = min(24, 3 << min(renderFailures - 1, 4))
+        return renderFailedAt.addingTimeInterval(Double(hours) * 3600) <= .now
+    }
+
+    func renderFailed() {
+        renderFailures += 1
+        renderFailedAt = .now
+    }
+
+    func renderSucceeded() {
+        guard renderFailures > 0 else { return }
+        renderFailures = 0
+        renderFailedAt = nil
     }
 }
 
