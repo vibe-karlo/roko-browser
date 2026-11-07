@@ -604,6 +604,12 @@ const proofData = {
     note: "Ad and tracker servers reached per page, by Peter Lowe's and Disconnect's lists, which roko doesn't draw on, leaving out cookie consent tools. Average of 40 runs each on 16 sites, from the phone's traffic. A browser stopped at a cookie wall reaches fewer.",
     values: { roko: 0.7, arc: 0.9, brave: 1.7, duckduckgo: 2.7, quiche: 4.2, firefox: 5.7, safari: 5.7, edge: 9.8, lens: 16.4, chrome: 16.4 },
   },
+  first: {
+    unit: v => v.toFixed(0) + " of 12", low: false, head: "First to the page, first time.",
+    note: "How many of 12 sites none of these browsers had opened showed a readable page after 20 seconds, not a cookie wall, bot check or blank screen, judged by a reader who didn't know which browser was which. roko was also first to a readable page on 7 of the 10 sites any browser reached, with a median of 1.23 s. One run each, on AP News, Axios, ABC, Die Presse, Europe 1, Hindustan Times, Il Mattino, Il Post, Kurier, LCI, NOS and the NZ Herald.",
+    method: " iPhone 17 Pro, iOS 27.2, 7 November 2026. roko 0.1.4, against the six browsers that drew first visits sooner than roko on 5 November. Yours will vary. ",
+    values: { roko: 10, arc: 9, quiche: 5, firefox: 5, lens: 5, safari: 3, chrome: 3 },
+  },
   clean: {
     unit: v => v.toFixed(0) + " of 6", low: false, head: "No ads, pop-ups or walls.",
     note: "How many of six ad-heavy sites showed no ad, pop-up or wall in five swipes down the page: CNN, Daily Mail, The Guardian, The Independent, the New York Post and The Sun. One run each, judged by eye.",
