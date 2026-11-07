@@ -66,7 +66,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Reader no longer starts with a byline, a picture credit or "44 minutes ago".
 
 ### Website
-- The changelog page lists 0.1.3, now that Apple has approved it for public testing.
+- The changelog page lists 0.1.3 and 0.1.4.
 - The site is lighter and calmer: half the download, a much faster first screen on phones, and a page left alone no longer keeps the phone working.
 - The site shows the new bar: pages as rounded cards on the band, with the Search capsule, and every screenshot taken again on it.
 - News looks as it does in the app, pictures and all: four sites' reports of one story become one headline as you scroll, then open as one account with numbered sources, and where they differ only if they do.
