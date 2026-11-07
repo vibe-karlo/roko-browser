@@ -407,6 +407,28 @@ export function start(AutoConsent, filterCompactRules, compactRules) {
         }
     };
 
+    // A frame that is only a yes to cookies, drawn as text rather than a button (Piano's, for
+    // El Confidencial): roko asks whether the page around it is a wall, and presses it if so.
+    const watchForFrameYes = () => {
+        let asked = false;
+        for (const delay of [1500, 4000, 8000, 13000]) {
+            setTimeout(async () => {
+                if (asked || accepted || !document.body) return;
+                const text = (document.body.innerText || '').trim();
+                if (!text || text.length > 40 || !COOKIE_WORDS.test(text) || !WALL_YES.test(text)) return;
+                // The innermost element holding all of it: the one its click is meant for.
+                let target = document.body;
+                for (let child; (child = [...target.children].find((c) => (c.innerText || '').trim() === text));) target = child;
+                asked = true;
+                const reply = await post({ type: 'rokoFrameYes' });
+                if (!reply || !reply.press) return;
+                target.click();
+                accepted = true;
+                countSaved(1);
+            }, delay);
+        }
+    };
+
     const watchForBlockedContent = () => {
         let reported = false;
         for (const delay of [2000, 5000, 9000]) {
@@ -453,6 +475,7 @@ export function start(AutoConsent, filterCompactRules, compactRules) {
         { autoconsent: [], compact: filterCompactRules(compactRules, { url: location.href, mainFrame }) },
     );
     watchForPaidWall();
+    if (!mainFrame) watchForFrameYes();
     if (mainFrame) {
         watchForBlockedContent();
         watchForPlainBanner();

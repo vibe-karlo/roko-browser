@@ -56,10 +56,17 @@ final class ConsentHandler: NSObject, WKScriptMessageHandlerWithReply {
             const coversPage = () => innerWidth >= 280 && innerHeight >= 300
                 && /accept|agree|consent|allow|acept|aceit|accett|akzept|zustimm|prihvat|prihvać/i.test(
                     [...document.querySelectorAll("button, [role=button]")].slice(0, 12).map((b) => b.innerText).join(" "));
+            // Or a frame that is only a yes to cookies: a wall's button served on its own
+            // (El Confidencial's, from Piano, beside the frame with the choices).
+            const loneYes = () => {
+                const text = document.body ? (document.body.innerText || "").trim() : "";
+                return text.length > 0 && text.length <= 40 && /cookie|kolačić|kolacic/i.test(text)
+                    && /accept|acept|aceit|accett|akzept|agree|zustimm|akkoord|prihvat/i.test(text);
+            };
             const wanted = () => !gate
                 || (gate.patterns && new RegExp(gate.patterns).test(location.href))
                 || (gate.selectors && document.querySelector(gate.selectors) !== null)
-                || coversPage();
+                || coversPage() || loneYes();
             const begin = () => {
                 if (begun) return;
                 begun = true;
@@ -180,6 +187,18 @@ final class ConsentHandler: NSObject, WKScriptMessageHandlerWithReply {
                                                                   in: nil, contentWorld: .page)) as? Int ?? 0
             return (["answered": answered > 0, "accepted": accept && answered > 0], nil)
 
+        case "rokoFrameYes":
+            // A frame that is only a yes to cookies: pressed when the page around it is a wall
+            // whose other way past costs money, as for a wall's yes on the page itself.
+            guard !message.frameInfo.isMainFrame else { return (["press": false], nil) }
+            if acceptance(for: host) != nil { return (["press": true], nil) }
+            let frameHost = message.frameInfo.request.url?.host() ?? ""
+            let isWall = (try? await webView.evaluateJavaScript(Self.wallAround(frameHost), in: nil, contentWorld: Self.world)) as? Bool ?? false
+            guard isWall else { return (["press": false], nil) }
+            setAccepted(.wall, for: host)
+            onAccepted?(host, .wall)
+            return (["press": true], nil)
+
         case "rokoSaved":
             SavedStats.cookieBar(clicks: body["clicks"] as? Int ?? 1)
             return (nil, nil)
@@ -227,6 +246,33 @@ final class ConsentHandler: NSObject, WKScriptMessageHandlerWithReply {
         default:
             break
         }
+    }
+
+    /// Whether the page is a wall a frame's yes belongs to: a short page about cookies whose
+    /// other way past is paying (El Confidencial's /consent), or a big frame from the same
+    /// place pinned over the page, holding the choices.
+    private static func wallAround(_ frameHost: String) -> String {
+        let host = frameHost.replacingOccurrences(of: "\\", with: "").replacingOccurrences(of: "'", with: "")
+        return """
+        (() => {
+          const text = document.body ? document.body.innerText || '' : '';
+          const pay = /subscri|suscri|abonn|abbon|\\babo\\b|\\bpay\\b|\\bpaga|\\bpago\\b|bezahl|pretplat|assin|ad[- ]?free|werbefrei|sans pub|sin (anuncios|publi)|senza pubbl|contentpass/i;
+          if (text.length < 4000 && /cookie/i.test(text) && pay.test(text)) return true;
+          const pinned = (el) => {
+            for (let node = el; node && node !== document.body; node = node.parentElement) {
+              const p = getComputedStyle(node).position;
+              if (p === 'fixed' || p === 'sticky') return true;
+            }
+            return false;
+          };
+          return [...document.querySelectorAll('iframe')].some((f) => {
+            let from = '';
+            try { from = new URL(f.src, location.href).host; } catch (e) {}
+            const r = f.getBoundingClientRect();
+            return from === '\(host)' && r.width >= innerWidth * 0.6 && r.height >= innerHeight * 0.5 && pinned(f);
+          });
+        })()
+        """
     }
 
     /// A platform's notice that's showing, answered through its API: for pages
