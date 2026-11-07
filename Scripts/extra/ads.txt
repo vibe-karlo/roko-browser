@@ -49,3 +49,7 @@ glas-slavonije.hr##.iat-adhesion-bar
 ||cricketleaf.com^
 ||ads.thesun.co.uk^
 ||snippet.affilimatejs.com^
+!
+! iq digital's ad controller, for every publisher it serves (Tagesspiegel's "Anzeige" boxes):
+! EasyList blocks it only for spiegel.de.
+||amazonaws.com/prod.iqdcontroller.iqdigital/$third-party

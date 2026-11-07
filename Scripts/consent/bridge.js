@@ -43,7 +43,11 @@ const COOKIE_WORDS = /cookie|kolačić|kolacic|kolačiće|keks|galleta|biscott/i
 // to the payment page, or an account form ("Disagree and create account"). In any of the
 // languages below, a word for no and a word for paying or signing up.
 const SAY_NO = /\b(reject|refuse|decline|deny|disagree)\b|rifiut|rechaz|ablehn|refus|rejeit|recus|odbij|weiger|odrzu|odmít/i;
-const payToRejectLabel = (words) => (SAY_NO.test(words) && WALL_PAY.test(words)) || /\bpay to (reject|refuse|decline)\b/i.test(words);
+// A yes that says it isn't paying ("Nie chcę płacić, jednak akceptuję zgody", WP's) isn't a pay button:
+// those words go before a label is read for paying.
+const NOT_PAYING = /(nie chcę|nie chce) (płacić|placic)|don'?t want to pay|without paying|ohne (zu )?(be)?zahlen|sans payer|sin pagar|senza pagare|bez plaćanja|nechci platit/gi;
+const payWords = (words) => words.replace(NOT_PAYING, '');
+const payToRejectLabel = (words) => (SAY_NO.test(words) && WALL_PAY.test(payWords(words))) || /\bpay to (reject|refuse|decline)\b/i.test(words);
 const shown = (el) => typeof el.checkVisibility !== 'function' || el.checkVisibility({ checkVisibilityCSS: true });
 // Some walls ask twice (Il Messaggero: "press again to continue, 1/2"): while the same
 // yes is still there, it's pressed again, a few times at most.
@@ -58,12 +62,14 @@ const pressUntilGone = (find, button) => {
     };
     setTimeout(again, 700);
 };
-const buttonsOnPage = () => [...document.querySelectorAll('button, a, [role="button"], input[type="button"]')]
+// A site's own button element (RP Online's <custom-button>) counts as a button.
+const customButtons = (root) => [...root.querySelectorAll('*')].filter((el) => el.tagName.endsWith('-BUTTON'));
+const buttonsOnPage = () => [...document.querySelectorAll('button, a, [role="button"], input[type="button"]'), ...customButtons(document)]
     .filter((b) => label(b).length <= 60 && shown(b));
 const payToReject = () => buttonsOnPage().some((b) => payToRejectLabel(label(b)));
 // Its accept button, pressed directly: a platform's rule can miss a site's
 // own variant of the pop-up ("I Accept" beside "Reject and Pay").
-const isYes = (words) => ACCEPT.test(words) || (WALL_YES.test(words) && !WALL_NOT_YES.test(words) && !WALL_PAY.test(words));
+const isYes = (words) => ACCEPT.test(words) || (WALL_YES.test(words) && !WALL_NOT_YES.test(words) && !WALL_PAY.test(payWords(words)));
 // The biggest first: a yes is a button, and the word "consent" in a line of text can be a
 // link beside it (as.com's opens an explanation).
 const area = (el) => { const r = el.getBoundingClientRect(); return r.width * r.height; };
@@ -76,10 +82,10 @@ const acceptBeside = () => biggestFirst(buttonsOnPage().filter((b) => isYes(labe
 // a box pinned over the page, or a pop-up's whole frame, that talks about cookies
 // or data and has both buttons. A newsletter's subscribe box has no accept button,
 // and an "accept only necessary" isn't a yes.
-const WALL_YES = /\b(accept|agree|consent|allow)\b|acept|aceit|accett|accept|akzept|zustimm|einverstanden|prihvać|prihvac|slažem|slazem|akkoord|zgadzam|souhlas/i;
+const WALL_YES = /\b(accept|agree|consent|allow)\b|acept|aceit|accett|accept|akzept|akcept|zustimm|einverstanden|prihvać|prihvac|slažem|slazem|akkoord|zgadzam|souhlas/i;
 const WALL_NOT_YES = /necess|essential|notwendig|erforderlich|nužn|nuzn|only|solo|nur\b|manag|setting|prefer|einstell|option|custom|personal|gestion|ajust|configur|detail|learn|more/i;
-const WALL_PAY = /subscri|suscri|abonn|abbon|\babo\b|\bpay\b|\bpaga|\bpago\b|bezahl|kaufen|\bbuy\b|purchase|\bpur\b|pretplat|assin|ad[- ]?free|werbefrei|sans pub|sin (anuncios|publi)|senza pubbl|contentpass|create (an )?account|créer un compte|crear (una )?cuenta|konto erstellen|crea (un )?account/i;
-const WALL_WORDS = /cookie|kolačić|kolacic|consent|tracking|privacy|partner|personal|datos|daten|données|donnees|dati\b|podat|werbung|publicidad|pubblicit|publicité|adverts/i;
+const WALL_PAY = /subscri|suscri|abonn|abbon|\babo\b|abonament|\bpay\b|\bpaga|\bpago\b|bezahl|kaufen|\bbuy\b|purchase|\bpur\b|pretplat|předplat|płac|płać|zapłac|zaplat|assin|\bpremium\b|upgrade|\d\s?(€|eur\b|zł|kč|£)|[€£$]\s?\d|ad[- ]?free|werbefrei|sans pub|sin (anuncios|publi)|senza pubbl|contentpass|create (an )?account|créer un compte|crear (una )?cuenta|konto erstellen|crea (un )?account/i;
+const WALL_WORDS = /cookie|kolačić|kolacic|consent|tracking|privacy|partner|personal|datos|daten|données|donnees|dati\b|podat|werbung|publicidad|pubblicit|publicité|adverts|zgod|reklam|prywatno|toestemming/i;
 const WALL_BUTTONS = 'button, a, [role="button"], input[type="button"], input[type="submit"]';
 
 // The big pinned boxes around a button, innermost first: a wall's buttons often sit in a
@@ -102,22 +108,24 @@ const pinnedBoxes = (el) => {
 // consent in so many words, not a footer's "cookies", and by being no form: a sign-up page
 // with an "I agree" isn't this.
 const CONSENT_WORDS = /consen|einwillig|zustimm/i;
+// Or by its address: a page of its own for consent (RP Online's /info/consent/) can run long with its footer.
+const CONSENT_PAGE = /consent|einwillig|zustimm|privacy-gate|cookie/i;
 const wholePageWall = () => {
     const text = document.body ? document.body.innerText || '' : '';
-    if (text.length >= 4000 || !CONSENT_WORDS.test(text)) return false;
+    if (!CONSENT_PAGE.test(location.pathname) && (text.length >= 4000 || !CONSENT_WORDS.test(text))) return false;
     return ![...document.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, select')].some(shown);
 };
 
 const paidWall = (mainFrame) => {
-    const buttons = [...document.querySelectorAll(WALL_BUTTONS)].filter((b) => {
+    const buttons = [...document.querySelectorAll(WALL_BUTTONS), ...customButtons(document)].filter((b) => {
         const rect = b.getBoundingClientRect();
         return rect.width > 0 && rect.height > 0 && label(b).length > 0 && label(b).length <= 60 && shown(b);
     });
-    const pay = buttons.filter((b) => WALL_PAY.test(label(b)));
+    const pay = buttons.filter((b) => WALL_PAY.test(payWords(label(b))));
     if (!pay.length) return null;
     for (const yes of biggestFirst(buttons)) {
         const words = label(yes);
-        if (!WALL_YES.test(words) || WALL_NOT_YES.test(words) || WALL_PAY.test(words)) continue;
+        if (!WALL_YES.test(words) || WALL_NOT_YES.test(words) || WALL_PAY.test(payWords(words))) continue;
         for (const box of mainFrame ? [...pinnedBoxes(yes), ...(wholePageWall() ? [document.body] : [])] : [document.body]) {
             if (pay.some((b) => box.contains(b)) && WALL_WORDS.test((box.innerText || '').slice(0, 3000))) return yes;
         }
