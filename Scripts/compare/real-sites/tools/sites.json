@@ -55,5 +55,21 @@
 "fox": "https://www.foxnews.com/",
 "usatoday": "https://www.usatoday.com/",
 "people": "https://people.com/",
-"weather": "https://weather.com/"
+"weather": "https://weather.com/",
+"skynews": "https://news.sky.com/",
+"dailystar": "https://www.dailystar.co.uk/",
+"nbcnews": "https://www.nbcnews.com/",
+"cbsnews": "https://www.cbsnews.com/",
+"latimes": "https://www.latimes.com/",
+"tagesspiegel": "https://www.tagesspiegel.de/",
+"merkur": "https://www.merkur.de/",
+"rponline": "https://rp-online.de/",
+"ilgiornale": "https://www.ilgiornale.it/",
+"20minutesfr": "https://www.20minutes.fr/",
+"ladepeche": "https://www.ladepeche.fr/",
+"eldiario": "https://www.eldiario.es/",
+"elperiodico": "https://www.elperiodico.com/",
+"rtlnieuws": "https://www.rtl.nl/nieuws",
+"oe24": "https://www.oe24.at/",
+"wppl": "https://www.wp.pl/"
 }
