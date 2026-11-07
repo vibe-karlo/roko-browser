@@ -127,6 +127,65 @@ const paidWall = (mainFrame) => {
 
 const label = (el) => (el.innerText || el.value || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim();
 
+// A wall no rule knows whose no isn't on its first screen, or that draws itself inside a
+// shadow root, out of reach of every rule and check that looks through the page (DPG Media's,
+// on its own address, for AD, NU.nl, de Volkskrant and more). It has a yes, and a no or the way
+// to one. A no is what it gets: only when settings hold none does the wall count as a wall.
+const SETTINGS = /^(cookie |privacy |my )?(settings|preferences|options|instellingen)$|^(instellen|manage|manage (my |your )?(cookies|settings|preferences|options|choices)|more options|customi[sz]e|voorkeuren|einstellungen|optionen|cookie-einstellungen|anpassen|paramètres|paramétrer|personnaliser|gérer|gérer (mes |les )?(choix|cookies|préférences)|configurar|ajustes|personalizar|gestionar|impostazioni|personalizza|gestisci|opcje|ustawienia|postavke|nastavení)$/i;
+const SAVE = /^(save|save (my |and |& )?(settings|preferences|choices|exit|close)|confirm( my)? (choices|selection)|voorkeuren opslaan|opslaan|bevestigen|speichern|auswahl (speichern|bestätigen)|enregistrer|guardar|salva|spremi|potvrdi|zapisz|uložit)$/i;
+const REJECT_ALL = /\b(all|alles|alle|tout|todo|tutto|wszystko|sve)\b/i;
+const shadowRootsOnPage = () => {
+    const roots = [];
+    const visit = (root, depth) => {
+        for (const el of root.querySelectorAll('*')) {
+            if (!el.shadowRoot) continue;
+            roots.push(el.shadowRoot);
+            if (depth < 2) visit(el.shadowRoot, depth + 1);
+        }
+    };
+    visit(document, 0);
+    return roots;
+};
+const buttonsIn = (root) => [...root.querySelectorAll(WALL_BUTTONS)].filter((b) => {
+    const rect = b.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0 && label(b).length > 0 && label(b).length <= 60 && shown(b);
+});
+const rejectIn = (buttons) => buttons.filter((b) => REJECT.test(label(b)))
+    .sort((a, b) => REJECT_ALL.test(label(b)) - REJECT_ALL.test(label(a)))[0];
+// Up through a shadow root's host too, unlike pinnedBoxes.
+const overPage = (el) => {
+    for (let node = el, depth = 0; node && depth < 30; depth++) {
+        if (node.nodeType === 1 && node !== document.body && node !== document.documentElement) {
+            const position = getComputedStyle(node).position;
+            const rect = node.getBoundingClientRect();
+            if ((position === 'fixed' || position === 'sticky') && rect.width >= window.innerWidth * 0.6 && rect.height >= window.innerHeight * 0.2) return true;
+        }
+        node = node.parentNode && node.parentNode.host ? node.parentNode.host : node.parentNode;
+    }
+    return false;
+};
+const textOf = (root) => (root === document ? (document.body ? document.body.innerText : '') : [...root.children].map((c) => c.innerText || '').join(' ')) || '';
+const pageIsShort = () => !document.body || (document.body.innerText || '').length < 4000;
+const consentGate = () => {
+    for (const root of [...shadowRootsOnPage(), document]) {
+        const buttons = buttonsIn(root);
+        const yes = biggestFirst(buttons.filter((b) => isYes(label(b))))[0];
+        if (!yes) continue;
+        const reject = rejectIn(buttons), settings = buttons.find((b) => SETTINGS.test(label(b)));
+        if (!reject && !settings) continue;
+        // One choice, so one place on the screen: a short page's "Settings" link in its menu isn't it.
+        let near = yes;
+        for (let i = 0; i < 4 && near.parentElement; i++) near = near.parentElement;
+        if (!near.contains(reject || settings)) continue;
+        if (!WALL_WORDS.test(textOf(root).slice(0, 4000))) continue;
+        // Over the page, or all there is of it.
+        if (overPage(yes) || (pageIsShort() && !document.querySelector('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, select'))) {
+            return { root, yes, reject, settings };
+        }
+    }
+    return null;
+};
+
 const pinned = (el) => {
     for (let node = el, depth = 0; node && node !== document.body && depth < 4; node = node.parentElement, depth++) {
         const position = getComputedStyle(node).position;
@@ -301,6 +360,53 @@ export function start(AutoConsent, filterCompactRules, compactRules) {
         }
     };
 
+    // The answer takes up to two steps, and a gate that opens its settings on a new address
+    // starts here again: it remembers, so that page's lack of a no counts.
+    const watchForConsentGate = () => {
+        let handled = false;
+        const triedSettings = () => { try { return sessionStorage.getItem('rokoGateSettings') === '1'; } catch (_) { return false; } };
+        const sayYes = async (gate) => {
+            await post({ type: 'rokoWall', cmp: 'roko-gate' });
+            gate.yes.click();
+            accepted = true;
+            countSaved(1);
+        };
+        for (const delay of [2000, 4500, 8000, 13000]) {
+            setTimeout(async () => {
+                if (handled || accepted || consent.foundCmp) return;
+                const gate = consentGate();
+                if (!gate) return;
+                handled = true;
+                const reply = await post({ type: 'popupFound', cmp: 'roko-gate', url: location.href });
+                if (!reply) return;
+                if (reply.type === 'optIn') {
+                    gate.yes.click();
+                    accepted = true;
+                    countSaved(1);
+                    return;
+                }
+                let reject = gate.reject, root = gate.root;
+                if (!reject && !triedSettings()) {
+                    try { sessionStorage.setItem('rokoGateSettings', '1'); } catch (_) {}
+                    gate.settings.click();
+                    await new Promise((resolve) => setTimeout(resolve, 1500));
+                    reject = rejectIn(buttonsIn(root));
+                }
+                if (!reject) {
+                    const now = consentGate();
+                    if (now) await sayYes(now);
+                    return;
+                }
+                reject.click();
+                countSaved(1);
+                // A no that only sets the choices still has to be saved.
+                await new Promise((resolve) => setTimeout(resolve, 900));
+                const save = buttonsIn(root).find((b) => SAVE.test(label(b)));
+                if (save && save.isConnected) save.click();
+            }, delay);
+        }
+    };
+
     const watchForBlockedContent = () => {
         let reported = false;
         for (const delay of [2000, 5000, 9000]) {
@@ -351,5 +457,6 @@ export function start(AutoConsent, filterCompactRules, compactRules) {
         watchForBlockedContent();
         watchForPlainBanner();
         watchForPlatformApi();
+        watchForConsentGate();
     }
 }

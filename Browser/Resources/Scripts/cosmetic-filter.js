@@ -123,6 +123,36 @@
   // Sites often lock scrolling a moment after the pop-up would have appeared.
   for (const delay of [800, 2500, 6000]) setTimeout(() => overlays.length && unlockIfNeeded(), delay);
 
+  // A lock that outlives its pop-up, whoever answered it: People's stylesheet locks the page for as
+  // long as OneTrust's box says show-banner, which it goes on saying after the answer. Nothing is
+  // up and the page is long, but it won't move. Only while you haven't touched the page (a menu you
+  // opened may lock it on purpose), and not with anything big over it, in or out of the way. A
+  // page that scrolls inside itself has nothing past the screen here, so it isn't touched.
+  let touched = false;
+  addEventListener("pointerdown", () => { touched = true; }, { capture: true, passive: true, once: true });
+  const overTheContent = () => {
+    for (const share of [0.3, 0.5, 0.7]) {
+      let el = document.elementFromPoint(innerWidth / 2, innerHeight * share);
+      for (; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
+        if (el.offsetHeight < innerHeight * 0.3) continue;
+        const s = getComputedStyle(el);
+        if (s.position === "fixed" || s.position === "sticky" && el.offsetHeight < innerHeight * 1.2) return true;
+        if (s.position === "absolute" && parseInt(s.zIndex) >= 10) return true;
+        if (el.getAttribute("aria-modal") === "true" || el.tagName === "DIALOG") return true;
+      }
+    }
+    return false;
+  };
+  const freeIfStranded = () => {
+    const root = document.documentElement, body = document.body;
+    if (touched || !body || (!isLocked(root) && !isLocked(body))) return;
+    if (Math.max(root.scrollHeight, body.scrollHeight) < innerHeight * 1.5 || overTheContent()) return;
+    unlock();
+  };
+  const armStranded = () => { for (const delay of [1500, 4000, 8000, 13000]) setTimeout(freeIfStranded, delay); };
+  if (document.readyState === "complete") armStranded();
+  else addEventListener("load", armStranded, { once: true });
+
   // "Get our app" banners (smartbanner.js, on countless sites) push the page
   // down by their height and note the margin they replaced. Hidden, the banner
   // leaves that push behind as an empty band at the top: put the margin back.

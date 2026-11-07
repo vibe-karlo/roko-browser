@@ -639,6 +639,8 @@ struct BrowserView: View {
                     .environment(\.liveBandOverBar, barInBand)
                     .frame(maxWidth: barInBand ? bandBarWidth : nil)
                     .keepsOffFold()
+                    // Alone in the band, it's centred in all of it, down to the screen's edge.
+                    .offset(y: barInBand && browser.isBarCollapsed && browser.bandShowsStrip ? max(bottomInset - 20, 9) / 2 : 0)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             if barInBand && !browser.isBarCollapsed {

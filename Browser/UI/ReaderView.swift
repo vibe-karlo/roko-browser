@@ -305,7 +305,7 @@ struct ReaderView: View {
     // MARK: The bar
 
     /// Always in reach: out on the left, as on every screen here; the story's three
-    /// sides, one switch; then put it aside, or take the page into a tab of its own.
+    /// sides, one switch; then put it aside.
     private func storyBar(_ story: NewsStory) -> some View {
         let saved = ReadLater.shared.contains(story.link)
         return HStack(spacing: 0) {
@@ -321,15 +321,17 @@ struct ReaderView: View {
             }
             .animation(.snappy(duration: 0.28), value: shown)
             Spacer(minLength: 0)
-            // A newsletter has no address to save or open: its text and its email are here.
+            // A newsletter has no address to save: its text and its email are here.
             if story.isMail {
                 Color.clear.frame(width: 44, height: Theme.barHeight)
             } else {
-                barButton(.readLater, label: saved ? "Saved" : "Save for Later", tint: saved ? Theme.accentText : Theme.ink) {
-                    ReadLater.shared.save(story, text: model.page?.text ?? "")
+                barButton(.readLater, label: saved ? "Remove from Saved" : "Save for Later", tint: saved ? Theme.accentText : Theme.ink) {
+                    if saved {
+                        ReadLater.shared.remove(url: story.link)
+                    } else {
+                        ReadLater.shared.save(story, text: model.page?.text ?? "")
+                    }
                 }
-                .disabled(saved)
-                barButton(.openLink, label: "Open in a tab", tint: Theme.ink) { browser.openOriginal(of: story) }
             }
         }
         .frame(height: Theme.barHeight + 8)

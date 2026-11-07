@@ -1410,11 +1410,6 @@ final class BrowserModel {
         model.start()
     }
 
-    /// A story as the page it came from, in a new tab.
-    func openOriginal(of story: NewsStory) {
-        openPage(story.link)
-    }
-
     /// Out of the feed to a page of its own, in a new tab.
     func openPage(_ url: URL) {
         reader = nil

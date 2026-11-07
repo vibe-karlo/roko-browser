@@ -77,6 +77,12 @@ final class ReadLater {
 
     func page(_ id: UUID) -> ReadLaterPage? { pages.first { $0.id == id } }
 
+    /// Takes this address back out of the list.
+    func remove(url: URL) {
+        guard let page = pages.first(where: { Self.samePage($0.url, url) }) else { return }
+        remove(page.id)
+    }
+
     func imageURL(of page: ReadLaterPage) -> URL? {
         page.image.map { Self.folder.appending(path: $0) }
     }
