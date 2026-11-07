@@ -14,3 +14,6 @@ says which servers each browser reached. No page contents are kept, only hostnam
    sheets. These hold private things from the phone's screen, such as notifications: don't publish them.
 
 Runs on real sites differ day to day, so compare browsers within one pass.
+
+Runs of one browser need room between them. Force-closed and reopened within about a minute, Brave asks whether to
+restore its tabs and doesn't load the page: such a run shows up with almost no data. Keep at least two minutes between its runs.

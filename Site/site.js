@@ -596,7 +596,8 @@ const proofData = {
   speed: {
     unit: v => v.toFixed(2) + " s", low: true, head: "The fastest of ten browsers.",
     note: "Time from opening a link until half of the page is drawn, on CNN, Daily Mail, The Guardian, The Independent, Index.hr, the New York Post, The Sun and Wikipedia, sites each browser had opened before. Median of 24 runs each, in random order, measured from the screen.",
-    values: { roko: 1.07, quiche: 1.70, lens: 2.76, arc: 3.41, firefox: 3.47, brave: 3.54, duckduckgo: 4.33, chrome: 4.96, safari: 4.96, edge: 5.46 },
+    method: " roko, Quiche, Arc Search, Lens and Brave are from 7 November 2026; the other five are from 5 to 6 November, so compare within a date first. iPhone 17 Pro, iOS 27.2. roko on 7 November was a test build of 0.1.4. Others on 5 to 6 November: Safari 27.2, Chrome 157, Firefox 159, Edge 156, DuckDuckGo 7.244. Yours will vary. ",
+    values: { roko: 0.77, quiche: 1.48, arc: 2.87, lens: 2.91, firefox: 3.47, brave: 3.75, duckduckgo: 4.33, chrome: 4.96, safari: 4.96, edge: 5.46 },
   },
   block: {
     unit: v => v.toFixed(1) + " reached a page", low: true, head: "Blocks the most ads and trackers.",
@@ -633,7 +634,7 @@ if (runs) {
     head.textContent = view.head;
     reads.textContent = m.low ? "Shorter is better." : "Longer is better.";
     note.innerHTML = "";
-    note.append(m.note + proofMethod);
+    note.append(m.note + (m.method || proofMethod));
     const how = document.createElement("a");
     how.href = "https://github.com/vibe-karlo/roko-browser/tree/main/Scripts/compare/real-sites";
     how.textContent = "Run the test yourself.";
