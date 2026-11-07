@@ -14,10 +14,50 @@ final class BrowseSession: Identifiable {
         didSet { if showsSearch { loadSearchIfNeeded() } }
     }
 
+    /// Its card in the tab switcher, and its file once it's closed (RecentAnswers).
+    let answerID: UUID
+    /// Asked from private browsing: nothing of it is kept.
+    var isPrivate = false
+    /// Opened from its card, not asked just now.
+    let isRestored: Bool
+
     init(question: String, context: [(question: String, answer: String)] = []) {
         let first = BrowseForMeModel(query: question, context: context)
         turns = [first]
+        answerID = UUID()
+        isRestored = false
         first.start()
+    }
+
+    /// An answer opened again from its card: as it was, with nothing asked again.
+    /// Follow-ups carry every answer before them, as for one asked just now.
+    init(restoring answer: SavedAnswer, id: UUID) {
+        var restored: [BrowseForMeModel] = []
+        for turn in answer.turns {
+            let context = restored.map { (question: $0.query, answer: $0.plainAnswer) }
+            restored.append(BrowseForMeModel(restoring: turn, context: context))
+        }
+        turns = restored
+        answerID = id
+        isRestored = true
+    }
+
+    /// What's kept once it's closed: the questions answered in full, in order. Nil with none.
+    var keepable: SavedAnswer? {
+        let done = turns.prefix { $0.phase == .done }.compactMap(\.saved)
+        return done.isEmpty ? nil : SavedAnswer(turns: done)
+    }
+
+    /// The card's lines: the first answer's opening, without its marks.
+    var cardLines: [String] {
+        let text = turns.first?.plainAnswer ?? ""
+        return text.split(separator: "\n").lazy
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .map { $0.replacingOccurrences(of: #"^(#+|[-*>•]|=>|\d+\.)\s*"#, with: "", options: .regularExpression) }
+            .map { $0.replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "|", with: " · ") }
+            .filter { !$0.isEmpty }
+            .prefix(4)
+            .map { String($0.prefix(160)) }
     }
 
     var latest: BrowseForMeModel { turns[turns.count - 1] }

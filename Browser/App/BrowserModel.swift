@@ -36,6 +36,11 @@ final class BrowserModel {
         // Back from the to-do list or the bar (a to-do added there): what's due may have changed.
         didSet {
             if [.todos, .command].contains(oldValue), panel != oldValue { refreshLive() }
+            // Left one of roko's screens: its card in the switcher, with what it showed.
+            if panel != oldValue, let kind = RecentScreen.Kind(oldValue) {
+                rememberScreen(kind)
+                if panel == .tabs { screenForSwitcher = RecentScreens.shared.items.first?.id }
+            }
             if panel == .command { showsLaunchField = false }
             // On an open Duo Read Later is half the screen, not a panel over it: the page and its controls stay live.
             if panel == .readLater, uprightFoldOpen, selectedTab != nil, split == nil {
@@ -145,10 +150,19 @@ final class BrowserModel {
         // An answer that's closed or replaced stops working on the spot:
         // nobody will read it, so it shouldn't keep searching or spending tokens.
         didSet {
-            if oldValue !== browseForMe { oldValue?.cancel() }
+            if oldValue !== browseForMe {
+                oldValue?.cancel()
+                if let oldValue { keepAnswer(oldValue) }
+                // Asked from private browsing: nothing of it is kept.
+                if let browseForMe, !browseForMe.isRestored {
+                    browseForMe.isPrivate = selectedTab?.isPrivate == true || commandMode == .privateTab
+                }
+            }
             if browseForMe == nil { pageBeside = false }
         }
     }
+    /// The card to centre as the switcher opens: the screen it was opened from.
+    var screenForSwitcher: UUID?
     /// An open iPhone Duo in landscape: the fold runs top to bottom.
     var uprightFoldOpen = false {
         didSet {
@@ -163,6 +177,7 @@ final class BrowserModel {
     var readLaterBeside = false {
         didSet {
             guard !readLaterBeside else { return }
+            if oldValue { rememberScreen(.readLater) }
             finishSavedBeside()
             pageBeside = false
         }
@@ -969,6 +984,8 @@ final class BrowserModel {
 
     /// Everything one Close All took, ready to come back together.
     struct ClosedGroup {
+        /// roko's screens' cards, which Close All takes too.
+        var screens: [RecentScreen] = []
         let tabs: [ClosedTab]
         let selectedIndex: Int?
     }
@@ -989,6 +1006,7 @@ final class BrowserModel {
         // Taken before anything closes, so Undo finds every tab's place. The
         // selected one goes last, so no other tab wakes up on the way out.
         let group = ClosedGroup(
+            screens: RecentScreens.shared.takeAll(),
             tabs: tabs.enumerated().compactMap { index, tab in
                 guard !tab.isPrivate, let url = tab.url else { return nil }
                 return ClosedTab(id: tab.id, url: url, title: tab.title, state: tab.interactionState, index: index)
@@ -997,7 +1015,7 @@ final class BrowserModel {
         // Their pictures stay on disk for Undo; the next launch sweeps up the rest.
         for tab in closing where tab.id != selectedID { close(tab, keepingPicture: true) }
         if let selectedTab, closing.contains(where: { $0.id == selectedTab.id }) { close(selectedTab, keepingPicture: true) }
-        closedGroup = group.tabs.isEmpty ? nil : group
+        closedGroup = group.tabs.isEmpty && group.screens.isEmpty ? nil : group
         panel = .tabs
     }
 
@@ -1005,6 +1023,7 @@ final class BrowserModel {
     func reopenClosedGroup() {
         guard let group = closedGroup else { return }
         closedGroup = nil
+        RecentScreens.shared.restore(group.screens)
         recentlyClosed.removeLast(min(group.tabs.count, recentlyClosed.count))
         for closed in group.tabs {
             // The same id as before: its picture is still on disk under it.
@@ -1672,6 +1691,64 @@ final class BrowserModel {
         ((try? context.fetch(descriptor)) ?? []).forEach(context.delete)
         try? context.save()
         historyIndex.rebuild(from: context.container)
+        RecentScreens.shared.forgetAnswers(since: since)
+    }
+
+    // MARK: roko's screens in the switcher
+
+    /// Its card, with the first few things on it as you left it: read here, as it closes,
+    /// so the switcher reads nothing of the screen's own.
+    func rememberScreen(_ kind: RecentScreen.Kind) {
+        let lines: [String]
+        switch kind {
+        case .todos:
+            var descriptor = FetchDescriptor<Todo>(predicate: #Predicate { !$0.done }, sortBy: [SortDescriptor(\.order)])
+            descriptor.fetchLimit = 5
+            lines = ((try? context?.fetch(descriptor)) ?? []).map(\.title)
+        case .shopping:
+            var descriptor = FetchDescriptor<ShoppingItem>(predicate: #Predicate { !$0.done }, sortBy: [SortDescriptor(\.order)])
+            descriptor.fetchLimit = 6
+            lines = ((try? context?.fetch(descriptor)) ?? []).map(\.title)
+        case .feed:
+            // In the page's own order, an event once: as News lays it out.
+            let shown = FeedStore.shared.blocks.flatMap { block -> [FeedStory] in
+                switch block {
+                case .lead(let item), .row(let item): item.stories.first.map { [$0] } ?? []
+                default: block.stories
+                }
+            }
+            lines = shown.filter { !$0.isRead }.prefix(5).map(\.story.title)
+        case .readLater:
+            lines = ReadLater.shared.unread.prefix(5).map(\.title)
+        case .answer:
+            return
+        }
+        RecentScreens.shared.left(kind, title: kind.name, lines: lines)
+    }
+
+    /// A closed answer gets its card, and its file, once a question in it is answered in full.
+    private func keepAnswer(_ session: BrowseSession) {
+        guard !session.isPrivate, let answer = session.keepable else { return }
+        // The card first: a file with no card can be swept up.
+        RecentScreens.shared.left(.answer, title: session.turns[0].query, lines: session.cardLines, id: session.answerID)
+        RecentAnswers.save(answer, id: session.answerID)
+    }
+
+    /// A card in the switcher, opened: the screen, or the answer as it was.
+    func openScreen(_ screen: RecentScreen) {
+        switch screen.kind {
+        case .todos: panel = .todos
+        case .feed: panel = .feed
+        case .shopping: panel = .shopping
+        case .readLater: panel = .readLater
+        case .answer:
+            guard let answer = RecentAnswers.load(screen.id) else {
+                RecentScreens.shared.remove(screen.id)
+                return
+            }
+            panel = .none
+            browseForMe = BrowseSession(restoring: answer, id: screen.id)
+        }
     }
 }
 

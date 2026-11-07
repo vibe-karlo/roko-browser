@@ -584,6 +584,25 @@ final class BrowseForMeModel: Identifiable {
         depth = ResearchDepth.of(query)
     }
 
+    /// An answer kept from before (RecentAnswers): finished, so there's nothing left to do.
+    init(restoring turn: SavedAnswer.Turn, context: [(question: String, answer: String)]) {
+        query = turn.query
+        self.context = context
+        depth = ResearchDepth.of(turn.query)
+        text = turn.text
+        sources = turn.sources.map { Source(url: $0.url, title: $0.title) }
+        images = turn.images
+        engine = turn.engine
+        phase = .done
+    }
+
+    /// What's kept of a finished answer once it's closed; nil before it's done.
+    var saved: SavedAnswer.Turn? {
+        guard phase == .done, !text.isEmpty else { return nil }
+        return SavedAnswer.Turn(query: query, text: text, engine: engine,
+                                sources: sources.map { SavedAnswer.SavedSource(url: $0.url, title: $0.title) }, images: images)
+    }
+
     /// Still finding: no answer text yet.
     var isWorking: Bool {
         switch phase {

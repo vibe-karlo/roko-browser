@@ -6,6 +6,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- To-do, News, Shopping, Saved and Browse for Me answers get a card in the tab switcher once you've had them open, beside the tab you were on, so they're a swipe away. A card is a few lines of text from the screen as you left it, not a picture or a screen kept running, and tapping it opens the screen. An answer comes back as it was, sources and all, with nothing asked again: the last five, for a week, never from private browsing, and cleared with your history. Throw a card up to close it; Close All takes them too, and Undo brings them back.
 - News: what you follow, each event once, on one composed page that ends. Stories several sites covered open as a comparison of what they agree on and where they differ. A story has Reader, Summary and the page itself in one switch.
 - Follow in News from any page's tools, or "follow" in the bar: the section you're on or the whole site. Sites without a feed are followed from their sitemap, their page's data or their page.
 - Newsletters in News: by their feed, or a private address to subscribe with or forward to.

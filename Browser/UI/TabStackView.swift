@@ -19,6 +19,33 @@ struct TabStackView: View {
     @State private var closedHere = false
     /// Where the + is on screen, for the launcher to grow out of.
     @State private var plusFrame: CGRect = .zero
+    /// The tab roko's screens' cards sit after: the one you were on as the switcher opened,
+    /// so the screen you just left is a swipe away. Held while it's open, so nothing moves.
+    @State private var anchor: BrowserTab.ID?
+
+    /// A card in the carousel: a tab, or one of roko's screens.
+    private enum Entry: Identifiable {
+        case tab(BrowserTab)
+        case screen(RecentScreen)
+        var id: UUID {
+            switch self {
+            case .tab(let tab): tab.id
+            case .screen(let screen): screen.id
+            }
+        }
+    }
+
+    /// Hidden with private browsing locked, as history is.
+    private var screens: [RecentScreen] { PrivacyLock.shared.isLocked ? [] : RecentScreens.shared.items }
+
+    private var entries: [Entry] {
+        var list = browser.tabs.map(Entry.tab)
+        let cards = screens.map(Entry.screen)
+        guard !cards.isEmpty else { return list }
+        let at = anchor.flatMap { id in list.firstIndex { $0.id == id } }.map { $0 + 1 } ?? list.count
+        list.insert(contentsOf: cards, at: at)
+        return list
+    }
 
     private let returnThreshold: CGFloat = 90
 
@@ -42,7 +69,7 @@ struct TabStackView: View {
                 // Pins live above the address field, not here.
                 Spacer(minLength: 0)
 
-                if browser.tabs.isEmpty {
+                if entries.isEmpty {
                     Text("No open tabs")
                         .font(.system(size: 15))
                         .foregroundStyle(Theme.secondaryInk)
@@ -72,7 +99,9 @@ struct TabStackView: View {
         // A thrown-away tab lands with a thud.
         .sensoryFeedback(.impact(weight: .medium), trigger: browser.tabs.count) { old, new in new < old }
         .onAppear {
-            focused = browser.selectedID ?? browser.tabs.last?.id
+            anchor = browser.selectedID ?? browser.tabs.last?.id
+            focused = browser.screenForSwitcher ?? browser.selectedID ?? entries.last?.id
+            browser.screenForSwitcher = nil
             closedHere = false
             throwsFrom = Date.now.addingTimeInterval(0.5)
         }
@@ -94,14 +123,21 @@ struct TabStackView: View {
                 // Lazily: with every tile made at once, every tab's picture was read at
                 // once, and most were thrown away again before they could be shown.
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(cardWidth), spacing: gap), count: columns), spacing: 16) {
-                    ForEach(browser.tabs) { tab in
-                        TabTile(tab: tab, width: cardWidth, height: cardHeight,
-                                isCurrent: tab.id == browser.selectedID,
-                                open: { open(tab) },
-                                close: { close(tab) },
-                                closeAll: closeAllAction,
-                                split: splitAction(with: tab))
-                        .id(tab.id)
+                    ForEach(entries) { entry in
+                        switch entry {
+                        case .tab(let tab):
+                            TabTile(tab: tab, width: cardWidth, height: cardHeight,
+                                    isCurrent: tab.id == browser.selectedID,
+                                    open: { open(tab) },
+                                    close: { close(tab) },
+                                    closeAll: closeAllAction,
+                                    split: splitAction(with: tab))
+                            .id(tab.id)
+                        case .screen(let screen):
+                            ScreenTile(screen: screen, width: cardWidth, height: cardHeight,
+                                       open: { open(screen) }, close: { close(screen) })
+                            .id(screen.id)
+                        }
                     }
                 }
                 .padding(.vertical, 14)
@@ -122,7 +158,7 @@ struct TabStackView: View {
                 reader.scrollTo(browser.selectedID, anchor: .center)
             }
             .onDisappear { BrowserTab.keepPictures(BrowserTab.usualPictures) }
-            .animation(.snappy(duration: 0.3), value: browser.tabs.map(\.id))
+            .animation(.snappy(duration: 0.3), value: entries.map(\.id))
         }
     }
 
@@ -132,17 +168,29 @@ struct TabStackView: View {
                           screenWidth: CGFloat, stacks: Bool) -> some View {
         ScrollView(.horizontal) {
             LazyHStack(alignment: .top, spacing: stride - cardWidth) {
-                let focusedIndex = browser.tabs.firstIndex { $0.id == focused } ?? 0
-                ForEach(Array(browser.tabs.enumerated()), id: \.element.id) { index, tab in
-                    TabCard(tab: tab, width: cardWidth, height: cardHeight,
-                            titleWidth: (stacks ? stride : cardWidth) - 8, isFocused: tab.id == focused,
-                            isBehind: stacks && index < focusedIndex, overlaps: stacks,
-                            showsNeighbourIcon: !stacks,
-                            throwsFrom: throwsFrom,
-                            open: { open(tab) },
-                            close: { close(tab) },
-                            closeAll: closeAllAction,
-                            split: splitAction(with: tab))
+                let all = entries
+                let focusedIndex = all.firstIndex { $0.id == focused } ?? 0
+                ForEach(Array(all.enumerated()), id: \.element.id) { index, entry in
+                    Group {
+                        switch entry {
+                        case .tab(let tab):
+                            TabCard(tab: tab, width: cardWidth, height: cardHeight,
+                                    titleWidth: (stacks ? stride : cardWidth) - 8, isFocused: tab.id == focused,
+                                    isBehind: stacks && index < focusedIndex, overlaps: stacks,
+                                    showsNeighbourIcon: !stacks,
+                                    throwsFrom: throwsFrom,
+                                    open: { open(tab) },
+                                    close: { close(tab) },
+                                    closeAll: closeAllAction,
+                                    split: splitAction(with: tab))
+                        case .screen(let screen):
+                            ScreenCard(screen: screen, width: cardWidth, height: cardHeight,
+                                       titleWidth: (stacks ? stride : cardWidth) - 8, isFocused: screen.id == focused,
+                                       isBehind: stacks && index < focusedIndex, overlaps: stacks,
+                                       showsNeighbourIcon: !stacks, throwsFrom: throwsFrom,
+                                       open: { open(screen) }, close: { close(screen) })
+                        }
+                    }
                     // As in Arc: tabs to the left sink back into a stack behind
                     // the focused card, smaller and tucked under it; the next tab
                     // on the right stays full size, laid over it. Drawn by the
@@ -164,12 +212,12 @@ struct TabStackView: View {
         .contentMargins(.horizontal, (screenWidth - cardWidth) / 2, for: .scrollContent)
         .scrollClipDisabled()
         .frame(height: cardHeight + 40)
-        .animation(.snappy(duration: 0.3), value: browser.tabs.map(\.id))
+        .animation(.snappy(duration: 0.3), value: entries.map(\.id))
     }
 
-    /// Nil with only one tab open.
+    /// Nil with only one tab open and nothing else here.
     private var closeAllAction: (() -> Void)? {
-        guard browser.tabs.count > 1 else { return nil }
+        guard browser.tabs.count > 1 || !screens.isEmpty && !browser.tabs.isEmpty else { return nil }
         return { closeAllTabs() }
     }
 
@@ -201,12 +249,26 @@ struct TabStackView: View {
         browser.panel = .none
     }
 
+    /// Keep a neighbour centred so the carousel doesn't jump to the start.
+    private func focusNeighbour(of id: UUID) {
+        let all = entries
+        guard focused == id, let index = all.firstIndex(where: { $0.id == id }) else { return }
+        let neighbours = all.indices.filter { $0 != index }
+        focused = neighbours.min { abs($0 - index) < abs($1 - index) }.map { all[$0].id }
+    }
+
+    private func open(_ screen: RecentScreen) {
+        browser.panel = .none
+        browser.openScreen(screen)
+    }
+
+    private func close(_ screen: RecentScreen) {
+        focusNeighbour(of: screen.id)
+        RecentScreens.shared.remove(screen.id)
+    }
+
     private func close(_ tab: BrowserTab) {
-        // Keep a neighbour centred so the carousel doesn't jump to the start.
-        if focused == tab.id, let index = browser.tabs.firstIndex(where: { $0.id == tab.id }) {
-            let neighbours = browser.tabs.indices.filter { $0 != index }
-            focused = neighbours.min { abs($0 - index) < abs($1 - index) }.map { browser.tabs[$0].id }
-        }
+        focusNeighbour(of: tab.id)
         browser.close(tab)
         browser.closedGroup = nil
         if !tab.isPrivate, tab.url != nil { closedHere = true }
@@ -221,7 +283,8 @@ struct TabStackView: View {
                 browser.reopenClosedGroup()
                 focused = browser.selectedID ?? browser.tabs.last?.id
             }) {
-                Text(group.tabs.count == 1 ? "1 tab closed" : "\(group.tabs.count) tabs closed")
+                Text(group.screens.isEmpty ? (group.tabs.count == 1 ? "1 tab closed" : "\(group.tabs.count) tabs closed")
+                     : "\(group.tabs.count + group.screens.count) closed")
                     .font(.system(size: 15, weight: .medium))
             }
         } else if closedHere, let closed = browser.recentlyClosed.last {
@@ -283,13 +346,16 @@ struct TabStackView: View {
 
     /// "3 of 12", under the cards. Digits that hold their place as you swipe.
     private var position: some View {
-        let index = (browser.tabs.firstIndex { $0.id == focused } ?? 0) + 1
-        return Text("\(index) of \(browser.tabs.count)")
+        // Counting tabs: on a screen's card it steps aside, keeping its room.
+        let index = browser.tabs.firstIndex { $0.id == focused }
+        return Text("\((index ?? 0) + 1) of \(browser.tabs.count)")
             .font(.system(size: 13, weight: .medium))
             .monospacedDigit()
             .foregroundStyle(Theme.secondaryInk)
             .contentTransition(.numericText())
             .animation(.snappy(duration: 0.2), value: index)
+            .opacity(index == nil ? 0 : 1)
+            .animation(.easeOut(duration: 0.15), value: index == nil)
             .padding(.bottom, 2)
     }
 
@@ -327,7 +393,7 @@ struct TabStackView: View {
                 Button { browser.panel = .readLater } label: { Label("Saved", image: "phosphor/readLater") }
                 Button { browser.panel = .todos } label: { Label(todosLabel, image: "phosphor/todo") }
                 Button { browser.panel = .settings } label: { Label("Settings", image: "phosphor/settings") }
-                if browser.tabs.count > 1 {
+                if browser.tabs.count > 1 || !screens.isEmpty && !browser.tabs.isEmpty {
                     Divider()
                     Button(role: .destructive) { closeAllTabs() } label: {
                         Label("Close All Tabs", image: "phosphor/close")
@@ -366,7 +432,7 @@ struct TabStackView: View {
 
     private func closeAllTabs() {
         browser.closeAllTabs()
-        focused = browser.selectedID ?? browser.tabs.last?.id
+        focused = browser.selectedID ?? entries.last?.id
     }
 
     private var pullUp: some Gesture {
@@ -650,5 +716,219 @@ private struct UpwardPan: UIGestureRecognizerRepresentable {
             let velocity = pan.velocity(in: pan.view)
             return velocity.y < 0 && abs(velocity.y) > abs(velocity.x) * 1.2
         }
+    }
+}
+
+// MARK: roko's screens
+
+private extension RecentScreen.Kind {
+    var glyph: Glyph.Kind {
+        switch self {
+        case .todos: .todo
+        case .feed: .news
+        case .shopping: .basket
+        case .readLater: .readLater
+        case .answer: .browse
+        }
+    }
+
+    /// Things to tick off, drawn with the ring they have on their screen.
+    var isList: Bool { self == .todos || self == .shopping }
+
+    var empty: String {
+        switch self {
+        case .todos: "Nothing left to do"
+        case .shopping: "Nothing on the list"
+        case .feed: "All read"
+        case .readLater: "Nothing to read"
+        case .answer: ""
+        }
+    }
+}
+
+/// What a screen's card shows: its name or question, and the first few things on it as you
+/// left it. Text, set as the screen sets it, on the screen's own paper.
+private struct ScreenFace: View {
+    let screen: RecentScreen
+    let width: CGFloat
+    let height: CGFloat
+    /// A tile in the wide grid: smaller type for a shorter card.
+    var compact = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: compact ? 6 : 10) {
+            Text(screen.kind == .answer ? screen.title : screen.kind.name)
+                .font(.system(size: screen.kind == .answer ? (compact ? 16 : 21) : (compact ? 20 : 30), weight: .bold))
+                .foregroundStyle(Theme.ink)
+                .lineLimit(3)
+                .padding(.bottom, compact ? 2 : 8)
+            if screen.lines.isEmpty {
+                Text(screen.kind.empty)
+                    .font(.system(size: compact ? 13 : 16))
+                    .foregroundStyle(Theme.secondaryInk)
+            }
+            ForEach(Array(screen.lines.enumerated()), id: \.offset) { _, line in
+                HStack(alignment: .top, spacing: 10) {
+                    if screen.kind.isList {
+                        // On the first line's middle: 16-point type stands about 21 points tall.
+                        Circle()
+                            .strokeBorder(Theme.secondaryInk.opacity(0.7), lineWidth: 1.5)
+                            .frame(width: compact ? 12 : 15, height: compact ? 12 : 15)
+                            .padding(.top, compact ? 2.5 : 3)
+                    }
+                    Text(line)
+                        .font(.system(size: compact ? 13 : 16))
+                        .foregroundStyle(screen.kind == .answer ? Theme.secondaryInk : Theme.ink)
+                        .lineLimit(screen.kind == .answer ? 4 : 2)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, compact ? 14 : 22)
+        .padding(.top, compact ? 14 : 30)
+        .frame(width: width, height: height, alignment: .topLeading)
+        .background(Theme.panel)
+        // What doesn't fit fades into the paper rather than being cut through a line.
+        .mask {
+            VStack(spacing: 0) {
+                Color.black
+                LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: height * 0.18)
+            }
+        }
+        .background(Theme.panel)
+        .environment(\.colorScheme, .dark)
+    }
+}
+
+/// A screen in the carousel, built like a tab's card: its name and close above, the card
+/// under them, thrown up to close.
+private struct ScreenCard: View {
+    let screen: RecentScreen
+    let width: CGFloat
+    let height: CGFloat
+    let titleWidth: CGFloat
+    let isFocused: Bool
+    var isBehind = false
+    var overlaps = true
+    var showsNeighbourIcon = false
+    var throwsFrom = Date.distantPast
+    let open: () -> Void
+    let close: () -> Void
+
+    @State private var throwOffset: CGFloat = 0
+    private let closeDistance: CGFloat = 140
+    private var corner: CGFloat { min(34, width * 0.16) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            header
+            card
+        }
+        .frame(width: width, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(screen.kind == .answer ? "Browse for Me: \(screen.title)" : screen.kind.name)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(.default, open)
+        .accessibilityAction(named: "Close", close)
+    }
+
+    private var header: some View {
+        HStack(spacing: 8) {
+            if isFocused || showsNeighbourIcon {
+                Glyph(screen.kind.glyph, size: 18).foregroundStyle(Theme.ink)
+            }
+            if isFocused {
+                Text(screen.kind.name)
+                    .font(.system(size: 14, weight: .medium))
+                    .lineLimit(1)
+                    .transition(.opacity)
+            }
+            Spacer(minLength: 0)
+            if isFocused {
+                Button(action: close) {
+                    Glyph(.close, size: 14, weight: 2)
+                        .foregroundStyle(Theme.secondaryInk)
+                        .frame(width: 44, height: 44)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(GlyphButtonStyle())
+                .padding(.trailing, -15)
+                .accessibilityLabel("Close")
+                .transition(.opacity)
+            }
+        }
+        .frame(width: titleWidth, height: 28, alignment: .leading)
+        .padding(.leading, 4)
+        .animation(.easeOut(duration: 0.18), value: isFocused)
+        .opacity(isBehind ? 0 : 1 + throwOffset / 200)
+        .animation(.easeOut(duration: 0.18), value: isBehind)
+    }
+
+    private var card: some View {
+        ScreenFace(screen: screen, width: width, height: height)
+            .clipShape(.rect(cornerRadius: corner))
+            .overlay(RoundedRectangle(cornerRadius: corner).strokeBorder(.white.opacity(0.08)))
+            .shadow(color: .black.opacity(overlaps ? 0.35 : 0), radius: 8, x: -5, y: 0)
+            .contentShape(.rect(cornerRadius: corner))
+            .onTapGesture(perform: open)
+            .contextMenu {
+                Button(role: .destructive, action: close) { Label("Close", image: "phosphor/close") }
+            }
+            .offset(y: throwOffset)
+            .opacity(1 + throwOffset / 700)
+            .sensoryFeedback(.impact(weight: .light), trigger: throwOffset < -closeDistance) { _, past in past }
+            .gesture(UpwardPan(
+                notBefore: throwsFrom,
+                changed: { throwOffset = min(0, $0) },
+                ended: { translation, velocity in
+                    if -translation > closeDistance || velocity < -900 {
+                        withAnimation(.easeIn(duration: 0.18)) { throwOffset = -1000 } completion: { close() }
+                    } else {
+                        withAnimation(.spring(duration: 0.3, bounce: 0.2)) { throwOffset = 0 }
+                    }
+                }))
+    }
+}
+
+/// A screen in the wide grid, as a tab's tile is: the card, and under it its name and close.
+private struct ScreenTile: View {
+    let screen: RecentScreen
+    let width: CGFloat
+    let height: CGFloat
+    let open: () -> Void
+    let close: () -> Void
+
+    var body: some View {
+        VStack(spacing: 6) {
+            ScreenFace(screen: screen, width: width, height: height, compact: true)
+                .clipShape(.rect(cornerRadius: 18))
+                .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(.white.opacity(0.08)) }
+                .contentShape(.rect(cornerRadius: 18))
+                .onTapGesture(perform: open)
+                .contextMenu {
+                    Button(role: .destructive, action: close) { Label("Close", image: "phosphor/close") }
+                }
+            HStack(spacing: 8) {
+                Glyph(screen.kind.glyph, size: 16).foregroundStyle(Theme.ink)
+                Text(screen.kind.name)
+                    .font(.system(size: 14, weight: .medium))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                Button(action: close) {
+                    Glyph(.close, size: 14, weight: 2)
+                        .foregroundStyle(Theme.secondaryInk)
+                        .frame(width: 44, height: TabTile.labelHeight - 6)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(GlyphButtonStyle())
+                .accessibilityLabel("Close")
+            }
+            .padding(.leading, 4)
+            .frame(width: width)
+            .contentShape(.rect)
+            .onTapGesture(perform: open)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(screen.kind == .answer ? "Browse for Me: \(screen.title)" : screen.kind.name)
     }
 }
